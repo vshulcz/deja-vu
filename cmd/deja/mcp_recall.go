@@ -620,12 +620,13 @@ type rankedRecall struct {
 // rankRecall runs the search recall serves from. context_search reads the
 // same ranking, so the two surfaces cannot disagree about what is relevant.
 func rankRecall(dir, q, harness, project string, window int) (rankedRecall, error) {
-	live, cut := liveLineageCut(dir)
-	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: live, ExcludeUpTo: cut, Window: window, Activation: policy.ActivationMCP, LoneWord: true}
+	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), Window: window, Activation: policy.ActivationMCP, LoneWord: true}
 	cov, err := index.EnsureForSearchCoverage(dir, o, mcpProgress())
 	if err != nil {
 		return rankedRecall{}, err
 	}
+	live, cut := liveLineageCut(dir)
+	o.ExcludeSessions, o.ExcludeUpTo = live, cut
 	if cov.Stale && !warmupRunning(dir) {
 		// A store rewrote itself (cline, cursor); rebuilding inline would
 		// blow the client's tool timeout, so refresh detached and serve the

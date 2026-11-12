@@ -123,13 +123,14 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 			return text, 1, id.size, []string{id.session}, nil, id.note, nil
 		}
 	}
-	live, cut := liveLineageCut(dir)
-	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: live, ExcludeUpTo: cut, Window: 1, Activation: policy.ActivationMCP}
+	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), Window: 1, Activation: policy.ActivationMCP}
 	if stale, err := index.EnsureForSearchStale(dir, o, mcpProgress()); err != nil {
 		return "", 0, 0, nil, nil, "", err
 	} else if stale && !warmupRunning(dir) {
 		requestWarmup(dir)
 	}
+	live, cut := liveLineageCut(dir)
+	o.ExcludeSessions, o.ExcludeUpTo = live, cut
 	result, err := index.SearchWithRecoveryDetailed(dir, o, mcpProgress())
 	if err != nil {
 		return "", 0, 0, nil, nil, "", err

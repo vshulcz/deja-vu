@@ -134,3 +134,164 @@ func TestOpenClawRecallKeepsAnOlderNewestSession(t *testing.T) {
 		t.Errorf("a session left 40 minutes ago was dropped as the asker:\n%s", out)
 	}
 }
+
+func claudeLine(id, role, cwd, text string, at time.Time) string {
+	body, err := json.Marshal(text)
+	if err != nil {
+		panic(err)
+	}
+	return fmt.Sprintf(`{"type":%q,"sessionId":%q,"cwd":%q,"timestamp":%q,"message":{"role":%q,"content":%s}}`,
+		role, id, cwd, at.UTC().Format(time.RFC3339), role, string(body))
+}
+
+func appendClaudeLine(t *testing.T, path, line string, at time.Time) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString(line + "\n"); err != nil {
+		_ = f.Close()
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(path, at, at); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// An MCP-only install (`deja install claude-code`, without `-auto`) writes no
+// hook entries, so nothing marks the live session, and recall answered with
+// the conversation asking (#6027) — even when the prompt line was appended to
+// JSONL after the initial index build.
+func TestMCPOnlyClaudeRecallAndContextLeaveOutUnstampedAsker(t *testing.T) {
+	tmp := hermeticEnv(t)
+	hostsNoWarmup(t)
+	t.Cleanup(func() { setMCPClient("") })
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+
+	proj := filepath.Join(tmp, "work", "billing")
+	otherProj := filepath.Join(tmp, "work", "analytics")
+	for _, p := range []string{proj, otherProj} {
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Chdir(proj)
+
+	now := time.Now()
+	old := now.Add(-2 * time.Hour)
+	priorPath := filepath.Join(root, "billing", "prior-cc.jsonl")
+	appendClaudeLine(t, priorPath, claudeLine("prior-cc", "user", proj, "decide the retry ceiling for HALCYON-9 webhooks", old), old)
+	appendClaudeLine(t, priorPath, claudeLine("prior-cc", "assistant", proj, "HALCYON-9 webhook retries cap at 4 attempts with exponential jitter.", old.Add(time.Minute)), old.Add(time.Minute))
+
+	// A session finished 2 minutes ago in the same project must still be
+	// eligible when a newer session asks right after it.
+	recentDone := now.Add(-2 * time.Minute)
+	donePath := filepath.Join(root, "billing", "done-cc.jsonl")
+	appendClaudeLine(t, donePath, claudeLine("done-cc", "user", proj, "verify HALCYON-9 dead-letter routing", recentDone), recentDone)
+	appendClaudeLine(t, donePath, claudeLine("done-cc", "assistant", proj, "HALCYON-9 dead-letter routing goes to billing-dlq.", recentDone.Add(10*time.Second)), recentDone.Add(10*time.Second))
+
+	// A brand-new session in ANOTHER project must not be mistaken for the asker
+	// in `proj`, nor hide `done-cc` if `done-cc` were the asker.
+	otherNow := now.Add(-2 * time.Second)
+	otherPath := filepath.Join(root, "analytics", "other-cc.jsonl")
+	appendClaudeLine(t, otherPath, claudeLine("other-cc", "user", otherProj, "unrelated analytics note", otherNow), otherNow)
+
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// Simulate the asking session created and appended AFTER initial index
+	// build, right before the MCP tool call arrives (so EnsureForSearch picks
+	// up the new turn first, and liveLineageCut must run after it).
+	const asker = "88a1bc23-4d5e-4f60-9a11-77bc88de9900"
+	askAt := now.Add(-5 * time.Second)
+	askerPath := filepath.Join(root, "billing", asker+".jsonl")
+	appendClaudeLine(t, askerPath, claudeLine(asker, "user", proj, "check HALCYON-9 retry ceiling and dead-letter routing", askAt), askAt)
+
+	for _, client := range []string{"claude-code", "Claude Code"} {
+		setMCPClient(client)
+		out, err := callMCPTool(dir, "recall", json.RawMessage(`{"query":"HALCYON-9 retry ceiling"}`))
+		if err != nil {
+			t.Fatalf("recall (%s): %v", client, err)
+		}
+		if strings.Contains(out, asker[:8]) {
+			t.Errorf("recall (%s) answered with the unstamped asking session:\n%s", client, out)
+		}
+		if !strings.Contains(out, "4 attempts") {
+			t.Errorf("recall (%s) missed the prior session holding the answer:\n%s", client, out)
+		}
+
+		// Two recent sessions in the same project: only the newest asking
+		// session is dropped; the 2-minute-old finished session still answers.
+		outDLQ, err := callMCPTool(dir, "recall", json.RawMessage(`{"query":"HALCYON-9 dead-letter routing"}`))
+		if err != nil {
+			t.Fatalf("recall dlq (%s): %v", client, err)
+		}
+		if strings.Contains(outDLQ, asker[:8]) {
+			t.Errorf("recall dlq (%s) returned the asking session:\n%s", client, outDLQ)
+		}
+		if !strings.Contains(outDLQ, "billing-dlq") {
+			t.Errorf("recall dlq (%s) dropped the 2-minute-old finished session too:\n%s", client, outDLQ)
+		}
+
+		ctxOut, err := callMCPTool(dir, "deja", json.RawMessage(`{"mode":"context","query":"HALCYON-9 retry ceiling"}`))
+		if err != nil {
+			t.Fatalf("context (%s): %v", client, err)
+		}
+		if strings.Contains(ctxOut, asker[:8]) {
+			t.Errorf("context (%s) answered with the unstamped asking session:\n%s", client, ctxOut)
+		}
+		if !strings.Contains(ctxOut, "4 attempts") {
+			t.Errorf("context (%s) missed the prior session holding the answer:\n%s", client, ctxOut)
+		}
+	}
+
+	// When the asking session is the ONLY session mentioning a brand-new token,
+	// recall must report no match instead of echoing the prompt back.
+	soleAt := now.Add(-1 * time.Second)
+	appendClaudeLine(t, askerPath, claudeLine(asker, "user", proj, "investigate ZIRCON-7741 handshake timeout", soleAt), soleAt)
+	setMCPClient("claude-code")
+	soleOut, err := callMCPTool(dir, "recall", json.RawMessage(`{"query":"ZIRCON-7741"}`))
+	if err != nil {
+		t.Fatalf("sole recall: %v", err)
+	}
+	if strings.Contains(soleOut, asker[:8]) || strings.Contains(soleOut, "handshake timeout") {
+		t.Errorf("sole-token recall echoed the asking session back:\n%s", soleOut)
+	}
+}
+
+func TestMCPClientHarnessesMapping(t *testing.T) {
+	cases := []struct {
+		client string
+		want   string
+	}{
+		{"claude-code", "claude"},
+		{"Claude Code", "claude"},
+		{"codex-mcp-client", "codex"},
+		{"cursor-vscode", "cursor"},
+		{"gemini-cli", "gemini"},
+		{"qwen-code", "qwen"},
+		{"opencode", "opencode"},
+		{"roo-cline", "roo"},
+		{"zoo-code", "roo"},
+		{"kilo-code", "kilocode"},
+		{"openclaw-bundle-mcp", "openclaw"},
+		{"", ""},
+		{"deja-shell-verify", ""},
+		{"unknown-custom-client", ""},
+	}
+	for _, tc := range cases {
+		got := strings.Join(mcpClientHarnesses(tc.client), ",")
+		if got != tc.want {
+			t.Errorf("mcpClientHarnesses(%q) = %q, want %q", tc.client, got, tc.want)
+		}
+	}
+}

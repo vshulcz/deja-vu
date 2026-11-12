@@ -261,6 +261,13 @@ func liveLineage(dir string) map[string]bool {
 // leaves on the page that a live session shares turns with (#5335).
 func liveLineageCut(dir string) (map[string]bool, map[string]time.Time) {
 	ids := liveSessionIDs(dir)
+	if asker := mcpUnstampedAsker(dir); asker != "" {
+		ids = maps.Clone(ids)
+		if ids == nil {
+			ids = map[string]bool{}
+		}
+		ids[asker] = true
+	}
 	var wholes []model.Session
 	for id := range ids {
 		if isSpawnedReader(id) || index.HasSession(dir, id) {
@@ -429,13 +436,6 @@ func spawnParent(sid string) string {
 // on a page of five (#3945).
 func withoutLiveSessions(dir string, ss []model.Session) []model.Session {
 	live := liveLineage(dir)
-	if asker := openclawUnstampedAsker(dir); asker != "" {
-		live = maps.Clone(live)
-		if live == nil {
-			live = map[string]bool{}
-		}
-		live[asker] = true
-	}
 	if len(live) == 0 {
 		return ss
 	}
