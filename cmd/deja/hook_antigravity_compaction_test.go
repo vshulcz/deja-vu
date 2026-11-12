@@ -78,3 +78,36 @@ func TestAntigravityCompactionIsCaughtUpAtTheNextInvocation(t *testing.T) {
 		t.Fatalf("expected 1 measured Antigravity compaction recovery with 1 action before edit, got %+v", sum)
 	}
 }
+
+func TestLatestToolFailureFromStepsParsesAntigravityAndMCPFormats(t *testing.T) {
+	steps := []transcriptStep{
+		{
+			Type:    "GENERIC",
+			Content: "Command exited with code 1.\nCommand output:\ninternal/parser/parse.go:42:2: assignment mismatch: 3 variables but ParseToken returns 2 values",
+		},
+	}
+	got := latestToolFailureFromSteps(steps)
+	if !strings.Contains(got, "assignment mismatch: 3 variables but ParseToken returns 2 values") {
+		t.Fatalf("expected Command exited with code 1 format to extract output, got %q", got)
+	}
+
+	mcpSteps := []transcriptStep{
+		{
+			Type:    "GENERIC",
+			Content: "[cmd direct | exit=1 | 120ms]\n--- FAIL: TestParseToken (0.01s)",
+		},
+	}
+	if gotMCP := latestToolFailureFromSteps(mcpSteps); !strings.Contains(gotMCP, "--- FAIL: TestParseToken") {
+		t.Fatalf("expected MCP exit=1 format to extract output, got %q", gotMCP)
+	}
+
+	okSteps := []transcriptStep{
+		{
+			Type:    "GENERIC",
+			Content: "Command exited with code 0.\nCommand output:\nPASS",
+		},
+	}
+	if gotOK := latestToolFailureFromSteps(okSteps); gotOK != "" {
+		t.Fatalf("expected exit 0 to return empty failure, got %q", gotOK)
+	}
+}

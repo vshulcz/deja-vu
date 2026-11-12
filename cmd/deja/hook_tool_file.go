@@ -1342,17 +1342,20 @@ func parseDeclarationLine(line string) (string, string) {
 }
 
 // changedDeclarationSymbols returns declared symbols in editText whose
-// signature line differs from the declaration currently on disk in path.
+// signature line differs between the before/after snippets in editText or
+// differs from the declaration currently on disk in path.
 func changedDeclarationSymbols(cwd, path, editText string) []string {
 	if path == "" || editText == "" {
 		return nil
 	}
+	firstSigs := map[string]string{}
 	editSigs := map[string]string{}
 	var editOrder []string
 	for line := range strings.SplitSeq(editText, "\n") {
 		if id, sig := parseDeclarationLine(line); id != "" && sig != "" {
 			if _, exists := editSigs[id]; !exists {
 				editOrder = append(editOrder, id)
+				firstSigs[id] = sig
 			}
 			editSigs[id] = sig
 		}
@@ -1360,22 +1363,24 @@ func changedDeclarationSymbols(cwd, path, editText string) []string {
 	if len(editOrder) == 0 {
 		return nil
 	}
+	diskSigs := map[string]string{}
 	diskPath := path
 	if !filepath.IsAbs(diskPath) && cwd != "" {
 		diskPath = filepath.Join(cwd, diskPath)
 	}
-	raw, err := os.ReadFile(diskPath)
-	if err != nil || len(raw) > 2<<20 {
-		return nil
-	}
-	diskSigs := map[string]string{}
-	for line := range strings.SplitSeq(string(raw), "\n") {
-		if id, sig := parseDeclarationLine(line); id != "" && sig != "" {
-			diskSigs[id] = sig
+	if raw, err := os.ReadFile(diskPath); err == nil && len(raw) <= 2<<20 {
+		for line := range strings.SplitSeq(string(raw), "\n") {
+			if id, sig := parseDeclarationLine(line); id != "" && sig != "" {
+				diskSigs[id] = sig
+			}
 		}
 	}
 	var changed []string
 	for _, id := range editOrder {
+		if firstSigs[id] != editSigs[id] {
+			changed = append(changed, id)
+			continue
+		}
 		if diskSig, ok := diskSigs[id]; ok && diskSig != editSigs[id] {
 			changed = append(changed, id)
 		}
@@ -2368,4 +2373,73 @@ func commonSuffixLength(a, b string) int {
 		}
 	}
 	return n
+}
+
+const (
+	missingFileLocatedLabel = " — file not at requested path, located in repo: "
+	missingFileSiblingLabel = " — file does not exist here; sibling files: "
+)
+
+// missingFileHintLine inspects a read or edit target path that does not exist
+// on disk and points the agent to either the file's real path in the
+// repository or existing sibling files sharing the same stem in that directory.
+func missingFileHintLine(cwd, path, toolName string) string {
+	if cwd == "" || path == "" || isFileCreationTool(toolName) {
+		return ""
+	}
+	diskPath := path
+	if !filepath.IsAbs(diskPath) {
+		diskPath = filepath.Join(cwd, diskPath)
+	}
+	if _, err := os.Stat(diskPath); !os.IsNotExist(err) {
+		return ""
+	}
+	scanRoot := sources.RepoRoot(cwd)
+	if scanRoot == "" {
+		scanRoot = cwd
+	}
+	base := filepath.Base(diskPath)
+	tree := orientRepoTree(scanRoot)
+	if resolved := tree.resolveRel(base); resolved != "" {
+		return missingFileLocatedLabel + search.SafePath(resolved)
+	}
+	dirPath := filepath.Dir(diskPath)
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return ""
+	}
+	ext := strings.ToLower(filepath.Ext(base))
+	stem := strings.ToLower(strings.TrimSuffix(base, filepath.Ext(base)))
+	if len(stem) < 3 {
+		return ""
+	}
+	var siblings []string
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if !strings.EqualFold(filepath.Ext(name), ext) {
+			continue
+		}
+		candStem := strings.ToLower(strings.TrimSuffix(name, filepath.Ext(name)))
+		if commonPrefixLength(stem, candStem) >= 4 || commonSuffixLength(stem, candStem) >= 4 || levenshteinDistance(stem, candStem) <= 2 {
+			siblings = append(siblings, search.SafePath(name))
+			if len(siblings) == 3 {
+				break
+			}
+		}
+	}
+	if len(siblings) > 0 {
+		return missingFileSiblingLabel + strings.Join(siblings, ", ")
+	}
+	return ""
+}
+
+func isFileCreationTool(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "write", "write_file", "write_to_file", "create", "create_file", "fs_write", "fs_append", "notebookedit", "notebook_edit":
+		return true
+	}
+	return false
 }

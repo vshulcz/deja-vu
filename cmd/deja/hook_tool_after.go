@@ -545,7 +545,7 @@ func fixPairLineFor(dir, cwd, command, output string) string {
 		if near == "" {
 			continue
 		}
-		for _, p := range index.FixesFor(dir, near, 4, allowHere) {
+		for _, p := range index.FixesForCommand(dir, command, near, 4, allowHere) {
 			if orientSkipFixPairForHook(p) {
 				continue
 			}
@@ -778,6 +778,9 @@ func compilerSymbolSignatureLine(cwd, output string, pol policy.Policy) string {
 		"not enough arguments in call to ",
 		"too many arguments in call to ",
 		"in argument to ",
+		" variables but ",
+		" variable but ",
+		" return values of ",
 		"undefined: ",
 		"has no field or method ",
 		"cannot import name '",
@@ -875,6 +878,13 @@ func orientSkipFixPairForHook(p index.FixPair) bool {
 		if orientDestructiveRemedy(cmd) || !orientTestRemedyMatchesFail(p.Error, cmd) {
 			return true
 		}
+		return false
+	}
+	edit := strings.TrimSpace(search.SafeLine(p.Edit))
+	if edit != "" && p.Symbol == "" && p.Why == "" {
+		if orientTautologicalEdit(p.Error, edit) {
+			return true
+		}
 	}
 	return false
 }
@@ -913,8 +923,30 @@ func nearErrorProbesFromOutput(output string) []string {
 				break
 			}
 		}
+		if msg := stripFileLineColDiagnostic(line); msg != "" {
+			add(msg)
+		}
 	}
 	return probes
+}
+
+func stripFileLineColDiagnostic(line string) string {
+	idx := strings.Index(line, ": ")
+	if idx <= 0 {
+		return ""
+	}
+	loc, msg := line[:idx], strings.TrimSpace(line[idx+2:])
+	if len(msg) < 12 || strings.ContainsAny(loc, " \t") || !strings.ContainsAny(loc, "./\\") {
+		return ""
+	}
+	parts := strings.Split(loc, ":")
+	if len(parts) < 2 {
+		return ""
+	}
+	if _, err := strconv.Atoi(parts[len(parts)-1]); err != nil {
+		return ""
+	}
+	return msg
 }
 
 // frictionCount is how many sessions hit this error, scoped the way the line
