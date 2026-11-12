@@ -29,6 +29,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -233,15 +234,16 @@ func main() {
 	if *limit > 0 && len(qs) > *limit {
 		qs = qs[:*limit]
 	}
+	if *corpus <= 0 {
+		all = qs
+	}
+	dedupeCorpus(all, qs)
 	if *keep != "" {
 		if err := keepCorpus(*keep, all, qs); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1) //nolint:gocritic // a failed run has no profile worth flushing
 		}
 		fmt.Printf("kept: %s/home (claude + codex layout), %s/questions.json\n", *keep, *keep)
-	}
-	if *corpus <= 0 {
-		all = qs
 	}
 
 	for _, w := range writers() {
@@ -472,4 +474,57 @@ func keepCorpus(dir string, all, qs []question) error {
 		return err
 	}
 	return os.WriteFile(filepath.Join(dir, "questions.json"), b, 0o644)
+}
+
+// dedupeCorpus collapses sessions in all that carry the exact same turn list
+// under different session IDs onto the first ID seen for that content, and
+// rewrites AnswerSession in qs to match. LongMemEval shares distractor and
+// answer sessions across questions under new IDs; pooling haystacks by ID alone
+// writes verbatim copies that split top-rank credit on tie-breaks.
+func dedupeCorpus(all, qs []question) {
+	canonByHash := make(map[[32]byte]string)
+	canonByID := make(map[string]string)
+	for qi, q := range all {
+		ids := make([]string, len(q.SessionIDs))
+		for i, turns := range q.Sessions {
+			id := q.SessionIDs[i]
+			h := hashTurns(turns)
+			canon, ok := canonByHash[h]
+			if !ok {
+				canon = id
+				canonByHash[h] = canon
+			}
+			if _, seen := canonByID[id]; !seen {
+				canonByID[id] = canon
+			}
+			ids[i] = canon
+		}
+		q.SessionIDs = ids
+		all[qi] = q
+	}
+	for qi := range qs {
+		ans := make([]string, 0, len(qs[qi].AnswerSession))
+		for _, id := range qs[qi].AnswerSession {
+			if canon, ok := canonByID[id]; ok {
+				id = canon
+			}
+			if !slices.Contains(ans, id) {
+				ans = append(ans, id)
+			}
+		}
+		qs[qi].AnswerSession = ans //nolint:gosec // qi is bounded by range qs
+	}
+}
+
+func hashTurns(turns []turn) [32]byte {
+	h := sha256.New()
+	for _, t := range turns {
+		_, _ = h.Write([]byte(t.Role))
+		_, _ = h.Write([]byte{0})
+		_, _ = h.Write([]byte(t.Content))
+		_, _ = h.Write([]byte{'\n'})
+	}
+	var sum [32]byte
+	copy(sum[:], h.Sum(nil))
+	return sum
 }
