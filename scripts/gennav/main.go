@@ -89,6 +89,7 @@ var groups = []group{
 		{"delete-continue-session-history.html", "Continue"},
 		{"delete-kiro-session-history.html", "Kiro"},
 		{"delete-kimi-code-session-history.html", "Kimi Code"},
+		{"delete-dsh-session-history.html", "dsh"},
 		{"delete-commandcode-session-history.html", "Command Code"},
 		{"delete-junie-session-history.html", "Junie"},
 		{"delete-goose-session-history.html", "Goose"},

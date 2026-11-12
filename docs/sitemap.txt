@@ -193,3 +193,4 @@ https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html
 https://vshulcz.github.io/deja-vu/zh/guide/claude-mem-alternative.html
 https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html
 https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html
+https://vshulcz.github.io/deja-vu/guide/delete-dsh-session-history.html

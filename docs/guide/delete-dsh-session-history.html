@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delete DeepSeek Harness session history — deja-vu</title>
+<meta name="description" content="DeepSeek Harness (dsh) keeps each session in its own directory. Find it, remove one session or all, and what deja does not touch.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-dsh-session-history.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Delete DeepSeek Harness session history">
+<meta property="og:description" content="DeepSeek Harness (dsh) keeps each session in its own directory. Find it, remove one session or all, and what deja does not touch.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-dsh-session-history.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Delete DeepSeek Harness session history">
+<meta name="twitter:description" content="DeepSeek Harness (dsh) keeps each session in its own directory. Find it, remove one session or all, and what deja does not touch.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete DeepSeek Harness session history","description":"DeepSeek Harness (dsh) keeps each session in its own directory. Find it, remove one session or all, and what deja does not touch.","url":"https://vshulcz.github.io/deja-vu/guide/delete-dsh-session-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished":"2026-11-10","dateModified": "2026-11-12","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="nav-cta" href="https://github.com/vshulcz/deja-vu"><span class="star-ic" aria-hidden="true">★</span>GitHub</a></nav>
+<div class="wrap"><div class="doc"><aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="switch-agents-without-losing-context.html">Session handoffs</a>
+<a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="one-rules-file.html">One rules file</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold"><summary>Session history <span class="n">13</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="codex-history.html">Codex history</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="repo-memory.html">Repo memory</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="recover-overwritten-files.html">Recover overwritten files</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
+</details>
+<details class="grpfold" open><summary>Deleting sessions <span class="n">35</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb too large</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-copilot-cli-session-history.html">Copilot CLI</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-roo-task-history.html">Roo Code</a>
+<a href="delete-zed-thread-history.html">Zed</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+<a href="delete-kimi-code-session-history.html">Kimi Code</a>
+<a href="delete-dsh-session-history.html" aria-current="page">dsh</a>
+<a href="delete-commandcode-session-history.html">Command Code</a>
+<a href="delete-junie-session-history.html">Junie</a>
+<a href="delete-goose-session-history.html">Goose</a>
+<a href="delete-windsurf-cascade-history.html">Windsurf</a>
+<a href="delete-qwen-code-chat-history.html">Qwen Code</a>
+<a href="delete-trae-sessions.html">TRAE CLI</a>
+<a href="delete-codebuddy-sessions.html">CodeBuddy</a>
+<a href="delete-antigravity-history.html">Antigravity</a>
+<a href="delete-pi-session-history.html">pi</a>
+<a href="delete-senpi-session-history.html">Senpi</a>
+<a href="delete-crush-session-history.html">Crush</a>
+<a href="delete-hermes-session-history.html">Hermes</a>
+<a href="delete-cherrystudio-session-history.html">Cherry Studio</a>
+<a href="delete-codewhale-session-history.html">CodeWhale</a>
+<a href="delete-aider-chat-history.html">aider</a>
+<a href="delete-openclaw-session-history.html">OpenClaw</a>
+<a href="delete-grok-session-history.html">Grok Build</a>
+</details>
+<details class="grpfold"><summary>Per-agent guides <span class="n">43</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codebuddy.html">CodeBuddy Code</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-devin.html">Devin CLI</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-jetbrains.html">JetBrains AI Assistant</a>
+<a href="memory-for-junie.html">Junie</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-mcode.html">MiniMax Code</a>
+<a href="memory-for-muse.html">Muse Code</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-trae.html">TRAE CLI</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-windsurf.html">Windsurf</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="mem0-alternative.html">Mem0 alternative</a>
+<a href="specstory-alternative.html">SpecStory alternative</a>
+<a href="basic-memory-alternative.html">Basic Memory alternative</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside><article>
+<h1>How to delete DeepSeek Harness (dsh) session history, and what you lose</h1>
+<p class="pagelede">Each session is a directory holding a compressed log; remove the whole directory<span class="mins" data-mins></span></p>
+<p>dsh keeps one directory per session, and the conversation is a zstd-compressed JSONL log inside it. Delete the directory, not just the log.</p>
+
+<h2>Where the sessions are</h2>
+<pre>${DSH_HOME:-~/.dsh}/sessions/&lt;workspace-slug&gt;/session-&lt;uuid&gt;/
+  session.v4.jsonl.zstd</pre>
+<p>Older dsh builds wrote <code>session.v3.jsonl.zstd</code>. When dsh opens an older session it writes the history into a new-generation file and leaves the old one beside it, so one session directory can hold several logs. Setting <code>DSH_HOME</code> moves the whole tree. <code>&lt;workspace-slug&gt;</code> groups sessions by the workspace they ran in.</p>
+<p>Cherry Studio embeds its own dsh store under <code>&lt;app data&gt;/CherryStudio/Data/Agents/.dsh</code>, with the same layout.</p>
+
+<h2>How to delete one session</h2>
+<p>Close dsh first so a running session cannot rewrite its files, then remove the session's directory:</p>
+<pre>rm -r "${DSH_HOME:-$HOME/.dsh}/sessions/&lt;workspace-slug&gt;/session-&lt;uuid&gt;"</pre>
+<p>Remove the whole directory so no older-generation log is left beside the new one.</p>
+<p>To clear everything, remove the <code>sessions</code> directory. That removes every session of every workspace; the rest of <code>${DSH_HOME:-~/.dsh}</code>, such as plugins and configuration, is not touched.</p>
+
+<h2>Delete one session with deja</h2>
+<p>If deja is installed, run <code>deja last</code> and copy the session id. Preview the deletion, then run it from a terminal and confirm:</p>
+<pre>deja delete &lt;id&gt; --dry-run
+deja delete &lt;id&gt;</pre>
+<p>The dry run lists the paths without removing them. After confirmation, deja removes those paths and forgets its own copy of the session. This cannot be undone. It removes the whole <code>session-&lt;uuid&gt;</code> directory, including older-generation logs. deja refuses deletion if a file or directory to be removed was written in the last 5 minutes; end the session and wait before deleting it. deja still indexes Cherry Studio's embedded <code>.dsh</code> sessions under the <code>cherrystudio</code> harness, but <code>deja delete</code> does not support that harness, so delete them by hand as above. See <a href="delete-cherrystudio-session-history.html">Delete Cherry Studio session history</a>.</p>
+
+<h2>What you lose</h2>
+<p>The conversation, the tool calls and results, and the directory that identifies the session. dsh cannot bring a deleted session back unless you have a separate backup.</p>
+
+<h2>Keeping it searchable instead</h2>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads dsh sessions, alongside the other agents' histories, into one local index:</p>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja "dsh session about the refactor"</pre>
+<p>Indexing and search stay local, credentials are stripped, and <code>deja forget</code> removes a session from the index when you do want it gone. deja reads <code>DSH_HOME</code> too; <code>DEJA_DEEPSEEK_ROOT</code> overrides it for deja's reads only, so set it to point deja at a copy or a backup of the tree.</p>
+<p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-dsh.html">Memory for dsh</a> · <a href="../registry/deepseek.html">The dsh format</a></p>
+<nav class="related-guides" aria-label="Related guides"><p><b>Related guides:</b> <a href="memory-for-dsh.html">Memory for dsh</a> · <a href="../registry/deepseek.html">dsh format</a> · <a href="getting-started.html">Getting started</a> · <a href="day-zero.html">Day zero</a> · <a href="switching-agents.html">Switching agents</a> · <a href="sync-across-machines.html">Sync across machines</a> · <a href="compare.html">Compare memory tools</a> · <a href="claude-mem-alternative.html">claude-mem alternative</a> · <a href="memory-for-claude-code.html">Claude Code</a> · <a href="memory-for-codex.html">Codex</a> · <a href="memory-for-cursor.html">Cursor</a> · <a href="memory-for-opencode.html">opencode</a> · <a href="memory-for-gemini.html">Gemini CLI</a> · <a href="agents.html">Agents &amp; MCP</a></p></nav>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article></div></div>
+</body></html>
