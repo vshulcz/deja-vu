@@ -229,7 +229,7 @@ $ deja "jwt refresh token"
 자세한 내용은 [압축 이후 자동 복구](../../docs/compaction.md)에 있습니다.
 
 Claude Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
-Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
+Grok Build · Hermes · Goose · Qwen Code · Qoder · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
 Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·

@@ -235,7 +235,7 @@ rm -r "$base/Data/Agents/.claude/projects" \
 <p>The prompts, the replies, and the tool calls of every session whose file you removed. Cherry Studio can no longer reopen them, and there is no archive directory to restore from. What <code>deja index</code> stored before the removal is the copy that remains searchable.</p>
 
 <h2>Keeping it searchable instead</h2>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads those three stores — along with the other forty-two agents' histories on the machine — into one local index, searchable from the shell and from Cherry Studio once the MCP server is imported:</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads those three stores — along with the other forty-three agents' histories on the machine — into one local index, searchable from the shell and from Cherry Studio once the MCP server is imported:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja index
 deja "cherry studio session about the migration"</pre>

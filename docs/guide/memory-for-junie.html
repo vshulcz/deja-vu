@@ -175,7 +175,7 @@
 <h1>Adding memory to Junie</h1>
 <p class="pagelede">MCP and Claude-schema hooks in <code>~/.junie</code>, with the digest on the first prompt<span class="mins" data-mins></span></p>
 
-<p>JetBrains' Junie — both the <code>junie</code> CLI and the agent AI Assistant runs in the IDE — records every session under <code>~/.junie/sessions</code> and opens the next one without it, or anything from the other forty-two coding agents on the machine.</p>
+<p>JetBrains' Junie — both the <code>junie</code> CLI and the agent AI Assistant runs in the IDE — records every session under <code>~/.junie/sessions</code> and opens the next one without it, or anything from the other forty-three coding agents on the machine.</p>
 
 <h2>What Junie already has</h2>
 <p>Each session is an event log at <code>${JUNIE_HOME:-~/.junie}/sessions/&lt;session-id&gt;/events.jsonl</code>, listed with its <code>projectDir</code> and <code>taskName</code> in <code>sessions/index.jsonl</code>. Setting <code>JUNIE_HOME</code> moves the whole store. Resuming a session runs <code>cd &lt;projectDir&gt; &amp;&amp; junie --session-id &lt;id&gt; --resume</code>.</p>
@@ -194,7 +194,7 @@
 <p>A project's own <code>.junie/config.json</code> hooks run beside these once the project is trusted.</p>
 
 <h2>The part that is not about this harness</h2>
-<p>The index covers every agent's transcripts on the machine — forty-three of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code or Cursor answers a question asked in Junie. Indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+<p>The index covers every agent's transcripts on the machine — forty-four of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code or Cursor answers a question asked in Junie. Indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
 
 <p><a href="getting-started.html">Getting started</a> · <a href="delete-junie-session-history.html">Deleting Junie session history</a> · <a href="../registry/junie.html">How Junie's store is read</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>

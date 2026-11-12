@@ -234,7 +234,7 @@ chamadas de ferramenta entre a compactação e a primeira edição, que foi com 
 Detalhes em [recuperação depois da compactação](../../docs/compaction.md).
 
 Claude Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
-Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
+Grok Build · Hermes · Goose · Qwen Code · Qoder · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
 Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·

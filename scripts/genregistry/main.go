@@ -1,7 +1,7 @@
 // Command genregistry renders the session-format registry into pages a search
 // engine can read.
 //
-// The registry documents where forty-three coding agents keep their history and
+// The registry documents where forty-four coding agents keep their history and
 // what is in those files. That is the one question people put to a search
 // engine in their own words — "where does Claude Code store conversations" —
 // and the answer sat in docs/registry as raw .md, which GitHub Pages serves as

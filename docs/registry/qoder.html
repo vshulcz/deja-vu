@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Qoder stores its history — session format</title>
+<meta name="description" content="Where Qoder writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/qoder.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where Qoder stores its history — session format">
+<meta property="og:description" content="Where Qoder writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/qoder.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where Qoder stores its history — session format">
+<meta name="twitter:description" content="Where Qoder writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Qoder writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Qoder session format","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/qoder.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/qoder.html","name":"Qoder session format","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="nav-cta" href="https://github.com/vshulcz/deja-vu"><span class="star-ic" aria-hidden="true">★</span>GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="amp.html">Amp</a><a href="antigravity.html">Antigravity</a><a href="cherrystudio.html">Cherry Studio</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codebuddy.html">CodeBuddy Code</a><a href="codewhale.html">CodeWhale</a><a href="codex.html">Codex CLI</a><a href="commandcode.html">Command Code</a><a href="continue.html">Continue</a><a href="copilot.html">Copilot CLI</a><a href="crush.html">Crush</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="devin.html">Devin CLI</a><a href="gjc.html">gajae-code</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="jetbrains.html">JetBrains AI Assistant</a><a href="junie.html">Junie</a><a href="kilocode.html">Kilo Code</a><a href="kimchi.html">Kimchi Coding</a><a href="kimi.html">Kimi Code</a><a href="kiro.html">Kiro</a><a href="mcode.html">MiniMax Code</a><a href="muse.html">Muse Code</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qoder.html" aria-current="page">Qoder</a><a href="qwen.html">Qwen Code</a><a href="reasonix.html">Reasonix</a><a href="roo.html">Roo Code</a><a href="senpi.html">Senpi</a><a href="trae.html">TRAE CLI</a><a href="copilot-chat.html">VS Code Copilot Chat</a><a href="windsurf.html">Windsurf / Devin Desktop</a><a href="zcode.html">ZCode</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>Qoder session format</h1>
+<h2 id="store-and-files">Store and files</h2>
+<p>Qoder — Alibaba&#39;s AI IDE and CLI — writes CLI sessions below</p>
+<p><code>${DEJA_QODER_ROOT:-~/.qoder}/projects/&lt;encoded-project&gt;/&lt;session-uuid&gt;.jsonl</code>.</p>
+<p>The project directory uses the same slash-and-hyphen encoding as Claude Code</p>
+<p>(<code>-Users-x-code-app</code>). Unlike Qwen Code there is no <code>chats/</code> level: the</p>
+<p>transcript sits directly in the project directory. Lines carry an</p>
+<p><code>isSidechain</code> flag, the field Claude Code uses to mark sub-agent turns inside</p>
+<p>the session file itself.</p>
+<p>The Qoder configuration directory remains <code>~/.qoder</code> for the CLI&#39;s own</p>
+<p>settings (<code>agents/</code>, <code>commands/</code>, hooks, ...). <code>DEJA_QODER_ROOT</code> relocates</p>
+<p>session reads only.</p>
+<p>The Qoder <strong>IDE</strong> (a VS Code fork) keeps its chats elsewhere: as</p>
+<p><code>aicoding-chat-&lt;uuid&gt;</code> entries in</p>
+<p><code>~/Library/Application Support/Qoder/User/globalStorage/state.vscdb</code> plus an</p>
+<p><code>aicoding.aicoding-agent</code> global-storage directory. That store is not parsed</p>
+<p>today; this entry covers the CLI&#39;s transcripts only.</p>
+<h2 id="records">Records</h2>
+<p>Each line is Claude Code-shaped JSON: <code>type</code> (<code>user</code>, <code>assistant</code>,</p>
+<p><code>progress</code>, ...), <code>sessionId</code>, <code>uuid</code>, <code>parentUuid</code>, <code>timestamp</code>, <code>cwd</code>,</p>
+<p><code>version</code>, <code>isSidechain</code>, <code>permissionMode</code>, and a <code>message</code> object whose</p>
+<p><code>content</code> is a string or a list of content blocks. Observed on Qoder CLI</p>
+<p>transcripts written from 2026-04 onward.</p>
+<pre><code class="language-json">{&#34;type&#34;:&#34;user&#34;,&#34;sessionId&#34;:&#34;3f2b7c1e-0a5d-4b62-9e84-1c2d3e4f5a6b&#34;,&#34;cwd&#34;:&#34;/workspace/demo&#34;,&#34;timestamp&#34;:&#34;2026-07-17T09:00:00Z&#34;,&#34;uuid&#34;:&#34;a0000000-0000-4000-8000-000000000001&#34;,&#34;parentUuid&#34;:null,&#34;isSidechain&#34;:false,&#34;version&#34;:&#34;1.0.0&#34;,&#34;message&#34;:{&#34;role&#34;:&#34;user&#34;,&#34;content&#34;:&#34;...&#34;}}</code></pre>
+<p>The Claude decoder reads these lines, so role mapping, timestamp handling,</p>
+<p>tool records and side-chain behaviour are exactly as described in</p>
+<p><a href="claude-code.html">claude-code.md</a>; only the harness attribution differs —</p>
+<p>sessions are indexed as <code>qoder</code>, never as <code>claude</code>. <code>progress</code> lines (hook</p>
+<p>events such as <code>SessionStart</code>) carry no message and are skipped like their</p>
+<p>Claude counterparts.</p>
+<h2 id="wiring">Wiring</h2>
+<p>Nothing is wired yet: no MCP install target, no auto-recall hooks, no skill</p>
+<p>or command install, and no resume support. This entry covers the reader —</p>
+<p>search, recall, blame and digest over indexed Qoder history work because the</p>
+<p>sessions are ordinary transcripts once parsed. The Qoder CLI&#39;s hook and MCP</p>
+<p>surface has not been verified; wiring is follow-up work.</p>
+<h2 id="resume">Resume</h2>
+<p>Not supported. deja does not know a Qoder command that reopens a session by</p>
+<p>id, so handoff falls back to paste.</p>
+<p><strong>Last verified:</strong> 2026-11-10</p>
+
+<hr>
+<p>deja reads this format and 43 others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

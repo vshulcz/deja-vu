@@ -108,7 +108,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 <p>如果没有它的话，能不能召回取决于智能体自己决定去不去搜。钩子把这个决定提前了：会话一开就带着这个项目已经定下来的东西，于是第一轮不用花在重新推导上。Claude Code 还会在压缩之前把会话记录交给钩子，而那是唯一一道让工作上下文能被救回来的缝：deja 留下任务、结论、每条命令以及它是否通过、还有什么没结，并在摘要落地之后交还一次。<a href="../../guide/after-compaction.html">压缩之后</a>讲的是这一半。</p>
 
 <h2>和这个 harness 无关的部分</h2>
-<p>索引覆盖这台机器上每个智能体的转录——今天是四十三个，<a href="where-sessions-are-stored.html">而且各有各的格式</a>——所以在一个工具里找到的修法，能回答在另一个工具里提的问题，包括这一切装上来之前的会话。这就是选择索引、而不是选择边用边记的原因。</p>
+<p>索引覆盖这台机器上每个智能体的转录——今天是四十四个，<a href="where-sessions-are-stored.html">而且各有各的格式</a>——所以在一个工具里找到的修法，能回答在另一个工具里提的问题，包括这一切装上来之前的会话。这就是选择索引、而不是选择边用边记的原因。</p>
 <p>这里没有任何东西在写记忆，所以也就没有什么能凭空编进你的历史里；建立索引和检索都在本地，凭据在建索引时就被脱敏（<a href="../../guide/privacy.html">隐私说明</a>）。每次提问注入上限 1536 字节，每次工具调用约 4 KB——<a href="../../guide/token-cost.html">记忆要花多少 token</a> 里有实测对比。</p>
 
 <p><a href="getting-started.html">快速开始</a> · <a href="../../registry/claude-code.html">Claude 的会话文件是怎么读的</a> · <a href="../../guide/rules-files.html">CLAUDE.md 长起来之后</a></p>

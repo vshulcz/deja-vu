@@ -6,7 +6,7 @@ English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions
 
 Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S · **13.6 s** to index 19,195 sessions · **half the tokens** of agentmemory) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/) · **[★ Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)**
 
-Search and resume coding agent sessions across Claude Code, Codex, Cursor, OpenCode, Gemini CLI and 38 more harnesses from Raycast.
+Search and resume coding agent sessions across Claude Code, Codex, Cursor, OpenCode, Gemini CLI and 39 more harnesses from Raycast.
 
 ## Prerequisites
 

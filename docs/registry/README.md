@@ -19,6 +19,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Grok Build](grok.md) | ACP update JSONL with JSON metadata |
 | [Goose](goose.md) | legacy JSONL and SQLite session store |
 | [Qwen Code](qwen.md) | JSONL transcript |
+| [Qoder](qoder.md) | JSONL transcript |
 | [pi](pi.md) | JSONL transcript |
 | [omp (Oh My Pi)](omp.md) | JSONL transcript |
 | [prime-agent (PrimeIntellect)](prime.md) | JSONL transcript |

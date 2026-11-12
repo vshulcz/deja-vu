@@ -5,7 +5,7 @@ This document is for people changing `deja` internals.
 ## Source parsers
 
 Parsers live in `internal/sources` and return `[]model.Session`. The table is
-what the loader registers: the forty-three coding agents plus deja's own notes,
+what the loader registers: the forty-four coding agents plus deja's own notes,
 which is what `deja sources` prints. `docs/registry/` describes each store's
 layout in detail, and `internal/sources/registry_test.go` checks that index
 against the loader list.
@@ -27,6 +27,7 @@ keeping real links inside a store out of the walk.
 | Antigravity | `antigravity.go` | JSONL transcripts under `~/.gemini/antigravity*` |
 | Grok Build | `grok.go` | ACP update streams and session summaries under `~/.grok/sessions` |
 | Qwen Code | `qwen.go` | JSONL chats under `~/.qwen/projects/*/chats` |
+| Qoder | `qoder.go` | Claude Code-shaped JSONL transcripts under `~/.qoder/projects` |
 | pi | `pi.go` | JSONL transcripts under `~/.pi/agent/sessions` |
 | Copilot CLI | `copilot.go` | `events.jsonl` per session under `~/.copilot/session-state`; a `task` sub-agent's records (stamped `agentId`) read as a side chain of the session, a `/fork` as a fork of the session its `session.info` note names |
 | VS Code Copilot Chat | `copilot_chat.go`, `copilot_agent.go` | `.jsonl` / `.json` under VS Code User `workspaceStorage/*/chatSessions`, and the extension's own `GitHub.copilot-chat/transcripts/*.jsonl` |
