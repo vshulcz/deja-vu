@@ -412,3 +412,69 @@ func TestToolHookReadVsEditSiblingTestTargetAndAnonDedup(t *testing.T) {
 		t.Fatalf("expected decisionLineOf to filter Task: echo and keep real decision, got %q", dec)
 	}
 }
+
+func TestDeveloperPainGuardsPostEditSignatureMissingFileAndDiagnostics(t *testing.T) {
+	tmp := hermeticEnv(t)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+
+	proj := filepath.Join(tmp, "work", "svc")
+	if err := os.MkdirAll(filepath.Join(proj, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(proj, "go.mod"), []byte("module example.com/svc\n\ngo 1.24\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(proj, "internal", "gateway"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	signerFile := filepath.Join(proj, "internal", "gateway", "frame_codec.go")
+	callerFile := filepath.Join(proj, "internal", "gateway", "middleware.go")
+	// Simulate post-edit state on disk where DecodeFrameHeader ALREADY has the new 2-arg signature.
+	if err := os.WriteFile(signerFile, []byte("package gateway\n\nfunc DecodeFrameHeader(id string, ttl int) (string, error) { return id, nil }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(callerFile, []byte("package gateway\n\nfunc HandleFrame() string {\n\treturn DecodeFrameHeader(\"u1\")\n}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDE_PROJECT_DIR", proj)
+
+	// 1. Post-edit signature change detection: disk already has the new signature, but old_string -> new_string changed it.
+	postEditPayload := fmt.Sprintf(`{"hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{"file_path":%q,"old_string":"func DecodeFrameHeader(id string) string","new_string":"func DecodeFrameHeader(id string, ttl int) (string, error)"},"session_id":"s-sig","cwd":%q}`, signerFile, proj)
+	sigOut := toolHookRun(t, postEditPayload)
+	if !strings.Contains(sigOut, "callers of DecodeFrameHeader:") || !strings.Contains(sigOut, "middleware.go:4") {
+		t.Fatalf("expected post-edit signature change to surface caller middleware.go:4, got:\n%s", sigOut)
+	}
+
+	// 2. Ghost / moved file radar: reading a file at the wrong directory resolves its real repo location.
+	wrongPath := filepath.Join(proj, "frame_codec.go")
+	readMovedPayload := fmt.Sprintf(`{"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":%q},"session_id":"s-move","cwd":%q}`, wrongPath, proj)
+	movedOut := toolHookRun(t, readMovedPayload)
+	if !strings.Contains(movedOut, "located in repo: internal/gateway/frame_codec.go") {
+		t.Fatalf("expected Read on wrong path to point to internal/gateway/frame_codec.go, got:\n%s", movedOut)
+	}
+
+	// 3. Ghost / sibling file radar: reading a non-existent sibling filename in internal/gateway lists sibling files.
+	ghostSibling := filepath.Join(proj, "internal", "gateway", "frame_writer.go")
+	readSiblingPayload := fmt.Sprintf(`{"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":%q},"session_id":"s-sib","cwd":%q}`, ghostSibling, proj)
+	sibOut := toolHookRun(t, readSiblingPayload)
+	if !strings.Contains(sibOut, "sibling files: frame_codec.go") {
+		t.Fatalf("expected Read on nonexistent sibling to suggest frame_codec.go, got:\n%s", sibOut)
+	}
+
+	// 4. Compiler return-value assignment mismatch surfaces live symbol signature in repo.
+	compileErr := "internal/gateway/middleware.go:4:9: assignment mismatch: 1 variable but DecodeFrameHeader returns 2 values"
+	afterCompile := fixPairLine(dir, proj, compileErr)
+	if !strings.Contains(afterCompile, "symbol signature in repo") || !strings.Contains(afterCompile, "func DecodeFrameHeader(id string, ttl int) (string, error)") {
+		t.Fatalf("expected assignment mismatch to surface live symbol signature, got:\n%s", afterCompile)
+	}
+
+	// 5. stripFileLineColDiagnostic extracts linter/compiler message without file:line:col prefix.
+	probes := nearErrorProbesFromOutput("cmd/deja/hook.go:118:20: G602: slice index out of range (gosec)")
+	if len(probes) == 0 || probes[0] != "G602: slice index out of range (gosec)" {
+		t.Fatalf("expected nearErrorProbesFromOutput to extract stripped diagnostic probe, got %v", probes)
+	}
+}

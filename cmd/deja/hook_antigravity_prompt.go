@@ -361,29 +361,43 @@ func workspaceFromConversation(transcriptPath, conversationID string) string {
 
 func latestToolFailureFromSteps(steps []transcriptStep) string {
 	for _, step := range steps {
+		if step.Type == "USER_INPUT" {
+			return ""
+		}
 		if step.Type != "GENERIC" {
 			continue
 		}
 		body := step.Content
-		if !strings.Contains(body, exitedWithCode) {
-			// The newest tool step said nothing about an exit code, so there
-			// is no failure to speak about.
+		if !isAntigravityToolFailure(body) {
 			return ""
 		}
-		if strings.Contains(body, exitedWithCode+" 0.") {
-			return ""
-		}
-		if _, after, ok := strings.Cut(body, toolOutputMarker); ok {
-			return strings.TrimSpace(after)
+		for _, marker := range []string{commandOutputMarker, toolOutputMarker} {
+			if _, after, ok := strings.Cut(body, marker); ok {
+				return strings.TrimSpace(after)
+			}
 		}
 		return strings.TrimSpace(body)
 	}
 	return ""
 }
 
+func isAntigravityToolFailure(body string) bool {
+	for _, prefix := range []string{exitedWithCode, commandExitedWithCode} {
+		if strings.Contains(body, prefix) {
+			return !strings.Contains(body, prefix+" 0.") && !strings.Contains(body, prefix+" 0\n")
+		}
+	}
+	if strings.Contains(body, "| exit=") && !strings.Contains(body, "| exit=0") {
+		return true
+	}
+	return false
+}
+
 const (
-	exitedWithCode   = "The command exited with code"
-	toolOutputMarker = "Output:"
+	exitedWithCode        = "The command exited with code"
+	commandExitedWithCode = "Command exited with code"
+	commandOutputMarker   = "Command output:"
+	toolOutputMarker      = "Output:"
 )
 
 // antigravityFixPair is the repair this machine ran after the same failure, or

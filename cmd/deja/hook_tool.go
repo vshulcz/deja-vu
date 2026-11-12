@@ -688,6 +688,13 @@ func fileLineFor(dir, cwd string, input toolHookInput) string {
 		input.ToolInput.Patch,
 	}, "\n")
 	line := fileHookLineOutsideWithEdit(dir, cwd, path, editText, askerSkip(dir, input))
+	if missing := missingFileHintLine(cwd, path, input.ToolName); missing != "" {
+		if line == "" {
+			line = search.SafePath(baseName(path)) + missing
+		} else if len(line)+len(missing) <= toolHookMaxBytes {
+			line += missing
+		}
+	}
 	if assertLine := testAssertionLiteralLine(cwd, path, oldStr, newStr); assertLine != "" {
 		if line == "" {
 			line = search.SafePath(baseName(path)) + assertLine
@@ -706,11 +713,12 @@ func fileLineFor(dir, cwd string, input toolHookInput) string {
 }
 
 // fileReadGuardLine returns a file line on a PreToolUse Read only when the file
-// carries an explicit .deja/memory.jsonl guardrail, keeping ordinary reads
-// silent while warning before an agent designs a change to a guarded file.
+// carries an explicit .deja/memory.jsonl guardrail or does not exist at the
+// requested path, keeping ordinary reads silent while warning before an agent
+// designs a change to a guarded file or wastes turns hunting a moved path.
 func fileReadGuardLine(dir, cwd string, input toolHookInput) string {
 	line := fileLineFor(dir, cwd, input)
-	if strings.Contains(line, repoDecisionLabel) {
+	if strings.Contains(line, repoDecisionLabel) || strings.Contains(line, missingFileLocatedLabel) || strings.Contains(line, missingFileSiblingLabel) {
 		return line
 	}
 	return ""
