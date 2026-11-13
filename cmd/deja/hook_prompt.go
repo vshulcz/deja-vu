@@ -1676,7 +1676,7 @@ func sessionStandingRuleLine(dir, cwd, sessionID, asked string, seen map[string]
 	for _, p := range paths {
 		for _, rec := range slices.Backward(readLiveRuleRecords(p)) {
 			e := rec.RepoEntry
-			if e.Text == "" || seenID[e.ID] {
+			if e.Text == "" || seenID[e.ID] || isMalformedStandingRuleText(e.Text) {
 				continue
 			}
 			seenID[e.ID] = true
@@ -1711,6 +1711,39 @@ func sessionStandingRuleLine(dir, cwd, sessionID, asked string, seen map[string]
 		}
 	}
 	return "", ""
+}
+
+// isMalformedStandingRuleText reports whether a standing rule has a punctuation-only or empty target.
+func isMalformedStandingRuleText(text string) bool {
+	s := strings.TrimSpace(text)
+	if s == "" {
+		return true
+	}
+	countLetters := func(v string) int {
+		n := 0
+		for _, r := range v {
+			if unicode.IsLetter(r) {
+				n++
+			}
+		}
+		return n
+	}
+	if rest, ok := strings.CutPrefix(s, "Do not suggest "); ok {
+		subj, body, hasColon := strings.Cut(rest, ":")
+		if hasColon && (countLetters(subj) < 2 || countLetters(body) < 2) {
+			return true
+		}
+		if !hasColon && countLetters(rest) < 2 {
+			return true
+		}
+	}
+	low := strings.ToLower(s)
+	for _, prefix := range []string{"do not suggest ", "do not use ", "do not ", "don't use ", "don't ", "never use ", "never ", "always use ", "always ", "avoid "} {
+		if rest, ok := strings.CutPrefix(low, prefix); ok {
+			return countLetters(rest) < 2
+		}
+	}
+	return countLetters(s) < 3
 }
 
 func extractLiveRulePathsAndSymbols(cwd, text string) ([]string, []string) {

@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -1037,7 +1038,90 @@ type repoFileTree struct {
 
 var orientTreeCache sync.Map
 
+// isSkippedScanDir reports whether a directory name is a dependency, build, or
+// platform cache directory that should never be walked during repo scans.
+func isSkippedScanDir(name string) bool {
+	if strings.HasPrefix(name, ".") {
+		return true
+	}
+	switch name {
+	case "node_modules", "vendor", "dist", "build", "target",
+		"Library", "Applications", "venv", "site-packages", "__pycache__", "Pods", "DerivedData":
+		return true
+	}
+	return false
+}
+
+// safeScanRoot returns the repository root for cwd, or a bounded non-repo
+// directory when cwd is not a broad OS/user root (such as $HOME, /, or /tmp).
+func safeScanRoot(cwd string) string {
+	cwd = strings.TrimSpace(cwd)
+	if cwd == "" {
+		return ""
+	}
+	clean := filepath.Clean(cwd)
+	if clean == "." || clean == "" {
+		return ""
+	}
+	if root := sources.RepoRoot(clean); root != "" {
+		return root
+	}
+	if filepath.Dir(clean) == clean {
+		return ""
+	}
+	evalClean := clean
+	if resolved, err := filepath.EvalSymlinks(clean); err == nil {
+		evalClean = resolved
+	}
+	rejectExact := func(dir string) bool {
+		if dir == "" {
+			return false
+		}
+		dClean := filepath.Clean(dir)
+		if clean == dClean || evalClean == dClean {
+			return true
+		}
+		if dEval, err := filepath.EvalSymlinks(dClean); err == nil {
+			if clean == dEval || evalClean == dEval {
+				return true
+			}
+		}
+		return false
+	}
+	if rejectExact(sources.Home()) || rejectExact(os.TempDir()) {
+		return ""
+	}
+	if uh, err := os.UserHomeDir(); err == nil && rejectExact(uh) {
+		return ""
+	}
+	if slices.ContainsFunc([]string{"/Users", "/home", "/tmp", "/private", "/private/tmp", "/var", "/private/var", "/opt", "/Library", "/Applications", "/System"}, rejectExact) {
+		return ""
+	}
+	uh, _ := os.UserHomeDir()
+	for _, h := range []string{sources.Home(), uh} {
+		if h == "" {
+			continue
+		}
+		for _, sub := range []string{"Library", "Applications", "Movies", "Pictures", "Music"} {
+			subDir := filepath.Join(h, sub)
+			subClean := filepath.Clean(subDir)
+			if rejectExact(subDir) ||
+				strings.HasPrefix(clean, subClean+string(filepath.Separator)) ||
+				strings.HasPrefix(evalClean, subClean+string(filepath.Separator)) {
+				return ""
+			}
+		}
+		for _, sub := range []string{"Downloads", "Desktop", "Documents"} {
+			if rejectExact(filepath.Join(h, sub)) {
+				return ""
+			}
+		}
+	}
+	return clean
+}
+
 func orientRepoTree(cwd string) repoFileTree {
+	cwd = safeScanRoot(cwd)
 	if cwd == "" {
 		return repoFileTree{}
 	}
@@ -1063,7 +1147,7 @@ func orientRepoTree(cwd string) repoFileTree {
 		}
 		if d.IsDir() {
 			name := d.Name()
-			if path != cwd && (strings.HasPrefix(name, ".") || name == "node_modules" || name == "vendor" || name == "dist" || name == "build" || name == "target") {
+			if path != cwd && isSkippedScanDir(name) {
 				return filepath.SkipDir
 			}
 			return nil

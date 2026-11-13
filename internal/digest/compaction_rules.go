@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
@@ -414,7 +415,7 @@ func proposedEntities(text string) []string {
 	}
 	for _, m := range standingBacktickRE.FindAllStringSubmatch(text, -1) {
 		tok := strings.TrimSpace(m[1])
-		if tok == "" {
+		if !isValidProposalEntity(tok) {
 			continue
 		}
 		low := strings.ToLower(tok)
@@ -424,6 +425,30 @@ func proposedEntities(text string) []string {
 		}
 	}
 	return out
+}
+
+func isValidProposalEntity(tok string) bool {
+	if len(tok) < 2 || len(tok) > 80 || strings.ContainsAny(tok, "\n\r") {
+		return false
+	}
+	switch tok[0] {
+	case ',', ';', ':', '!', '?', ')', ']', '}':
+		return false
+	}
+	switch tok[len(tok)-1] {
+	case ',', ';', ':', '(', '[', '{':
+		return false
+	}
+	letters := 0
+	for _, r := range tok {
+		if unicode.IsLetter(r) {
+			letters++
+		}
+	}
+	if strings.HasPrefix(tok, "-") {
+		return letters >= 1 && len(tok) >= 3
+	}
+	return letters >= 2
 }
 
 func proposedSlashCommands(text string) []string {
