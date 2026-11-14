@@ -73,6 +73,9 @@ func TestDoctorSaysWhenTheLauncherFindsNoDeja(t *testing.T) {
 }
 
 func TestDoctorReportsABinaryThatFailsToStart(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no launcher on windows")
+	}
 	tmp := hermeticEnv(t)
 	savedWK := launcherWellKnown
 	t.Cleanup(func() { launcherWellKnown = savedWK })

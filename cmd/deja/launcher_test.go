@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -190,14 +191,14 @@ func TestTheLauncherSkipsAKilledBinary(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := exec.Command(launcher, "hook-test").Run()
-	ee, ok := err.(*exec.ExitError)
-	if !ok || ee.ExitCode() != 2 {
-		t.Fatalf("launcher exit = %v, want exit code 2 from fallback", err)
+	runErr := exec.CommandContext(t.Context(), launcher, "hook-test").Run()
+	var ee *exec.ExitError
+	if !errors.As(runErr, &ee) || ee.ExitCode() != 2 {
+		t.Fatalf("launcher exit = %v, want exit code 2 from fallback", runErr)
 	}
-	got, err := os.ReadFile(marker)
-	if err != nil {
-		t.Fatalf("fallback was not reached after primary was killed: %v", err)
+	got, readErr := os.ReadFile(marker)
+	if readErr != nil {
+		t.Fatalf("fallback was not reached after primary was killed: %v", readErr)
 	}
 	if string(got) != "hook-test" {
 		t.Fatalf("fallback args = %q, want %q", string(got), "hook-test")
@@ -206,15 +207,15 @@ func TestTheLauncherSkipsAKilledBinary(t *testing.T) {
 	// Non-fatal exit codes (< 126) from a candidate must propagate without
 	// falling through to the next candidate.
 	_ = os.Remove(marker)
-	if err := os.WriteFile(primary, []byte("#!/bin/sh\nexit 3\n"), 0o755); err != nil {
-		t.Fatal(err)
+	if writeErr := os.WriteFile(primary, []byte("#!/bin/sh\nexit 3\n"), 0o755); writeErr != nil {
+		t.Fatal(writeErr)
 	}
-	err = exec.Command(launcher, "hook-test").Run()
-	ee, ok = err.(*exec.ExitError)
-	if !ok || ee.ExitCode() != 3 {
-		t.Fatalf("launcher exit = %v, want exit code 3 from primary", err)
+	runErr = exec.CommandContext(t.Context(), launcher, "hook-test").Run()
+	ee = nil
+	if !errors.As(runErr, &ee) || ee.ExitCode() != 3 {
+		t.Fatalf("launcher exit = %v, want exit code 3 from primary", runErr)
 	}
-	if _, err := os.Stat(marker); err == nil {
+	if _, statErr := os.Stat(marker); statErr == nil {
 		t.Fatal("fallback ran even though primary exited 3 (< 126)")
 	}
 }
