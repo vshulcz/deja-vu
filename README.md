@@ -29,7 +29,7 @@ npx @vshulcz/deja-vu install --auto                # 1-step cross-platform insta
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
 ```
 
-<p align="center"><sub>Homebrew: <code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code: <code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Skills: <code>npx skills add vshulcz/deja-vu</code><br><a href="#install">Windows (Scoop / winget), Codex, OpenCode, OpenClaw and more</a> &middot; Audit local stores &amp; retention risk without installing: <code>npx @vshulcz/deja-vu audit</code></sub></p>
+<p align="center"><sub>Homebrew: <code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code: <code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Skills: <code>npx skills add vshulcz/deja-vu</code><br><a href="#install">Windows (Scoop / winget), Codex, OpenCode, OpenClaw and more</a> &middot; Try without installing: <code>npx @vshulcz/deja-vu stats --no-index --card</code> or <code>npx @vshulcz/deja-vu audit</code></sub></p>
 
 ```sh
 $ deja "jwt refresh token"             # lexical + structural search across all 46 agent stores
@@ -76,7 +76,7 @@ Prefer a browser? `deja view` exports the store — sessions, the recall audit t
 
 ### Your own work, wrapped
 
-`deja stats --card` draws your yearly agent activity in the terminal or writes an SVG for your GitHub profile ([convert to PNG in browser](https://vshulcz.github.io/deja-vu/card/)).
+`deja stats --card` draws your yearly agent activity in the terminal or writes an SVG for your GitHub profile ([convert to PNG in browser](https://vshulcz.github.io/deja-vu/card/)). Before installing, run `npx @vshulcz/deja-vu stats --no-index --card` to scan local stores without writing an index.
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/docs/assets/stats-card-demo.svg" width="600" alt="deja stats card: a year of agent sessions as a heatmap, the agents they came from, and the longest one"></p>
 
@@ -241,7 +241,7 @@ as usual. `deja search <query>` skips the suggestion.
 | `deja sync export/import/ssh` | Move memory between machines. Watermarked, append-only, idempotent. |
 | `deja repo candidates`, `deja repo add <id>` | Move memory between people: write the decisions and dropped approaches you pick into the repository's `.deja/memory.jsonl`, redacted, for review and commit. Whoever clones it gets them in recall. |
 | `deja view` | Your whole memory as one local HTML file ([live demo](https://vshulcz.github.io/deja-vu/view/)). No server, and the file never leaves the machine. |
-| `deja stats` | Your agent work, wrapped. `--card` draws it in the terminal, `--card <file>.svg` writes one for a profile, `--html` a browsable timeline. |
+| `deja stats` | Your agent work, wrapped. `--no-index` scans local stores before installing, `--card` draws it in the terminal or SVG, `--html` writes a browsable timeline. |
 | `deja secrets [--scrub]` | Which sessions' source transcripts carry credentials, and what kind. Never prints a value. `--scrub` rewrites the ones it can, original kept beside the file. |
 | `deja rules [sync]` | Keep your standing rules in `~/.config/deja/rules.md`; `sync` copies them as a marked block into every installed agent's global rules file. |
 | `deja rules candidates [--json] [--limit n] [--since 90d] [--project name] [--repo]` | The turns where you corrected an agent, across every tool (or scoped to `--repo` / `--project`), numbered with their session. Ask your agent to suggest rules and it groups them; nothing is written until you pick. |

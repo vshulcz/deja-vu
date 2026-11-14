@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/embed"
@@ -17,6 +18,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/stats"
 	"github.com/vshulcz/deja-vu/internal/termwidth"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -36,12 +38,14 @@ type redactionReport struct {
 	Tombstones  int                       `json:"tombstones"`
 }
 
+const noIndexInstallHint = "to recall across sessions automatically: npx @vshulcz/deja-vu install --auto"
+
 // statsArgs is what `deja stats` was asked.
 type statsArgs struct {
-	jsonOut, impact, year, card, html, redaction bool
-	cardPath, htmlPath                           string
-	options                                      search.Options
-	sinceRaw, harnessRaw                         string
+	jsonOut, impact, year, card, html, redaction, noIndex bool
+	cardPath, htmlPath                                    string
+	options                                               search.Options
+	sinceRaw, harnessRaw                                  string
 }
 
 // parseStatsArgs reads the `deja stats` arguments.
@@ -54,6 +58,7 @@ func parseStatsArgs(args []string) (statsArgs, error) {
 	htmlPath := ""
 	html := false
 	redaction := false
+	noIndex := false
 	var options search.Options
 	// What the reader typed, before checkHarness rewrites an alias: naming a
 	// "deja" filter to someone who passed `--harness notes` names a flag they
@@ -80,6 +85,8 @@ func parseStatsArgs(args []string) (statsArgs, error) {
 			impact = true
 		case "--year":
 			year = true
+		case "--no-index":
+			noIndex = true
 		case "--card":
 			if card {
 				return statsArgs{}, errors.New("stats: --card specified twice")
@@ -126,7 +133,7 @@ func parseStatsArgs(args []string) (statsArgs, error) {
 			return statsArgs{}, unknownFlag("stats", args[i], statsFlags)
 		}
 	}
-	return statsArgs{jsonOut: jsonOut, impact: impact, year: year, card: card, html: html, redaction: redaction,
+	return statsArgs{jsonOut: jsonOut, impact: impact, year: year, card: card, html: html, redaction: redaction, noIndex: noIndex,
 		cardPath: cardPath, htmlPath: htmlPath, options: options, sinceRaw: sinceRaw, harnessRaw: harnessRaw}, nil
 }
 
@@ -166,6 +173,9 @@ func checkStatsArgs(a *statsArgs) error {
 			return fmt.Errorf("stats: %s prints as text or --json, not as --card or --html", r.flag)
 		}
 	}
+	if a.noIndex && (impact || year || redaction) {
+		return errors.New("stats: --no-index cannot combine with --impact, --year, or --redaction")
+	}
 	return nil
 }
 
@@ -176,6 +186,9 @@ func runStats(dir string, args []string) error {
 	}
 	if err := checkStatsArgs(&a); err != nil {
 		return err
+	}
+	if a.noIndex {
+		return runStatsNoIndex(a)
 	}
 	jsonOut, impact, year, cardPath, card, html, redaction := a.jsonOut, a.impact, a.year, a.cardPath, a.card, a.html, a.redaction
 	options, sinceRaw, harnessRaw := a.options, a.sinceRaw, a.harnessRaw
@@ -238,24 +251,7 @@ func runStats(dir string, args []string) error {
 	// *matching* sessions, and taken over the whole store `deja stats --project
 	// alpha` reported the ones hidden in beta (#2816, the class #2795 and #2814
 	// closed for how and friction).
-	kept, withheld := policyFilterSessionsSplit(policy.ActivationSearch, ss)
-	policyHidden := len(stats.Filter(withheld, options))
-	ss = kept
-	if note := policyHiddenNote(policy.ActivationSearch, policyHidden); note != "" {
-		fmt.Fprintln(os.Stderr, note)
-	}
-	filteredSessions := stats.Filter(ss, options)
-	report := stats.Build(filteredSessions, time.Now())
-	for _, s := range filteredSessions {
-		if !s.IsImported() && transcriptGone(s) {
-			report.PreservedSessions++
-		}
-	}
-	// The rule that emptied the report is named a line above, so "nothing
-	// indexed yet — run `deja index`" is advice for a state deja is not in:
-	// the same backside `last` grew when it learned to filter (#949, #983).
-	report.PolicyWithheld = policyHidden
-	report.EmptiedByPolicy = report.TotalSessions == 0 && policyHidden > 0
+	report, ss := buildStatsReport(ss, a, true)
 	if report.TotalSessions == 0 {
 		// A filter emptied a store that has sessions in it. "run `deja index`"
 		// is then advice for a state deja is not in — indexing changes nothing
@@ -298,12 +294,93 @@ func runStats(dir string, args []string) error {
 	return writeStatsReport(dir, report, ss, a, sshTip)
 }
 
+func buildStatsReport(ss []model.Session, a statsArgs, checkPreserved bool) (stats.Report, []model.Session) {
+	kept, withheld := policyFilterSessionsSplit(policy.ActivationSearch, ss)
+	policyHidden := len(stats.Filter(withheld, a.options))
+	ss = kept
+	if note := policyHiddenNote(policy.ActivationSearch, policyHidden); note != "" {
+		fmt.Fprintln(os.Stderr, note)
+	}
+	filteredSessions := stats.Filter(ss, a.options)
+	report := stats.Build(filteredSessions, time.Now())
+	if checkPreserved {
+		for _, s := range filteredSessions {
+			if !s.IsImported() && transcriptGone(s) {
+				report.PreservedSessions++
+			}
+		}
+	}
+	// The rule that emptied the report is named a line above, so "nothing
+	// indexed yet — run `deja index`" is advice for a state deja is not in:
+	// the same backside `last` grew when it learned to filter (#949, #983).
+	report.PolicyWithheld = policyHidden
+	report.EmptiedByPolicy = report.TotalSessions == 0 && policyHidden > 0
+	return report, ss
+}
+
+func runStatsNoIndex(a statsArgs) error {
+	options := a.options
+	ss := loadSessionsNoIndex(options.Harness)
+	report, ss := buildStatsReport(ss, a, false)
+	if report.TotalSessions == 0 {
+		if len(ss) > 0 {
+			report.NarrowedBy = activeFilters(options, a.sinceRaw, a.harnessRaw)
+		}
+		report.HiddenBySettings = hiddenByOwnSettings()
+	}
+	return writeStatsReport("", report, ss, a, "")
+}
+
+func loadSessionsNoIndex(harness string) []model.Session {
+	harnesses := sources.StoresToRead()
+	selected := make([]sources.Harness, 0, len(harnesses))
+	for _, hr := range harnesses {
+		if harness != "" && hr.Name != harness {
+			continue
+		}
+		if hr.Load == nil {
+			continue
+		}
+		selected = append(selected, hr)
+	}
+	results := make([][]model.Session, len(selected))
+	sem := make(chan struct{}, 8)
+	var wg sync.WaitGroup
+	for i, hr := range selected {
+		wg.Add(1)
+		go func(idx int, load func() []model.Session) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() {
+				if recover() != nil {
+					results[idx] = nil
+				}
+				<-sem
+			}()
+			results[idx] = load()
+		}(i, hr.Load)
+	}
+	wg.Wait()
+	total := 0
+	for _, res := range results {
+		total += len(res)
+	}
+	out := make([]model.Session, 0, total)
+	for _, res := range results {
+		out = append(out, res...)
+	}
+	return out
+}
+
 // writeStatsReport prints the report in the form that was asked for.
 func writeStatsReport(dir string, report stats.Report, ss []model.Session, a statsArgs, sshTip string) error {
 	jsonOut, card, cardPath, htmlPath, options := a.jsonOut, a.card, a.cardPath, a.htmlPath, a.options
 	if card && cardPath == "" {
 		printStatsCard(os.Stdout, report)
 		fmt.Fprintf(os.Stdout, "\n%s\n", "for a README or a post: deja stats --card deja-stats.svg")
+		if a.noIndex && report.TotalSessions > 0 && nothingWired() {
+			fmt.Fprintln(os.Stdout, noIndexInstallHint)
+		}
 		return nil
 	}
 	if cardPath != "" {
@@ -334,14 +411,18 @@ func writeStatsReport(dir string, report stats.Report, ss []model.Session, a sta
 		enc.SetIndent("", "  ")
 		return enc.Encode(report)
 	}
-	printStats(os.Stdout, report)
+	printStatsMode(os.Stdout, report, a.noIndex)
 	// The screen says "wrapped for sharing" at the top and then never says how.
 	// `--card` draws the same numbers as one object — a terminal card, or an
 	// SVG with a path — and nobody finds a flag they were not told about.
 	// Only where there is something worth a picture.
 	if report.TotalSessions > 0 {
 		fmt.Fprintln(os.Stdout, "\n  As a card        deja stats --card")
-		if tip := maybeStarTip(dir, report.Recall.Recalls+report.Recall.Injections); tip != "" {
+		if a.noIndex {
+			if nothingWired() {
+				fmt.Fprintln(os.Stdout, "\n  "+noIndexInstallHint)
+			}
+		} else if tip := maybeStarTip(dir, report.Recall.Recalls+report.Recall.Injections); tip != "" {
 			fmt.Fprintln(os.Stdout, tip)
 		}
 	}
@@ -389,6 +470,10 @@ func printRedactionReport(dir string, jsonOut bool) error {
 }
 
 func printStats(w io.Writer, r stats.Report) {
+	printStatsMode(w, r, false)
+}
+
+func printStatsMode(w io.Writer, r stats.Report, noIndex bool) {
 	color := statColorOK(w)
 	width := printableWidth(w)
 	barGlyph := "#"
@@ -404,6 +489,10 @@ func printStats(w io.Writer, r stats.Report) {
 	// announced a report that then did not come.
 	if r.TotalSessions == 0 {
 		if r.EmptiedByPolicy {
+			if noIndex {
+				fmt.Fprintln(w, "deja: nothing to report — the trust policy withholds every session from this path")
+				return
+			}
 			// The rule is named on stderr a line above; repeating "run `deja
 			// index`" here sends the reader after a build that changes nothing.
 			fmt.Fprintln(w, "deja: nothing to report — the trust policy withholds every indexed session from this path")
@@ -416,14 +505,26 @@ func printStats(w io.Writer, r stats.Report) {
 			return
 		}
 		if r.HiddenBySettings != "" {
+			if noIndex {
+				fmt.Fprint(w, "deja: no agent sessions found in local stores\n"+r.HiddenBySettings)
+				return
+			}
 			fmt.Fprint(w, "deja: nothing indexed yet\n"+r.HiddenBySettings)
+			return
+		}
+		if noIndex {
+			fmt.Fprintln(w, "deja: no agent sessions found in local stores")
 			return
 		}
 		fmt.Fprintln(w, emptyIndexHint("nothing indexed yet"))
 		return
 	}
 	fmt.Fprintf(w, "%sdeja stats%s\n", bold, reset)
-	fmt.Fprintf(w, "%sindexed agent work, wrapped for sharing%s\n\n", faint, reset)
+	if noIndex {
+		fmt.Fprintf(w, "%slocal agent stores, wrapped for sharing%s\n\n", faint, reset)
+	} else {
+		fmt.Fprintf(w, "%sindexed agent work, wrapped for sharing%s\n\n", faint, reset)
+	}
 	if headline := statsHeadline(r); headline != "" {
 		fmt.Fprintf(w, "%s%s%s\n\n", bold, termwidth.Indent(headline, width, "", ""), reset)
 	}
@@ -508,6 +609,16 @@ func printStats(w io.Writer, r stats.Report) {
 	fmt.Fprintf(w, "%sHighlights%s\n", bold, reset)
 	fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Longest session  %s message%s · %s · %s", grouped(r.Longest.Messages), pluralS(r.Longest.Messages), statHarnessTag(r.Longest.Harness, color), statLongestTitle(r, width))))
 	fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Busiest day      %s · %s message%s", valueOrDash(statDay(r.BusiestDay.Date)), grouped(r.BusiestDay.Messages), pluralS(r.BusiestDay.Messages))))
+	if !noIndex {
+		printStatsRecall(w, r, width)
+	}
+}
+
+func printStatsRecall(w io.Writer, r stats.Report, width int) {
+	bold, reset := "", ""
+	if statColorOK(w) {
+		bold, reset = statBold, statReset
+	}
 	fmt.Fprintln(w)
 	if r.RecallMachineWide {
 		fmt.Fprintf(w, "%sRecall%s    whole machine — filters do not reach the recall log\n", bold, reset)
