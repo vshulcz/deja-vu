@@ -226,23 +226,28 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 	})
 
 	budget := 4096
-	maxSessions := 6
+	maxSessions := 7
 	if mode == RecallSafe {
 		budget = 2048
 		maxSessions = 3
 	}
 	conclusionLimit := 2
 	conclusionBudget := 400
-	if len(candidates) == 1 {
-		conclusionLimit = 4
+	switch len(candidates) {
+	case 1:
+		conclusionLimit = 5
 		conclusionBudget = 1600
 		if mode != RecallSafe {
-			conclusionLimit = 5
-			conclusionBudget = 2000
+			conclusionLimit = 6
+			conclusionBudget = 2400
 		}
-	} else if len(candidates) == 2 {
+	case 2:
 		conclusionLimit = 3
 		conclusionBudget = 1000
+		if mode != RecallSafe {
+			conclusionLimit = 5
+			conclusionBudget = 1800
+		}
 	}
 	var b strings.Builder
 	var fingerprints []map[string]bool
@@ -252,7 +257,12 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 		if mode == RecallSafe && !projectMatches(s.Project, o.ProjectNames) {
 			continue
 		}
-		section := autoRecallSessionWithLimit(s, o.Now, true, conclusionBudget, conclusionLimit)
+		sessLimit, sessBudget := conclusionLimit, conclusionBudget
+		if mode != RecallSafe && len(candidates) > 1 && (len(s.Messages) >= 40 || s.Held >= 40) && budget-b.Len() >= 1200 {
+			sessLimit = max(sessLimit, 5)
+			sessBudget = max(sessBudget, 1400)
+		}
+		section := autoRecallSessionWithLimit(s, o.Now, true, sessBudget, sessLimit)
 		if section == "" || (mode == RecallSafe && relevanceWords(s) < 3) {
 			continue
 		}

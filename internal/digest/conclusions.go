@@ -56,7 +56,7 @@ var decisionMarkers = []string{
 	// fired once or twice each: the store is Russian-dominant, so the gap read
 	// as rare rather than as a hole (#2340). It is a hole for a reader working
 	// in English, and these are the same shapes as the entries above them.
-	"settled on", "settled at", "settled that", "agreed to", "went with", "ended up", "in the end", "opted for",
+	"settled on", "settled at", "settled that", "agreed to", "agreed on", "went with", "ended up", "in the end", "opted for", "we picked",
 	// Chinese decision, root-cause and outcome markers, in Simplified form
 	// (Traditional is folded before matching).
 	"决定：", "决定:", "结论：", "结论:", "原因：", "原因:", "根因：", "根因:",
@@ -347,19 +347,7 @@ func selectConclusionsWithTrajectory(ms []model.Message, trajVerified map[string
 	}
 	var keep []model.Message
 	for i, m := range ms {
-		low := strings.ToLower(m.Text)
-		if cjkfold.HasCJK(low) {
-			low = cjkfold.String(low)
-		}
-		marked := trajVerified[m.Text]
-		if !marked {
-			for _, d := range decisionMarkers {
-				if marksLine(low, d) {
-					marked = true
-					break
-				}
-			}
-		}
+		marked := trajVerified[m.Text] || CarriesDecision(m.Text)
 		if marked || strings.Contains(m.Text, "```") || i == len(ms)-1 {
 			keep = append(keep, m)
 		}

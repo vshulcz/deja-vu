@@ -69,4 +69,31 @@ func TestBuildAutoRecallSingleMarathonSessionScalesConclusionBudget(t *testing.T
 	if !strings.Contains(gotPair.Text, "theta") {
 		t.Errorf("two-session recall missed second session:\n%s", gotPair.Text)
 	}
+
+	marathon8 := model.Session{
+		ID:      "marathon-8",
+		Harness: "claude",
+		Project: "app",
+		Updated: now,
+		Messages: []model.Message{
+			{Role: "user", Text: "consolidate all service decisions", Time: now},
+			{Role: "assistant", Text: "we decided alpha retry cap is 4", Time: now},
+			{Role: "assistant", Text: "settled at beta batch size 64", Time: now},
+			{Role: "assistant", Text: "settled that gamma pool mode is transaction", Time: now},
+			{Role: "assistant", Text: "agreed to delta timeout of 30s", Time: now},
+			{Role: "assistant", Text: "we chose epsilon compression zstd", Time: now},
+			{Role: "assistant", Text: "we picked zeta flush interval 500ms", Time: now},
+			{Role: "assistant", Text: "we decided eta backoff factor 2x", Time: now},
+			{Role: "assistant", Text: "agreed on theta shard count 16", Time: now},
+		},
+	}
+	got8 := BuildAutoRecall([]model.Session{marathon8}, AutoRecallOptions{Mode: RecallAggressive, ProjectNames: []string{"app"}, Now: now})
+	if len(got8.Text) > 4096 {
+		t.Errorf("aggressive recall exceeded 4096B budget: %d", len(got8.Text))
+	}
+	for _, fact := range []string{"gamma", "delta", "epsilon", "zeta", "eta", "theta"} {
+		if !strings.Contains(got8.Text, fact) {
+			t.Errorf("6-fact marathon recall missed %q:\n%s", fact, got8.Text)
+		}
+	}
 }

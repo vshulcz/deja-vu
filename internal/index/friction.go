@@ -513,6 +513,7 @@ var frictionPhrases = []string{
 	// Refused by a server or a tool, with the tool named.
 	"fatal:", "npm err!", "rpc failed", "timeout expired",
 	"statement timeout", "connection reset", "connection timed out",
+	"address already in use", "eaddrinuse",
 	// Failed to build or run.
 	"] error ", "build failed", "compilation failed", "cannot be resolved",
 	// Measured against 24 errors an agent actually hits, the list above

@@ -271,3 +271,113 @@ func TestShellLevelDiagnosticFixPairAnsweredFromAnyProject(t *testing.T) {
 		t.Errorf("project-specific error from another project leaked: %q", line)
 	}
 }
+
+func TestHookToolAfterColdStoreAttributeAndNearMissRecovery(t *testing.T) {
+	tmp := hermeticEnv(t)
+	coldDir := filepath.Join(tmp, "cold-index")
+	t.Setenv("DEJA_INDEX_DIR", coldDir)
+
+	repo := filepath.Join(tmp, "repo")
+	files := map[string]string{
+		filepath.Join(repo, ".git", "HEAD"): "ref: refs/heads/main\n",
+		filepath.Join(repo, "billing", "ledger.py"): `class InvoiceLedger:
+    def compute_total(self, rows):
+        return 0
+
+    def settle_balance(self, account_id):
+        return True
+`,
+		filepath.Join(repo, "web", "client.ts"): `export interface RetryPolicy {
+  maxAttempts: number;
+  backoffMillis: number;
+  retryBudget?: number;
+}
+`,
+		filepath.Join(repo, "src", "lease.rs"): `pub struct LeaseGuard {
+    epoch: u64,
+}
+
+impl LeaseGuard {
+    pub fn renew_epoch(&mut self, ttl_ms: u64) -> u64 {
+        self.epoch + ttl_ms
+    }
+
+    pub fn release_lock(&mut self) {}
+}
+`,
+		filepath.Join(repo, "internal", "cache", "store.go"): `package cache
+
+type ShardRouter struct{}
+
+func (s *ShardRouter) RebalanceKeys(limit int) error {
+	return nil
+}
+
+func (s *ShardRouter) FlushPending() {}
+`,
+	}
+	for p, content := range files {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	callAfter := func(command, stderr string) string {
+		t.Helper()
+		raw, err := json.Marshal(map[string]any{
+			"hook_event_name": "PostToolUse",
+			"tool_name":       "Bash",
+			"cwd":             repo,
+			"session_id":      "cold-s1",
+			"tool_input":      map[string]any{"command": command},
+			"tool_response":   map[string]any{"stdout": "", "stderr": stderr, "interrupted": false},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out bytes.Buffer
+		if err := runHookToolAfter(coldDir, bytes.NewReader(raw), &out); err != nil {
+			t.Fatal(err)
+		}
+		if out.Len() == 0 {
+			return ""
+		}
+		var resp sessionStartHookResponse
+		if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
+			t.Fatalf("undecodable hook response %q: %v", out.String(), err)
+		}
+		return resp.HookSpecificOutput.AdditionalContext
+	}
+
+	pyOut := callAfter("pytest billing/test_ledger.py", "AttributeError: 'InvoiceLedger' object has no attribute 'comput_total'")
+	if !strings.Contains(pyOut, "attribute hint for InvoiceLedger") || !strings.Contains(pyOut, "compute_total") {
+		t.Errorf("expected cold Python attribute hint, got %q", pyOut)
+	}
+
+	tsOut := callAfter("npx tsc --noEmit", "web/client.ts(10,5): error TS2339: Property 'maxAttempt' does not exist on type 'RetryPolicy'.")
+	if !strings.Contains(tsOut, "attribute hint for RetryPolicy") || !strings.Contains(tsOut, "maxAttempts") {
+		t.Errorf("expected cold TS attribute hint, got %q", tsOut)
+	}
+
+	rsOut := callAfter("cargo test", "error[E0599]: no method named `renew_epch` found for struct `LeaseGuard` in the current scope")
+	if !strings.Contains(rsOut, "attribute hint for LeaseGuard") || !strings.Contains(rsOut, "renew_epoch") {
+		t.Errorf("expected cold Rust attribute hint, got %q", rsOut)
+	}
+
+	goAttrOut := callAfter("go test ./...", "./main.go:12:9: r.RebalnceKeys undefined (type *ShardRouter has no field or method RebalnceKeys)")
+	if !strings.Contains(goAttrOut, "attribute hint for ShardRouter") || !strings.Contains(goAttrOut, "RebalanceKeys") {
+		t.Errorf("expected cold Go attribute hint, got %q", goAttrOut)
+	}
+
+	goNearOut := callAfter("go test ./...", "./main.go:18:4: undefined: ShardRoutre")
+	if !strings.Contains(goNearOut, "symbol near-match in repo") || !strings.Contains(goNearOut, "ShardRouter") {
+		t.Errorf("expected cold Go near-miss symbol hint, got %q", goNearOut)
+	}
+
+	if negOut := callAfter("curl http://203.0.113.10:8080/health", "error: connection timed out"); negOut != "" {
+		t.Errorf("expected empty output for unrelated failure, got %q", negOut)
+	}
+}

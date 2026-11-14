@@ -537,3 +537,91 @@ func TestToolHookFileLineSurfacesCoChangedCompanion(t *testing.T) {
 		t.Errorf("expected co-change companion note in %q", out)
 	}
 }
+
+func TestToolHookColdStoreHallucinatedLocalImport(t *testing.T) {
+	tmp := hermeticEnv(t)
+	coldDir := filepath.Join(tmp, "cold-index")
+	t.Setenv("DEJA_INDEX_DIR", coldDir)
+
+	repo := filepath.Join(tmp, "repo")
+	t.Setenv("CLAUDE_PROJECT_DIR", repo)
+
+	files := map[string]string{
+		filepath.Join(repo, ".git", "HEAD"): "ref: refs/heads/main\n",
+		filepath.Join(repo, "billing", "tax.py"): `def calculate_vat(amount):
+    return amount * 0.2
+
+def format_receipt(entry):
+    return str(entry)
+`,
+		filepath.Join(repo, "web", "format.ts"): `export function formatCurrency(cents: number): string {
+  return String(cents);
+}
+
+export const DEFAULT_LOCALE = "en-US";
+`,
+		filepath.Join(repo, "web", "view.ts"): "export const title = 'x';\n",
+	}
+	for p, content := range files {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	makePayload := func(tool string, input map[string]any) string {
+		t.Helper()
+		b, err := json.Marshal(map[string]any{
+			"hook_event_name": "PreToolUse",
+			"tool_name":       tool,
+			"tool_input":      input,
+			"session_id":      "cold-now",
+			"cwd":             repo,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+
+	pyBad := toolHookRun(t, makePayload("Write", map[string]any{
+		"file_path": filepath.Join(repo, "billing", "handler.py"),
+		"content":   "from .tax import compute_vat\n",
+	}))
+	if !strings.Contains(pyBad, "handler.py — check import from billing/tax.py") || !strings.Contains(pyBad, "compute_vat") || !strings.Contains(pyBad, "calculate_vat") {
+		t.Errorf("expected Python local import typo hint, got %q", pyBad)
+	}
+
+	if pyGood := toolHookRun(t, makePayload("Write", map[string]any{
+		"file_path": filepath.Join(repo, "billing", "valid_handler.py"),
+		"content":   "from .tax import calculate_vat\n",
+	})); pyGood != "" {
+		t.Errorf("expected empty output for valid Python local import, got %q", pyGood)
+	}
+
+	if pyExt := toolHookRun(t, makePayload("Write", map[string]any{
+		"file_path": filepath.Join(repo, "billing", "ext_handler.py"),
+		"content":   "from requests import get\n",
+	})); pyExt != "" {
+		t.Errorf("expected empty output for external Python import, got %q", pyExt)
+	}
+
+	tsBad := toolHookRun(t, makePayload("Edit", map[string]any{
+		"file_path":  filepath.Join(repo, "web", "view.ts"),
+		"old_string": "export const title = 'x';\n",
+		"new_string": "import { formattCurrency } from './format';\nexport const title = 'x';\n",
+	}))
+	if !strings.Contains(tsBad, "view.ts — check import from web/format.ts") || !strings.Contains(tsBad, "formattCurrency") || !strings.Contains(tsBad, "formatCurrency") {
+		t.Errorf("expected TypeScript local import typo hint, got %q", tsBad)
+	}
+
+	if tsGood := toolHookRun(t, makePayload("Edit", map[string]any{
+		"file_path":  filepath.Join(repo, "web", "view.ts"),
+		"old_string": "export const title = 'x';\n",
+		"new_string": "import { formatCurrency } from './format';\nexport const title = 'x';\n",
+	})); tsGood != "" {
+		t.Errorf("expected empty output for valid TypeScript local import, got %q", tsGood)
+	}
+}

@@ -404,3 +404,90 @@ func TestTurn0StructuredPromptDiagnosticGuardrailAndDedup(t *testing.T) {
 		t.Errorf("unexpected breakage error classification")
 	}
 }
+
+func TestTurn0StemStopwordMemoryAndSingleSessionConsensus(t *testing.T) {
+	tmp := hermeticEnv(t)
+	idxDir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", idxDir)
+
+	proj := filepath.Join(tmp, "payservice")
+	files := map[string]string{
+		filepath.Join(proj, ".git", "HEAD"):          "ref: refs/heads/main\n",
+		filepath.Join(proj, "batch_after_hook.go"):   "package payservice\n\nfunc RunSettlementWindow() {}\n",
+		filepath.Join(proj, "mcp_router.go"):         "package payservice\n\nfunc DispatchMcpFrame() {}\n",
+		filepath.Join(proj, "localize_cache.go"):     "package payservice\n\nfunc LocalizeTargetCache() {}\n",
+		filepath.Join(proj, "quorum_fence.go"):       "package payservice\n\nfunc FenceEpoch() {}\n",
+		filepath.Join(proj, "worker_retry_one.go"):   "package payservice\n\nfunc RetryWorkerOne() {}\n",
+		filepath.Join(proj, "worker_retry_two.go"):   "package payservice\n\nfunc RetryWorkerTwo() {}\n",
+		filepath.Join(proj, "worker_retry_three.go"): "package payservice\n\nfunc RetryWorkerThree() {}\n",
+		filepath.Join(proj, "worker_retry_four.go"):  "package payservice\n\nfunc RetryWorkerFour() {}\n",
+		filepath.Join(proj, ".deja", "memory.jsonl"): `{"id":"aa11bb22cc","kind":"gotcha","text":"Settlement rollback fails during reconciliation window","files":["batch_after_hook.go"],"date":"2026-03-05"}` + "\n",
+	}
+	for p, content := range files {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// 1. Generic stopword stem tokens ("after hook") must not pass isTechnicalStemStopWord or spuriously match batch_after_hook.go.
+	if !isTechnicalStemStopWord("after") || !isTechnicalStemStopWord("hook") {
+		t.Fatalf("expected after/hook to be filtered as technical stem stopwords")
+	}
+	if stopOut, _ := promptTaskTargetsLine(idxDir, proj, "check behavior after hook runs", nil, nil); strings.Contains(stopOut, "batch_after_hook.go") {
+		t.Errorf("generic stopwords unexpectedly localized batch_after_hook.go: %q", stopOut)
+	}
+
+	// 2. Cold repo without an index still resolves 3-letter package/stem tokens ("mcp"), ASCII inflections ("localizing"), and .deja/memory.jsonl.
+	if mcpOut, _ := promptTaskTargetsLine(idxDir, proj, "fix broken mcp dispatch router", nil, nil); !strings.Contains(mcpOut, "mcp_router.go") {
+		t.Errorf("expected 3-letter token to localize mcp_router.go, got %q", mcpOut)
+	}
+	if inflectOut, _ := promptTaskTargetsLine(idxDir, proj, "fix localizing target cache bug", nil, nil); !strings.Contains(inflectOut, "localize_cache.go") {
+		t.Errorf("expected ASCII inflection to localize localize_cache.go, got %q", inflectOut)
+	}
+	memBoost := repoMemoryTargetBoost(proj, "settlement rollback failure during reconciliation window", selfProjectWordSet(proj))
+	if memBoost["batch_after_hook.go"] <= 0 {
+		t.Errorf("expected .deja/memory.jsonl boost for batch_after_hook.go, got %v", memBoost)
+	}
+
+	// 3. Single strong session fallback in rankedTouchedConsensusLine works when contributingSessions == 1,
+	// while weak or cross-project single sessions stay silent.
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	fenceFile := filepath.Join(proj, "quorum_fence.go")
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "payservice", "strong1.jsonl"), "strong1", []string{
+		fmt.Sprintf(`{"type":"user","sessionId":"strong1","cwd":%q,"timestamp":"2026-03-06T10:00:00Z","message":{"role":"user","content":"fix quorum epoch fencing drift during snapshot handoff"}}`, proj),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"strong1","cwd":%q,"timestamp":"2026-03-06T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"e1","name":"Edit","input":{"file_path":%q,"old_string":"func FenceEpoch() {}","new_string":"func FenceEpoch() {}"}}]}}`, proj, fenceFile),
+	})
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	metas, err := index.AllMeta(idxDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var projName string
+	for _, m := range metas {
+		if m.ID == "strong1" {
+			projName = m.Project
+			break
+		}
+	}
+	if projName == "" {
+		t.Fatalf("expected strong1 metadata in index, got %+v", metas)
+	}
+
+	ranked := []model.Session{{Harness: "claude", ID: "strong1", Project: projName}}
+	strongLine, strongTok := rankedTouchedConsensusLine(idxDir, proj, ranked, []int{3}, []int{2}, nil, nil)
+	if !strings.Contains(strongLine, "files edited in related session: quorum_fence.go") || strongTok == "" {
+		t.Errorf("expected single-strong-session fallback to recover quorum_fence.go, got line=%q tok=%q", strongLine, strongTok)
+	}
+	if weakLine, _ := rankedTouchedConsensusLine(idxDir, proj, ranked, []int{2}, []int{0}, nil, nil); weakLine != "" {
+		t.Errorf("expected weak single session to stay silent, got %q", weakLine)
+	}
+	crossRanked := []model.Session{{Harness: "claude", ID: "strong1", Project: "other/unrelated"}}
+	if crossLine, _ := rankedTouchedConsensusLine(idxDir, proj, crossRanked, []int{3}, []int{2}, nil, nil); crossLine != "" {
+		t.Errorf("expected cross-project single session to be filtered out, got %q", crossLine)
+	}
+}
