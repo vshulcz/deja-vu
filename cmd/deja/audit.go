@@ -6,8 +6,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -91,7 +93,7 @@ func collectAudit(dir string, now time.Time) auditReport {
 		{"claude", sources.ClaudeFiles},
 		{"codex", sources.CodexFiles},
 		{"cursor", cursorReadFiles},
-		{"opencode", func() []string { return presentFiles(sources.OpencodeDB()) }},
+		{"opencode", func() []string { return []string{sources.OpencodeDB()} }},
 		{"gemini", sources.GeminiChatFiles},
 		{"antigravity", sources.AntigravityTranscripts},
 		{"openclaw", sources.OpenClawStoreFiles},
@@ -105,7 +107,7 @@ func collectAudit(dir string, now time.Time) auditReport {
 		{"goose", sources.GooseSessionFiles},
 		{"qwen", sources.QwenSessionFiles},
 		{"kimi", sources.KimiSessionFiles},
-		{"zed", func() []string { return presentFiles(sources.ZedDB()) }},
+		{"zed", func() []string { return []string{sources.ZedDB()} }},
 		{"windsurf", sources.WindsurfSessionFiles},
 		{"kiro", sources.KiroSessionFiles},
 		{"continue", sources.ContinueSessionFiles},
@@ -137,27 +139,112 @@ func collectAudit(dir string, now time.Time) auditReport {
 	}
 
 	skipStore := sources.ExcludedHarnesses()
-	for _, sp := range specs {
+	claudeSkipped := skipStore["claude"] || sources.StoreSilenced("claude")
+
+	type storeScanResult struct {
+		row   auditStoreRow
+		ok    bool
+		files []string
+		infos []os.FileInfo
+	}
+	results := make([]storeScanResult, len(specs))
+	jobs := make(chan int, len(specs))
+	for i, sp := range specs {
 		if sources.StoreSilenced(sp.name) || skipStore[sp.name] {
 			continue
 		}
-		files := presentFiles(sp.files()...)
-		if len(files) == 0 {
-			continue
+		jobs <- i
+	}
+	close(jobs)
+	nJobs := len(jobs)
+
+	var (
+		wg           sync.WaitGroup
+		idxSessions  int
+		recoverFiles int
+		preservedDel int
+	)
+
+	// Keep index reads in a single goroutine while store scans run concurrently.
+	wg.Go(func() {
+		if n, err := index.SessionCount(dir); err == nil && n > 0 {
+			idxSessions = n
+			seenPaths := map[string]bool{}
+			_ = index.EachRecordOfRole(dir, index.RoleEdit, func(_ index.SessionMeta, r index.Record) {
+				if recorded, _, ok := strings.Cut(r.Text, "\n"); ok && recorded != "" {
+					seenPaths[recorded] = true
+				}
+			})
+			recoverFiles = len(seenPaths)
 		}
-		sz := filesSize(files)
-		if sp.name == "opencode" {
-			if s, _, err := sources.OpencodeCounts(); err == nil && s == 0 {
-				continue
+		if !claudeSkipped {
+			if kept, err := index.KeptSince(dir, time.Unix(1, 0), now.Add(time.Second)); err == nil {
+				for _, k := range kept {
+					if k.Harness == "claude" {
+						preservedDel++
+					}
+				}
 			}
 		}
-		rep.Stores = append(rep.Stores, auditStoreRow{
-			Name:  sp.name,
-			Files: len(files),
-			Bytes: sz,
+	})
+
+	workers := min(nJobs, max(runtime.GOMAXPROCS(0), 4))
+	for range workers {
+		wg.Go(func() {
+			for i := range jobs {
+				sp := specs[i]
+				files, infos, sz := statPresentFiles(sp.files()...)
+				if len(files) == 0 {
+					continue
+				}
+				if sp.name == "opencode" {
+					if ok, err := sources.OpencodeHasSessions(); err == nil && !ok {
+						continue
+					}
+				}
+				res := storeScanResult{
+					row: auditStoreRow{
+						Name:  sp.name,
+						Files: len(files),
+						Bytes: sz,
+					},
+					ok: true,
+				}
+				if sp.name == "claude" {
+					res.files = files
+					res.infos = infos
+				}
+				results[i] = res
+			}
 		})
-		rep.TotalFiles += len(files)
-		rep.TotalBytes += sz
+	}
+
+	days, explicit := readClaudeCleanupPeriodDays()
+	if db := sources.ClaudeMemDBPath(); db != "" {
+		if fi, err := os.Stat(db); err == nil && !fi.IsDir() && fi.Size() > 0 {
+			rep.ClaudeMemDBPresent = true
+			rep.ClaudeMemDBBytes = fi.Size()
+		}
+	}
+	st := readWiringState()
+
+	wg.Wait()
+
+	var (
+		claudeFiles []string
+		claudeInfos []os.FileInfo
+	)
+	for i, res := range results {
+		if !res.ok {
+			continue
+		}
+		rep.Stores = append(rep.Stores, res.row)
+		rep.TotalFiles += res.row.Files
+		rep.TotalBytes += res.row.Bytes
+		if specs[i].name == "claude" {
+			claudeFiles = res.files
+			claudeInfos = res.infos
+		}
 	}
 	sort.Slice(rep.Stores, func(i, j int) bool {
 		if rep.Stores[i].Bytes != rep.Stores[j].Bytes {
@@ -166,27 +253,10 @@ func collectAudit(dir string, now time.Time) auditReport {
 		return rep.Stores[i].Name < rep.Stores[j].Name
 	})
 
-	rep.ClaudeRetention = collectClaudeRetention(dir, now, skipStore["claude"] || sources.StoreSilenced("claude"))
+	rep.ClaudeRetention = collectClaudeRetention(now, days, explicit, claudeSkipped, claudeFiles, claudeInfos, preservedDel)
+	rep.IndexedSessions = idxSessions
+	rep.RecoverableFiles = recoverFiles
 
-	if db := sources.ClaudeMemDBPath(); db != "" {
-		if fi, err := os.Stat(db); err == nil && !fi.IsDir() && fi.Size() > 0 {
-			rep.ClaudeMemDBPresent = true
-			rep.ClaudeMemDBBytes = fi.Size()
-		}
-	}
-
-	if n, err := index.SessionCount(dir); err == nil && n > 0 {
-		rep.IndexedSessions = n
-		seenPaths := map[string]bool{}
-		_ = index.EachRecordOfRole(dir, index.RoleEdit, func(_ index.SessionMeta, r index.Record) {
-			if recorded, _, ok := strings.Cut(r.Text, "\n"); ok && recorded != "" {
-				seenPaths[recorded] = true
-			}
-		})
-		rep.RecoverableFiles = len(seenPaths)
-	}
-
-	st := readWiringState()
 	if len(st.Targets) > 0 {
 		rep.WiredTargets = append(rep.WiredTargets, st.Targets...)
 		sort.Strings(rep.WiredTargets)
@@ -197,43 +267,51 @@ func collectAudit(dir string, now time.Time) auditReport {
 	return rep
 }
 
-func collectClaudeRetention(dir string, now time.Time, skipped bool) auditClaudeRetention {
-	days, explicit := readClaudeCleanupPeriodDays()
+func statPresentFiles(paths ...string) (present []string, infos []os.FileInfo, totalBytes int64) {
+	seen := make(map[string]struct{}, len(paths))
+	for _, p := range paths {
+		if p == "" {
+			continue
+		}
+		fi, err := os.Stat(p)
+		if err != nil || fi.IsDir() {
+			continue
+		}
+		present = append(present, p)
+		infos = append(infos, fi)
+		if _, ok := seen[p]; !ok {
+			seen[p] = struct{}{}
+			totalBytes += fi.Size()
+		}
+	}
+	return present, infos, totalBytes
+}
+
+func collectClaudeRetention(now time.Time, days int, explicit, skipped bool, files []string, infos []os.FileInfo, preservedDeleted int) auditClaudeRetention {
 	ret := auditClaudeRetention{
 		CleanupPeriodDays: days,
 		Explicit:          explicit,
+		PreservedDeleted:  preservedDeleted,
 	}
 	if skipped {
 		return ret
 	}
-	files := presentFiles(sources.ClaudeFiles()...)
 	warnAge := time.Duration(max(days-7, 0)) * 24 * time.Hour
 	pastAge := time.Duration(days) * 24 * time.Hour
-	for _, p := range files {
-		// Skip claude-mem SQLite DB when counting JSONL transcript ages.
-		if sources.IsClaudeMemDB(p) {
+	for i, p := range files {
+		// Skip claude-mem SQLite DB and auto-memory notes when counting JSONL transcript ages.
+		if sources.IsClaudeMemDB(p) || sources.IsClaudeAutoMemoryFile(p) {
 			continue
 		}
 		ret.TotalFiles++
-		if days <= 0 {
+		if days <= 0 || i >= len(infos) || infos[i] == nil {
 			continue
 		}
-		fi, err := os.Stat(p)
-		if err != nil {
-			continue
-		}
-		age := now.Sub(fi.ModTime())
+		age := now.Sub(infos[i].ModTime())
 		if age >= pastAge {
 			ret.PastPeriod++
 		} else if age >= warnAge {
 			ret.ExpiringIn7Days++
-		}
-	}
-	if kept, err := index.KeptSince(dir, time.Unix(1, 0), now.Add(time.Second)); err == nil {
-		for _, k := range kept {
-			if k.Harness == "claude" {
-				ret.PreservedDeleted++
-			}
 		}
 	}
 	return ret

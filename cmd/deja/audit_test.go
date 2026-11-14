@@ -19,6 +19,8 @@ func TestAuditReportsClaudeRetentionAndUnwiredNextStep(t *testing.T) {
 	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(home, ".claude"))
 	t.Setenv("CLAUDE_CODE_PROJECT_DIR_NAME", "")
 	t.Setenv("DEJA_CLAUDE_ROOT", "")
+	t.Setenv("DEJA_XCODE_CLAUDE_ROOT", filepath.Join(home, ".none-xcode-claude"))
+	t.Setenv("DEJA_CC_MIRROR_ROOT", filepath.Join(home, ".none-cc-mirror"))
 	t.Setenv("DEJA_STORES", "claude")
 
 	projDir := filepath.Join(home, ".claude", "projects", "-Users-alex-app")
@@ -46,6 +48,20 @@ func TestAuditReportsClaudeRetentionAndUnwiredNextStep(t *testing.T) {
 	writeTranscript("fresh.jsonl", 5)
 	writeTranscript("soon.jsonl", 25)
 	writeTranscript("expired.jsonl", 34)
+
+	// Aged auto-memory notes belong to Claude's store but are not deleted by cleanupPeriodDays.
+	memDir := filepath.Join(projDir, "memory")
+	if err := os.MkdirAll(memDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	memPath := filepath.Join(memDir, "project_old.md")
+	if err := os.WriteFile(memPath, []byte("# Old note\nMust not count toward transcript expiry.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	oldTS := now.Add(-45 * 24 * time.Hour)
+	if err := os.Chtimes(memPath, oldTS, oldTS); err != nil {
+		t.Fatal(err)
+	}
 
 	claudeMemDir := filepath.Join(home, ".claude-mem")
 	if err := os.MkdirAll(claudeMemDir, 0o755); err != nil {

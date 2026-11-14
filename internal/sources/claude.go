@@ -136,13 +136,16 @@ func LoadClaude() []model.Session {
 			ss = append(ss, storeRead(cm, cmSS, err)...)
 		}
 	}
+	ss = append(ss, parseFiles(ClaudeAutoMemoryFiles(), ParseClaudeAutoMemoryFile)...)
 	return ss
 }
 
-// ClaudeFiles lists the transcript files under the Claude root, and the prompt
-// log when there is one, without parsing them — a cheap count for diagnostics.
+// ClaudeFiles lists the transcript files under the Claude root, auto-memory
+// markdown notes beside them, and the prompt log when there is one, without
+// parsing them — a cheap count for diagnostics.
 func ClaudeFiles() []string {
 	out := claudeTranscriptFiles()
+	out = append(out, ClaudeAutoMemoryFiles()...)
 	if hist := ClaudeHistoryFile(); hist != "" && fileExists(hist) {
 		out = append(out, hist)
 	}

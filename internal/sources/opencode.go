@@ -905,6 +905,36 @@ func OpencodeCounts() (sessions, messages int, err error) {
 	return
 }
 
+// OpencodeHasSessions reports whether the OpenCode store contains at least one
+// session row without scanning the part or session_message tables.
+func OpencodeHasSessions() (bool, error) {
+	db := OpencodeDB()
+	fi, err := os.Stat(db)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if fi.Size() == 0 {
+		return false, nil
+	}
+	tables := opencodeSessionTables(db)
+	if len(tables) == 0 {
+		return false, nil
+	}
+	parts := make([]string, 0, len(tables))
+	for _, tbl := range tables {
+		parts = append(parts, `select 1 from "`+strings.ReplaceAll(tbl, `"`, `""`)+`"`)
+	}
+	q := "select exists(" + strings.Join(parts, " union all ") + ")"
+	b, err := sqliteOutput(db, q)
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(string(b)) == "1", nil
+}
+
 // sqlEscape doubles single quotes for embedding in a SQL literal. It does not
 // add the surrounding quotes — the caller does, because half the call sites
 // build a LIKE pattern around the value. It was called sqlQuote, and that name

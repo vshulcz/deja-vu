@@ -351,6 +351,9 @@ var sessionDirName = regexp.MustCompile(`^(?:(?:session[_-]|sess_)?[0-9a-fA-F]{8
 // away whole: its directory is still there, or the directory that went with
 // it was one session's (#4195).
 func deletedFromLiveStore(p string) bool {
+	if sources.IsClaudeAutoMemoryFile(p) {
+		return false
+	}
 	if _, err := os.Stat(filepath.Dir(p)); err == nil {
 		return true
 	}
