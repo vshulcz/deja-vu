@@ -1,6 +1,9 @@
 package sources
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"os"
 	"path/filepath"
@@ -9,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/redact"
 )
 
@@ -258,6 +262,9 @@ func parseClaudeMemoryIndexFile(full, memDir string, de os.DirEntry, loadedFiles
 }
 
 func readClaudeMemoryBytes(full string, de os.DirEntry) (string, time.Time, bool) {
+	if de == nil {
+		return readClaudeMemoryFile(full)
+	}
 	f, err := os.Open(full)
 	if err != nil {
 		return "", time.Time{}, false
@@ -268,10 +275,29 @@ func readClaudeMemoryBytes(full string, de os.DirEntry) (string, time.Time, bool
 		mtime = info.ModTime()
 	}
 	b, err := io.ReadAll(io.LimitReader(f, claudeMemoryFileMaxBytes))
-	if err != nil || len(b) == 0 {
+	if err != nil || len(b) == 0 || bytes.IndexByte(b, 0) >= 0 {
 		return "", time.Time{}, false
 	}
-	return strings.ReplaceAll(string(b), "\r\n", "\n"), mtime, true
+	text := strings.ToValidUTF8(string(b), "\uFFFD")
+	return strings.ReplaceAll(text, "\r\n", "\n"), mtime, true
+}
+
+func readClaudeMemoryFile(full string) (string, time.Time, bool) {
+	f, err := os.Open(full)
+	if err != nil {
+		return "", time.Time{}, false
+	}
+	defer func() { _ = f.Close() }()
+	fi, err := f.Stat()
+	if err != nil || fi.IsDir() {
+		return "", time.Time{}, false
+	}
+	b, err := io.ReadAll(io.LimitReader(f, claudeMemoryFileMaxBytes))
+	if err != nil || len(b) == 0 || bytes.IndexByte(b, 0) >= 0 {
+		return "", time.Time{}, false
+	}
+	text := strings.ToValidUTF8(string(b), "\uFFFD")
+	return strings.ReplaceAll(text, "\r\n", "\n"), fi.ModTime(), true
 }
 
 func splitClaudeFrontmatter(text string) (map[string]string, string) {
@@ -378,4 +404,205 @@ func trimMarkdownBullet(s string) string {
 		}
 	}
 	return s
+}
+
+// IsClaudeAutoMemoryFile reports whether p is a markdown auto-memory note under
+// a Claude Code project directory (<root>/<encoded-project>/memory/*.md).
+func IsClaudeAutoMemoryFile(p string) bool {
+	clean := filepath.Clean(p)
+	if clean == "." || !strings.EqualFold(filepath.Ext(clean), ".md") {
+		return false
+	}
+	if !strings.EqualFold(filepath.Base(filepath.Dir(clean)), "memory") {
+		return false
+	}
+	return UnderClaudeRoot(clean)
+}
+
+// ClaudeAutoMemoryFiles lists markdown notes under Claude Code's per-project
+// auto-memory directories (<root>/<encoded-project>/memory/*.md).
+func ClaudeAutoMemoryFiles() []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, root := range ClaudeRoots() {
+		projEntries, err := os.ReadDir(root)
+		if err != nil {
+			continue
+		}
+		for _, pe := range projEntries {
+			if !pe.IsDir() && pe.Type()&os.ModeSymlink == 0 {
+				continue
+			}
+			memDir := filepath.Join(root, pe.Name(), "memory")
+			memEntries, err := os.ReadDir(memDir)
+			if err != nil {
+				continue
+			}
+			for _, me := range memEntries {
+				if me.IsDir() || !strings.EqualFold(filepath.Ext(me.Name()), ".md") {
+					continue
+				}
+				if me.Type()&os.ModeSymlink != 0 {
+					if fi, err := os.Stat(filepath.Join(memDir, me.Name())); err != nil || fi.IsDir() {
+						continue
+					}
+				}
+				full := filepath.Clean(filepath.Join(memDir, me.Name()))
+				if seen[full] {
+					continue
+				}
+				seen[full] = true
+				out = append(out, full)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// ParseClaudeAutoMemoryFile parses one Claude Code auto-memory markdown file
+// with its full redacted body intact so multi-paragraph notes survive transcript
+// cleanup and remain searchable in deja.
+func ParseClaudeAutoMemoryFile(path string) ([]model.Session, error) {
+	raw, mtime, ok := readClaudeMemoryFile(path)
+	if !ok {
+		return nil, nil
+	}
+	fm, bodyText := splitClaudeFrontmatter(raw)
+	if claudeMemoryVetoed(fm) {
+		return nil, nil
+	}
+
+	cleanPath := filepath.Clean(path)
+	name := strings.TrimSpace(fm["name"])
+	desc := strings.TrimSpace(fm["description"])
+	memType := strings.TrimSpace(fm["type"])
+
+	var body string
+	if strings.EqualFold(filepath.Base(cleanPath), "MEMORY.md") {
+		filtered, hasContent := claudeMemoryIndexBody(filepath.Dir(cleanPath), bodyText)
+		if !hasContent && name == "" && desc == "" {
+			return nil, nil
+		}
+		body = filtered
+	} else {
+		body = strings.TrimSpace(bodyText)
+		if body == "" && name == "" && desc == "" {
+			return nil, nil
+		}
+	}
+
+	var parts []string
+	if name != "" {
+		parts = append(parts, name)
+	}
+	if desc != "" {
+		parts = append(parts, desc)
+	}
+	if memType != "" {
+		parts = append(parts, "type: "+memType)
+	}
+	if body != "" {
+		parts = append(parts, body)
+	}
+	if len(parts) == 0 {
+		return nil, nil
+	}
+	redacted, _ := redact.Text(strings.Join(parts, "\n\n"))
+	redacted = strings.TrimSpace(strings.ToValidUTF8(redacted, "\uFFFD"))
+	if redacted == "" {
+		return nil, nil
+	}
+
+	title := desc
+	if name != "" {
+		switch {
+		case title == "":
+			title = name
+		case !strings.Contains(strings.ToLower(title), strings.ToLower(name)):
+			title = name + " — " + title
+		}
+	}
+	if title == "" {
+		title = firstClaudeMemoryLine(body)
+	}
+	if title == "" {
+		title = strings.TrimSuffix(filepath.Base(cleanPath), filepath.Ext(cleanPath))
+	}
+	title, _ = redact.Text(title)
+	title = strings.TrimSpace(strings.ToValidUTF8(title, "\uFFFD"))
+	if title == "" {
+		title = filepath.Base(cleanPath)
+	}
+
+	projDir := filepath.Dir(cleanPath)
+	if strings.EqualFold(filepath.Base(projDir), "memory") {
+		projDir = filepath.Dir(projDir)
+	}
+	proj := strings.ToValidUTF8(claudeProjectName(projDir), "\uFFFD")
+	if proj == "" {
+		proj = "claude"
+	}
+
+	sum := sha256.Sum256([]byte(cleanPath))
+	return []model.Session{{
+		ID:      "claude-memory-" + hex.EncodeToString(sum[:8]),
+		Harness: "claude",
+		Project: proj,
+		Path:    cleanPath,
+		Title:   title,
+		Started: mtime,
+		Updated: mtime,
+		Messages: []model.Message{{
+			Role: "assistant",
+			Text: redacted,
+			Time: mtime,
+		}},
+	}}, nil
+}
+
+func claudeMemoryIndexBody(memDir, body string) (string, bool) {
+	var kept []string
+	hasContent := false
+	inFence := false
+	for line := range strings.SplitSeq(body, "\n") {
+		s := strings.TrimSpace(line)
+		if strings.HasPrefix(s, "```") {
+			inFence = !inFence
+			kept = append(kept, line)
+			continue
+		}
+		if inFence {
+			if s != "" {
+				hasContent = true
+			}
+			kept = append(kept, line)
+			continue
+		}
+		if s == "" || strings.HasPrefix(s, "#") || s == "---" || strings.HasPrefix(s, "<!--") {
+			kept = append(kept, line)
+			continue
+		}
+		cleaned, target := cleanClaudeMemoryIndexLine(line)
+		if target != "" && strings.HasSuffix(strings.ToLower(target), ".md") {
+			if _, err := os.Stat(filepath.Join(memDir, filepath.Base(target))); err == nil {
+				continue
+			}
+			if cleaned == "" {
+				continue
+			}
+			kept = append(kept, cleaned)
+			hasContent = true
+			continue
+		}
+		if target != "" && cleaned == "" {
+			continue
+		}
+		kept = append(kept, line)
+		hasContent = true
+	}
+	if !hasContent {
+		return "", false
+	}
+	return strings.TrimSpace(strings.Join(kept, "\n")), true
 }

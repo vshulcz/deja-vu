@@ -206,6 +206,11 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 					ParseFrom: dbParseFrom(ParseClaudeMemDB, ParseClaudeMemDBSince),
 				},
 				{
+					Name:  "claude-memory",
+					Match: IsClaudeAutoMemoryFile,
+					Parse: fullParse(ParseClaudeAutoMemoryFile),
+				},
+				{
 					Name:      "claude",
 					Match:     func(p string) bool { return strings.HasSuffix(p, ".jsonl") && UnderClaudeRoot(p) },
 					Parse:     fullParse(ParseClaudeFile),

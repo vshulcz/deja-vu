@@ -116,3 +116,115 @@ func TestLoadClaudeAutoMemoryEdgeCases(t *testing.T) {
 		t.Fatalf("missing combined description+body in %#v", entries)
 	}
 }
+
+func TestParseClaudeAutoMemoryFileFullBodyAndRedaction(t *testing.T) {
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude", "projects")
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+
+	proj := filepath.Join(tmp, "work", "my-payments")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	memDir := filepath.Join(claudeRoot, claudeEncodePath(proj), "memory")
+	if err := os.MkdirAll(memDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	topicPath := filepath.Join(memDir, "deploy_notes.md")
+	topicContent := strings.Join([]string{
+		"---",
+		"name: deploy-notes",
+		"description: Production deployment constraints",
+		"type: project",
+		"---",
+		"First paragraph mentions StagingRolloutGate.",
+		"",
+		"Second paragraph holds deep token sk-ant-api03-1234567890abcdefghij1234567890abcdefghij and keyword MidnightCanary.",
+	}, "\n")
+	if err := os.WriteFile(topicPath, []byte(topicContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Sibling MEMORY.md: link to existing deploy_notes.md should be skipped,
+	// while standalone prose stays indexed.
+	indexPath := filepath.Join(memDir, "MEMORY.md")
+	indexContent := "# Memory Index\n- [Deploy](deploy_notes.md) — duplicate summary\n- Standalone index fact OrangeFalcons\n"
+	if err := os.WriteFile(indexPath, []byte(indexContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Pure link index MEMORY.md in another project should yield zero sessions.
+	otherMemDir := filepath.Join(claudeRoot, "-Users-alex-other", "memory")
+	if err := os.MkdirAll(otherMemDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(otherMemDir, "rule.md"), []byte("Keep strict checks."), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pureIndexPath := filepath.Join(otherMemDir, "MEMORY.md")
+	if err := os.WriteFile(pureIndexPath, []byte("# Index\n- [Rule](rule.md)\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Vetoed and binary files return no session.
+	vetoedPath := filepath.Join(memDir, "vetoed.md")
+	if err := os.WriteFile(vetoedPath, []byte("---\nstate: rejected\n---\nSecret ignored body\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	binaryPath := filepath.Join(memDir, "binary.md")
+	if err := os.WriteFile(binaryPath, []byte("header\x00binary"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	files := ClaudeAutoMemoryFiles()
+	if len(files) != 6 {
+		t.Fatalf("ClaudeAutoMemoryFiles got %d files, want 6: %v", len(files), files)
+	}
+	for _, f := range files {
+		if !IsClaudeAutoMemoryFile(f) {
+			t.Fatalf("IsClaudeAutoMemoryFile(%q) = false, want true", f)
+		}
+	}
+	if IsClaudeAutoMemoryFile(filepath.Join(filepath.Dir(memDir), "transcript.jsonl")) {
+		t.Fatal("IsClaudeAutoMemoryFile unexpectedly matched .jsonl transcript")
+	}
+
+	ss, err := ParseClaudeAutoMemoryFile(topicPath)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("ParseClaudeAutoMemoryFile(topic) = %#v, err=%v", ss, err)
+	}
+	s := ss[0]
+	if s.Harness != "claude" || s.Project != "work/my-payments" || s.Path != topicPath {
+		t.Fatalf("unexpected session metadata: %+v", s)
+	}
+	if len(s.Messages) != 1 || s.Messages[0].Role != "assistant" {
+		t.Fatalf("unexpected messages: %#v", s.Messages)
+	}
+	txt := s.Messages[0].Text
+	if !strings.Contains(txt, "StagingRolloutGate") || !strings.Contains(txt, "MidnightCanary") {
+		t.Fatalf("multi-paragraph body missing in indexed message: %q", txt)
+	}
+	if strings.Contains(txt, "sk-ant-api03-1234567890abcdefghij") {
+		t.Fatalf("secret token was not redacted: %q", txt)
+	}
+
+	idxSS, err := ParseClaudeAutoMemoryFile(indexPath)
+	if err != nil || len(idxSS) != 1 {
+		t.Fatalf("ParseClaudeAutoMemoryFile(MEMORY.md with standalone note) = %#v, err=%v", idxSS, err)
+	}
+	idxText := idxSS[0].Messages[0].Text
+	if strings.Contains(idxText, "duplicate summary") || !strings.Contains(idxText, "OrangeFalcons") {
+		t.Fatalf("MEMORY.md filtering unexpected: %q", idxText)
+	}
+
+	if pureSS, err := ParseClaudeAutoMemoryFile(pureIndexPath); err != nil || len(pureSS) != 0 {
+		t.Fatalf("pure link MEMORY.md = %#v, err=%v, want empty", pureSS, err)
+	}
+	if vSS, err := ParseClaudeAutoMemoryFile(vetoedPath); err != nil || len(vSS) != 0 {
+		t.Fatalf("vetoed note = %#v, err=%v, want empty", vSS, err)
+	}
+	if bSS, err := ParseClaudeAutoMemoryFile(binaryPath); err != nil || len(bSS) != 0 {
+		t.Fatalf("binary note = %#v, err=%v, want empty", bSS, err)
+	}
+}

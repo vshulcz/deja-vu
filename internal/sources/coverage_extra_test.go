@@ -455,3 +455,67 @@ func TestMoreSourceEdgeBranches(t *testing.T) {
 		t.Fatalf("bad registry=%q", got)
 	}
 }
+
+func TestOpencodeHasSessions(t *testing.T) {
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("sqlite3 not installed")
+	}
+	tmp := hermeticSourcesEnv(t)
+
+	// Missing DB.
+	has, err := OpencodeHasSessions()
+	if err != nil || has {
+		t.Fatalf("missing db: has=%v err=%v", has, err)
+	}
+
+	// Empty 0-byte DB.
+	zeroDB := filepath.Join(tmp, "zero.db")
+	if err := os.WriteFile(zeroDB, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_OPENCODE_DB", zeroDB)
+	has, err = OpencodeHasSessions()
+	if err != nil || has {
+		t.Fatalf("zero db: has=%v err=%v", has, err)
+	}
+
+	// v1 schema with empty session table.
+	v1Empty := filepath.Join(tmp, "v1-empty.db")
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", v1Empty, "create table session(id text primary key);").CombinedOutput(); err != nil {
+		t.Fatalf("sqlite v1 empty: %v %s", err, out)
+	}
+	t.Setenv("DEJA_OPENCODE_DB", v1Empty)
+	has, err = OpencodeHasSessions()
+	if err != nil || has {
+		t.Fatalf("v1 empty: has=%v err=%v", has, err)
+	}
+
+	// v1 schema with 1 session row.
+	v1Full := filepath.Join(tmp, "v1-full.db")
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", v1Full, "create table session(id text primary key); insert into session values('s1');").CombinedOutput(); err != nil {
+		t.Fatalf("sqlite v1 full: %v %s", err, out)
+	}
+	t.Setenv("DEJA_OPENCODE_DB", v1Full)
+	has, err = OpencodeHasSessions()
+	if err != nil || !has {
+		t.Fatalf("v1 full: has=%v err=%v", has, err)
+	}
+
+	// v2 schema non-empty and empty.
+	v2Full := opencodeV2Fixture(t)
+	t.Setenv("DEJA_OPENCODE_DB", v2Full)
+	has, err = OpencodeHasSessions()
+	if err != nil || !has {
+		t.Fatalf("v2 full: has=%v err=%v", has, err)
+	}
+
+	v2Empty := filepath.Join(tmp, "v2-empty.db")
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", v2Empty, "create table session_v2(id text primary key);").CombinedOutput(); err != nil {
+		t.Fatalf("sqlite v2 empty: %v %s", err, out)
+	}
+	t.Setenv("DEJA_OPENCODE_DB", v2Empty)
+	has, err = OpencodeHasSessions()
+	if err != nil || has {
+		t.Fatalf("v2 empty: has=%v err=%v", has, err)
+	}
+}
