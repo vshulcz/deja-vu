@@ -3928,6 +3928,96 @@
           "proof": "fixture"
         }
       }
+    },
+    {
+      "id": "clawcode",
+      "store_paths": [
+        "${CLAW_CONFIG_HOME:-~/.claw}/sessions",
+        "${DEJA_CLAWCODE_ROOT}",
+        "${DEJA_CLAWCODE_ROOTS}"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/clawcode/session.jsonl",
+        "fixtures/registry/clawcode/legacy.json"
+      ],
+      "parser_source": "internal/sources/clawcode.go",
+      "last_verified": "2026-11-15",
+      "display_name": "Claw Code",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "none"
+      },
+      "gaps": {},
+      "surfaces": {
+        "digest": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "rust/crates/runtime/src/config.rs accepts only PreToolUse, PostToolUse, and PostToolUseFailure and rejects SessionStart as unknown_hook_event"
+        },
+        "prompt": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "rust/crates/runtime/src/config.rs rejects UserPromptSubmit in is_supported_hook_event, so per-prompt recall cannot hook in yet"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_reset": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "rust/crates/runtime/src/config.rs omits PreCompact and PostCompact hooks and compact.rs compacts in-process without emitting a reset hook"
+        },
+        "compaction_capture": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "rust/crates/runtime/src/compact.rs compacts sessions inline without firing a PreCompact hook to trigger deja digest"
+        },
+        "compaction_packet": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "rust/crates/runtime/src/compact.rs builds a fixed summary and tail without invoking an external hook or reading a recovery packet"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "deja handoff --exec launches claw with the handoff prompt"
+        },
+        "session_end": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "rust/crates/runtime/src/config.rs omits SessionEnd from is_supported_hook_event, so exit indexing cannot hook in yet"
+        },
+        "rules": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "rust/crates/runtime/src/prompt.rs walks workspace .claw/CLAUDE.md and project roots but does not load global ~/.claw/CLAUDE.md"
+        },
+        "statusline": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "rust/crates/rusty-claude-cli/src/main.rs does not execute or render a configured settings.json statusLine command"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "reads ~/.claw/sessions/*.jsonl transcripts and legacy .json snapshots while skipping .meta.json and .deleted.json"
+        }
+      }
     }
   ]
 }

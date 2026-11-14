@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add memory to herdr: search across agent panes — deja-vu</title>
+<meta name="description" content="Give coding agents inside herdr multiplexer panes shared local memory. Run deja install --auto so Claude Code, Codex, Cursor and opencode share recall.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-herdr.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Add memory to herdr: search across agent panes">
+<meta property="og:description" content="Give coding agents inside herdr multiplexer panes shared local memory. Run deja install --auto so Claude Code, Codex, Cursor and opencode share recall.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-herdr.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Add memory to herdr: search across agent panes">
+<meta name="twitter:description" content="Give coding agents inside herdr multiplexer panes shared local memory. Run deja install --auto so Claude Code, Codex, Cursor and opencode share recall.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to herdr", "description": "Give coding agents inside herdr multiplexer panes shared local memory. Run deja install --auto so Claude Code, Codex, Cursor and opencode share recall.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-herdr.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-herdr.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-14", "dateModified": "2026-11-14"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for herdr", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-herdr.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does herdr share conversation history across agent panes?", "acceptedAnswer": {"@type": "Answer", "text": "herdr preserves detachable pane layouts and surfaces working, blocked, or idle states for Claude Code, Codex, Cursor, opencode, and Grok, while each agent stores its own separate transcript format on disk. deja indexes all of them into one local index so panes share recall."}}, {"@type": "Question", "name": "How do I give agents running inside herdr shared memory?", "acceptedAnswer": {"@type": "Answer", "text": "Run deja install --auto once on the machine. Every supported harness launched in a herdr pane automatically receives the deja MCP server, skill, and lifecycle hooks."}}, {"@type": "Question", "name": "How can herdr agents hand off work between harnesses?", "acceptedAnswer": {"@type": "Answer", "text": "An agent in a new herdr pane can call deja handoff or deja orient to pull recent changes, failed commands, and settled decisions from any other harness on the same repository."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="nav-cta" href="https://github.com/vshulcz/deja-vu"><span class="star-ic" aria-hidden="true">★</span>GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="switch-agents-without-losing-context.html">Session handoffs</a>
+<a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="one-rules-file.html">One rules file</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold"><summary>Session history <span class="n">13</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="codex-history.html">Codex history</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="repo-memory.html">Repo memory</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="recover-overwritten-files.html">Recover overwritten files</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
+</details>
+<details class="grpfold"><summary>Deleting sessions <span class="n">39</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb too large</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-copilot-cli-session-history.html">Copilot CLI</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-roo-task-history.html">Roo Code</a>
+<a href="delete-zed-thread-history.html">Zed</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+<a href="delete-kimi-code-session-history.html">Kimi Code</a>
+<a href="delete-dsh-session-history.html">dsh</a>
+<a href="delete-commandcode-session-history.html">Command Code</a>
+<a href="delete-junie-session-history.html">Junie</a>
+<a href="delete-goose-session-history.html">Goose</a>
+<a href="delete-windsurf-cascade-history.html">Windsurf</a>
+<a href="delete-qwen-code-chat-history.html">Qwen Code</a>
+<a href="delete-trae-sessions.html">TRAE CLI</a>
+<a href="delete-codebuddy-sessions.html">CodeBuddy</a>
+<a href="delete-antigravity-history.html">Antigravity</a>
+<a href="delete-pi-session-history.html">pi</a>
+<a href="delete-senpi-session-history.html">Senpi</a>
+<a href="delete-crush-session-history.html">Crush</a>
+<a href="delete-hermes-session-history.html">Hermes</a>
+<a href="delete-cherrystudio-session-history.html">Cherry Studio</a>
+<a href="delete-codewhale-session-history.html">CodeWhale</a>
+<a href="delete-aider-chat-history.html">aider</a>
+<a href="delete-openclaw-session-history.html">OpenClaw</a>
+<a href="delete-grok-session-history.html">Grok Build</a>
+<a href="delete-devin-session-history.html">Devin CLI</a>
+<a href="delete-mimo-session-history.html">MiMo-Code</a>
+<a href="delete-omnigent-session-history.html">Omnigent</a>
+<a href="delete-orca-session-history.html">Orca</a>
+</details>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">50</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-claw-code.html">Claw Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-cmux.html">cmux</a>
+<a href="memory-for-codebuddy.html">CodeBuddy Code</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-devin.html">Devin CLI</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-herdr.html" aria-current="page">herdr</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-jetbrains.html">JetBrains AI Assistant</a>
+<a href="memory-for-junie.html">Junie</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-mimo.html">MiMo-Code</a>
+<a href="memory-for-mcode.html">MiniMax Code</a>
+<a href="memory-for-muse.html">Muse Code</a>
+<a href="memory-for-oh-my-claudecode.html">oh-my-claudecode</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-omnigent.html">Omnigent</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-orca.html">Orca</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-trae.html">TRAE CLI</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-windsurf.html">Windsurf</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="mem0-alternative.html">Mem0 alternative</a>
+<a href="specstory-alternative.html">SpecStory alternative</a>
+<a href="basic-memory-alternative.html">Basic Memory alternative</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to herdr</h1>
+<p class="pagelede">cross-agent memory across detachable panes for Claude Code, Codex, Cursor, opencode and Grok<span class="mins" data-mins></span></p>
+
+<p><code>herdr</code> multiplexes coding agents (<code>claude code</code>, <code>codex</code>, <code>cursor</code>, <code>opencode</code>, <code>grok</code>) inside persistent, detachable panes with live status tracking (<code>working</code>, <code>blocked</code>, <code>idle</code>), a socket API, and layout restore after detaching with <code>ctrl+b q</code>. What <code>herdr</code> does not unify is conversation memory: every pane still reads only its own agent's session log.</p>
+
+<h2>Wiring every harness herdr runs</h2>
+<pre>deja install --auto</pre>
+<p>Because <code>deja</code> wires each underlying harness directly rather than sitting in the terminal PTY path, one command sets up recall across every tool installed on the machine — without changing your <code>herdr</code> keybindings, socket server, or pane layouts. You can also install targets individually (<code>claude-auto</code>, <code>codex-auto</code>, <code>cursor-auto</code>, <code>opencode</code>, <code>grok-auto</code>).</p>
+
+<h2>What panes share</h2>
+<ul>
+<li><b>Shared local index:</b> as soon as any harness writes a turn to disk, <code>deja</code> indexes it into <code>~/.cache/deja/index.db</code> (BM25 search with secret scrubbing) alongside all forty-seven supported agent formats.</li>
+<li><b>Cross-harness handoffs:</b> when a Claude Code pane hits a wall or finishes a submodule and you open Codex in another pane, <code>deja handoff</code> and <code>SessionStart</code>/<code>UserPromptSubmit</code> hooks carry over settled decisions and recent commands (<a href="switch-agents-without-losing-context.html">session handoffs</a>).</li>
+<li><b>No duplicate mistakes across splits:</b> error resolutions recorded in one pane flow back via <code>fix</code> and per-file history in every other pane working on the same repo (<a href="parallel-sessions.html">parallel sessions</a>).</li>
+</ul>
+
+<h2>Format references for panes in herdr</h2>
+<p><code>herdr</code> reads the standard native stores of each tool it launches: <a href="../registry/claude-code.html">Claude Code</a>, <a href="../registry/codex.html">Codex CLI</a>, <a href="../registry/cursor.html">Cursor</a>, <a href="../registry/opencode.html">opencode</a>, and <a href="../registry/grok.html">Grok Build</a>. <a href="privacy.html">Indexing and search stay on your machine</a>, with tokens stripped during indexing.</p>
+
+<p><a href="parallel-sessions.html">Parallel sessions</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="getting-started.html">Getting started</a></p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

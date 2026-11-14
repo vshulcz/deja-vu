@@ -48,6 +48,14 @@ func TestACleanResultInTheNextPassStampsItsExit(t *testing.T) {
 			res:  `{"type":"user","sessionId":"c1","timestamp":"2026-10-01T10:00:02Z","cwd":"/tmp/proj","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","is_error":false,"content":"ok"}]}}` + "\n",
 		},
 		{
+			name: "clawcode", env: "DEJA_CLAWCODE_ROOT",
+			file: "s1.jsonl",
+			head: `{"type":"session_meta","session_id":"s1","created_at_ms":1759350554000,"workspace_root":"/tmp/proj"}` + "\n" +
+				`{"type":"message","message":{"role":"user","blocks":[{"type":"text","text":"fix the retry loop"}]}}` + "\n",
+			call: `{"type":"message","message":{"role":"assistant","blocks":[{"type":"tool_use","id":"call_1","name":"bash","input":"{\"command\":\"go vet ./retry\"}"}]}}` + "\n",
+			res:  `{"type":"message","message":{"role":"tool","blocks":[{"type":"tool_result","tool_use_id":"call_1","tool_name":"bash","output":"{\"stdout\":\"ok\",\"stderr\":\"\",\"interrupted\":false}","is_error":false}]}}` + "\n",
+		},
+		{
 			name: "commandcode", env: "DEJA_COMMANDCODE_ROOT",
 			file: "-tmp-proj/s1.jsonl",
 			head: `{"type":"session","version":3,"id":"s1","timestamp":"2026-10-01T20:09:14.839Z","cwd":"/tmp/proj"}` + "\n" +

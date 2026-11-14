@@ -54,6 +54,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | [MiMo-Code](mimo.md) | OpenCode-schema SQLite relational store, plus a JSON diff file per session |
 | [Omnigent](omnigent.md) | SQLite session, message, and typed item store |
 | [Orca](orca.md) | SQLite journal entry and JSON block store |
+| [Claw Code](clawcode.md) | JSONL transcripts and legacy JSON snapshots under `~/.claw/sessions` |
 
 ## Reporting drift
 

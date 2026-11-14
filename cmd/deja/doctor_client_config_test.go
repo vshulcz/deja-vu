@@ -17,7 +17,7 @@ import (
 // missing; stale is for deja's own entry gone wrong (#4275).
 func TestDoctorCallsAClientConfigWithoutDejaMissing(t *testing.T) {
 	const hook = "/usr/local/bin/deja hook-precompact"
-	for _, name := range []string{"kimi", "qwen", "cursor", "crush", "zcode", "commandcode"} {
+	for _, name := range []string{"kimi", "qwen", "cursor", "crush", "zcode", "commandcode", "clawcode"} {
 		t.Run(name, func(t *testing.T) {
 			tmp := hermeticEnv(t)
 			t.Setenv("KIMI_CODE_HOME", "")

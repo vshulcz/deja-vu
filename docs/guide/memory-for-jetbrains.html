@@ -118,13 +118,15 @@
 <a href="delete-omnigent-session-history.html">Omnigent</a>
 <a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold" open><summary>Per-agent guides <span class="n">46</span></summary>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">50</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
 <a href="memory-for-cherrystudio.html">Cherry Studio</a>
 <a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-claw-code.html">Claw Code</a>
 <a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-cmux.html">cmux</a>
 <a href="memory-for-codebuddy.html">CodeBuddy Code</a>
 <a href="memory-for-codewhale.html">CodeWhale</a>
 <a href="memory-for-codex.html">Codex</a>
@@ -139,6 +141,7 @@
 <a href="memory-for-gemini.html">Gemini CLI</a>
 <a href="memory-for-goose.html">Goose</a>
 <a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-herdr.html">herdr</a>
 <a href="memory-for-hermes.html">Hermes</a>
 <a href="memory-for-jetbrains.html" aria-current="page">JetBrains AI Assistant</a>
 <a href="memory-for-junie.html">Junie</a>
@@ -149,6 +152,7 @@
 <a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
+<a href="memory-for-oh-my-claudecode.html">oh-my-claudecode</a>
 <a href="memory-for-omp.html">omp</a>
 <a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
@@ -183,7 +187,7 @@
 <h1>Adding memory to JetBrains AI Assistant</h1>
 <p class="pagelede">one MCP file every IDE reads, and no hook that can deliver a digest<span class="mins" data-mins></span></p>
 
-<p>AI Assistant is the chat inside IntelliJ IDEA, PyCharm, GoLand and the other JetBrains IDEs. It keeps each project's chats on disk and opens the next one without them — and without anything from the other forty-five coding agents on the machine.</p>
+<p>AI Assistant is the chat inside IntelliJ IDEA, PyCharm, GoLand and the other JetBrains IDEs. It keeps each project's chats on disk and opens the next one without them — and without anything from the other forty-six coding agents on the machine.</p>
 
 <h2>What AI Assistant already has</h2>
 <p>Chats live under the JetBrains IDE configuration directory, one directory per product and version (<code>IntelliJIdea2026.2</code>, <code>PyCharm2026.1</code>, …). That root is <code>~/Library/Application Support/JetBrains</code> on macOS, <code>%APPDATA%\JetBrains</code> on Windows, and <code>${XDG_CONFIG_HOME:-~/.config}/JetBrains</code> elsewhere. <code>DEJA_JETBRAINS_ROOT</code> replaces the root.</p>
@@ -201,7 +205,7 @@
 <p>A chat reopens from the IDE's own history panel. There is no command-line resume: <code>deja resume</code> has nothing to print for an AI Assistant chat. Carrying one into a new chat is <code>deja handoff</code>, which prints a packet to paste — the chat runs inside the IDE, so there is no flag to hand that packet to.</p>
 
 <h2>The part that is not about this harness</h2>
-<p>The index covers every agent's transcripts on the machine — forty-six of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code or Cursor answers a question asked in AI Assistant, including sessions from before any of this was installed. Indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+<p>The index covers every agent's transcripts on the machine — forty-seven of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code or Cursor answers a question asked in AI Assistant, including sessions from before any of this was installed. Indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
 
 <p><a href="getting-started.html">Getting started</a> · <a href="../registry/jetbrains.html">How AI Assistant's store is read</a> · <a href="memory-for-junie.html">Junie is a different harness</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>

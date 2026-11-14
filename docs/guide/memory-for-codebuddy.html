@@ -118,13 +118,15 @@
 <a href="delete-omnigent-session-history.html">Omnigent</a>
 <a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold" open><summary>Per-agent guides <span class="n">46</span></summary>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">50</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
 <a href="memory-for-cherrystudio.html">Cherry Studio</a>
 <a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-claw-code.html">Claw Code</a>
 <a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-cmux.html">cmux</a>
 <a href="memory-for-codebuddy.html" aria-current="page">CodeBuddy Code</a>
 <a href="memory-for-codewhale.html">CodeWhale</a>
 <a href="memory-for-codex.html">Codex</a>
@@ -139,6 +141,7 @@
 <a href="memory-for-gemini.html">Gemini CLI</a>
 <a href="memory-for-goose.html">Goose</a>
 <a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-herdr.html">herdr</a>
 <a href="memory-for-hermes.html">Hermes</a>
 <a href="memory-for-jetbrains.html">JetBrains AI Assistant</a>
 <a href="memory-for-junie.html">Junie</a>
@@ -149,6 +152,7 @@
 <a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
+<a href="memory-for-oh-my-claudecode.html">oh-my-claudecode</a>
 <a href="memory-for-omp.html">omp</a>
 <a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
@@ -183,7 +187,7 @@
 <h1>Adding memory to CodeBuddy Code</h1>
 <p class="pagelede">the CLI and WorkBuddy desktop share the same session layout and Claude-shape hooks<span class="mins" data-mins></span></p>
 
-<p>CodeBuddy Code (<code>@tencent-ai/codebuddy-code</code>) writes every conversation to disk and starts the next session blank. Its desktop counterpart, WorkBuddy, runs the same agent under its own configuration directory. Both stores sit on disk alongside whatever the other forty-five coding agents on the machine wrote.</p>
+<p>CodeBuddy Code (<code>@tencent-ai/codebuddy-code</code>) writes every conversation to disk and starts the next session blank. Its desktop counterpart, WorkBuddy, runs the same agent under its own configuration directory. Both stores sit on disk alongside whatever the other forty-six coding agents on the machine wrote.</p>
 
 <h2>What CodeBuddy already has</h2>
 <p>Sessions live under <code>${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/&lt;mangled-cwd&gt;/&lt;session-id&gt;.jsonl</code>, one JSONL file per conversation, with sub-agent runs under <code>&lt;session-id&gt;/subagents/agent-&lt;id&gt;.jsonl</code>. WorkBuddy writes the same layout under <code>~/.workbuddy/projects</code> (workbuddy.cn), <code>~/.workbuddy-ai/projects</code> (workbuddy.ai), or <code>$WORKBUDDY_CONFIG_DIR/projects</code>.</p>
@@ -209,7 +213,7 @@
 <p><code>codebuddy -r &lt;id&gt;</code> looks for the session only under the folder of the current working directory, and <code>-r</code> by itself drops the <code>SessionStart</code> hook context. Passing <code>-c</code> alongside <code>-r</code> keeps the <code>SessionStart</code> context while still selecting the session id, so <code>deja resume &lt;id&gt;</code> runs <code>codebuddy -c -r &lt;id&gt;</code> in the project directory.</p>
 
 <h2>The part that is not about this harness</h2>
-<p>The index covers every agent's transcripts on the machine — forty-six of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code or Qwen Code answers a question asked in CodeBuddy. Indexing and search stay local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+<p>The index covers every agent's transcripts on the machine — forty-seven of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code or Qwen Code answers a question asked in CodeBuddy. Indexing and search stay local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
 
 <p><a href="getting-started.html">Getting started</a> · <a href="delete-codebuddy-sessions.html">Deleting CodeBuddy sessions</a> · <a href="../registry/codebuddy.html">How CodeBuddy's store is read</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>

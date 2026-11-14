@@ -118,13 +118,15 @@
 <a href="delete-omnigent-session-history.html">Omnigent</a>
 <a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold" open><summary>Per-agent guides <span class="n">46</span></summary>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">50</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
 <a href="memory-for-cherrystudio.html">Cherry Studio</a>
 <a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-claw-code.html">Claw Code</a>
 <a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-cmux.html">cmux</a>
 <a href="memory-for-codebuddy.html">CodeBuddy Code</a>
 <a href="memory-for-codewhale.html">CodeWhale</a>
 <a href="memory-for-codex.html">Codex</a>
@@ -139,6 +141,7 @@
 <a href="memory-for-gemini.html">Gemini CLI</a>
 <a href="memory-for-goose.html">Goose</a>
 <a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-herdr.html">herdr</a>
 <a href="memory-for-hermes.html">Hermes</a>
 <a href="memory-for-jetbrains.html">JetBrains AI Assistant</a>
 <a href="memory-for-junie.html" aria-current="page">Junie</a>
@@ -149,6 +152,7 @@
 <a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
+<a href="memory-for-oh-my-claudecode.html">oh-my-claudecode</a>
 <a href="memory-for-omp.html">omp</a>
 <a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
@@ -183,7 +187,7 @@
 <h1>Adding memory to Junie</h1>
 <p class="pagelede">MCP and Claude-schema hooks in <code>~/.junie</code>, with the digest on the first prompt<span class="mins" data-mins></span></p>
 
-<p>JetBrains' Junie — both the <code>junie</code> CLI and the agent AI Assistant runs in the IDE — records every session under <code>~/.junie/sessions</code> and opens the next one without it, or anything from the other forty-five coding agents on the machine.</p>
+<p>JetBrains' Junie — both the <code>junie</code> CLI and the agent AI Assistant runs in the IDE — records every session under <code>~/.junie/sessions</code> and opens the next one without it, or anything from the other forty-six coding agents on the machine.</p>
 
 <h2>What Junie already has</h2>
 <p>Each session is an event log at <code>${JUNIE_HOME:-~/.junie}/sessions/&lt;session-id&gt;/events.jsonl</code>, listed with its <code>projectDir</code> and <code>taskName</code> in <code>sessions/index.jsonl</code>. Setting <code>JUNIE_HOME</code> moves the whole store. Resuming a session runs <code>cd &lt;projectDir&gt; &amp;&amp; junie --session-id &lt;id&gt; --resume</code>.</p>
@@ -202,7 +206,7 @@
 <p>A project's own <code>.junie/config.json</code> hooks run beside these once the project is trusted.</p>
 
 <h2>The part that is not about this harness</h2>
-<p>The index covers every agent's transcripts on the machine — forty-six of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code or Cursor answers a question asked in Junie. Indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+<p>The index covers every agent's transcripts on the machine — forty-seven of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code or Cursor answers a question asked in Junie. Indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
 
 <p><a href="getting-started.html">Getting started</a> · <a href="delete-junie-session-history.html">Deleting Junie session history</a> · <a href="../registry/junie.html">How Junie's store is read</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>

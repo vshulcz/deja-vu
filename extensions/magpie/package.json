@@ -6,6 +6,7 @@
   "files": [
     "deja.hooks.mjs",
     "deja.lib.mjs",
+    "docs/zh.md",
     "README.md",
     "LICENSE"
   ],

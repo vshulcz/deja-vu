@@ -25,6 +25,8 @@ deja install --auto
 | [`grok/`](grok) | Grok Build plugin `deja` from this repository's marketplace, then `grok plugin install deja` (official entry in review: xai-org/plugin-marketplace#332) | `grok plugin marketplace add vshulcz/deja-vu` |
 | [`hermes/`](hermes) | Hermes memory provider `deja-memory` | `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 | [`magpie/`](magpie) | npm `@vshulcz/magpie-deja` | `magpie plugin add @vshulcz/magpie-deja` |
+| [`orca/`](orca) | Orca v2 `trusted-worker` plugin `deja` | `Orca → Plugins → extensions/orca` |
+| [`codewhale/`](codewhale) | CodeWhale Claude-compatible bundle `deja-vu` | `/plugin install extensions/codewhale` |
 | [`vscode/`](vscode) | VS Code Marketplace & OpenVSX `vshulcz.deja-status` | `code --install-extension vshulcz.deja-status` |
 | [`jetbrains/`](jetbrains) | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35998-deja-vu-cross-agent-ai-session-memory) `com.github.vshulcz.deja-vu`, release asset `deja-jetbrains.zip` | `idea installPlugins com.github.vshulcz.deja-vu` |
 | [`nvim/`](nvim) | Neovim runtime plugin (`lua/deja/`) | `{ "vshulcz/deja-vu", opts = {} }` |
@@ -85,6 +87,8 @@ marketplace entry. `TestKimiManifestsAgree` keeps the two manifests one plugin.
 Kimi notifies about updates only for plugins installed from its own
 marketplace, so `deja doctor` reports the installed plugin version against the
 one this deja ships.
+
+The Orca (`extensions/orca`) and CodeWhale (`extensions/codewhale`) extensions are installed directly from this repository rather than published to npm.
 
 The Spec Kit extension is not a harness: it is a `/speckit.deja-vu.recall`
 command that any agent Spec Kit drives can run before `/speckit.implement`. Each

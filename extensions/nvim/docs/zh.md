@@ -5,7 +5,7 @@
 
 属于 **[deja-vu](https://github.com/vshulcz/deja-vu)** 项目（SQLite FTS5 查询 **< 1 ms** · 索引体积约为原始会话的 **4%** · 入库 **0** LLM Token 开销）· [文档](https://vshulcz.github.io/deja-vu/) · [在线演示](https://vshulcz.github.io/deja-vu/view/) · [基准测试](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-在 Neovim 内全文检索 Claude Code、Codex CLI、Cursor、opencode、Gemini CLI 等全部四十三款编程智能体的本地会话记录，支持按光标所在行追溯改动来源（AI Blame）、回查报错修复过程以及生成跨智能体交接摘要。
+在 Neovim 内全文检索 Claude Code、Codex CLI、Cursor、opencode、Gemini CLI 等全部四十七款编程智能体的本地会话记录，支持按光标所在行追溯改动来源（AI Blame）、回查报错修复过程以及生成跨智能体交接摘要。
 
 ## 前置条件
 

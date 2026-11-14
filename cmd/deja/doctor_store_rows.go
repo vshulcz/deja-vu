@@ -251,6 +251,10 @@ func (r *doctorStoreRows) laterStores(sqlite bool) {
 	// for drift that is not there.
 	r.filesBeside("commandcode", commandRoot, doctorExists(commandRoot),
 		sources.CommandCodeSessionFiles(), sources.CommandCodeCheckpointFiles()...)
+	clawRoot := sources.ClawCodeRoot()
+	clawRoots := sources.ClawCodeRoots()
+	r.filesSkippingIn("clawcode", clawRoot, clawRoots, doctorAnyExists(clawRoots),
+		sources.ClawCodeSessionFiles(), nil)
 	// ZCode has two stores, the way Kilo does: the project transcripts and the
 	// CLI's SQLite database. The count is the transcripts and the database is
 	// named beside them, or the newest "file" is a database the transcript

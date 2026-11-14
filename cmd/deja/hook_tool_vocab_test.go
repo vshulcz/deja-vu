@@ -101,3 +101,25 @@ func TestHookToolKnowsCommandCodePowershellAndArgs(t *testing.T) {
 		t.Errorf("command = %q, want the arguments after it", in.ToolInput.Command)
 	}
 }
+
+// Claw Code's PostToolUseFailure payload puts the failing output in
+// `tool_error` with `"tool_name":"bash"` and `"tool_result_is_error":true`.
+func TestHookToolAfterReadsPostToolUseFailureToolError(t *testing.T) {
+	seedFixPair(t, "panic: sql: database is closed", "make clean && make CGO_ENABLED=0")
+	for i, payload := range []string{
+		`{"hook_event_name":"PostToolUseFailure","session_id":"claw-1","cwd":"/work/app","tool_name":"bash","tool_input":{"command":"make"},"tool_input_json":"{\"command\":\"make\"}","tool_error":"exit 1\npanic: sql: database is closed\n","tool_result_is_error":true}`,
+		// Truncated mid-string (>1 MiB build output) triggers salvageFromPayload("tool_error").
+		`{"hook_event_name":"PostToolUseFailure","session_id":"claw-2","cwd":"/work/app","tool_name":"bash","tool_input":{"command":"make"},"tool_error":"exit 1\npanic: sql: database is closed\n` + strings.Repeat("x", 1024),
+	} {
+		var out bytes.Buffer
+		if err := runHookToolAfter(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(payload), &out); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(out.String(), "CGO_ENABLED=0") {
+			t.Errorf("payload %d: no fix pair for claw-code PostToolUseFailure:\n%q", i, out.String())
+		}
+		if i == 0 && !strings.Contains(out.String(), `"PostToolUseFailure"`) {
+			t.Errorf("payload %d: reply lost PostToolUseFailure event name:\n%q", i, out.String())
+		}
+	}
+}

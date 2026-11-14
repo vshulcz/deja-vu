@@ -5,9 +5,9 @@
   </picture>
 </p>
 
-<p align="center"><b>跨 43 个编程智能体的本地共享记忆、跨智能体交接与代码恢复。</b></p>
+<p align="center"><b>跨 47 个编程智能体的本地共享记忆、跨智能体交接与代码恢复。</b></p>
 
-<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 36 个智能体本来就把每次会话写在磁盘上。<br>
+<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 40 个智能体本来就把每次会话写在磁盘上。<br>
 deja 在本地索引全部历史，让智能体跨 <code>/compact</code> 保住上下文、用 <code>deja handoff</code> 中途换智能体接着做、用 <code>deja restore</code> 找回被覆盖的代码——无需 LLM，单个 Go 二进制。</p>
 
 <p align="center"><a href="../../README.md">English</a> | 简体中文 | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -132,7 +132,7 @@ skill 调用的是上面装好的 `deja` 二进制，自己不带。
 
 ## 能得到什么
 
-**在 Codex 里解决，Claude 记得。** 四十六个编程智能体把每一次对话都写进本地文件，
+**在 Codex 里解决，Claude 记得。** 四十七个编程智能体把每一次对话都写进本地文件，
 deja 把这些文件变成一层它们都能读的记忆。
 
 | | |
@@ -213,7 +213,7 @@ $ deja "jwt refresh token"
 `deja stats` 统计压缩之后到第一次编辑之间的工具调用次数，这个功能就是拿它来衡量的。
 细节见[压缩后自动恢复](../../docs/compaction.md)。
 
-Claude Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
+Claude Code · Claw Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
 Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
 Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
@@ -241,6 +241,8 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 | pi（以及 omp） | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 | Hermes | 记忆提供者 `deja-memory`，在 Hermes 插件目录里 | `hermes plugins install deja-memory`，或从 GitHub：`hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 | Magpie | npm `@vshulcz/magpie-deja` | `magpie plugin add @vshulcz/magpie-deja` |
+| Orca | v2 `trusted-worker` 插件 `deja` | `Orca → Plugins → extensions/orca`（再运行 `deja install orca` 启用原生 MCP 与钩子） |
+| CodeWhale | Claude 兼容插件包 `deja-vu` | `/plugin install extensions/codewhale`（再运行 `deja install codewhale` 启用原生钩子） |
 | VS Code / Cursor / Windsurf | 状态栏扩展 `vshulcz.deja-status` | `code --install-extension vshulcz.deja-status` |
 | JetBrains 全家桶 | IntelliJ、GoLand、PyCharm、WebStorm 与 RustRover 插件（[`extensions/jetbrains/`](../../extensions/jetbrains/docs/zh.md)） | `idea installPlugins com.github.vshulcz.deja-vu` |
 | Neovim | `lazy.nvim` 与 CodeCompanion 插件（[`extensions/nvim/`](../../extensions/nvim/docs/zh.md)） | `{ "vshulcz/deja-vu", opts = {} }` |

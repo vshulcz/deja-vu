@@ -339,7 +339,7 @@ func scanJSONL(path string, fn func(map[string]any)) error {
 // transcript's first prompt on every resume, and left an omp session split
 // in two, since omp writes a title slot before its session record (#4406). omp writes a title slot before its session record, and
 // taking line 1 left an omp session split in two on every resume (#4406).
-func scanJSONLWithHeaderFromOffsetFunc(path string, offset int64, lookahead int, isHeader func(map[string]any) bool, fn func(map[string]any)) error {
+func scanJSONLWithHeaderFromOffsetFunc(path string, offset int64, lookahead int, isHeader func(map[string]any) bool, fn func(map[string]any)) error { //nolint:unparam // lookahead matches leadingJSONLHeader so callers share one signature
 	if offset > 0 {
 		if header := leadingJSONLHeader(path, offset, lookahead, isHeader); header != nil {
 			fn(header)

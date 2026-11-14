@@ -136,7 +136,7 @@ func switcherLine(text string) string {
 // rosterHead is where the list starts. It is the same three names in every
 // language because they are product names, which is what makes this checkable
 // at all.
-const rosterHead = "Claude Code · Cline · Codex CLI"
+const rosterHead = "Claude Code · Claw Code · Cline · Codex CLI"
 
 // rosterTail closes it: "Zed" and the sentence-ending mark, which is a full
 // stop in the Latin-script pages and an ideographic one in the Chinese pages.

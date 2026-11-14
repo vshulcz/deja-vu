@@ -19,7 +19,7 @@ import (
 // exist, so a test reads only the store it sets up.
 var parityStores = []string{
 	"DEJA_AIDER_ROOTS", "DEJA_AMP_ROOT", "DEJA_ANTIGRAVITY_ROOT", "DEJA_CC_MIRROR_ROOT", "DEJA_CHERRYSTUDIO_ROOTS",
-	"DEJA_CLAUDE_ROOT", "DEJA_CLINE_ROOT", "DEJA_CLINE_ROOTS", "DEJA_CODEWHALE_ROOT", "DEJA_CODEX_ROOT",
+	"DEJA_CLAUDE_ROOT", "DEJA_CLAWCODE_ROOT", "DEJA_CLINE_ROOT", "DEJA_CLINE_ROOTS", "DEJA_CODEWHALE_ROOT", "DEJA_CODEX_ROOT",
 	"DEJA_COMMANDCODE_ROOT", "DEJA_CONTINUE_ROOT", "DEJA_COPILOT_CHAT_ROOTS", "DEJA_COPILOT_ROOT", "DEJA_CRUSH_ROOT",
 	"DEJA_CURSOR_CLI_ROOT", "DEJA_CURSOR_ROOT", "DEJA_DEEPSEEK_ROOT", "DEJA_GEMINI_ROOT", "DEJA_GJC_ROOT",
 	"DEJA_GOOSE_DB", "DEJA_GOOSE_ROOT", "DEJA_GROK_DB", "DEJA_GROK_ROOT", "DEJA_HERMES_DB", "DEJA_HERMES_HOME",
@@ -284,6 +284,14 @@ func TestToolResultInTheNextPassSettlesItsCall(t *testing.T) {
 			head: `{"version":"v1","kind":"Prompt","data":{"message_id":"m0","content":[{"kind":"text","data":"fix the retry loop"}],"meta":{"timestamp":1790848800}}}` + "\n",
 			call: `{"version":"v1","kind":"AssistantMessage","data":{"message_id":"m1","content":[{"kind":"toolUse","data":{"toolUseId":"t1","name":"shell","input":{"command":"go vet ./retry"}}}],"meta":{"timestamp":1790848801}}}` + "\n",
 			res:  `{"version":"v1","kind":"ToolResults","data":{"message_id":"m2","content":[{"kind":"toolResult","data":{"toolUseId":"t1","content":[{"kind":"json","data":{"exit_status":"exit status: 2","stdout":"","stderr":"vet: unreachable"}}],"status":"success"}}],"meta":{"timestamp":1790848802}}}` + "\n",
+		},
+		{
+			name: "clawcode", env: "DEJA_CLAWCODE_ROOT",
+			file: "s1.jsonl",
+			head: `{"type":"session_meta","session_id":"s1","created_at_ms":1759350554000,"workspace_root":"/tmp/proj"}` + "\n" +
+				`{"type":"message","message":{"role":"user","blocks":[{"type":"text","text":"fix the retry loop"}]}}` + "\n",
+			call: `{"type":"message","message":{"role":"assistant","blocks":[{"type":"tool_use","id":"call_1","name":"bash","input":"{\"command\":\"go vet ./retry\"}"}]}}` + "\n",
+			res:  `{"type":"message","message":{"role":"tool","blocks":[{"type":"tool_result","tool_use_id":"call_1","tool_name":"bash","output":"{\"stdout\":\"\",\"stderr\":\"vet: unreachable\",\"interrupted\":false,\"returnCodeInterpretation\":\"exit_code:2\"}","is_error":true}]}}` + "\n",
 		},
 		{
 			// Command Code stamps a failure since #4539.

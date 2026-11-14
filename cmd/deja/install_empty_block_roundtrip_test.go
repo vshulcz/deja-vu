@@ -23,6 +23,7 @@ func TestUninstallGivesBackTheEmptyBlock(t *testing.T) {
 		{"codex-auto", "{\n  \"hooks\": {}\n}\n", func() string { return filepath.Join(sources.CodexHome(), "hooks.json") }},
 		{"cursor-auto", "{\n  \"hooks\": {}\n}\n", func() string { return filepath.Join(sources.CursorCLIHome(), "hooks.json") }},
 		{"commandcode-auto", "{\n  \"hooks\": {}\n}\n", commandCodeSettings},
+		{"clawcode-auto", "{\n  \"hooks\": {}\n}\n", clawCodeSettings},
 		{"zed", "{\n  \"context_servers\": {}\n}\n", sources.ZedSettingsPath},
 		{"vscode", "{\n  \"servers\": {}\n}\n", func() string { return filepath.Join(vsCodeDefaultUserDir(), "mcp.json") }},
 		{"grok", "{\n  \"mcp\": {\"servers\": []}\n}\n", func() string { return filepath.Join(sources.GrokHome(), "user-settings.json") }},
@@ -128,7 +129,8 @@ func TestUninstallKeepsAnEmptyBlockAClientSavedMidRun(t *testing.T) {
 		path   func() string
 	}{
 		{"qwen-auto", func() string { return filepath.Join(sources.QwenConfigDir(), "settings.json") }},
-		{"codebuddy-auto", codeBuddySettingsPath},
+		{"commandcode-auto", commandCodeSettings},
+		{"clawcode-auto", clawCodeSettings},
 		{"claude-auto", func() string { return filepath.Join(sources.ClaudeConfigDir(), "settings.json") }},
 	} {
 		t.Run(c.target, func(t *testing.T) {

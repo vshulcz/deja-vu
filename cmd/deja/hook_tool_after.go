@@ -76,6 +76,8 @@ type toolAfterInput struct {
 	// on qwen-code 0.20.0. Without this the hook fires at the failure and finds
 	// nothing to look up.
 	Error json.RawMessage `json:"error"`
+	// Claw Code PostToolUseFailure puts the failure string in tool_error.
+	ToolError json.RawMessage `json:"tool_error"`
 	// Cursor's postToolUseFailure names the failure here (2026.09.02).
 	ErrorMessage json.RawMessage `json:"error_message"`
 	SessionID    string          `json:"session_id"`
@@ -172,6 +174,9 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 	}
 	if len(bytes.TrimSpace(response)) == 0 {
 		response = input.ToolResult
+	}
+	if len(bytes.TrimSpace(response)) == 0 {
+		response = input.ToolError
 	}
 	if len(bytes.TrimSpace(response)) == 0 {
 		response = input.ErrorMessage
@@ -342,8 +347,12 @@ func salvageFromPayload(raw string) string {
 	if scope := afterLast(raw, `"tool_response"`); scope != "" {
 		return clampOutput(salvageToolOutput(scope))
 	}
-	v, _ := jsonStringAfter(afterLast(raw, `"error"`))
-	return clampOutput(v)
+	for _, key := range []string{`"error"`, `"tool_error"`} {
+		if v, _ := jsonStringAfter(afterLast(raw, key)); strings.TrimSpace(v) != "" {
+			return clampOutput(v)
+		}
+	}
+	return ""
 }
 
 // afterLast is after, from the last place the key is used as one. A tool's
@@ -385,7 +394,7 @@ func salvageToolOutput(raw string) string {
 	// half of the payload without the error in it (#2051).
 	// llmContent and returnDisplay are where Gemini CLI puts a command's
 	// output (#4314).
-	for _, key := range []string{`"stderr"`, `"error"`, `"output"`, `"stdout"`, `"content"`, `"result"`, `"llmContent"`, `"returnDisplay"`} {
+	for _, key := range []string{`"stderr"`, `"error"`, `"tool_error"`, `"output"`, `"stdout"`, `"content"`, `"result"`, `"llmContent"`, `"returnDisplay"`} {
 		// Every occurrence, not the first: a mention of the key that is not a
 		// key — `grep "stderr" build.log` — made this give up on the key
 		// entirely and skip the real one further along (#2051).

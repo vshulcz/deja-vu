@@ -25,7 +25,7 @@ func TestEverySkillDeclaresTheNameOfItsDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The three that had the bug, plus Claude's own and the shared one.
-	for _, target := range []string{"kilocode", "gjc", "commandcode", "claude-code", "codex"} {
+	for _, target := range []string{"kilocode", "gjc", "commandcode", "clawcode", "claude-code", "codex"} {
 		if _, err := captureRun(t, "install", target, "--no-index"); err != nil {
 			continue
 		}

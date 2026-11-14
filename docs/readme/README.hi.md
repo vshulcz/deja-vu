@@ -5,9 +5,9 @@
   </picture>
 </p>
 
-<p align="center"><b>43 कोडिंग एजेंट्स के लिए साझा लोकल मेमोरी, एजेंट हैंडऑफ़ और कोड रिकवरी।</b></p>
+<p align="center"><b>47 कोडिंग एजेंट्स के लिए साझा लोकल मेमोरी, एजेंट हैंडऑफ़ और कोड रिकवरी।</b></p>
 
-<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes और 36 अन्य एजेंट्स हर सेशन पहले से डिस्क पर सेव करते हैं।<br>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes और 40 अन्य एजेंट्स हर सेशन पहले से डिस्क पर सेव करते हैं।<br>
 deja सब कुछ लोकल रूप से इंडेक्स करता है ताकि आपके एजेंट्स <code>/compact</code> के बाद भी कॉन्टेक्स्ट बनाए रखें, <code>deja handoff</code> से काम आगे बढ़ाएँ और <code>deja restore</code> से ओवरराइट हुआ कोड वापस पाएँ — बिना LLM, एक अकेली Go बाइनरी।</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | हिन्दी</p>
@@ -231,7 +231,7 @@ deja वह रख लेता है जो सारांश अभी ख�
 गया था।
 विवरण [कॉम्पैक्शन के बाद रिकवरी](../../docs/compaction.md) में है।
 
-Claude Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
+Claude Code · Claw Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
 Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
 Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·

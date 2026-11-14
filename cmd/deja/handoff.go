@@ -440,6 +440,8 @@ func handoffCommand(target, prompt string) ([]string, bool) {
 	case "devin":
 		// Devin CLI's one-shot mode: -p prints an answer and exits.
 		return []string{"devin", "-p", prompt}, true
+	case "clawcode":
+		return []string{"claw", "-p", prompt}, true
 	default:
 		return nil, false
 	}
@@ -449,7 +451,8 @@ func handoffCommand(target, prompt string) ([]string, bool) {
 var handoffAlias = map[string]string{
 	"agy": "antigravity", "kilo": "kilocode", "mimocode": "mimo", "cn": "continue", "cmd": "commandcode",
 	"cmdc": "commandcode", "traex": "trae", "traecli": "trae", "kiro-cli": "kiro",
-	"dsh": "deepseek", "code": "copilot-chat", "vscode": "copilot-chat",
+	"dsh": "deepseek", "code": "copilot-chat", "vscode": "copilot-chat", "claw": "clawcode",
+	"claw-code": "clawcode",
 }
 
 // handoffPasteOnly mirrors the registry's `handoff: paste` entries; the
@@ -501,5 +504,5 @@ func pasteOnlyFooter(prefix string) string {
 func handoffTargets() []string {
 	return []string{"claude", "codex", "opencode", "cursor", "copilot", "copilot-chat", "gemini", "qwen", "antigravity", "aider", "pi", "senpi", "omp", "amp", "prime", "grok", "cline", "goose", "kimi", "crush",
 		"kilocode", "mimo", "omnigent", "orca", "continue", "commandcode", "codebuddy", "trae", "muse", "kiro", "gjc", "kimchi", "codewhale", "junie", "hermes", "openclaw", "deepseek", "reasonix", "zcode", "devin",
-		"mcode"}
+		"mcode", "clawcode"}
 }

@@ -119,13 +119,15 @@
 <a href="delete-omnigent-session-history.html">Omnigent</a>
 <a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold" open><summary>Per-agent guides <span class="n">46</span></summary>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">50</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
 <a href="memory-for-cherrystudio.html">Cherry Studio</a>
 <a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-claw-code.html">Claw Code</a>
 <a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-cmux.html">cmux</a>
 <a href="memory-for-codebuddy.html">CodeBuddy Code</a>
 <a href="memory-for-codewhale.html">CodeWhale</a>
 <a href="memory-for-codex.html">Codex</a>
@@ -140,6 +142,7 @@
 <a href="memory-for-gemini.html">Gemini CLI</a>
 <a href="memory-for-goose.html">Goose</a>
 <a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-herdr.html">herdr</a>
 <a href="memory-for-hermes.html">Hermes</a>
 <a href="memory-for-jetbrains.html">JetBrains AI Assistant</a>
 <a href="memory-for-junie.html">Junie</a>
@@ -150,6 +153,7 @@
 <a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
+<a href="memory-for-oh-my-claudecode.html">oh-my-claudecode</a>
 <a href="memory-for-omp.html">omp</a>
 <a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
@@ -220,7 +224,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 <p>An injection is capped: 1,536 bytes per prompt, about 4 KB for a tool call. On opencode 2.x the plugin <code>deja install opencode-auto</code> writes gives each hook 10 s; past that the turn goes on without memory. An install from before this release has no limit, so run <code>deja install opencode-auto</code> again. <a href="token-cost.html">What memory costs</a> has the measured numbers against replaying or grepping instead.</p>
 
 <h2>The part that is not opencode-specific</h2>
-<p>The index covers every agent's transcripts on the machine, not opencode's alone — forty-six of them today, <a href="where-sessions-are-stored.html">each in its own format</a>. So a fix you found in Claude Code in March answers a question you ask in opencode in August, and the reverse. That is the whole reason to index rather than to capture: the history is already written, including the months before any of this was installed.</p>
+<p>The index covers every agent's transcripts on the machine, not opencode's alone — forty-seven of them today, <a href="where-sessions-are-stored.html">each in its own format</a>. So a fix you found in Claude Code in March answers a question you ask in opencode in August, and the reverse. That is the whole reason to index rather than to capture: the history is already written, including the months before any of this was installed.</p>
 
 <h2>Turning parts off</h2>
 <pre>{"plugin": [["opencode-deja", {"autoRecall": false, "tools": true}]]}</pre>

@@ -1,0 +1,19 @@
+{
+  "name": "deja-vu",
+  "version": "0.24.2",
+  "description": "Cross-agent session memory across forty-seven AI coding tools (Claude Code, Codex, Cursor, opencode, CodeWhale, and more), including work from before deja was installed.",
+  "author": {
+    "name": "Vladislav Shulcz",
+    "url": "https://github.com/vshulcz"
+  },
+  "homepage": "https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html",
+  "repository": "https://github.com/vshulcz/deja-vu",
+  "license": "MIT",
+  "keywords": [
+    "memory",
+    "recall",
+    "sessions",
+    "search",
+    "history"
+  ]
+}

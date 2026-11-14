@@ -36,6 +36,7 @@ func parseSwitchRows() []switchRow {
 		{name: "claude mixed message", kind: "claude", fixture: file("c1.jsonl", claudeMixed), cmd: "go test ./...", out: "backoffJitter", said: "also check the logs"},
 		{name: "cherrystudio", kind: "cherrystudio", fixture: file("c1.jsonl", claudeMixed), cmd: "go test ./...", out: "backoffJitter", said: "also check the logs"},
 		{name: "pi", kind: "pi", fixture: file("2026-09-20T10-00-00-000Z_s1.jsonl", failedPiTranscript), cmd: "go test ./...", out: "backoffJitter"},
+		{name: "clawcode", kind: "clawcode", fixture: clawCodeExitStore(`{"stdout":"./retry.go:12:5: undefined: backoffJitter","stderr":"","interrupted":false,"returnCodeInterpretation":"exit_code:1"}`, true), cmd: "go test ./...", out: "backoffJitter"},
 		{name: "commandcode", kind: "commandcode", fixture: commandCodeExitStore("Exit code: 1\n./retry.go:12:5: undefined: backoffJitter"), cmd: "go test ./...", out: "backoffJitter"},
 		{name: "goose jsonl", kind: "goose-jsonl", fixture: file("20260920_1.jsonl", strings.Join([]string{
 			`{"role":"user","created":1790874400,"content":[{"type":"text","text":"fix the retry loop"}]}`,

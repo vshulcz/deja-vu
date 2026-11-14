@@ -91,6 +91,8 @@ func commandFilePath(harness string) string {
 		// basename — the surface two independent integrations describe from
 		// the vendor's docs.
 		return filepath.Join(homeDir(), ".commandcode", "commands", "deja.md")
+	case "clawcode":
+		return filepath.Join(sources.ClawCodeConfigDir(), "commands", "deja.md")
 	case "kilocode":
 		// Kilo's own workflows doc: global commands live in
 		// `~/.config/kilo/commands/`, project ones in `.kilo/commands/`, and a

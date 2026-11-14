@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Add **Claw Code** (`clawcode`) session reader, `clawcode` / `clawcode-auto` installer targets (`PreToolUse`, `PostToolUse`, `PostToolUseFailure`), `claw --resume` support, and `PostToolUseFailure` handling in `deja hook-tool-after`.
+- Add standalone plugins for **Orca** (`extensions/orca`) and **CodeWhale** (`extensions/codewhale`), and update storefront docs for DeepSeek Harness, Magpie, opencode, pi, and OpenClaw.
+
 ## [0.24.2] - 2026-11-12
 
 Turn-0 file localization and verified target guardrails, dead-end reversal and

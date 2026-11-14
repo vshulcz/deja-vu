@@ -1,0 +1,6 @@
+{"type":"session_meta","version":1,"session_id":"reg-clawcode-001","created_at_ms":1790000000000,"updated_at_ms":1790000025000,"workspace_root":"/workspace/claw-demo","model":"claude-sonnet-4-6"}
+{"type":"prompt_history","timestamp_ms":1790000005000,"text":"the backoff loop reuses the first host 203.0.113.10"}
+{"type":"message","message":{"role":"user","blocks":[{"type":"text","text":"the backoff loop reuses the first host 203.0.113.10"}]}}
+{"type":"message","message":{"role":"assistant","blocks":[{"type":"tool_use","id":"call_1","name":"bash","input":"{\"command\":\"go test ./retry\"}"}]}}
+{"type":"message","message":{"role":"tool","blocks":[{"type":"tool_result","tool_use_id":"call_1","tool_name":"bash","output":"{\"stdout\":\"\",\"stderr\":\"retry_test.go:18: dialed 203.0.113.10 twice\\nFAIL\",\"returnCodeInterpretation\":\"exit_code:1\",\"interrupted\":false,\"isImage\":false}","is_error":true}]}}
+{"type":"message","message":{"role":"assistant","blocks":[{"type":"thinking","thinking":"need to advance the host index per attempt"},{"type":"tool_use","id":"call_2","name":"edit_file","input":"{\"path\":\"/workspace/claw-demo/retry/dial.go\",\"old_string\":\"host := hosts[0]\",\"new_string\":\"host := hosts[attempt%len(hosts)]\"}"},{"type":"text","text":"Advanced the host index modulo len(hosts) across retry attempts."}]}}

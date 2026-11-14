@@ -5,11 +5,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Add memory to CodeWhale: search old sessions — deja-vu</title>
-<meta name="description" content="CodeWhale keeps one JSON file per session and reads none of them back. deja indexes them with every other agent on the machine and makes them searchable.">
+<meta name="description" content="CodeWhale keeps one JSON file per session under ~/.codewhale/sessions. Install extensions/codewhale or run deja install codewhale-auto for shared recall.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Add memory to CodeWhale: search old sessions">
-<meta property="og:description" content="CodeWhale keeps one JSON file per session and reads none of them back. deja indexes them with every other agent on the machine and makes them searchable.">
+<meta property="og:description" content="CodeWhale keeps one JSON file per session under ~/.codewhale/sessions. Install extensions/codewhale or run deja install codewhale-auto for shared recall.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -26,15 +26,15 @@
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
 <meta name="twitter:title" content="Add memory to CodeWhale: search old sessions">
-<meta name="twitter:description" content="CodeWhale keeps one JSON file per session and reads none of them back. deja indexes them with every other agent on the machine and makes them searchable.">
+<meta name="twitter:description" content="CodeWhale keeps one JSON file per session under ~/.codewhale/sessions. Install extensions/codewhale or run deja install codewhale-auto for shared recall.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to CodeWhale", "description": "CodeWhale keeps one JSON file per session under ~/.codewhale and reads none of them back. deja indexes them with every other agent on the machine and makes them searchable.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-21", "dateModified": "2026-10-08"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to CodeWhale", "description": "CodeWhale keeps one JSON file per session under ~/.codewhale/sessions. Install extensions/codewhale or run deja install codewhale-auto for shared recall.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-21", "dateModified": "2026-11-14"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for CodeWhale", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does CodeWhale remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It writes one pretty-printed JSON file per session under ~/.codewhale/sessions and can resume one, but a new session reads none of the others. deja indexes them with every other agent's transcripts on the machine, so the history is searchable from anywhere."}}, {"@type": "Question", "name": "Is CodeWhale the same thing as the DeepSeek Harness?", "acceptedAnswer": {"@type": "Answer", "text": "No. CodeWhale is the Rust terminal agent that shipped as deepseek-tui until v0.8.41; it writes one JSON file per session. The DeepSeek Harness keeps zstd-framed JSONL under ~/.dsh and has a guide of its own. deja reads both, and a machine part-way through the rename still keeps ~/.deepseek/sessions, which deja walks too."}}, {"@type": "Question", "name": "How do I search my CodeWhale history?", "acceptedAnswer": {"@type": "Answer", "text": "deja last lists recent sessions, deja search finds a phrase across every agent on the machine, and deja show prints one session in full. deja writes no CodeWhale config in this release, so recall here is the CLI — and any agent that does have the MCP server wired, because there is one index."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does CodeWhale remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It writes one pretty-printed JSON file per session under ~/.codewhale/sessions and can resume one, but a new session reads none of the others. deja indexes them with every other agent's transcripts on the machine, so the history is searchable from anywhere."}}, {"@type": "Question", "name": "Is CodeWhale the same thing as the DeepSeek Harness?", "acceptedAnswer": {"@type": "Answer", "text": "No. CodeWhale is the Rust terminal agent that shipped as deepseek-tui until v0.8.41; it writes one JSON file per session. The DeepSeek Harness keeps zstd-framed JSONL under ~/.dsh and has a guide of its own. deja reads both, and a machine part-way through the rename still keeps ~/.deepseek/sessions, which deja walks too."}}, {"@type": "Question", "name": "How do I search my CodeWhale history?", "acceptedAnswer": {"@type": "Answer", "text": "Install the extensions/codewhale bundle via /plugin install extensions/codewhale for MCP, skill, and /deja, or run deja install codewhale-auto to wire native config.toml hooks, ~/.codewhale/mcp.json under servers, and tools.always_load."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -119,13 +119,15 @@
 <a href="delete-omnigent-session-history.html">Omnigent</a>
 <a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold" open><summary>Per-agent guides <span class="n">46</span></summary>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">50</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
 <a href="memory-for-cherrystudio.html">Cherry Studio</a>
 <a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-claw-code.html">Claw Code</a>
 <a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-cmux.html">cmux</a>
 <a href="memory-for-codebuddy.html">CodeBuddy Code</a>
 <a href="memory-for-codewhale.html" aria-current="page">CodeWhale</a>
 <a href="memory-for-codex.html">Codex</a>
@@ -140,6 +142,7 @@
 <a href="memory-for-gemini.html">Gemini CLI</a>
 <a href="memory-for-goose.html">Goose</a>
 <a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-herdr.html">herdr</a>
 <a href="memory-for-hermes.html">Hermes</a>
 <a href="memory-for-jetbrains.html">JetBrains AI Assistant</a>
 <a href="memory-for-junie.html">Junie</a>
@@ -150,6 +153,7 @@
 <a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
+<a href="memory-for-oh-my-claudecode.html">oh-my-claudecode</a>
 <a href="memory-for-omp.html">omp</a>
 <a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
@@ -191,22 +195,25 @@
 <p>This is not the DeepSeek Harness deja reads as <code>deepseek</code>: that one keeps zstd-framed JSONL under <code>~/.dsh</code> and has <a href="memory-for-dsh.html">its own page</a>.</p>
 
 <h2>Adding recall</h2>
+<p>Two options, which compose cleanly:</p>
+<ul>
+<li><b>Plugin bundle (<code>extensions/codewhale</code>):</b> run <code>/plugin install extensions/codewhale</code> inside CodeWhale. It installs <code>.claude-plugin/plugin.json</code>, the stdio <code>.mcp.json</code> entry, <code>skills/deja-history/SKILL.md</code>, and <code>commands/deja.md</code> (CodeWhale's compatibility loader imports MCP servers, skills, and slash commands, and ignores <code>hooks</code>).</li>
+<li><b>Native CLI wiring:</b> <code>deja install codewhale</code> writes the MCP server under <code>servers</code> in <code>~/.codewhale/mcp.json</code> and adds <code>mcp_deja_deja</code> to <code>tools.always_load</code> in <code>~/.codewhale/config.toml</code> (CodeWhale boots an MCP server only when listed there or discovered via tool search). <code>deja install codewhale-auto</code> adds the native <code>[[hooks.hooks]]</code> entries, <code>~/.agents/skills/deja-history/SKILL.md</code>, and <code>~/.codewhale/commands/deja.md</code>. All native edits reverse with <code>deja uninstall codewhale-auto</code>.</li>
+</ul>
 <pre>deja install codewhale-auto</pre>
-<p>That writes the MCP server into <code>~/.codewhale/mcp.json</code>, adds its tool to <code>tools.always_load</code> (CodeWhale starts a server only when a tool of it is named there), puts deja's hooks in <code>config.toml</code> and the <code>deja-history</code> skill under <code>~/.agents/skills</code>. Your own entries in those files stay as they are, and <code>deja uninstall codewhale-auto</code> takes out only deja's.</p>
 
 <h2>What arrives</h2>
 <ul>
 <li>The MCP server, with the <code>deja</code> tool and the modes it serves everywhere.</li>
 <li>A digest of where you left off in the repo, with the session's first message: CodeWhale drops what <code>session_start</code> prints, so <code>message_submit</code> carries it.</li>
 <li>Recall for each message, and before an edit the file's history, on <code>tool_call_before</code>. For a call that failed to run, the line waits for the next tool call or message.</li>
-<li>After a failed command, the fix that worked last time. <code>tool_call_after</code> output never reaches the model, and it fires after the next tool has already started, so the pair rides your next message.</li>
-<li>After a compaction, the state of the work, on the next message or tool call.</li>
+<li>After a failed command, the fix that worked last time. <code>tool_call_after</code> output never reaches the model, and it fires after the next tool has already started, so the pair rides your next message or tool call.</li>
 <li><code>/deja</code> in the slash menu, from <code>~/.codewhale/commands/deja.md</code>.</li>
 </ul>
-<p>CodeWhale's footer takes only its built-in items, so there is no deja status line here.</p>
+<p>CodeWhale's native hooks run in the interactive TUI (<code>codewhale exec</code> and headless servers fire none), and its footer takes only built-in items so there is no deja status line.</p>
 
 <h2>The part that is not about CodeWhale</h2>
-<p>The index covers every agent's transcripts on the machine — forty-six of them, each in its own format — so a fix found in Claude Code answers a question asked in CodeWhale, including sessions from before any of this was installed. A transcript a client later deletes stays searchable; only <code>deja forget</code> drops one on purpose. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+<p>The index covers every agent's transcripts on the machine — forty-seven of them, each in its own format — so a fix found in Claude Code answers a question asked in CodeWhale, including sessions from before any of this was installed. A transcript a client later deletes stays searchable; only <code>deja forget</code> drops one on purpose. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
 
 <p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/codewhale.html">The CodeWhale session format</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
