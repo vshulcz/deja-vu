@@ -167,11 +167,12 @@ var helpEntries = []helpEntry{
 		examples: []string{"deja secrets", "deja secrets --scrub --dry-run"}},
 	{name: "stats", group: groupAsk,
 		usage: []string{
-			"deja stats [--json] [--impact] [--year] [--redaction] [--card [path]]",
-			"    [--html [path]] [--project name] [--harness name] [--since 30d] [--role name]",
+			"deja stats [--json] [--impact] [--year] [--redaction] [--no-index]",
+			"    [--card [path]] [--html [path]] [--project name] [--harness name]",
+			"    [--since 30d] [--role name]",
 		},
 		desc:     "totals, projects and activity, as text, card or page",
-		examples: []string{"deja stats", "deja stats --since 30d --card"}},
+		examples: []string{"deja stats", "deja stats --since 30d --card", "deja stats --no-index --card"}},
 
 	{name: "remember", group: groupNotes,
 		usage:    []string{`deja remember "text" [--project name] [--tag name] [--repo]`},

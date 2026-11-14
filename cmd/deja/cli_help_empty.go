@@ -186,6 +186,7 @@ var flagsOfOtherCommands = map[string]string{
 	"--impact":           "stats",
 	"--card":             "stats",
 	"--year":             "stats",
+	"--no-index":         "stats",
 	"--attribution":      "blame",
 	"--git-note":         "blame",
 	"--all-projects":     "how",
@@ -209,7 +210,7 @@ var (
 		"--session", "--project", "--before", "--unforget",
 	}
 	statsFlags = []string{
-		"--json", "--html", "--redaction", "--impact", "--card", "--year",
+		"--json", "--html", "--redaction", "--impact", "--card", "--year", "--no-index",
 		"--harness", "--project", "--since", "--role",
 	}
 	doctorFlags   = []string{"--json", "--offline", "--deep", "--all"}

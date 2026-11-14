@@ -250,7 +250,7 @@ _deja_completion() {
             elif [[ "$prev" == "--project" || "$prev" == "--since" ]]; then
                 COMPREPLY=()
             else
-                COMPREPLY=( $(compgen -W "--json --impact --year --html --redaction --card --harness --project --since --role" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--json --impact --year --html --redaction --card --no-index --harness --project --since --role" -- "$cur") )
             fi
             ;;
         sync)
@@ -520,7 +520,7 @@ _deja() {
       _arguments '--limit=[maximum findings]:count:' '--json[print JSON]' '--scrub[rewrite files to remove secrets]' '--dry-run[show what --scrub would change]'
       ;;
     stats)
-      _arguments '--json[print JSON]' '--impact[measured impact report]' '--year[your last twelve months in one screen]' '--html=[write HTML timeline]:path:_files' '--redaction[include redaction facts]' '--card=[write SVG card]:path:_files' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(%ROLES%)'
+      _arguments '--json[print JSON]' '--impact[measured impact report]' '--year[your last twelve months in one screen]' '--html=[write HTML timeline]:path:_files' '--redaction[include redaction facts]' '--card=[write SVG card]:path:_files' '--no-index[scan local stores without writing an index]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(%ROLES%)'
       ;;
     sync)
       if (( CURRENT == 3 )); then
@@ -722,6 +722,7 @@ complete -c deja -n '__fish_seen_subcommand_from stats' -l year
 complete -c deja -n '__fish_seen_subcommand_from stats' -l html -r
 complete -c deja -n '__fish_seen_subcommand_from stats' -l redaction
 complete -c deja -n '__fish_seen_subcommand_from stats' -l card -r
+complete -c deja -n '__fish_seen_subcommand_from stats' -l no-index -d 'Scan local stores without writing an index'
 complete -c deja -n '__fish_seen_subcommand_from stats' -l harness -r -a '%HARNESSES%'
 complete -c deja -n '__fish_seen_subcommand_from stats' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from stats' -l since -r
@@ -877,7 +878,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 if ($previous -eq '--harness') { $harnesses }
                 elseif ($previous -eq '--role') { $roles }
                 elseif ($previous -in @('--project', '--since')) { @() }
-                else { @('--json', '--impact', '--year', '--html', '--redaction', '--card', '--harness', '--project', '--since', '--role') }
+                else { @('--json', '--impact', '--year', '--html', '--redaction', '--card', '--no-index', '--harness', '--project', '--since', '--role') }
             }
             'sync' {
                 if ($argumentPosition -eq 1) { @('export', 'import', 'ssh', 'forget', '--full') }
