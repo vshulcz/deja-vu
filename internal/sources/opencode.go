@@ -909,7 +909,14 @@ func OpencodeCounts() (sessions, messages int, err error) {
 // session row without scanning the part or session_message tables.
 func OpencodeHasSessions() (bool, error) {
 	db := OpencodeDB()
-	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
+	fi, err := os.Stat(db)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if fi.Size() == 0 {
 		return false, nil
 	}
 	tables := opencodeSessionTables(db)

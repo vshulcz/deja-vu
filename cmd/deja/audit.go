@@ -166,9 +166,7 @@ func collectAudit(dir string, now time.Time) auditReport {
 	)
 
 	// Keep index reads in a single goroutine while store scans run concurrently.
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		if n, err := index.SessionCount(dir); err == nil && n > 0 {
 			idxSessions = n
 			seenPaths := map[string]bool{}
@@ -188,13 +186,11 @@ func collectAudit(dir string, now time.Time) auditReport {
 				}
 			}
 		}
-	}()
+	})
 
 	workers := min(nJobs, max(runtime.GOMAXPROCS(0), 4))
-	for w := 0; w < workers; w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range workers {
+		wg.Go(func() {
 			for i := range jobs {
 				sp := specs[i]
 				files, infos, sz := statPresentFiles(sp.files()...)
@@ -220,7 +216,7 @@ func collectAudit(dir string, now time.Time) auditReport {
 				}
 				results[i] = res
 			}
-		}()
+		})
 	}
 
 	days, explicit := readClaudeCleanupPeriodDays()

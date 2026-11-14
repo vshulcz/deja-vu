@@ -122,7 +122,7 @@ func TestParseClaudeAutoMemoryFileFullBodyAndRedaction(t *testing.T) {
 	claudeRoot := filepath.Join(tmp, "claude", "projects")
 	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
 
-	proj := filepath.Join(tmp, "work", "my-payments")
+	proj := filepath.Join(tmp, "work", "payments")
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +195,7 @@ func TestParseClaudeAutoMemoryFileFullBodyAndRedaction(t *testing.T) {
 		t.Fatalf("ParseClaudeAutoMemoryFile(topic) = %#v, err=%v", ss, err)
 	}
 	s := ss[0]
-	if s.Harness != "claude" || s.Project != "work/my-payments" || s.Path != topicPath {
+	if s.Harness != "claude" || s.Project != "work/payments" || s.Path != topicPath {
 		t.Fatalf("unexpected session metadata: %+v", s)
 	}
 	if len(s.Messages) != 1 || s.Messages[0].Role != "assistant" {

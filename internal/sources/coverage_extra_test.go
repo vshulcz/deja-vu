@@ -470,8 +470,8 @@ func TestOpencodeHasSessions(t *testing.T) {
 
 	// Empty 0-byte DB.
 	zeroDB := filepath.Join(tmp, "zero.db")
-	if err := os.WriteFile(zeroDB, nil, 0o644); err != nil {
-		t.Fatal(err)
+	if writeErr := os.WriteFile(zeroDB, nil, 0o644); writeErr != nil {
+		t.Fatal(writeErr)
 	}
 	t.Setenv("DEJA_OPENCODE_DB", zeroDB)
 	has, err = OpencodeHasSessions()
@@ -481,8 +481,8 @@ func TestOpencodeHasSessions(t *testing.T) {
 
 	// v1 schema with empty session table.
 	v1Empty := filepath.Join(tmp, "v1-empty.db")
-	if out, err := exec.CommandContext(t.Context(), "sqlite3", v1Empty, "create table session(id text primary key);").CombinedOutput(); err != nil {
-		t.Fatalf("sqlite v1 empty: %v %s", err, out)
+	if out, cmdErr := exec.CommandContext(t.Context(), "sqlite3", v1Empty, "create table session(id text primary key);").CombinedOutput(); cmdErr != nil {
+		t.Fatalf("sqlite v1 empty: %v %s", cmdErr, out)
 	}
 	t.Setenv("DEJA_OPENCODE_DB", v1Empty)
 	has, err = OpencodeHasSessions()
@@ -492,8 +492,8 @@ func TestOpencodeHasSessions(t *testing.T) {
 
 	// v1 schema with 1 session row.
 	v1Full := filepath.Join(tmp, "v1-full.db")
-	if out, err := exec.CommandContext(t.Context(), "sqlite3", v1Full, "create table session(id text primary key); insert into session values('s1');").CombinedOutput(); err != nil {
-		t.Fatalf("sqlite v1 full: %v %s", err, out)
+	if out, cmdErr := exec.CommandContext(t.Context(), "sqlite3", v1Full, "create table session(id text primary key); insert into session values('s1');").CombinedOutput(); cmdErr != nil {
+		t.Fatalf("sqlite v1 full: %v %s", cmdErr, out)
 	}
 	t.Setenv("DEJA_OPENCODE_DB", v1Full)
 	has, err = OpencodeHasSessions()
@@ -510,8 +510,8 @@ func TestOpencodeHasSessions(t *testing.T) {
 	}
 
 	v2Empty := filepath.Join(tmp, "v2-empty.db")
-	if out, err := exec.CommandContext(t.Context(), "sqlite3", v2Empty, "create table session_v2(id text primary key);").CombinedOutput(); err != nil {
-		t.Fatalf("sqlite v2 empty: %v %s", err, out)
+	if out, cmdErr := exec.CommandContext(t.Context(), "sqlite3", v2Empty, "create table session_v2(id text primary key);").CombinedOutput(); cmdErr != nil {
+		t.Fatalf("sqlite v2 empty: %v %s", cmdErr, out)
 	}
 	t.Setenv("DEJA_OPENCODE_DB", v2Empty)
 	has, err = OpencodeHasSessions()
