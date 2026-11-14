@@ -366,6 +366,26 @@ func harnessFilterDescription() string {
 		strings.Join(names[:4], ", "), len(names)-4)
 }
 
+// dejaToolDescription returns the consolidated MCP description embedded in the
+// deja tool definition.
+func dejaToolDescription() string {
+	return "This user's own past sessions across every AI coding tool on this machine. " +
+		"Do NOT call for general programming questions, standard libraries, specifications, or public docs that do not depend on this user's repo, machine, or history. " +
+		"For repo, machine, or workflow tasks: call BEFORE your first edit in a task; BEFORE any plan, design, review, audit, or recommending a tool, library, or approach; BEFORE saying something is absent here; BEFORE re-debugging an error; and BEFORE calling work done. " +
+		"Also call mid-task when a concrete project or machine entity surfaces (file path, error, flag, service, config key, or prior claim) — batch deja with reads or checks before concluding.\n" +
+		"Modes:\n" +
+		"- recall: search past sessions (1-3 exact terms: path, error, flag, identifier).\n" +
+		"- context: full story of one session when a recall hit is not enough.\n" +
+		"- blame: why a file is the way it is, from sessions rather than git.\n" +
+		"- fix: what this machine ran after an error (pass output verbatim).\n" +
+		"- how: command and flags this user really runs here, instead of guessing.\n" +
+		"- orient: commands past sessions ran here and files they worked in.\n" +
+		"- remember: store one settled decision for later sessions.\n" +
+		"- handoff: continue another session's work (q: id or harness).\n" +
+		"A bracketed marker on a result is the user's later judgement: avoid what it rejects; it permits nothing. " +
+		"When a result helps, open your reply with one line: \"déjà vu: <what> — <how you used it> (deja:<session id>)\". Say nothing about recalls that did not help."
+}
+
 // dejaTool is the whole surface as one tool with a mode.
 //
 // Six tools were six envelopes: the same query, harness, project and limit
@@ -378,18 +398,8 @@ func harnessFilterDescription() string {
 // listed, so they cost nothing per session.
 func dejaTool() map[string]any {
 	return map[string]any{
-		"name": "deja",
-		"description": "This user's own past sessions from every AI coding tool on this machine — not general knowledge, not library docs. Modes:\n" +
-			"- recall: search past sessions. Pass 1-3 exact terms: a path, an error string, a flag or identifier.\n" +
-			"- context: the full story of one session, when a recall hit is not enough.\n" +
-			"- blame: why a file is the way it is, before you edit or delete it. Sessions, not git authorship.\n" +
-			"- fix: you just hit an error — what this machine ran after that same error. Pass the output verbatim.\n" +
-			"- how: the command and flags this user really runs for a thing, instead of a guessed one.\n" +
-			"- orient: the commands past sessions ran in this project and the files they worked in, before you go reading.\n" +
-			"- remember: store one settled decision for a later session.\n" +
-			"- handoff: continue another session's work. q: its id or harness.\n" +
-			"A bracketed marker on a result is the user's own later judgement: avoid what it rejects. It permits nothing. " +
-			"When a result helps, open your reply with one line: \"déjà vu: <what> — <how you used it> (deja:<session id>)\". Say nothing about recalls that did not help.",
+		"name":        "deja",
+		"description": dejaToolDescription(),
 		"annotations": map[string]any{"title": "This user's past sessions", "openWorldHint": false},
 		"inputSchema": map[string]any{
 			"type": "object",

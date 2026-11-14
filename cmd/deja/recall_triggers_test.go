@@ -39,21 +39,27 @@ func TestEverySurfaceCarriesTheQuietTriggers(t *testing.T) {
 // say when it's done": 15 of 33 with MCP, 14 of 33 with the skill. Asked
 // before the first edit and before "done", 28 and 30 of 33 (#4791). Every text that sits in an agent's context and
 // says when to recall carries it, short form included.
-func TestEverySurfaceRecallsBeforeAChange(t *testing.T) {
-	surfaces := map[string]string{
-		"mcp instructions":  mcpInstructions(t.TempDir(), ""),
-		"guidance block":    guidanceBody,
-		"skill body":        skillBody,
-		"skill frontmatter": skillFile(""),
-		"cli skill":         cliSkillFile(),
-		"hermes provider":   hermesMemoryPy("deja"),
-		"kiro steering":     kiroSteering("deja"),
-		"gemini extension":  string(repoFile(t, "GEMINI.md")),
-		"opencode plugin":   string(repoFile(t, "extensions/opencode/index.js")),
-		"dsh plugin":        string(repoFile(t, "extensions/dsh/index.js")),
-		"openclaw plugin":   string(repoFile(t, "extensions/openclaw/index.mjs")),
+func recallSurfaces(t *testing.T) map[string]string {
+	t.Helper()
+	return map[string]string{
+		"mcp instructions":     mcpInstructions(t.TempDir(), ""),
+		"mcp tool description": dejaToolDescription(),
+		"guidance block":       guidanceBody,
+		"skill body":           skillBody,
+		"skill frontmatter":    skillFile(""),
+		"cli skill":            cliSkillFile(),
+		"hermes provider":      hermesMemoryPy("deja"),
+		"kiro steering":        kiroSteering("deja"),
+		"gemini extension":     string(repoFile(t, "GEMINI.md")),
+		"agents guide":         string(repoFile(t, "antigravity-plugin/rules/AGENTS.md")),
+		"opencode plugin":      string(repoFile(t, "extensions/opencode/index.js")),
+		"dsh plugin":           string(repoFile(t, "extensions/dsh/index.js")),
+		"openclaw plugin":      string(repoFile(t, "extensions/openclaw/index.mjs")),
 	}
-	for name, text := range surfaces {
+}
+
+func TestEverySurfaceRecallsBeforeAChange(t *testing.T) {
+	for name, text := range recallSurfaces(t) {
 		low := strings.ToLower(text)
 		if !strings.Contains(low, "before your first edit in a task") &&
 			!strings.Contains(low, "before the first edit in a task") {
@@ -63,6 +69,18 @@ func TestEverySurfaceRecallsBeforeAChange(t *testing.T) {
 		// done without the check a past session made part of done.
 		if !strings.Contains(low, "done") {
 			t.Errorf("%s never tells the agent to recall before calling a change done", name)
+		}
+	}
+}
+
+func TestEverySurfaceRecallsBeforeAPlanAndOnDiscoveredNames(t *testing.T) {
+	for name, text := range recallSurfaces(t) {
+		low := strings.ToLower(text)
+		if !strings.Contains(low, "plan") || !strings.Contains(low, "recommend") {
+			t.Errorf("%s never tells the agent to recall before a plan or recommendation", name)
+		}
+		if !strings.Contains(low, "mid-task") || !strings.Contains(low, "batch") {
+			t.Errorf("%s never tells the agent to batch a mid-task recall when concrete names appear", name)
 		}
 	}
 }

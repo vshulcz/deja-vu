@@ -199,7 +199,7 @@ func opencodeConfigHome() string {
 // The name has to match the directory, and the description is the only part
 // loaded before the skill is used, so it carries the trigger phrases.
 func skillFile(body string) string {
-	return "---\nname: deja-history\ndescription: Search the user's past AI coding sessions. Holds what they already settled and never wrote into the repo (naming rules, banned or already-tried tools, required checks before merge, preferred values, who owns what). Use before your first edit in a task, before you call a change done or ready to merge, before you recommend a tool, library, design or reviewer, before re-debugging an error that may already be solved, when they say 'didn't we fix this before', 'what did we decide about X' or 'I already have that', and before telling them something on this machine does not exist.\n---\n\n" + body + "\n"
+	return "---\nname: deja-history\ndescription: Search the user's past AI coding sessions. Holds what they already settled and never wrote into the repo (naming rules, banned or already-tried tools, required checks before merge, preferred values, who owns what). Use before your first edit in a task, before any plan, review, or blank-slate task, before you call a change done or ready to merge, before you recommend a tool, library, design or reviewer, before re-debugging an error, when concrete names (repo, service, file, error, flag) surface mid-task by batching recall with reads, when they say 'didn't we fix this before', 'what did we decide about X' or 'I already have that', and before telling them something on this machine does not exist.\n---\n\n" + body + "\n"
 }
 
 // instructionsFile wraps the same body for VS Code, whose custom instructions

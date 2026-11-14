@@ -60,17 +60,28 @@ func wiredDejaBinary(path string) string {
 // from the script on disk rather than from launcherCandidates, because the
 // order that matters is the one the installed launcher has, which an older
 // install wrote.
+// launcherPick runs the launcher's own resolution without running it: DEJA_BIN,
+// then the paths written into the script in its order, then the PATH. Read
+// from the script on disk rather than from launcherCandidates, because the
+// order that matters is the one the installed launcher has, which an older
+// install wrote. Resilient launchers fall through startup failures (exit >= 126),
+// so they resolve to the first runnable binary; legacy `exec` launchers stop on
+// the first executable file.
 func launcherPick(launcher string) string {
-	if p := os.Getenv("DEJA_BIN"); executableFile(p) {
-		return p
-	}
-	f, err := os.Open(launcher)
+	b, err := os.ReadFile(launcher)
 	if err != nil {
 		return ""
 	}
-	defer func() { _ = f.Close() }()
+	text := string(b)
+	okFn := executableFile
+	if strings.Contains(text, "-lt 126") {
+		okFn = runnableFile
+	}
+	if p := os.Getenv("DEJA_BIN"); okFn(p) {
+		return p
+	}
 	in := false
-	sc := bufio.NewScanner(f)
+	sc := bufio.NewScanner(strings.NewReader(text))
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
 		switch {
@@ -86,11 +97,11 @@ func launcherPick(launcher string) string {
 		}
 		c := strings.TrimSpace(strings.TrimSuffix(line, `\`))
 		c = strings.ReplaceAll(strings.Trim(c, "'"), `'\''`, "'")
-		if executableFile(c) {
+		if okFn(c) {
 			return c
 		}
 	}
-	if p, err := exec.LookPath("deja"); err == nil && executableFile(p) {
+	if p, err := exec.LookPath("deja"); err == nil && okFn(p) {
 		return p
 	}
 	return ""
@@ -134,6 +145,50 @@ var dejaBinaryVersion = func(p string) string {
 	binaryVersionCache[key] = v
 	binaryVersionMu.Unlock()
 	return v
+}
+
+var (
+	binaryRunErrMu    sync.Mutex
+	binaryRunErrCache = map[binaryStamp]string{}
+)
+
+// dejaBinaryRunErr probes whether a deja binary actually starts, returning ""
+// when it runs or is not a deja-vu build, and the error text otherwise. A
+// binary on disk can satisfy os.Stat and buildinfo.ReadFile while the kernel
+// kills it on execve (for example, a stale macOS code-signature vnode cache).
+var dejaBinaryRunErr = func(p string) string {
+	fi, err := os.Stat(p)
+	if err != nil {
+		return ""
+	}
+	key := binaryStamp{p, fi.Size(), fi.ModTime()}
+	binaryRunErrMu.Lock()
+	e, ok := binaryRunErrCache[key]
+	binaryRunErrMu.Unlock()
+	if ok {
+		return e
+	}
+	e = probeDejaBinaryRunErr(p)
+	binaryRunErrMu.Lock()
+	binaryRunErrCache[key] = e
+	binaryRunErrMu.Unlock()
+	return e
+}
+
+func probeDejaBinaryRunErr(p string) string {
+	if !executableFile(p) {
+		return ""
+	}
+	bi, err := buildinfo.ReadFile(p)
+	if err != nil || bi.Main.Path != "github.com/vshulcz/deja-vu" {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := exec.CommandContext(ctx, p, "--version").Run(); err != nil {
+		return err.Error()
+	}
+	return ""
 }
 
 func readDejaBinaryVersion(p string) string {
