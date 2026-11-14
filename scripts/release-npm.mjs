@@ -2,8 +2,9 @@
 // Build and publish npm packages from goreleaser release archives.
 // Usage: node scripts/release-npm.mjs <version> <dist-dir>
 //   <dist-dir> must contain deja-vu_<version>_<os>_<arch>.{tar.gz,zip}
-// Publishes @vshulcz/deja-vu-<os>-<arch> for each platform, then @vshulcz/deja-vu,
-// then the harness packages under extensions/ at the same version.
+// Publishes @vshulcz/deja-vu-<os>-<arch> for each platform, @vshulcz/deja-vu,
+// the harness packages under extensions/, and unscoped deja-vu at the same
+// version.
 //
 // One version for everything is the point: a user reading `dsh-deja@0.21.0`
 // knows which deja it was built against, and nobody has to remember to publish
@@ -58,16 +59,7 @@ for (const [goos, goarch] of platforms) {
 }
 
 // main wrapper package from npm/ in the repo
-const mainDir = path.join(work, "deja-vu");
-fs.cpSync("npm", mainDir, { recursive: true });
-const mainPkgPath = path.join(mainDir, "package.json");
-const main = JSON.parse(fs.readFileSync(mainPkgPath, "utf8"));
-main.version = version;
-main.optionalDependencies = Object.fromEntries(
-  platforms.map(([o, a]) => [`@vshulcz/deja-vu-${o}-${a}`, version]),
-);
-fs.writeFileSync(mainPkgPath, JSON.stringify(main, null, 2));
-run("npm", ["publish", "--access", "public"], mainDir);
+publishWrapper("scoped", "@vshulcz/deja-vu");
 
 // The harness packages ride the same version where they can. Two of them were
 // versioned independently before this, and publishing them at a release behind
@@ -101,10 +93,35 @@ for (const name of extensions) {
   published.push(`${outPkg.name}@${publishAs}`);
 }
 
+// unscoped wrapper package so `npx deja-vu` works alongside `@vshulcz/deja-vu`
+publishWrapper("unscoped", "deja-vu");
+
 console.log(
-  `published ${platforms.length} platform packages + @vshulcz/deja-vu@${version}` +
+  `published ${platforms.length} platform packages + @vshulcz/deja-vu@${version} + deja-vu@${version}` +
     (published.length ? ` + ${published.join(", ")}` : ""),
 );
+
+// buildWrapperManifest returns a copy of npm/package.json pinned to pkgName and version.
+function buildWrapperManifest(basePkg, pkgName, pkgVersion, targetPlatforms) {
+  return {
+    ...basePkg,
+    name: pkgName,
+    version: pkgVersion,
+    optionalDependencies: Object.fromEntries(
+      targetPlatforms.map(([o, a]) => [`@vshulcz/deja-vu-${o}-${a}`, pkgVersion]),
+    ),
+  };
+}
+
+function publishWrapper(subdir, pkgName) {
+  const dir = path.join(work, subdir);
+  fs.cpSync("npm", dir, { recursive: true });
+  const pkgPath = path.join(dir, "package.json");
+  const base = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+  const pkg = buildWrapperManifest(base, pkgName, version, platforms);
+  fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+  run("npm", ["publish", "--access", "public"], dir);
+}
 
 // npmLatest is the version npm serves as `latest`, or "" when the package has
 // never been published.
