@@ -156,3 +156,65 @@ func TestUninstallRemovesTheLauncherWhenNothingIsLeft(t *testing.T) {
 		t.Error("the launcher outlived the wiring that pointed at it")
 	}
 }
+
+func TestTheLauncherSkipsAKilledBinary(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no launcher on windows — the entry names the binary, as before")
+	}
+	tmp := hermeticEnv(t)
+	saved := launcherWellKnown
+	t.Cleanup(func() { launcherWellKnown = saved })
+	launcherWellKnown = nil
+	t.Setenv("DEJA_BIN", "")
+	t.Setenv("PATH", filepath.Join(tmp, "empty-path"))
+
+	home := sources.Home()
+	primary := filepath.Join(tmp, "primary", "deja")
+	fallback := filepath.Join(home, "go", "bin", "deja")
+	marker := filepath.Join(tmp, "ran.txt")
+	for _, dir := range []string{filepath.Dir(primary), filepath.Dir(fallback)} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(primary, []byte("#!/bin/sh\nkill -9 $$\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	fallbackBody := "#!/bin/sh\nprintf '%s' \"$*\" > " + shellQuote(marker) + "\nexit 2\n"
+	if err := os.WriteFile(fallback, []byte(fallbackBody), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	launcher := filepath.Join(tmp, "deja-hook")
+	if err := os.WriteFile(launcher, []byte(dejaLauncherScript(primary)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	err := exec.Command(launcher, "hook-test").Run()
+	ee, ok := err.(*exec.ExitError)
+	if !ok || ee.ExitCode() != 2 {
+		t.Fatalf("launcher exit = %v, want exit code 2 from fallback", err)
+	}
+	got, err := os.ReadFile(marker)
+	if err != nil {
+		t.Fatalf("fallback was not reached after primary was killed: %v", err)
+	}
+	if string(got) != "hook-test" {
+		t.Fatalf("fallback args = %q, want %q", string(got), "hook-test")
+	}
+
+	// Non-fatal exit codes (< 126) from a candidate must propagate without
+	// falling through to the next candidate.
+	_ = os.Remove(marker)
+	if err := os.WriteFile(primary, []byte("#!/bin/sh\nexit 3\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	err = exec.Command(launcher, "hook-test").Run()
+	ee, ok = err.(*exec.ExitError)
+	if !ok || ee.ExitCode() != 3 {
+		t.Fatalf("launcher exit = %v, want exit code 3 from primary", err)
+	}
+	if _, err := os.Stat(marker); err == nil {
+		t.Fatal("fallback ran even though primary exited 3 (< 126)")
+	}
+}

@@ -168,7 +168,7 @@ export default {
         (ctx) => ({
           name: "deja_recall",
           description:
-            "Search this machine's own past AI coding sessions — every agent used on it, including months before deja was installed. Use before debugging an error or re-implementing something that may already exist, before the first edit in a task and before calling a change done or ready to merge, and whenever the user implies the work happened before.",
+            "Search this machine's own past AI coding sessions — every agent used on it, including months before deja was installed. Use before debugging an error, before any plan, review, or recommending an approach, before re-implementing something that may already exist, before the first edit in a task, mid-task whenever concrete names surface (batch alongside reads), before calling a change done or ready to merge, and whenever the user implies the work happened before.",
           parameters: RECALL_SCHEMA,
           async execute(_id, params) {
             // The page the MCP recall tool serves, framed and budgeted by deja.

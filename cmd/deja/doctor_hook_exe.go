@@ -45,14 +45,44 @@ func dejaHookCommandMissing(path string) string {
 	if err != nil {
 		return ""
 	}
-	text := string(b)
-	// A quoted path first, because the scan below cannot answer for one: it
-	// reads the path out of the text around it, and a path with a space in it
-	// is skipped on purpose — the boundary that ends every other path ends
-	// that one in the middle. Since #3692 deja quotes its own hook lines when
-	// a path needs it, and a quoted span has ends that can be read exactly.
-	if missing := quotedDejaCommandMissing(text); missing != "" {
-		return missing
+	return firstHookExeMatch(string(b), func(cand string) bool {
+		_, err := os.Stat(cand)
+		return err != nil
+	})
+}
+
+func dejaHookCommandBroken(path string) (string, string) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", ""
+	}
+	var runErr string
+	cand := firstHookExeMatch(string(b), func(c string) bool {
+		if _, err := os.Stat(c); err != nil {
+			return false
+		}
+		if msg := dejaBinaryRunErr(c); msg != "" {
+			runErr = msg
+			return true
+		}
+		return false
+	})
+	return cand, runErr
+}
+
+// quotedDejaCommandQuoted matches a hook line whose binary is quoted, in
+// either quote and with the escaped double quote a JSON file spells it with:
+// `'<path>' hook-prompt`, `"<path>" hook-prompt`, `\"<path>\" hook-prompt`.
+// The subcommand beside it is what says the line is deja's; the path itself
+// need not look like anything.
+var quotedDejaCommandQuoted = regexp.MustCompile(`(?:\\?["']|')([^"'\n]+?)(?:\\?["']|')\s+(hook-[a-z-]+|warmup-status|recall|statusline|mcp)\b`)
+
+func firstHookExeMatch(text string, match func(string) bool) string {
+	for _, m := range quotedDejaCommandQuoted.FindAllStringSubmatch(text, -1) {
+		cand := quotedPathUnescape.Replace(m[1])
+		if filepath.IsAbs(cand) && match(cand) {
+			return filepath.FromSlash(cand)
+		}
 	}
 	for _, loc := range hookExePath.FindAllStringIndex(text, -1) {
 		if !hookExeBoundary(text, loc[0]-1) || !hookExeBoundary(text, loc[1]) {
@@ -64,34 +94,9 @@ func dejaHookCommandMissing(path string) string {
 		// The windows form is written escaped, and the escapes are not part of
 		// the path: stat would miss and the note would print them back.
 		cand := quotedPathUnescape.Replace(text[loc[0]:loc[1]])
-		if !filepath.IsAbs(cand) {
-			continue
-		}
-		if _, err := os.Stat(cand); err != nil {
+		if filepath.IsAbs(cand) && match(cand) {
 			// Hook commands name a Windows path with forward slashes (#4116);
 			// the note names it the way the reader's own tools print it.
-			return filepath.FromSlash(cand)
-		}
-	}
-	return ""
-}
-
-// quotedDejaCommandQuoted matches a hook line whose binary is quoted, in
-// either quote and with the escaped double quote a JSON file spells it with:
-// `'<path>' hook-prompt`, `"<path>" hook-prompt`, `\"<path>\" hook-prompt`.
-// The subcommand beside it is what says the line is deja's; the path itself
-// need not look like anything.
-var quotedDejaCommandQuoted = regexp.MustCompile(`(?:\\?["']|')([^"'\n]+?)(?:\\?["']|')\s+(hook-[a-z-]+|warmup-status|recall|statusline|mcp)\b`)
-
-// quotedDejaCommandMissing returns the binary a quoted hook line runs when it
-// is not there, and "" otherwise.
-func quotedDejaCommandMissing(text string) string {
-	for _, m := range quotedDejaCommandQuoted.FindAllStringSubmatch(text, -1) {
-		cand := quotedPathUnescape.Replace(m[1])
-		if !filepath.IsAbs(cand) {
-			continue
-		}
-		if _, err := os.Stat(cand); err != nil {
 			return filepath.FromSlash(cand)
 		}
 	}
@@ -114,17 +119,19 @@ func hookExeBoundary(text string, i int) bool {
 }
 
 // hookExeNote is the line a row prints under itself when the hook it just
-// called wired runs a binary that is gone. The install target is the -auto
-// one: the plain target writes the MCP entry, and following advice that
-// repairs a different file leaves the hook dead and doctor quiet about it
+// called wired runs a binary that is gone or fails to start. The install target
+// is the -auto one: the plain target writes the MCP entry, and following advice
+// that repairs a different file leaves the hook dead and doctor quiet about it
 // (#2686).
 func hookExeNote(path, target string) string {
 	if strings.TrimSpace(path) == "" {
 		return ""
 	}
-	missing := dejaHookCommandMissing(path)
-	if missing == "" {
-		return ""
+	if missing := dejaHookCommandMissing(path); missing != "" {
+		return "runs " + missing + ", which is not there — `deja install " + target + "` rewrites it for this binary"
 	}
-	return "runs " + missing + ", which is not there — `deja install " + target + "` rewrites it for this binary"
+	if broken, runErr := dejaHookCommandBroken(path); broken != "" {
+		return "runs " + broken + ", which fails to start (" + runErr + ") — reinstall or run `deja install " + target + "`"
+	}
+	return ""
 }

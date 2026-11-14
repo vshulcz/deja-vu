@@ -27,7 +27,9 @@ import (
 // 77 more: the hosts that reach deja only through MCP had no other way to it.
 // The budget is set just above what that costs, because the point of it is to
 // notice growth rather than to leave room for it.
-const mcpToolsListCharBudget = 1900
+// Hosts that ignore initialize.instructions only see tools/list, so compact
+// when-to-call and when-not-to-call triggers also live in deja's description.
+const mcpToolsListCharBudget = 2350
 
 func TestMCPToolsListStaysWithinItsTokenBudget(t *testing.T) {
 	hermeticEnv(t)

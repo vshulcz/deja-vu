@@ -180,16 +180,17 @@ func dejaLauncherScript(exe string) string {
 			fmt.Fprintf(&b, "[ -n \"$%s\" ] || export %s=%s\n", kv[0], kv[0], shellQuote(kv[1]))
 		}
 	}
-	b.WriteString("if [ -n \"$DEJA_BIN\" ] && [ -x \"$DEJA_BIN\" ]; then exec \"$DEJA_BIN\" \"$@\"; fi\n")
+	b.WriteString("deja_try() {\n  _c=\"$1\"\n  shift\n  [ -n \"$_c\" ] && [ -x \"$_c\" ] || return 126\n  \"$_c\" \"$@\"\n  _rc=$?\n  [ \"$_rc\" -lt 126 ] && exit \"$_rc\"\n  return \"$_rc\"\n}\n")
+	b.WriteString("deja_try \"$DEJA_BIN\" \"$@\"\n")
 	b.WriteString("for c in \\\n")
 	for _, c := range launcherCandidates(exe) {
 		fmt.Fprintf(&b, "  %s \\\n", shellQuote(c))
 	}
 	b.WriteString("  ; do\n")
-	b.WriteString("  [ -x \"$c\" ] && exec \"$c\" \"$@\"\n")
+	b.WriteString("  deja_try \"$c\" \"$@\"\n")
 	b.WriteString("done\n")
 	b.WriteString("c=$(command -v deja 2>/dev/null) || c=\"\"\n")
-	b.WriteString("[ -n \"$c\" ] && exec \"$c\" \"$@\"\n")
+	b.WriteString("deja_try \"$c\" \"$@\"\n")
 	b.WriteString("exit 0\n")
 	return b.String()
 }
@@ -218,6 +219,7 @@ func launcherCandidates(exe string) []string {
 	if home != "" {
 		add(filepath.Join(home, ".local", "bin", "deja"))
 		add(filepath.Join(home, "bin", "deja"))
+		add(filepath.Join(home, "go", "bin", "deja"))
 	}
 	for _, p := range launcherWellKnown {
 		add(p)

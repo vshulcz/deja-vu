@@ -349,8 +349,12 @@ func autoWiringState(a autoWiring) (state string, binaryMissing bool) {
 	}
 	// Only the files that run the binary: aider's is a digest of past sessions
 	// and roo's is guidance, and either may quote a path for reasons of its own.
-	if a.marker != "" && dejaHookCommandMissing(path) != "" {
-		binaryMissing = true
+	if a.marker != "" {
+		if dejaHookCommandMissing(path) != "" {
+			binaryMissing = true
+		} else if _, runErr := dejaHookCommandBroken(path); runErr != "" {
+			binaryMissing = true
+		}
 	}
 	return state, binaryMissing
 }
