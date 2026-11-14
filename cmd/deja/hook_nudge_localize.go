@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -17,7 +18,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/prompt"
 	"github.com/vshulcz/deja-vu/internal/search"
-	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 type repoFileEntry struct {
@@ -47,9 +47,9 @@ func loadRepoSymbolMap(cwd string) repoSymbolMap {
 	if cwd == "" {
 		return repoSymbolMap{}
 	}
-	scanRoot := sources.RepoRoot(cwd)
+	scanRoot := safeScanRoot(cwd)
 	if scanRoot == "" {
-		scanRoot = cwd
+		return repoSymbolMap{}
 	}
 	if v, ok := repoSymbolMapCache.Load(scanRoot); ok {
 		if cached, ok := v.(repoSymbolMap); ok && time.Since(cached.at) < 2*time.Second {
@@ -74,7 +74,7 @@ func loadRepoSymbolMap(cwd string) repoSymbolMap {
 		}
 		if d.IsDir() {
 			name := d.Name()
-			if p != scanRoot && (strings.HasPrefix(name, ".") || name == "vendor" || name == "node_modules" || name == "dist" || name == "build" || name == "target" || name == "testdata") {
+			if p != scanRoot && (isSkippedScanDir(name) || name == "testdata") {
 				return filepath.SkipDir
 			}
 			return nil
@@ -597,13 +597,30 @@ func selfProjectWordSet(cwd string) map[string]bool {
 	return out
 }
 
+var conversationalHistStopWords = map[string]bool{
+	"давай": true, "дава": true, "дальше": true, "дальш": true,
+	"изучать": true, "изуча": true, "вопрос": true, "вопро": true,
+	"низкоуровнево": true, "низкоуровн": true, "улучшать": true, "улучш": true,
+	"улучшения": true, "улучшени": true, "инструмент": true, "инструм": true,
+	"работы": true, "работ": true, "работа": true, "работать": true,
+	"агент": true, "агентов": true, "агенты": true, "агента": true,
+	"думать": true, "подумать": true, "механизм": true, "механизмы": true,
+	"лечить": true, "помогать": true, "помочь": true, "людей": true, "людям": true,
+	"разработчик": true, "разработчикам": true, "сделать": true,
+	"посмотрим": true, "посмотреть": true, "продолжай": true, "продолжать": true,
+	"нужно": true, "можно": true, "сейчас": true, "вообще": true,
+	"просто": true, "реально": true, "полезно": true, "лучше": true, "хуже": true,
+	"неделю": true, "последнюю": true, "какие": true, "почему": true,
+	"когда": true, "через": true, "после": true, "перед": true,
+}
+
 func extractHistoricalQueryTerms(asked string, projSelf map[string]bool) []string {
 	focused, codeSpans, quotedPhrases := focusTaskPrompt(asked)
 	seen := map[string]bool{}
 	var out []string
 	add := func(t string) {
 		t = strings.Trim(strings.ToLower(t), "._-/")
-		if len([]rune(t)) < 4 || localizeStopWords[t] || workflowMetaWords[t] || projSelf[t] || seen[t] {
+		if len([]rune(t)) < 4 || localizeStopWords[t] || workflowMetaWords[t] || conversationalHistStopWords[t] || projSelf[t] || seen[t] {
 			return
 		}
 		allDigits := true
@@ -830,9 +847,9 @@ func matchDiagnosticPhraseFiles(cwd string, idx *repoSymbolMap, phrases []string
 	if len(phrases) == 0 || idx == nil || idx.numFiles == 0 {
 		return nil
 	}
-	scanRoot := sources.RepoRoot(cwd)
+	scanRoot := safeScanRoot(cwd)
 	if scanRoot == "" {
-		scanRoot = cwd
+		return nil
 	}
 	var out map[string]float64
 	for _, ph := range phrases {
@@ -909,11 +926,33 @@ func hayMatchesHistTerm(hay, qt string) bool {
 				stemLen = len(runes) - 3
 			}
 			if stemLen >= 5 {
-				return strings.Contains(hay, string(runes[:stemLen]))
+				return containsWordPrefix(hay, string(runes[:stemLen]))
 			}
 		}
 	}
 	return false
+}
+
+func containsWordPrefix(hay, prefix string) bool {
+	if prefix == "" {
+		return false
+	}
+	offset := 0
+	for {
+		idx := strings.Index(hay[offset:], prefix)
+		if idx < 0 {
+			return false
+		}
+		pos := offset + idx
+		if pos == 0 {
+			return true
+		}
+		prev, _ := utf8.DecodeLastRuneInString(hay[:pos])
+		if !unicode.IsLetter(prev) && !unicode.IsDigit(prev) {
+			return true
+		}
+		offset = pos + len(prefix)
+	}
 }
 
 // fixPairTargetBoost consults in-scope FixPair edit remedies in RAM so prompts
@@ -1029,7 +1068,7 @@ func historicalTitleTouchedBoost(dir, cwd, asked string, skip map[string]bool) (
 	if totalProj < 3 || len(projDocs) == 0 {
 		return nil, nil
 	}
-	rareSessionCap := max(5, totalProj/10)
+	rareSessionCap := min(max(5, totalProj/12), 18)
 	fileSessionDF := map[string]int{}
 	for _, m := range metas {
 		if skip != nil && skip[m.ID] {
@@ -1053,6 +1092,7 @@ func historicalTitleTouchedBoost(dir, cwd, asked string, skip map[string]bool) (
 	hubFileCap := max(8, totalProj/8)
 	boost := map[string]float64{}
 	sessCount := map[string]int{}
+	qualifyingDocs := 0
 	for _, d := range projDocs {
 		rareHits := 0
 		var docScore float64
@@ -1065,6 +1105,7 @@ func historicalTitleTouchedBoost(dir, cwd, asked string, skip map[string]bool) (
 		if rareHits < 2 && (rareHits < 1 || len(d.matched) < 3) {
 			continue
 		}
+		qualifyingDocs++
 		targets := resolveRepoTouchedTargets(cwd, d.touched)
 		if len(targets) == 0 || len(targets) > 6 {
 			continue
@@ -1082,6 +1123,14 @@ func historicalTitleTouchedBoost(dir, cwd, asked string, skip map[string]bool) (
 			}
 			boost[rel] += w
 			sessCount[rel]++
+		}
+	}
+	if qualifyingDocs >= 4 {
+		for rel, count := range sessCount {
+			if float64(count)/float64(qualifyingDocs) < 0.25 {
+				delete(boost, rel)
+				delete(sessCount, rel)
+			}
 		}
 	}
 	return boost, sessCount

@@ -168,7 +168,7 @@ func editFileCallLines(dir string, calls []sources.EditCall, conversationID, wor
 			toolName = "read_file"
 		}
 		payload, err := json.Marshal(map[string]any{
-			"hook_event_name": "PreToolUse",
+			"hook_event_name": "PostToolUse",
 			"tool_name":       toolName,
 			"tool_input":      toolInput,
 			"session_id":      conversationID,

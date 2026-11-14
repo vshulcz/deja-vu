@@ -672,6 +672,7 @@ func fileLineFor(dir, cwd string, input toolHookInput) string {
 	if newStr == "" {
 		newStr = input.ToolInput.NewStr
 	}
+	rawOldStr := oldStr
 	if oldStr == "" && newStr != "" {
 		diskPath := path
 		if !filepath.IsAbs(diskPath) && cwd != "" {
@@ -709,7 +710,103 @@ func fileLineFor(dir, cwd string, input toolHookInput) string {
 			line += hallucinated
 		}
 	}
+	if isSearchReplaceEditTool(input.ToolName) && rawOldStr != "" && !postToolEvent(input.HookEventName) {
+		if mismatch := editTargetMismatchLine(cwd, path, rawOldStr, newStr); mismatch != "" {
+			if line == "" {
+				line = search.SafePath(baseName(path)) + mismatch
+			} else if len(line)+len(mismatch) <= toolHookMaxBytes {
+				line += mismatch
+			}
+		}
+	}
 	return line
+}
+
+// isSearchReplaceEditTool reports whether toolName is a search-and-replace edit tool.
+func isSearchReplaceEditTool(toolName string) bool {
+	switch strings.ToLower(strings.TrimSpace(toolName)) {
+	case "edit", "edit_file", "replace", "replace_file_content", "multi_replace_file_content", "str_replace", "str_replace_editor":
+		return true
+	}
+	return false
+}
+
+// editTargetMismatchLine returns a single-line hint with the closest disk lines when oldStr is not verbatim on disk.
+func editTargetMismatchLine(cwd, path, oldStr, newStr string) string {
+	if oldStr == "" || oldStr == newStr {
+		return ""
+	}
+	diskPath := path
+	if !filepath.IsAbs(diskPath) {
+		if cwd == "" {
+			return ""
+		}
+		diskPath = filepath.Join(cwd, path)
+	}
+	raw, err := os.ReadFile(diskPath)
+	if err != nil || len(raw) == 0 || len(raw) > 256<<10 {
+		return ""
+	}
+	content := string(raw)
+	if strings.Contains(content, oldStr) {
+		return ""
+	}
+	diskLines := strings.Split(content, "\n")
+	oldLines := strings.Split(strings.TrimRight(oldStr, "\n"), "\n")
+	if len(oldLines) == 0 {
+		return ""
+	}
+	norm := func(s string) string {
+		return strings.Join(strings.Fields(s), " ")
+	}
+	oldNorm := make([]string, 0, len(oldLines))
+	for _, l := range oldLines {
+		if n := norm(l); n != "" {
+			oldNorm = append(oldNorm, n)
+		}
+	}
+	if len(oldNorm) == 0 {
+		return ""
+	}
+	win := min(len(oldLines), len(diskLines))
+	bestScore, bestStart, bestEnd := 0.0, -1, -1
+	for i := 0; i+win <= len(diskLines); i++ {
+		matches := 0
+		for _, on := range oldNorm {
+			for j := i; j < i+win; j++ {
+				dn := norm(diskLines[j])
+				if dn == on || (len(on) >= 8 && strings.Contains(dn, on)) || (len(dn) >= 8 && strings.Contains(on, dn)) {
+					matches++
+					break
+				}
+			}
+		}
+		score := float64(matches) / float64(len(oldNorm))
+		if score > bestScore {
+			bestScore = score
+			bestStart = i
+			bestEnd = i + win - 1
+		}
+	}
+	if bestScore < 0.4 || bestStart < 0 {
+		return ""
+	}
+	previewEnd := min(bestStart+3, bestEnd+1)
+	var parts []string
+	for k := bestStart; k < previewEnd; k++ {
+		if t := strings.TrimSpace(diskLines[k]); t != "" {
+			parts = append(parts, t)
+		}
+	}
+	snippet := strings.Join(parts, " | ")
+	if len(snippet) > 140 {
+		snippet = snippet[:137] + "..."
+	}
+	out := fmt.Sprintf(" — edit target not verbatim on disk; closest L%d-L%d: %s", bestStart+1, bestEnd+1, search.SafeLine(snippet))
+	if len(out) > 240 {
+		out = out[:237] + "..."
+	}
+	return out
 }
 
 // fileReadGuardLine returns a file line on a PreToolUse Read only when the file

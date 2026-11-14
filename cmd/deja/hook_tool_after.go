@@ -580,16 +580,16 @@ func failingTestSourceLine(cwd, output string, pol policy.Policy) string {
 	if cwd == "" || output == "" || !pol.Allows(policy.ActivationAuto, "") {
 		return ""
 	}
-	if !strings.Contains(output, "FAIL") && !strings.Contains(output, "AssertionError") && !strings.Contains(output, "panicked at ") {
+	if !strings.Contains(output, "FAIL") && !strings.Contains(output, "AssertionError") && !strings.Contains(output, "panicked at ") && !strings.Contains(output, "Traceback (most recent call last):") {
 		return ""
 	}
 	targets := extractFailingTestTargets(output)
 	if len(targets) == 0 {
 		return ""
 	}
-	scanRoot := sources.RepoRoot(cwd)
+	scanRoot := safeScanRoot(cwd)
 	if scanRoot == "" {
-		scanRoot = cwd
+		return ""
 	}
 	tree := orientRepoTree(scanRoot)
 	for _, target := range targets {
@@ -641,6 +641,41 @@ func extractFailingTestTargets(output string) []failingTestTarget {
 		lineNo, err := strconv.Atoi(rest)
 		if err == nil && lineNo > 0 {
 			addTarget(filePart, lineNo, "")
+		}
+	}
+	if len(targets) == 0 && strings.Contains(output, "Traceback (most recent call last):") {
+		var pyFrames []failingTestTarget
+		for line := range strings.SplitSeq(output, "\n") {
+			trimmed := strings.TrimSpace(line)
+			if !strings.HasPrefix(trimmed, `File "`) {
+				continue
+			}
+			rest := strings.TrimPrefix(trimmed, `File "`)
+			qIdx := strings.IndexByte(rest, '"')
+			if qIdx <= 0 {
+				continue
+			}
+			filePart := rest[:qIdx]
+			if strings.HasPrefix(filePart, "<") || strings.Contains(filePart, "site-packages") ||
+				strings.Contains(filePart, "/venv/") || strings.Contains(filePart, "/.venv/") ||
+				strings.Contains(filePart, "/lib/python") {
+				continue
+			}
+			afterQuote := rest[qIdx+1:]
+			_, afterLine, ok := strings.Cut(afterQuote, ", line ")
+			if !ok {
+				continue
+			}
+			numStr := strings.TrimSpace(afterLine)
+			if comma := strings.IndexAny(numStr, ", "); comma >= 0 {
+				numStr = numStr[:comma]
+			}
+			if lineNo, err := strconv.Atoi(numStr); err == nil && lineNo > 0 {
+				pyFrames = append(pyFrames, failingTestTarget{filePart: filePart, lineNo: lineNo})
+			}
+		}
+		for _, f := range slices.Backward(pyFrames) {
+			targets = append(targets, f)
 		}
 	}
 	return targets

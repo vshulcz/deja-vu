@@ -137,8 +137,15 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 }
 
 func resolveFileHookProjectNames(dir, cwd, path string) []string {
+	var fileRepoRoot string
+	if filepath.IsAbs(path) {
+		fileRepoRoot = sources.RepoRoot(filepath.Dir(filepath.Clean(path)))
+	}
+	if fileRepoRoot != "" && safeScanRoot(cwd) == "" {
+		return digest.ProjectNameCandidates(fileRepoRoot)
+	}
 	names := digest.ProjectNameCandidates(cwd)
-	if filepath.IsAbs(path) && cwd != "" {
+	if filepath.IsAbs(path) && cwd != "" && safeScanRoot(cwd) != "" {
 		cleanCwd := filepath.Clean(cwd)
 		cleanPath := filepath.Clean(path)
 		if strings.HasPrefix(cleanPath, cleanCwd+string(filepath.Separator)) {
@@ -149,6 +156,9 @@ func resolveFileHookProjectNames(dir, cwd, path string) []string {
 				}
 			}
 			for cur := dirPath; strings.HasPrefix(cur, cleanCwd+string(filepath.Separator)); cur = filepath.Dir(cur) {
+				if fileRepoRoot != "" && !strings.HasPrefix(cur, fileRepoRoot+string(filepath.Separator)) && cur != fileRepoRoot {
+					break
+				}
 				base := filepath.Base(cur)
 				parent := filepath.Base(filepath.Dir(cur))
 				for _, cand := range []string{parent + "/" + base, base} {
@@ -284,7 +294,7 @@ func assembleFileHookLine(head, dec, co, ran string) string {
 					avail = toolHookMaxBytes - len(head) - len(co) - len(label)
 				}
 				if avail >= 90 {
-					clipped := trimTrailingFragment(search.SafeText(clipDecision(strings.TrimPrefix(dec, label), avail)))
+					clipped := trimClippedDecision(search.SafeText(clipDecision(strings.TrimPrefix(dec, label), avail)), avail)
 					if clipped != "" {
 						dec = label + clipped
 					}
@@ -344,9 +354,16 @@ const breakageLabel = " — past breakage here: "
 // `notes.jsonl` says "notes".
 func mentionsFile(path, text string) bool {
 	low := strings.ToLower(text)
-	fullBase := strings.ToLower(filepath.Base(path))
-	if len(fullBase) >= 5 && strings.ContainsRune(fullBase, '.') && strings.Contains(low, fullBase) {
+	slashPath := strings.ToLower(strings.TrimPrefix(filepath.ToSlash(path), "./"))
+	if slashPath != "" && strings.Contains(low, slashPath) {
 		return true
+	}
+	fullBase := strings.ToLower(filepath.Base(path))
+	if len(fullBase) >= 5 && strings.ContainsRune(fullBase, '.') && !hasGenericBasename(path) && mentionsUnqualifiedOrSameDirBase(path, fullBase, low) {
+		return true
+	}
+	if hasGenericBasename(path) {
+		return false
 	}
 	base := fullBase
 	if i := strings.LastIndex(base, "."); i > 0 {
@@ -380,6 +397,50 @@ func mentionsFile(path, text string) bool {
 		}
 	}
 	return false
+}
+
+// hasGenericBasename reports whether path has an ambiguous single-stem filename like main.go or index.html.
+func hasGenericBasename(path string) bool {
+	base := strings.ToLower(filepath.Base(path))
+	if i := strings.LastIndex(base, "."); i > 0 {
+		base = base[:i]
+	}
+	base = strings.Trim(base, "_")
+	for _, suf := range []string{"_test", "_spec", ".test", ".spec", "-test", "-spec"} {
+		base = strings.TrimSuffix(base, suf)
+	}
+	parts := strings.FieldsFunc(base, func(r rune) bool { return r == '_' || r == '-' || r == '.' })
+	if len(parts) >= 2 && len(base) >= 9 {
+		return false
+	}
+	for _, w := range parts {
+		if len(w) >= 4 && !isGenericFileStemPart(w) {
+			return false
+		}
+	}
+	return true
+}
+
+func mentionsUnqualifiedOrSameDirBase(path, fullBase, low string) bool {
+	parent := strings.ToLower(filepath.Base(filepath.Dir(path)))
+	offset := 0
+	for {
+		idx := strings.Index(low[offset:], fullBase)
+		if idx < 0 {
+			return false
+		}
+		pos := offset + idx
+		if pos == 0 || low[pos-1] != '/' {
+			return true
+		}
+		if parent != "" && parent != "." && strings.HasSuffix(low[:pos], "/"+parent+"/") {
+			return true
+		}
+		if parent != "" && parent != "." && pos == len(parent)+1 && strings.HasPrefix(low, parent+"/") {
+			return true
+		}
+		offset = pos + len(fullBase)
+	}
 }
 
 func isGenericFileStemPart(w string) bool {
@@ -494,7 +555,7 @@ func repoEntryHasFile(root, path string, files []string) bool {
 	for _, f := range files {
 		f = strings.TrimPrefix(strings.ReplaceAll(filepath.ToSlash(f), "\\", "/"), "./")
 		fHasDir := strings.ContainsRune(f, '/')
-		if strings.EqualFold(f, slashPath) || (!fHasDir && len(base) >= 6 && strings.EqualFold(f, base)) ||
+		if strings.EqualFold(f, slashPath) || (!fHasDir && !hasGenericBasename(slashPath) && len(base) >= 6 && strings.EqualFold(f, base)) ||
 			strings.HasSuffix(slashPath, "/"+f) || strings.HasSuffix(f, "/"+slashPath) {
 			return true
 		}
@@ -514,7 +575,7 @@ func repoEntryMentionsFile(root, path, text string) bool {
 		}
 	}
 	base := strings.ToLower(filepath.Base(slashPath))
-	if len(base) >= 5 && strings.Contains(low, base) {
+	if !hasGenericBasename(slashPath) && mentionsUnqualifiedOrSameDirBase(slashPath, base, low) {
 		return true
 	}
 	if len(slashPath) >= 5 && strings.Contains(low, strings.ToLower(slashPath)) {
@@ -973,6 +1034,9 @@ func mentionsFileStrictForReversal(path, text string) bool {
 	if len(fullBase) >= 5 && strings.ContainsRune(fullBase, '.') && strings.Contains(low, fullBase) {
 		return true
 	}
+	if hasGenericBasename(path) {
+		return false
+	}
 	base := fullBase
 	if i := strings.LastIndex(base, "."); i > 0 {
 		base = base[:i]
@@ -1165,7 +1229,7 @@ func fileBreakageLineForSkipping(dir, cwd, path string, editSymbols []string, me
 			shown += fmt.Sprintf(" (+%d more)", len(brokenTests)-limit)
 		}
 		if bestSym != "" {
-			return truncateToolLine(shown+" failed and required editing "+search.SafeLine(bestSym)+" in this file", toolHookDecisionBudget)
+			return trimClippedDecision(shown+" failed and required editing "+search.SafeLine(bestSym)+" in this file", toolHookDecisionBudget)
 		}
 		return shown + " failed and required editing this file"
 	}
@@ -1535,9 +1599,9 @@ func findSymbolDeclarationInRepo(cwd, sym string) (string, int, string) {
 	if cwd == "" || len(lowSym) < 4 {
 		return "", 0, ""
 	}
-	scanRoot := sources.RepoRoot(cwd)
+	scanRoot := safeScanRoot(cwd)
 	if scanRoot == "" {
-		scanRoot = cwd
+		return "", 0, ""
 	}
 	var files []string
 	_ = filepath.WalkDir(scanRoot, func(p string, d os.DirEntry, err error) error {
@@ -1546,7 +1610,7 @@ func findSymbolDeclarationInRepo(cwd, sym string) (string, int, string) {
 		}
 		if d.IsDir() {
 			name := d.Name()
-			if p != scanRoot && (strings.HasPrefix(name, ".") || name == "vendor" || name == "node_modules" || name == "dist" || name == "build" || name == "testdata") {
+			if p != scanRoot && (isSkippedScanDir(name) || name == "testdata") {
 				return filepath.SkipDir
 			}
 			return nil
@@ -2086,20 +2150,32 @@ func decisionUsable(s model.Session, r *lifecycleResolver) bool {
 	return true
 }
 
-// trimTrailingFragment drops a half-word left by a byte-budget cut, so a decision
-// reads as "capped retries" rather than "capped retr". Only when the text was
-// actually cut (near the budget and not ending a sentence).
-func trimTrailingFragment(s string) string {
-	if len(s) < toolHookDecisionBudget-4 {
+// trimClippedDecision truncates s to budget and drops dangling trailing connectors before adding an ellipsis.
+func trimClippedDecision(s string, budget int) string {
+	s = truncateToolLine(s, budget)
+	if len(s) < budget-4 {
 		return s
 	}
 	if r := s[len(s)-1]; r == '.' || r == '!' || r == '?' {
 		return s
 	}
 	if i := strings.LastIndexAny(s, " \t"); i > 0 {
-		return strings.TrimRight(s[:i], " \t") + "…"
+		s = strings.TrimRight(s[:i], " \t,;:-")
 	}
-	return s
+	for _, tail := range []string{" in this", " in", " to", " for", " with", " by", " from", " of", " and", " or", " at", " on"} {
+		if strings.HasSuffix(strings.ToLower(s), tail) && len(s) > len(tail)+12 {
+			s = strings.TrimRight(s[:len(s)-len(tail)], " \t,;:-")
+			break
+		}
+	}
+	return s + "…"
+}
+
+// trimTrailingFragment drops a half-word left by a byte-budget cut, so a decision
+// reads as "capped retries" rather than "capped retr". Only when the text was
+// actually cut (near the budget and not ending a sentence).
+func trimTrailingFragment(s string) string {
+	return trimClippedDecision(s, toolHookDecisionBudget)
 }
 
 // fileMetaInScope keeps a session only if it worked on this exact path (an
@@ -2394,9 +2470,9 @@ func missingFileHintLine(cwd, path, toolName string) string {
 	if _, err := os.Stat(diskPath); !os.IsNotExist(err) {
 		return ""
 	}
-	scanRoot := sources.RepoRoot(cwd)
+	scanRoot := safeScanRoot(cwd)
 	if scanRoot == "" {
-		scanRoot = cwd
+		return ""
 	}
 	base := filepath.Base(diskPath)
 	tree := orientRepoTree(scanRoot)
