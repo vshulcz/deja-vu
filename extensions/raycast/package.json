@@ -2,7 +2,7 @@
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "deja-vu",
   "title": "deja-vu",
-  "description": "Search and resume sessions across Claude Code, Codex, Cursor, OpenCode, Gemini CLI and 38 more coding agents.",
+  "description": "Search and resume sessions across Claude Code, Codex, Cursor, OpenCode, Gemini CLI and 41 more coding agents.",
   "icon": "command-icon.png",
   "author": "vshulcz",
   "license": "MIT",

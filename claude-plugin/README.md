@@ -14,10 +14,10 @@ the session-start, per-prompt (`UserPromptSubmit`), pre-compact (`PreCompact`), 
 wiring `deja install --auto` writes, packaged the way those harnesses install
 things.
 
-`deja` indexes the session transcripts of every coding agent on the machine (`forty-three coding agents` total), across projects, and the hooks inject matching snippets from those local transcripts into the model's context (`UserPromptSubmit` recalls past sessions matching the prompt; `PreToolUse` surfaces decisions, verification commands, and co-changed files for edited paths, or pre-flight failure warnings before shell commands). Recalled transcripts are an untrusted text channel (they can contain earlier tool outputs or external content), so hook output is wrapped with a `<deja-recall>` untrusted-data framing banner and credentials are redacted at index time.
+`deja` indexes the session transcripts of every coding agent on the machine (`forty-six coding agents` total), across projects, and the hooks inject matching snippets from those local transcripts into the model's context (`UserPromptSubmit` recalls past sessions matching the prompt; `PreToolUse` surfaces decisions, verification commands, and co-changed files for edited paths, or pre-flight failure warnings before shell commands). Recalled transcripts are an untrusted text channel (they can contain earlier tool outputs or external content), so hook output is wrapped with a `<deja-recall>` untrusted-data framing banner and credentials are redacted at index time.
 
 [deja](https://github.com/vshulcz/deja-vu) indexes the session transcripts
-forty-three coding agents already write to disk, including sessions from before it
+forty-six coding agents already write to disk, including sessions from before it
 was installed, and answers from them locally: BM25 over the transcripts, no
 model and no embeddings, credentials redacted as the index is built.
 

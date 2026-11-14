@@ -11,11 +11,18 @@
     <name>vshulcz</name>
   </author>
   <entry>
-    <title>deja-vu: local memory, session search &amp; handoff across 43 coding agents</title>
+    <title>deja-vu: local memory, session search &amp; handoff across 46 coding agents</title>
     <id>https://vshulcz.github.io/deja-vu/</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
     <updated>2026-11-12T00:00:00Z</updated>
-    <summary>Shared local memory, session history search, cross-agent handoff, and uncommitted code recovery across 43 coding agents (Claude Code, Codex, Cursor, OpenCode, Gemini CLI, OpenClaw and 37 more agents). One Go binary, zero LLM calls.</summary>
+    <summary>Shared local memory, session history search, cross-agent handoff, and uncommitted code recovery across 46 coding agents (Claude Code, Codex, Cursor, OpenCode, Gemini CLI, OpenClaw and 40 more agents). One Go binary, zero LLM calls.</summary>
+  </entry>
+  <entry>
+    <title>Persistent memory for coding agents over MCP — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/agents.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/agents.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>How deja gives coding agents a searchable memory over MCP: one tool with recall, context, blame, fix, how, orient, remember and handoff modes.</summary>
   </entry>
   <entry>
     <title>deja CLI reference: search, recall, blame, stats — deja-vu</title>
@@ -23,6 +30,13 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/commands.html"></link>
     <updated>2026-11-12T00:00:00Z</updated>
     <summary>Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
+  </entry>
+  <entry>
+    <title>Memory plugins for Claude Code, Codex and Cursor, compared</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/compare.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/compare.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>deja-vu next to claude-mem, agentmemory, MemPalace, Mem0, Letta, CASS, ctx and agentsview: what each captures, where it keeps it, how it scores.</summary>
   </entry>
   <entry>
     <title>Cursor state.vscdb Too Large? Shrink or Clean It Safely</title>
@@ -44,6 +58,62 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-dsh-session-history.html"></link>
     <updated>2026-11-12T00:00:00Z</updated>
     <summary>DeepSeek Harness (dsh) keeps each session in its own directory. Find it, remove one session or all, and what deja does not touch.</summary>
+  </entry>
+  <entry>
+    <title>Delete MiMo-Code session history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-mimo-session-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-mimo-session-history.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>MiMo-Code keeps sessions in one SQLite database at ~/.local/share/mimocode/mimocode.db. Where it lives, how to remove one or all, and how to index first.</summary>
+  </entry>
+  <entry>
+    <title>Delete Omnigent session history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-omnigent-session-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-omnigent-session-history.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>Omnigent keeps conversations in one SQLite database at ~/.omnigent/chat.db. Where it lives, what removing it deletes, and how to index first.</summary>
+  </entry>
+  <entry>
+    <title>Delete Orca session history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-orca-session-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-orca-session-history.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>Orca keeps recorded sessions in one SQLite database named agent-session-journal.db. Where it lives, what removing it deletes, and how to index first.</summary>
+  </entry>
+  <entry>
+    <title>Claude Code, Codex, Cursor and 43 more agents — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/harnesses.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/harnesses.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>The forty-six coding agents deja indexes today, where each stores its history, and how to add a new one.</summary>
+  </entry>
+  <entry>
+    <title>Claude Code lost your context: how to get it back — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/lost-context.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/lost-context.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>A crash, a cleared window or a restart takes the agent&#39;s context but not the transcript — how to get the work back and stop paying for it next time.</summary>
+  </entry>
+  <entry>
+    <title>Add memory to MiMo-Code: every agent&#39;s sessions — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-mimo.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-mimo.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>How to give MiMo-Code (mimo) recall over every coding agent&#39;s sessions on the machine — the MCP server, the skill, the /deja command, and auto-recall.</summary>
+  </entry>
+  <entry>
+    <title>Add memory to Omnigent: every agent&#39;s sessions — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-omnigent.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-omnigent.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>How to give Omnigent recall over every coding agent&#39;s sessions on the machine — the MCP server, the skill, the /deja command, and lifecycle hooks.</summary>
+  </entry>
+  <entry>
+    <title>Add memory to Orca: every agent&#39;s sessions — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-orca.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-orca.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>How to give Orca recall over every coding agent&#39;s sessions on the machine — the MCP server, the skill, the /deja command, and lifecycle hooks.</summary>
   </entry>
   <entry>
     <title>Recover a deleted Claude Code CLI session — deja-vu</title>
@@ -71,7 +141,35 @@
     <id>https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html"></link>
     <updated>2026-11-12T00:00:00Z</updated>
-    <summary>Where each coding agent keeps its conversation history file, in forty-three formats, and how to read them without the tool that wrote them.</summary>
+    <summary>Where each coding agent keeps its conversation history file, in forty-six formats, and how to read them without the tool that wrote them.</summary>
+  </entry>
+  <entry>
+    <title>Where coding agents store their history — session format registry</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/README.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/README.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>Where Claude Code, Codex, Cursor, opencode and thirty-nine more coding agents keep their conversation history on disk, what is inside those files, and how each format drifts.</summary>
+  </entry>
+  <entry>
+    <title>Where MiMo-Code stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/mimo.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/mimo.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>Where MiMo-Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
+    <title>Where Omnigent stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/omnigent.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/omnigent.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>Where Omnigent writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
+    <title>Where Orca stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/orca.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/orca.html"></link>
+    <updated>2026-11-12T00:00:00Z</updated>
+    <summary>Where Orca writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
     <title>Install deja and index your agent history — deja-vu</title>
@@ -123,13 +221,6 @@
     <summary>codex resume, --all, --last and codex exec resume: why a session in ~/.codex/sessions is missing from the picker, the no rollout found error, and the fix.</summary>
   </entry>
   <entry>
-    <title>Memory plugins for Claude Code, Codex and Cursor, compared</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/compare.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/compare.html"></link>
-    <updated>2026-11-09T00:00:00Z</updated>
-    <summary>deja-vu next to claude-mem, agentmemory, MemPalace, Mem0, Letta, CASS, ctx and agentsview: what each captures, where it keeps it, how it scores.</summary>
-  </entry>
-  <entry>
     <title>Delete or Purge Codex CLI Sessions — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html"></link>
@@ -142,13 +233,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-grok-session-history.html"></link>
     <updated>2026-11-09T00:00:00Z</updated>
     <summary>Grok Build keeps each session in its own directory under ~/.grok/sessions. Remove one with deja delete or by hand, and keep the rest searchable.</summary>
-  </entry>
-  <entry>
-    <title>Claude Code, Codex, Cursor and 40 more agents — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/harnesses.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/harnesses.html"></link>
-    <updated>2026-11-09T00:00:00Z</updated>
-    <summary>The forty-three coding agents deja indexes today, where each stores its history, and how to add a new one.</summary>
   </entry>
   <entry>
     <title>Open-source Mem0 alternative for coding agents — deja-vu</title>
@@ -186,7 +270,7 @@
     <summary>Search past chat history across Claude Code, Codex, Cursor and 40 other agents by the error string, function name, file path or flag you remember.</summary>
   </entry>
   <entry>
-    <title>SpecStory alternative for CLI &amp; 43 agents — deja-vu</title>
+    <title>SpecStory alternative for CLI &amp; 46 agents — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html"></link>
     <updated>2026-11-05T00:00:00Z</updated>
@@ -205,89 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/codex-history.html"></link>
     <updated>2026-11-05T00:00:00Z</updated>
     <summary>Codex CLI 把会话历史放在哪里、为什么 grep 会漏掉一周之前的会话、jq 和 sqlite3 怎么读，以及如何搜索全部 Codex 会话。</summary>
-  </entry>
-  <entry>
-    <title>Codex resume 会话：列出、查找和修复报错 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/codex-resume-session.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/codex-resume-session.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>codex resume、--all、--last 和 exec resume：为什么某个会话不在选择器里，以及 no rollout found 和 is archived 这两个报错。</summary>
-  </entry>
-  <entry>
-    <title>Claude Code 上下文窗口满了：它会丢掉什么 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/context-window-full.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/context-window-full.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>压缩保留了 77% 的决定和 0.2% 的命令——实测。与其为不断增长、直到崩掉的窗口持续付账，不如换个做法。</summary>
-  </entry>
-  <entry>
-    <title>Cursor 的 state.vscdb 太大：安全瘦身并保留聊天记录 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>Cursor 的 state.vscdb 膨胀到 30–125 GB：两条只读 SQLite 查询找出哪些对话占满了空间，按最安全顺序瘦身，并保留删掉的聊天记录。</summary>
-  </entry>
-  <entry>
-    <title>怎么删除 Codex CLI 的会话 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/delete-codex-sessions.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/delete-codex-sessions.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>怎么删除 Codex CLI 的会话——删一次 rollout、删一天，或者删掉整个 ~/.codex/sessions——以及为什么 ~/.codex/history.jsonl 无论如何都留着你的提示词。</summary>
-  </entry>
-  <entry>
-    <title>怎么删除 Cursor 的聊天记录 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/delete-cursor-chat-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/delete-cursor-chat-history.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>怎么删除 Cursor 的聊天记录——聊天存在 state.vscdb 里的什么位置、为什么删掉整个文件会重置的不只是聊天，以及命令行版另外写了什么。</summary>
-  </entry>
-  <entry>
-    <title>怎么删掉 Claude Code 的旧会话 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/delete-old-claude-sessions.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/delete-old-claude-sessions.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>find ~/.claude/projects -mtime +30 -delete 一条命令就能清掉，cleanupPeriodDays 则按时间自动清——以及为什么按时间删腾出的磁盘远比按大小删少。</summary>
-  </entry>
-  <entry>
-    <title>Claude Code 记得之前的对话吗？ — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>Claude Code、Codex、Cursor、Gemini CLI 都不会跨会话记忆。这篇讲清楚每个工具在磁盘上留下了什么、压缩到底保住了多少，以及把历史找回来的三种办法。</summary>
-  </entry>
-  <entry>
-    <title>找回解决问题的那次会话 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/find-a-session.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/find-a-session.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>怎么在整台机器的所有智能体里同时搜聊天记录：按你记得的那个词搜，而不是按你记不清的话题搜，然后用会话 id 继续那次对话。</summary>
-  </entry>
-  <entry>
-    <title>为什么智能体在会话之间会忘事 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>会话结束时上下文窗口被丢弃，但会话记录还在磁盘上。这篇讲压缩到底保住了什么、丢掉了什么，以及为什么直接 grep 日志代价高得多。</summary>
-  </entry>
-  <entry>
-    <title>Claude Code 丢了上下文：怎么找回来 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>崩溃、清空窗口或重启会带走智能体的上下文，但带不走会话记录。怎么把工作找回来，以及怎样让下一次不必再付这个代价。</summary>
-  </entry>
-  <entry>
-    <title>给 Claude Code 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-claude-code.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-claude-code.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>如何让 Claude Code 查到这台机器上每个编程智能体的会话：MCP 服务器、SessionStart 钩子和插件市场。</summary>
-  </entry>
-  <entry>
-    <title>给 Codex CLI 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-codex.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-codex.html"></link>
-    <updated>2026-11-05T00:00:00Z</updated>
-    <summary>如何让 Codex CLI 查到这台机器上每个编程智能体的会话：MCP 服务器、需要你批准的钩子，以及插件市场。</summary>
   </entry>
 </feed>

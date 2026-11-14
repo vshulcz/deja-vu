@@ -37,7 +37,7 @@
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Search Claude Code, Codex and Cursor sessions where you solved it", "description": "Search past chat history across Claude Code, Codex, Cursor and 40 other agents by the error string, function name, file path or flag you remember.", "url": "https://vshulcz.github.io/deja-vu/guide/find-a-session.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/find-a-session.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-24", "dateModified": "2026-11-05"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Finding a session","item":"https://vshulcz.github.io/deja-vu/guide/find-a-session.html"}]}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I find the session where I fixed something?","acceptedAnswer":{"@type":"Answer","text":"Search the transcripts by the most specific thing you remember — an exact error string, a function name, a file path or a flag. Those match a session even when you have forgotten which tool, project or month it was."}},{"@type":"Question","name":"Can I reopen an old session in the agent that ran it?","acceptedAnswer":{"@type":"Answer","text":"For thirty-six of the forty-three harnesses deja reads, yes: deja resume <id> hands the id back to that harness and it continues the conversation. The rest have no resume path of their own."}},{"@type":"Question","name":"What if I only remember roughly when it was?","acceptedAnswer":{"@type":"Answer","text":"Time is a hint rather than a filter: a date in the query weighs recent sessions up without hiding older ones, and deja last lists the most recent sessions by project, role or harness."}}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I find the session where I fixed something?","acceptedAnswer":{"@type":"Answer","text":"Search the transcripts by the most specific thing you remember — an exact error string, a function name, a file path or a flag. Those match a session even when you have forgotten which tool, project or month it was."}},{"@type":"Question","name":"Can I reopen an old session in the agent that ran it?","acceptedAnswer":{"@type":"Answer","text":"For thirty-nine of the forty-six harnesses deja reads, yes: deja resume <id> hands the id back to that harness and it continues the conversation. The rest have no resume path of their own."}},{"@type":"Question","name":"What if I only remember roughly when it was?","acceptedAnswer":{"@type":"Answer","text":"Time is a hint rather than a filter: a date in the query weighs recent sessions up without hiding older ones, and deja last lists the most recent sessions by project, role or harness."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -81,7 +81,7 @@
 <a href="recover-overwritten-files.html">Recover overwritten files</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold"><summary>Deleting sessions <span class="n">36</span></summary>
+<details class="grpfold"><summary>Deleting sessions <span class="n">39</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -118,8 +118,11 @@
 <a href="delete-openclaw-session-history.html">OpenClaw</a>
 <a href="delete-grok-session-history.html">Grok Build</a>
 <a href="delete-devin-session-history.html">Devin CLI</a>
+<a href="delete-mimo-session-history.html">MiMo-Code</a>
+<a href="delete-omnigent-session-history.html">Omnigent</a>
+<a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold"><summary>Per-agent guides <span class="n">43</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">46</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
@@ -147,11 +150,14 @@
 <a href="memory-for-kimchi.html">Kimchi Coding</a>
 <a href="memory-for-kimi.html">Kimi Code</a>
 <a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
 <a href="memory-for-omp.html">omp</a>
+<a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
 <a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-orca.html">Orca</a>
 <a href="memory-for-pi.html">pi</a>
 <a href="memory-for-prime.html">prime-agent</a>
 <a href="memory-for-qwen.html">Qwen Code</a>
@@ -186,7 +192,7 @@
 <div class="save-first"><b>Search your existing history right now:</b> <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> indexes the session files Claude Code, Codex, Cursor and 40 other agents already wrote to disk into one local SQLite + FTS5 database.<div class="save-actions"><div class="save-cmd"><span class="p">$</span><code>brew install deja-vu &amp;&amp; deja "your error string"</code><button type="button">copy</button></div><div class="save-cmd"><span class="p">$</span><code>npx @vshulcz/deja-vu "your error string"</code><button type="button">copy</button></div><a class="save-btn" href="https://github.com/vshulcz/deja-vu">deja-vu on GitHub</a><a class="save-demo" href="getting-started.html">Quick start &rarr;</a></div></div>
 
 <h2>Search by the most specific thing you remember</h2>
-<p>Not the topic — the token. An exact error string, a function name, a file path, a flag. Those survive in a transcript verbatim, and they are what separates the session you want from forty-three that discuss the same subject:</p>
+<p>Not the topic — the token. An exact error string, a function name, a file path, a flag. Those survive in a transcript verbatim, and they are what separates the session you want from forty-six that discuss the same subject:</p>
 <pre>$ deja "refresh token"
 [claude] api   · Jul 8 · 8f31c0a9 — 2 matches
   login started failing after refresh token rotation; jwt kid mismatch in tests
@@ -212,7 +218,7 @@
 <pre>deja show 8f31c0a9      # read the session
 deja ctx  8f31c0a9      # a digest of the session and the code it changed, to paste into whatever you are doing now
 deja resume 8f31c0a9    # reopen it in the agent that ran it</pre>
-<p><code>resume</code> hands the id back to the harness that owns the session, with the project directory where that harness scopes its list to one. It works for thirty-six of the forty-three harnesses deja reads. The remaining seven — aider, Cherry Studio, DeepSeek Harness, JetBrains AI Assistant, VS Code Copilot Chat, Windsurf / Devin Desktop and Zed — have no resume path deja prints, and deja says so rather than pretending. For a Codex session, <code>deja resume &lt;id&gt; --app</code> opens it in the ChatGPT desktop app on macOS and Windows instead. Roo Code is half of each: tasks its CLI created take <code>roo --session-id</code>, and tasks from the editor reopen in the editor. Reasonix resumes what its CLI started in a workspace; sessions from its desktop app reopen from the app.</p>
+<p><code>resume</code> hands the id back to the harness that owns the session, with the project directory where that harness scopes its list to one. It works for thirty-nine of the forty-six harnesses deja reads. The remaining seven — aider, Cherry Studio, DeepSeek Harness, JetBrains AI Assistant, VS Code Copilot Chat, Windsurf / Devin Desktop and Zed — have no resume path deja prints, and deja says so rather than pretending. For a Codex session, <code>deja resume &lt;id&gt; --app</code> opens it in the ChatGPT desktop app on macOS and Windows instead. Roo Code is half of each: tasks its CLI created take <code>roo --session-id</code>, and tasks from the editor reopen in the editor. Reasonix resumes what its CLI started in a workspace; sessions from its desktop app reopen from the app.</p>
 <p>Ids are matched by prefix, so the eight characters a result prints are enough to type. On the screen there is nothing to type: <code>↵</code> opens the session at the match, <code>r</code> resumes it in its agent, and <code>o</code> continues it in a different one.</p>
 
 <h2>When the answer is a command rather than a session</h2>

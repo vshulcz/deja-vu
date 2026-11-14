@@ -268,7 +268,8 @@ func opencodeV2Touched(db string, t time.Time) string {
 	if opencodeSchemaOf(db).turnsStamped {
 		newer += " or " + newerThanEpoch("time_updated", t)
 	}
-	return "select session_id from session_message where " + newer
+	cand := opencodeCandidateSessions(opencodeSessionTable(db), t)
+	return fmt.Sprintf("select session_id from session_message where session_id in (%s) and (%s)", cand, newer)
 }
 
 // opencodeSessionTable is the table sessions live in, for the reads beside the

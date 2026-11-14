@@ -78,7 +78,7 @@
 <a href="recover-overwritten-files.html">Recover overwritten files</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold"><summary>Deleting sessions <span class="n">36</span></summary>
+<details class="grpfold"><summary>Deleting sessions <span class="n">39</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -115,8 +115,11 @@
 <a href="delete-openclaw-session-history.html">OpenClaw</a>
 <a href="delete-grok-session-history.html">Grok Build</a>
 <a href="delete-devin-session-history.html">Devin CLI</a>
+<a href="delete-mimo-session-history.html">MiMo-Code</a>
+<a href="delete-omnigent-session-history.html">Omnigent</a>
+<a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold" open><summary>Per-agent guides <span class="n">43</span></summary>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">46</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
@@ -144,11 +147,14 @@
 <a href="memory-for-kimchi.html">Kimchi Coding</a>
 <a href="memory-for-kimi.html">Kimi Code</a>
 <a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
 <a href="memory-for-omp.html">omp</a>
+<a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
 <a href="memory-for-opencode.html" aria-current="page">opencode</a>
+<a href="memory-for-orca.html">Orca</a>
 <a href="memory-for-pi.html">pi</a>
 <a href="memory-for-prime.html">prime-agent</a>
 <a href="memory-for-qwen.html">Qwen Code</a>
@@ -214,7 +220,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 <p>An injection is capped: 1,536 bytes per prompt, about 4 KB for a tool call. On opencode 2.x the plugin <code>deja install opencode-auto</code> writes gives each hook 10 s; past that the turn goes on without memory. An install from before this release has no limit, so run <code>deja install opencode-auto</code> again. <a href="token-cost.html">What memory costs</a> has the measured numbers against replaying or grepping instead.</p>
 
 <h2>The part that is not opencode-specific</h2>
-<p>The index covers every agent's transcripts on the machine, not opencode's alone — forty-three of them today, <a href="where-sessions-are-stored.html">each in its own format</a>. So a fix you found in Claude Code in March answers a question you ask in opencode in August, and the reverse. That is the whole reason to index rather than to capture: the history is already written, including the months before any of this was installed.</p>
+<p>The index covers every agent's transcripts on the machine, not opencode's alone — forty-six of them today, <a href="where-sessions-are-stored.html">each in its own format</a>. So a fix you found in Claude Code in March answers a question you ask in opencode in August, and the reverse. That is the whole reason to index rather than to capture: the history is already written, including the months before any of this was installed.</p>
 
 <h2>Turning parts off</h2>
 <pre>{"plugin": [["opencode-deja", {"autoRecall": false, "tools": true}]]}</pre>

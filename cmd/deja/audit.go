@@ -131,6 +131,9 @@ func collectAudit(dir string, now time.Time) auditReport {
 		{"reasonix", sources.ReasonixSessionFiles},
 		{"muse", sources.MuseSessionFiles},
 		{"mcode", sources.McodeSessionFiles},
+		{"mimo", func() []string { return []string{sources.MimoDB()} }},
+		{"omnigent", func() []string { return []string{sources.OmnigentDB()} }},
+		{"orca", func() []string { return []string{sources.OrcaDB()} }},
 	}
 
 	skipStore := sources.ExcludedHarnesses()

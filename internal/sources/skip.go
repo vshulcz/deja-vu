@@ -96,6 +96,12 @@ func SkipReason(harness string) string {
 		// Only the headless CLI's database needs sqlite3; the transcripts
 		// are JSONL (#4300).
 		present = fileExists(KiroDB())
+	case "mimo":
+		present = fileExists(MimoDB())
+	case "omnigent":
+		present = fileExists(OmnigentDB())
+	case "orca":
+		present = fileExists(OrcaDB())
 	}
 	// Checked after the store: a harness with no database on this machine has
 	// nothing to explain, and asking sqlite3 would cost a process for nothing.

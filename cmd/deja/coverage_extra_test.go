@@ -1011,3 +1011,87 @@ func TestInstallOpenClawMCP(t *testing.T) {
 		t.Fatal("expected malformed openclaw.json error")
 	}
 }
+
+func TestNewHarnessesEdgeCoverage(t *testing.T) {
+	hermeticEnv(t)
+	mimoDir := filepath.Join(t.TempDir(), "mimo")
+	t.Setenv("DEJA_MIMO_CONFIG_DIR", mimoDir)
+	t.Setenv("DEJA_OMNIGENT_ROOT", filepath.Join(t.TempDir(), "omnigent"))
+	t.Setenv("DEJA_ORCA_ROOT", filepath.Join(t.TempDir(), "orca"))
+
+	if got := mimoConfigPath(); filepath.Base(got) != "mimocode.jsonc" {
+		t.Fatalf("mimoConfigPath default = %q, want mimocode.jsonc", got)
+	}
+	if r, err := installMimoAuto("/opt/deja/bin/deja", false); err != nil || r.Action != "created" {
+		t.Fatalf("installMimoAuto: %#v %v", r, err)
+	}
+	if r, err := installMimoAuto("/opt/deja/bin/deja", true); err != nil || r.Action == "unchanged" {
+		t.Fatalf("uninstallMimoAuto: %#v %v", r, err)
+	}
+	pluginPath := filepath.Join(mimoDir, "plugins", "deja.js")
+	if err := os.MkdirAll(filepath.Dir(pluginPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(pluginPath, []byte("// hand-written\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installMimoAuto("/opt/deja/bin/deja", true); err != nil {
+		t.Fatalf("uninstallMimoAuto custom plugin: %v", err)
+	}
+	if _, err := os.Stat(pluginPath); err != nil {
+		t.Fatalf("hand-written plugin should stay on uninstall: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(mimoDir, "mimocode.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := mimoConfigPath(); filepath.Base(got) != "mimocode.json" {
+		t.Fatalf("mimoConfigPath with json = %q, want mimocode.json", got)
+	}
+
+	if r, err := installOmnigentAuto("/opt/deja/bin/deja", false); err != nil || r.Action != "created" {
+		t.Fatalf("installOmnigentAuto: %#v %v", r, err)
+	}
+	if r, err := installOmnigentAuto("/opt/deja/bin/deja", true); err != nil || r.Action == "unchanged" {
+		t.Fatalf("uninstallOmnigentAuto: %#v %v", r, err)
+	}
+	if r, err := installOrcaAuto("/opt/deja/bin/deja", false); err != nil || r.Action != "created" {
+		t.Fatalf("installOrcaAuto: %#v %v", r, err)
+	}
+	if r, err := installOrcaAuto("/opt/deja/bin/deja", true); err != nil || r.Action == "unchanged" {
+		t.Fatalf("uninstallOrcaAuto: %#v %v", r, err)
+	}
+	for _, cfg := range []string{omnigentMCPPath(), orcaMCPPath()} {
+		if err := os.MkdirAll(filepath.Dir(cfg), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(cfg, []byte("{bad"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := installOmnigentAuto("/bin/deja", false); err == nil {
+		t.Fatal("expected omnigent malformed mcp error")
+	}
+	if _, err := installOrcaAuto("/bin/deja", false); err == nil {
+		t.Fatal("expected orca malformed mcp error")
+	}
+
+	stPath := filepath.Join(t.TempDir(), "settings.json")
+	if err := os.WriteFile(stPath, []byte(`{"statusLine":{"command":"custom-status"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installSettingsStatusLine(stPath, "/bin/deja", false); err == nil || !strings.Contains(err.Error(), "statusline is already configured") {
+		t.Fatalf("expected conflict error, got %v", err)
+	}
+	if r, err := installSettingsStatusLine(stPath, "/bin/deja", true); err != nil || r.Action != "unchanged" {
+		t.Fatalf("uninstall non-deja statusline = %#v %v", r, err)
+	}
+	if err := os.WriteFile(stPath, []byte(`{"statusLine":{"command":"/gone/bin/deja statusline"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if r, err := installSettingsStatusLine(stPath, "/opt/deja/bin/deja", false); err != nil || r.Action != "updated" || !strings.Contains(r.Note, "replaced the deja statusline") {
+		t.Fatalf("replace deja statusline = %#v %v", r, err)
+	}
+	if r, err := installSettingsStatusLine(stPath, "/opt/deja/bin/deja", true); err != nil || r.Action != "updated" {
+		t.Fatalf("uninstall deja statusline = %#v %v", r, err)
+	}
+}

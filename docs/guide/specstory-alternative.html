@@ -4,11 +4,11 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SpecStory alternative for CLI &amp; 43 agents — deja-vu</title>
+<title>SpecStory alternative for CLI &amp; 46 agents — deja-vu</title>
 <meta name="description" content="Index the transcripts Claude Code, Codex, Cursor and 40 other agents already keep on disk into one local SQLite search index, with no account or extension.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html">
 <meta property="og:type" content="article">
-<meta property="og:title" content="SpecStory alternative for CLI &amp; 43 agents">
+<meta property="og:title" content="SpecStory alternative for CLI &amp; 46 agents">
 <meta property="og:description" content="Index the transcripts Claude Code, Codex, Cursor and 40 other agents already keep on disk into one local SQLite search index, with no account or extension.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
@@ -24,14 +24,14 @@
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
-<meta name="twitter:title" content="SpecStory alternative for CLI &amp; 43 agents">
+<meta name="twitter:title" content="SpecStory alternative for CLI &amp; 46 agents">
 <meta name="twitter:description" content="Index the transcripts Claude Code, Codex, Cursor and 40 other agents already keep on disk into one local SQLite search index, with no account or extension.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "SpecStory alternative for CLI and 43 coding agents", "description": "Index the transcripts Claude Code, Codex, Cursor and 40 other agents already keep on disk into one local SQLite search index, with no account or extension.", "url": "https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-05", "dateModified": "2026-11-05"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "SpecStory alternative for CLI and 46 coding agents", "description": "Index the transcripts Claude Code, Codex, Cursor and 40 other agents already keep on disk into one local SQLite search index, with no account or extension.", "url": "https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-05", "dateModified": "2026-11-05"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "SpecStory alternative", "item": "https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What is a SpecStory alternative that does not write .specstory folders into every repo?", "acceptedAnswer": {"@type": "Answer", "text": "deja-vu reads the session files Claude Code, Codex, Cursor and 40 other coding agents already write to their own storage directories and indexes them into one local SQLite database. Nothing is written into your repository unless you explicitly run deja repo add to share curated project rules."}}, {"@type": "Question", "name": "Can deja-vu index sessions from before it was installed?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Because coding agents store their transcripts on disk, deja index reads months of existing Claude Code, Codex, Cursor, Windsurf and Gemini CLI history on the first run without requiring a wrapper command."}}, {"@type": "Question", "name": "Does deja-vu feed past session context back into the coding agent automatically?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Alongside full-text CLI search and Markdown/HTML export, deja install --auto wires an MCP server and hooks so agents receive relevant past fixes, commands and decisions at session start and on demand."}}]}</script>
 </head>
@@ -77,7 +77,7 @@
 <a href="recover-overwritten-files.html">Recover overwritten files</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold"><summary>Deleting sessions <span class="n">36</span></summary>
+<details class="grpfold"><summary>Deleting sessions <span class="n">39</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -114,8 +114,11 @@
 <a href="delete-openclaw-session-history.html">OpenClaw</a>
 <a href="delete-grok-session-history.html">Grok Build</a>
 <a href="delete-devin-session-history.html">Devin CLI</a>
+<a href="delete-mimo-session-history.html">MiMo-Code</a>
+<a href="delete-omnigent-session-history.html">Omnigent</a>
+<a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold"><summary>Per-agent guides <span class="n">43</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">46</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
@@ -143,11 +146,14 @@
 <a href="memory-for-kimchi.html">Kimchi Coding</a>
 <a href="memory-for-kimi.html">Kimi Code</a>
 <a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
 <a href="memory-for-omp.html">omp</a>
+<a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
 <a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-orca.html">Orca</a>
 <a href="memory-for-pi.html">pi</a>
 <a href="memory-for-prime.html">prime-agent</a>
 <a href="memory-for-qwen.html">Qwen Code</a>
@@ -174,7 +180,7 @@
 <a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
 <article>
 
-<h1>A SpecStory alternative for CLI and 43 coding agents</h1>
+<h1>A SpecStory alternative for CLI and 46 coding agents</h1>
 <p class="pagelede">search and recall over the transcripts already on disk, without per-repo Markdown folders or CLI wrappers<span class="mins" data-mins></span></p>
 
 <p>SpecStory saves coding-agent conversations as Markdown files under <code>.specstory/history/</code> in each workspace so you can read, search, or share them. For terminal agents such as Claude Code or Codex CLI, it wraps the agent invocation (<code>specstory run claude</code>) to capture the session as it runs.</p>

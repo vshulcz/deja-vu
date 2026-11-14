@@ -34,7 +34,7 @@ const (
 
 // rulesHarnesses are the harnesses whose global rules file deja knows, in the
 // order `deja rules` lists them.
-var rulesHarnesses = []string{"claude-code", "codex", "opencode", "gemini", "qwen", "kimi", "grok", "goose", "copilot", "vscode", "cline", "kilocode", "zed", "antigravity", "cherrystudio", "hermes", "aider", "continue", "trae", "trae-ide", "pi", "omp", "senpi", "gjc", "prime", "kimchi", "codewhale", "junie", "crush", "codebuddy", "workbuddy", "commandcode", "kiro", "roo", "zcode", "amp", "cursor", "windsurf", "deepseek", "openclaw", "reasonix", "muse", "devin"}
+var rulesHarnesses = []string{"claude-code", "codex", "opencode", "gemini", "qwen", "kimi", "grok", "goose", "copilot", "vscode", "cline", "kilocode", "mimo", "omnigent", "orca", "zed", "antigravity", "cherrystudio", "hermes", "aider", "continue", "trae", "trae-ide", "pi", "omp", "senpi", "gjc", "prime", "kimchi", "codewhale", "junie", "crush", "codebuddy", "workbuddy", "commandcode", "kiro", "roo", "zcode", "amp", "cursor", "windsurf", "deepseek", "openclaw", "reasonix", "muse", "devin"}
 
 // rulesPath is the file a harness reads its global rules from, or "" when deja
 // does not know one. Only paths something already showed reach the model —
@@ -69,6 +69,46 @@ func sharedRules(path string) rulesFile {
 	return rulesFile{path: path, root: filepath.Dir(path)}
 }
 
+func firstClaudeFallbackRules(dir string) rulesFile {
+	return rulesFile{path: firstExisting(filepath.Join(dir, "AGENTS.md"), filepath.Join(sources.ClaudeConfigDir(), "CLAUDE.md")), root: dir}
+}
+
+func cherrystudioRules() rulesFile {
+	for _, r := range sources.CherryStudioRoots() {
+		if dir := filepath.Dir(r); filepath.Base(filepath.Dir(dir)) == "Agents" {
+			return sharedRules(filepath.Join(dir, "CLAUDE.md"))
+		}
+	}
+	return rulesFile{}
+}
+
+func kilocodeRules() rulesFile {
+	dir := kilocodeCLIConfigDir()
+	if p := os.Getenv("KILO_CONFIG_DIR"); p != "" {
+		dir = p
+	}
+	return firstClaudeFallbackRules(dir)
+}
+
+func clineRules() rulesFile {
+	dir := os.Getenv("CLINE_DIR")
+	if dir == "" {
+		dir = filepath.Join(homeDir(), ".cline")
+	}
+	return rulesFile{path: filepath.Join(dir, "rules", "deja-rules.md"), root: dir}
+}
+
+func ompGjcRules(harness string) rulesFile {
+	dir := sources.OmpConfigDir()
+	if harness == "gjc" {
+		dir = sources.GjcConfigDir()
+	}
+	return rulesFile{root: dir, path: firstExisting(filepath.Join(dir, "AGENTS.md"),
+		filepath.Join(sources.ClaudeConfigDir(), "CLAUDE.md"),
+		filepath.Join(sources.CodexHome(), "AGENTS.md"),
+		filepath.Join(sources.GeminiHome(), "GEMINI.md"))}
+}
+
 func rulesFileFor(harness string) rulesFile {
 	switch harness {
 	case "claude-code":
@@ -77,8 +117,7 @@ func rulesFileFor(harness string) rulesFile {
 		return sharedRules(filepath.Join(sources.CodexHome(), "AGENTS.md"))
 	case "opencode":
 		// Same first-file-wins loader as Kilo (see below).
-		dir := filepath.Join(opencodeConfigHome(), "opencode")
-		return rulesFile{path: firstExisting(filepath.Join(dir, "AGENTS.md"), filepath.Join(sources.ClaudeConfigDir(), "CLAUDE.md")), root: dir}
+		return firstClaudeFallbackRules(filepath.Join(opencodeConfigHome(), "opencode"))
 	case "gemini":
 		return sharedRules(filepath.Join(sources.GeminiHome(), "GEMINI.md"))
 	case "qwen":
@@ -100,24 +139,15 @@ func rulesFileFor(harness string) rulesFile {
 		// same file Copilot CLI reads, and the second write is a no-op.
 		return rulesFile{path: filepath.Join(homeDir(), ".copilot", "copilot-instructions.md"), root: vsCodeFirstRoot()}
 	case "cline":
-		// $CLINE_DIR/rules, every file a section of the system prompt: the
-		// CLI 3.0.69 sent it to a stub, and extension 4.1.23 reads the same
-		// folder with new files switched on.
-		dir := os.Getenv("CLINE_DIR")
-		if dir == "" {
-			dir = filepath.Join(homeDir(), ".cline")
-		}
-		return rulesFile{path: filepath.Join(dir, "rules", "deja-rules.md"), root: dir}
+		return clineRules()
 	case "kilocode":
-		// Kilo 7.8 (opencode's loader) takes the first global file that exists
-		// and stops: its own AGENTS.md, then ~/.claude/CLAUDE.md. Creating the
-		// first hides the second, so a reader who keeps rules in CLAUDE.md
-		// gets the block there (stand on the CLI bundled with VSIX 7.8.7).
-		dir := kilocodeCLIConfigDir()
-		if p := os.Getenv("KILO_CONFIG_DIR"); p != "" {
-			dir = p
-		}
-		return rulesFile{path: firstExisting(filepath.Join(dir, "AGENTS.md"), filepath.Join(sources.ClaudeConfigDir(), "CLAUDE.md")), root: dir}
+		return kilocodeRules()
+	case "mimo":
+		return firstClaudeFallbackRules(sources.MimoConfigDir())
+	case "omnigent":
+		return firstClaudeFallbackRules(sources.OmnigentRoot())
+	case "orca":
+		return firstClaudeFallbackRules(sources.OrcaRoot())
 	case "zed":
 		// <config dir>/AGENTS.md, the "Personal AGENTS.md" in every request
 		// of Zed's own agent (crates/agent_settings/src/user_agents_md.rs on
@@ -129,15 +159,7 @@ func rulesFileFor(harness string) rulesFile {
 		// the same file as Gemini CLI, so the two never carry it twice.
 		return rulesFile{path: filepath.Join(homeDir(), ".gemini", "GEMINI.md"), root: antigravityConfigHome()}
 	case "cherrystudio":
-		// Cherry runs its agents with CLAUDE_CONFIG_DIR at Data/Agents/.claude,
-		// so its CLAUDE.md is their user memory; a stand on the app's SDK and
-		// binary saw it. Sealed and external-CLI agents do not read it.
-		for _, r := range sources.CherryStudioRoots() {
-			if dir := filepath.Dir(r); filepath.Base(filepath.Dir(dir)) == "Agents" {
-				return sharedRules(filepath.Join(dir, "CLAUDE.md"))
-			}
-		}
-		return rulesFile{}
+		return cherrystudioRules()
 	case "hermes":
 		// SOUL.md opens the system prompt; $HERMES_HOME/AGENTS.md is not read
 		// (prompt_builder.py load_soul_md, stand on 0.17.0). It is also the
@@ -178,17 +200,7 @@ func rulesFileFor(harness string) rulesFile {
 	case "pi":
 		return piRules(sources.PiConfigDir())
 	case "omp", "gjc":
-		// omp keeps one user-level context file, the highest of its own
-		// AGENTS.md, Claude's, Codex's and Gemini's (context-file.ts), and gjc
-		// inherited the loader; creating its own would hide the reader's.
-		dir := sources.OmpConfigDir()
-		if harness == "gjc" {
-			dir = sources.GjcConfigDir()
-		}
-		return rulesFile{root: dir, path: firstExisting(filepath.Join(dir, "AGENTS.md"),
-			filepath.Join(sources.ClaudeConfigDir(), "CLAUDE.md"),
-			filepath.Join(sources.CodexHome(), "AGENTS.md"),
-			filepath.Join(sources.GeminiHome(), "GEMINI.md"))}
+		return ompGjcRules(harness)
 	case "senpi":
 		return piRules(sources.SenpiConfigDir(), "AGENTS.override.md")
 	case "prime":

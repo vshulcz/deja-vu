@@ -76,7 +76,7 @@ func naturalList(xs []string) string {
 	case 1:
 		return xs[0]
 	case 2:
-		return xs[0] + " and " + xs[1]
+		return strings.Join(xs, " and ")
 	default:
 		return strings.Join(xs[:len(xs)-1], ", ") + ", and " + xs[len(xs)-1]
 	}
@@ -1088,7 +1088,7 @@ func installTargetNames() []string {
 		"cline", "cline-auto",
 		"goose", "goose-auto",
 		"crush", "crush-auto",
-		"grok", "grok-auto", "copilot", "copilot-auto", "roo", "kilocode", "kilocode-auto", "cherrystudio", "cherrystudio-auto", "kiro", "kiro-auto", "senpi", "senpi-auto", "kimchi", "kimchi-auto", "codewhale", "codewhale-auto", "junie", "junie-auto", "jetbrains", "windsurf", "gjc", "gjc-auto", "zcode", "zcode-auto", "commandcode", "commandcode-auto", "aider",
+		"grok", "grok-auto", "copilot", "copilot-auto", "roo", "kilocode", "kilocode-auto", "mimo", "mimo-auto", "omnigent", "omnigent-auto", "orca", "orca-auto", "cherrystudio", "cherrystudio-auto", "kiro", "kiro-auto", "senpi", "senpi-auto", "kimchi", "kimchi-auto", "codewhale", "codewhale-auto", "junie", "junie-auto", "jetbrains", "windsurf", "gjc", "gjc-auto", "zcode", "zcode-auto", "commandcode", "commandcode-auto", "aider",
 		// Continue keeps the server and the slash command in one assistant
 		// config, and its skill in the folder beside it; there is no hook to
 		// wire, so there is nothing an -auto target would add (#3062).
@@ -1196,6 +1196,9 @@ func existingTargetChecks() map[string]string {
 		// editor's: a VS Code install without the extension is not a Kilo
 		// machine, and --auto must not write settings for one.
 		"kilocode": kilocodeFirstRoot(),
+		"mimo":     sources.MimoDB(),
+		"omnigent": sources.OmnigentDB(),
+		"orca":     sources.OrcaDB(),
 		// Cherry Studio keeps its servers in its own database, so --auto only
 		// writes the import file where the app itself has a store.
 		"cherrystudio": cherryStudioFirstRoot(),

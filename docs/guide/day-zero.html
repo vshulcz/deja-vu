@@ -108,7 +108,7 @@
 <a href="recover-overwritten-files.html">Recover overwritten files</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold"><summary>Deleting sessions <span class="n">36</span></summary>
+<details class="grpfold"><summary>Deleting sessions <span class="n">39</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -145,8 +145,11 @@
 <a href="delete-openclaw-session-history.html">OpenClaw</a>
 <a href="delete-grok-session-history.html">Grok Build</a>
 <a href="delete-devin-session-history.html">Devin CLI</a>
+<a href="delete-mimo-session-history.html">MiMo-Code</a>
+<a href="delete-omnigent-session-history.html">Omnigent</a>
+<a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold"><summary>Per-agent guides <span class="n">43</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">46</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
@@ -174,11 +177,14 @@
 <a href="memory-for-kimchi.html">Kimchi Coding</a>
 <a href="memory-for-kimi.html">Kimi Code</a>
 <a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
 <a href="memory-for-omp.html">omp</a>
+<a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
 <a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-orca.html">Orca</a>
 <a href="memory-for-pi.html">pi</a>
 <a href="memory-for-prime.html">prime-agent</a>
 <a href="memory-for-qwen.html">Qwen Code</a>
@@ -222,7 +228,7 @@
 <div class="cmpwrap">
 <table>
 <tr><th></th><th class="us">deja-vu</th><th><a href="https://github.com/ctxrs/ctx" rel="noopener">ctx</a></th><th><a href="https://github.com/Dicklesworthstone/coding_agent_session_search" rel="noopener">CASS</a></th><th><a href="https://github.com/kenn-io/agentsview" rel="noopener">agentsview</a></th><th><a href="https://github.com/rohitg00/agentmemory" rel="noopener">agentmemory</a></th><th><a href="https://github.com/MemPalace/mempalace" rel="noopener">MemPalace</a></th><th><a href="https://github.com/thedotmack/claude-mem" rel="noopener">claude-mem</a></th></tr>
-<tr><td>Reads the history already on disk</td><td class="us y">✓ 43 agents, no capture step</td><td class="y">✓ 39 providers</td><td class="y">✓ 25+ agents</td><td class="y">✓ 62 agents</td><td class="y">✓ Claude Code JSONL import, ≤1000 files per call</td><td class="y">✓ <code>mine</code> per file tree</td><td class="n">— records from install on</td></tr>
+<tr><td>Reads the history already on disk</td><td class="us y">✓ 46 agents, no capture step</td><td class="y">✓ 39 providers</td><td class="y">✓ 25+ agents</td><td class="y">✓ 62 agents</td><td class="y">✓ Claude Code JSONL import, ≤1000 files per call</td><td class="y">✓ <code>mine</code> per file tree</td><td class="n">— records from install on</td></tr>
 <tr><td>Install</td><td class="us y">18.6 MB binary</td><td>43 MB binary</td><td>58.5 MB binary</td><td>115 MB binary</td><td>689 MB npm + 28 MB engine</td><td>312 MB + 168 MB embedding model</td><td>npm + Claude Code plugin</td></tr>
 <tr><td>Runs in the background</td><td class="us y">nothing</td><td>daemon</td><td class="y">nothing</td><td>daemon, for search</td><td>worker + engine, four ports</td><td>Chroma</td><td>worker</td></tr>
 <tr><td>Needs a model or key</td><td class="us y">no</td><td class="y">no by default; optional local semantic model</td><td class="y">no</td><td class="y">no; optional embeddings endpoint</td><td>keyless mode: BM25 only</td><td>local embeddings</td><td>yes</td></tr>

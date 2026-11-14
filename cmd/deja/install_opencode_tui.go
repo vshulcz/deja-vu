@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // opencode and Kilo CLI have no command status line. Their TUI takes plugins
@@ -417,6 +419,22 @@ func installKiloTUI(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	list, err := installTUIPluginList(dir, "https://app.kilo.ai/tui.json", "./plugins/deja-status.tsx", uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	return wroteAll(file, list), nil
+}
+
+// installMimoTUI is the 1.x plugin in MiMo-Code's config, which reads tui.json
+// the way opencode 1.x does (schema https://opencode.ai/tui.json).
+func installMimoTUI(exe string, uninstall bool) (installResult, error) {
+	dir := sources.MimoConfigDir()
+	exe = hookExeFor(exe, uninstall)
+	file, err := writeGeneratedFile(filepath.Join(dir, "plugins", "deja-status.tsx"), opencodeTUIPluginV1(exe, "mimo-auto"), uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	list, err := installTUIPluginList(dir, "https://opencode.ai/tui.json", "./plugins/deja-status.tsx", uninstall)
 	if err != nil {
 		return installResult{}, err
 	}

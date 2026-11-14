@@ -12,7 +12,7 @@ It carries deja's MCP server, the `deja-history` skill, always-on guidance in
 `deja install antigravity-auto` writes, packaged as a native Antigravity plugin.
 
 [deja](https://github.com/vshulcz/deja-vu) indexes the session transcripts
-forty-three coding agents already write to disk, including sessions from before
+forty-six coding agents already write to disk, including sessions from before
 it was installed, and answers from them locally: BM25 over the transcripts, no
 model and no embeddings, credentials redacted as the index is built.
 

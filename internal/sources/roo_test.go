@@ -107,6 +107,56 @@ func TestRooRootsFollowsCustomStoragePath(t *testing.T) {
 	}
 }
 
+// Zoo Code (zoocodeorganization.zoo-code) is a Roo Code fork writing the
+// identical task layout under its own extension ID and customStoragePath key (#6044).
+func TestRooRootsFindsZooCodeExtensionAndCustomStoragePath(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("DEJA_ROO_ROOTS", "")
+	t.Setenv("DEJA_ROO_CLI_ROOT", filepath.Join(home, "absent"))
+
+	zooGlobal := filepath.Join(vsCodeUserDir("Code"), "globalStorage", ZooExtensionID)
+	task := filepath.Join(zooGlobal, "tasks", "1767225700001", "api_conversation_history.json")
+	if err := os.MkdirAll(filepath.Dir(task), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(task, []byte(`[{"role":"user","content":[{"type":"text","text":"zoo code task"}]}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	settingsPath := vsCodeUserSettingsPaths()[0]
+	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	zooCustom := filepath.Join(home, "zoo-custom")
+	if err := os.MkdirAll(filepath.Join(zooCustom, "tasks"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(settingsPath, []byte(`{"zoo-code.customStoragePath": `+strconv.Quote(zooCustom)+`}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	roots := RooRoots()
+	var sawGlobal, sawCustom bool
+	for _, r := range roots {
+		if r == zooGlobal {
+			sawGlobal = true
+		}
+		if r == zooCustom {
+			sawCustom = true
+		}
+	}
+	if !sawGlobal || !sawCustom {
+		t.Fatalf("Zoo Code roots missing (global=%v custom=%v): %v", sawGlobal, sawCustom, roots)
+	}
+	if got := KindForPath(task); got != "roo" {
+		t.Fatalf("KindForPath(%s) = %q, want roo", task, got)
+	}
+}
+
 func TestStripJSONCHandlesCommentsAndCommas(t *testing.T) {
 	in := []byte("{\n  \"a\": \"http://x/y\", // trailing note\n  /* block */ \"b\": [1,2,],\n}")
 	var got map[string]any

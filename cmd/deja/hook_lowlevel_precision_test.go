@@ -113,7 +113,23 @@ func TestFailingTestSourceLinePythonTraceback(t *testing.T) {
 		"    raise ValueError('bad input')\n" +
 		"ValueError: bad input\n"
 	got := failingTestSourceLine(dir, tb, policy.Policy{})
-	if !strings.Contains(got, "pkg/worker.py:3") || !strings.Contains(got, "raise ValueError") {
-		t.Fatalf("failingTestSourceLine(python traceback) = %q, want pkg/worker.py:3", got)
+	if !strings.HasPrefix(got, "failing test line — pkg/worker.py:3:") || !strings.Contains(got, "raise ValueError") {
+		t.Fatalf("failingTestSourceLine(python traceback) = %q, want prefix failing test line — pkg/worker.py:3:", got)
+	}
+	winTB := "Traceback (most recent call last):\n" +
+		"  File \"" + pyFile + "\", line 3, in run\n" +
+		"    raise ValueError('bad input')\n" +
+		"  File \"C:\\repo\\.venv\\Lib\\site-packages\\runner.py\", line 10, in exec\n" +
+		"    fn()\n" +
+		"  File \"C:\\Python311\\Lib\\python3.11\\unittest.py\", line 20, in run\n" +
+		"    fn()\n" +
+		"ValueError: bad input\n"
+	targets := extractFailingTestTargets(winTB)
+	if len(targets) != 1 || targets[0].filePart != pyFile {
+		t.Fatalf("extractFailingTestTargets(windows venv) = %#v, want single target %q", targets, pyFile)
+	}
+	gotWin := failingTestSourceLine(dir, winTB, policy.Policy{})
+	if !strings.HasPrefix(gotWin, "failing test line — pkg/worker.py:3:") || !strings.Contains(gotWin, "raise ValueError") {
+		t.Fatalf("failingTestSourceLine(windows venv) = %q, want prefix failing test line — pkg/worker.py:3:", gotWin)
 	}
 }

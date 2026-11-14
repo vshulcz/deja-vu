@@ -588,13 +588,13 @@ func rereadsWholeSessions(p string) bool {
 		return true
 	}
 	switch storeHarness(p) {
-	case "opencode", "kilocode", "zcode":
+	case "opencode", "kilocode", "zcode", "mimo":
 		// Read by session since #4207: a reply's text lands in a part created
 		// before the last pass, so only a touched session read whole carries
 		// it, and adding that to what the index held doubled the turns. Its
 		// counts start over with each pass, the goose trade above.
 		return true
-	case "grok", "zed", "hermes", "openclaw", "crush", "claude":
+	case "grok", "zed", "hermes", "openclaw", "crush", "claude", "omnigent", "orca":
 		// The same shape: each asks for the sessions touched since the stamp
 		// and hands them back whole, so what comes back replaces what the
 		// index holds for that key rather than adding to it (#2075). The
@@ -720,6 +720,7 @@ var opencodeSchemaDBs = map[string]func() string{
 	"opencode": sources.OpencodeDB,
 	"kilocode": sources.KiloDB,
 	"zcode":    sources.ZCodeDB,
+	"mimo":     sources.MimoDB,
 }
 
 // inOpencodeSchemaDB reports whether a session of harness h whose path is p
@@ -759,7 +760,12 @@ func opencodeSchemaOwnFile(h, p string) bool {
 }
 
 func resolveStorePaths() map[string]string {
-	out := map[string]string{sources.GrokDB(): "grok", sources.ZedDB(): "zed"}
+	out := map[string]string{
+		sources.GrokDB():     "grok",
+		sources.ZedDB():      "zed",
+		sources.OmnigentDB(): "omnigent",
+		sources.OrcaDB():     "orca",
+	}
 	for _, db := range sources.HermesDBs() {
 		out[db] = "hermes"
 	}

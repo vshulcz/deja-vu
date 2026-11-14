@@ -437,6 +437,12 @@ func resumeHarnessCommand(s model.Session) (string, string, error) {
 		// the same field: Kilo is OpenCode vendored and a CLI session carries
 		// its own working directory — when it is still there (#4201).
 		return existingDir(s.Path), "kilo -s " + s.ID, nil
+	case "mimo":
+		return existingDir(s.Path), "mimo -s " + s.ID, nil
+	case "omnigent":
+		return existingDir(resumeRecordedDir(s)), "omnigent run --resume " + s.ID, nil
+	case "orca":
+		return existingDir(resumeRecordedDir(s)), "orca --resume " + s.ID, nil
 	case "zcode":
 		// The terminal client for the ZCode runtime (zcode-app-cli 0.16.9,
 		// runtime 3.14.4) takes `--resume <sessionId>` with the sess_ id its
@@ -824,7 +830,7 @@ func existingDir(p string) string {
 // header, the others in a sidecar or the session file (#4459, #4460).
 func resumeRecordedDir(s model.Session) string {
 	switch s.Harness {
-	case "opencode", "kilocode":
+	case "opencode", "kilocode", "mimo":
 		return s.Path
 	case "zcode":
 		if !strings.HasSuffix(s.Path, ".jsonl") && !sources.ZCodeLegacyUnderRoot(s.Path) {
@@ -846,6 +852,10 @@ func resumeRecordedDir(s model.Session) string {
 	case "devin":
 		// The sessions row's own working_directory.
 		return sources.DevinSessionDir(s.Path, s.ID)
+	case "omnigent":
+		return sources.OmnigentSessionDir(s.Path, s.ID)
+	case "orca":
+		return sources.OrcaSessionDir(s.Path, s.ID)
 	case "continue":
 		return sources.ContinueSessionDir(s.Path)
 	case "codewhale":

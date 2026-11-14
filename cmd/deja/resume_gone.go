@@ -40,7 +40,7 @@ func transcriptGone(s model.Session) bool {
 	// directory it ran in, so the database is asked instead: `opencode -s`
 	// on a deleted id says "Session not found", and 2.x starts an empty
 	// session under it (#4205).
-	if s.Harness == "opencode" || s.Harness == "kilocode" {
+	if s.Harness == "opencode" || s.Harness == "kilocode" || s.Harness == "mimo" {
 		return sources.OpencodeStoreLacks(s.Harness, s.ID)
 	}
 	// goose >= 1.10 the same, with Path naming its sessions.db; a legacy

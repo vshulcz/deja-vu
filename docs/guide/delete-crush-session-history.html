@@ -77,7 +77,7 @@
 <a href="recover-overwritten-files.html">Recover overwritten files</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold" open><summary>Deleting sessions <span class="n">36</span></summary>
+<details class="grpfold" open><summary>Deleting sessions <span class="n">39</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -114,8 +114,11 @@
 <a href="delete-openclaw-session-history.html">OpenClaw</a>
 <a href="delete-grok-session-history.html">Grok Build</a>
 <a href="delete-devin-session-history.html">Devin CLI</a>
+<a href="delete-mimo-session-history.html">MiMo-Code</a>
+<a href="delete-omnigent-session-history.html">Omnigent</a>
+<a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold"><summary>Per-agent guides <span class="n">43</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">46</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
@@ -143,11 +146,14 @@
 <a href="memory-for-kimchi.html">Kimchi Coding</a>
 <a href="memory-for-kimi.html">Kimi Code</a>
 <a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
 <a href="memory-for-omp.html">omp</a>
+<a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
 <a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-orca.html">Orca</a>
 <a href="memory-for-pi.html">pi</a>
 <a href="memory-for-prime.html">prime-agent</a>
 <a href="memory-for-qwen.html">Qwen Code</a>
@@ -205,7 +211,7 @@ ${XDG_DATA_HOME:-~/.local/share}/crush/projects.json</pre>
 <p>The prompts, the shell commands and their exit codes, and the exact old and new lines of every <code>edit</code>, <code>multiedit</code>, <code>write</code> and <code>lsp_replace_symbol</code> call. Once removed, <code>crush --session &lt;uuid&gt;</code> in that project can no longer resume the conversation.</p>
 
 <h2>Keeping it searchable instead</h2>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> follows <code>projects.json</code> and reads each project's <code>crush.db</code> — along with the other forty-two agents' histories on the machine — into one local index, searchable from the shell and readable by Crush itself over MCP:</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> follows <code>projects.json</code> and reads each project's <code>crush.db</code> — along with the other forty-five agents' histories on the machine — into one local index, searchable from the shell and readable by Crush itself over MCP:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "crush session about the symbol rename"</pre>
 <p>Nothing to configure first: the per-project databases are already on disk. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> removes a session from the index when you want it gone. A session whose <code>crush.db</code> was later deleted stays readable with <code>deja show</code> and under the Deleted tab of bare <code>deja</code>, while deja never writes rows back into <code>crush.db</code>. Set <code>DEJA_CRUSH_ROOT</code> to point deja at a backup of the data directory holding <code>projects.json</code>.</p>

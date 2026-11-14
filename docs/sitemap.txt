@@ -195,3 +195,12 @@ https://vshulcz.github.io/deja-vu/zh/guide/claude-mem-alternative.html
 https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html
 https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html
 https://vshulcz.github.io/deja-vu/guide/delete-dsh-session-history.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-mimo.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-omnigent.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-orca.html
+https://vshulcz.github.io/deja-vu/guide/delete-mimo-session-history.html
+https://vshulcz.github.io/deja-vu/guide/delete-omnigent-session-history.html
+https://vshulcz.github.io/deja-vu/guide/delete-orca-session-history.html
+https://vshulcz.github.io/deja-vu/registry/mimo.html
+https://vshulcz.github.io/deja-vu/registry/omnigent.html
+https://vshulcz.github.io/deja-vu/registry/orca.html

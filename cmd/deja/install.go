@@ -562,9 +562,11 @@ func existingTargets() []string {
 // reach `guidanceHarness` too: aliasing only the wiring installed the server
 // and skipped the skill.
 var installTargetAliases = map[string]string{
-	"claude":   "claude-code",
-	"dsh":      "deepseek",
-	"dsh-auto": "deepseek-auto",
+	"claude":        "claude-code",
+	"dsh":           "deepseek",
+	"dsh-auto":      "deepseek-auto",
+	"mimocode":      "mimo",
+	"mimocode-auto": "mimo-auto",
 }
 
 // knownInstallTarget reports whether installTarget has a case for target.

@@ -732,6 +732,12 @@ func ownGuidanceFile(harness string) string {
 	switch harness {
 	case "kilocode":
 		return kilocodeSkillPath()
+	case "mimo":
+		return mimoSkillPath()
+	case "omnigent":
+		return omnigentSkillPath()
+	case "orca":
+		return orcaSkillPath()
 	case "gjc":
 		return gjcSkillPath()
 	case "kimchi":

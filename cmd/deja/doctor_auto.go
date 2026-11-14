@@ -57,6 +57,9 @@ func autoWirings() []autoWiring {
 		}, "hook-context", ""},
 		// Kilo CLI loads the same plugin from its own config directory (#4398).
 		{"kilocode", func() string { return filepath.Join(kilocodeCLIConfigDir(), "plugins", "deja.js") }, "hook-context", ""},
+		{"mimo", func() string { return filepath.Join(sources.MimoConfigDir(), "plugins", "deja.js") }, "hook-context", ""},
+		{"omnigent", omnigentSettingsPath, "hook-context", ""},
+		{"orca", orcaSettingsPath, "hook-context", ""},
 		{"cursor", func() string { return filepath.Join(sources.CursorCLIHome(), "hooks.json") }, "hook-context", ""},
 		{"gemini", geminiHooksPath, "hook-context", ""},
 		{"qwen", func() string { return filepath.Join(sources.QwenConfigDir(), "settings.json") }, "hook-prompt", ""},
@@ -159,7 +162,7 @@ func autoWirings() []autoWiring {
 // them or not, so the file being there says nothing about deja (#4275).
 var autoInClientConfig = map[string]bool{
 	"cursor": true, "qwen": true, "codebuddy": true, "workbuddy": true, "trae": true, "trae-ide": true, "muse": true, "kimi": true, "crush": true, "zcode": true, "commandcode": true, "junie": true,
-	"copilot": true, "devin": true,
+	"copilot": true, "devin": true, "omnigent": true, "orca": true,
 	// CodeWhale's config.toml is the reader's own, and the plain MCP targets
 	// of both write the file the row reads, so it is there with no hook of
 	// deja's in it on a machine that never asked for auto-recall.
@@ -706,7 +709,7 @@ func pluginScriptOutdated(name, text string) bool {
 		return false
 	}
 	switch name {
-	case "opencode", "kilocode":
+	case "opencode", "kilocode", "mimo":
 		return !strings.Contains(text, "hook-tool-after") || !strings.Contains(text, "hook-session-end")
 	case "deepseek":
 		return !strings.Contains(text, "hook-tool-after")

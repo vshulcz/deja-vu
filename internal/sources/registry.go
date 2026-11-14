@@ -863,6 +863,37 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			}},
 		},
 		{
+			// MiMo-Code: Xiaomi's OpenCode-derived CLI agent, keeping its
+			// sessions in mimocode.db under OpenCode's schema.
+			Name: "mimo", Load: LoadMimo, Files: MimoSessionFiles,
+			Kinds: []FileKind{{
+				Name:      "mimo",
+				Match:     func(p string) bool { return p == MimoDB() },
+				Parse:     dbParse(ParseMimoDB, ParseMimoDBSince),
+				ParseFrom: dbParseFrom(ParseMimoDB, ParseMimoDBSince),
+			}},
+		},
+		{
+			// Omnigent: conversations and subagent runs in ~/.omnigent/chat.db.
+			Name: "omnigent", Load: LoadOmnigent, Files: OmnigentFiles,
+			Kinds: []FileKind{{
+				Name:      "omnigent",
+				Match:     func(p string) bool { return p == OmnigentDB() },
+				Parse:     dbParse(ParseOmnigentDB, ParseOmnigentDBSince),
+				ParseFrom: dbParseFrom(ParseOmnigentDB, ParseOmnigentDBSince),
+			}},
+		},
+		{
+			// Orca: unified agent session journal in agent-session-journal.db.
+			Name: "orca", Load: LoadOrca, Files: OrcaFiles,
+			Kinds: []FileKind{{
+				Name:      "orca",
+				Match:     func(p string) bool { return p == OrcaDB() },
+				Parse:     dbParse(ParseOrcaDB, ParseOrcaDBSince),
+				ParseFrom: dbParseFrom(ParseOrcaDB, ParseOrcaDBSince),
+			}},
+		},
+		{
 			// deja's own notes, and the entries committed in the .deja/ of
 			// the repositories deja has been run in. A repo file is read
 			// whole: a merge or a deleted line rewrites it.

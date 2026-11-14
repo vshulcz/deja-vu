@@ -656,9 +656,10 @@ func extractFailingTestTargets(output string) []failingTestTarget {
 				continue
 			}
 			filePart := rest[:qIdx]
-			if strings.HasPrefix(filePart, "<") || strings.Contains(filePart, "site-packages") ||
-				strings.Contains(filePart, "/venv/") || strings.Contains(filePart, "/.venv/") ||
-				strings.Contains(filePart, "/lib/python") {
+			slashPath := strings.ToLower(strings.ReplaceAll(filePart, `\`, "/"))
+			if strings.HasPrefix(filePart, "<") || strings.Contains(slashPath, "site-packages") ||
+				strings.Contains(slashPath, "/venv/") || strings.Contains(slashPath, "/.venv/") ||
+				strings.Contains(slashPath, "/lib/python") {
 				continue
 			}
 			afterQuote := rest[qIdx+1:]
@@ -734,6 +735,31 @@ func isFailingTestFileToken(filePart string) bool {
 	return false
 }
 
+func relativizeToScanRoot(scanRoot, diskPath, fallback string) string {
+	relIfUnder := func(root, target string) string {
+		r, err := filepath.Rel(root, target)
+		if err != nil {
+			return ""
+		}
+		slashR := filepath.ToSlash(r)
+		if slashR == ".." || strings.HasPrefix(slashR, "../") {
+			return ""
+		}
+		return slashR
+	}
+	if r := relIfUnder(scanRoot, diskPath); r != "" {
+		return r
+	}
+	canonRoot, err1 := filepath.EvalSymlinks(scanRoot)
+	canonDisk, err2 := filepath.EvalSymlinks(diskPath)
+	if err1 == nil && err2 == nil {
+		if r := relIfUnder(canonRoot, canonDisk); r != "" {
+			return r
+		}
+	}
+	return fallback
+}
+
 func resolveFailingTargetSnippet(scanRoot string, tree repoFileTree, target failingTestTarget) string {
 	rel := target.filePart
 	if resolved := tree.resolveRel(target.filePart); resolved != "" {
@@ -743,9 +769,13 @@ func resolveFailingTargetSnippet(scanRoot string, tree repoFileTree, target fail
 	if !filepath.IsAbs(diskPath) {
 		diskPath = filepath.Join(scanRoot, diskPath)
 	}
-	if !fileThere(diskPath) && !strings.Contains(target.filePart, "/") {
+	if !fileThere(diskPath) && !strings.ContainsAny(target.filePart, `/\`) {
 		diskPath, rel = locateFailingFileInScanRoot(scanRoot, target.filePart, diskPath, rel)
 	}
+	if filepath.IsAbs(rel) {
+		rel = relativizeToScanRoot(scanRoot, diskPath, rel)
+	}
+	rel = filepath.ToSlash(rel)
 	raw, err := os.ReadFile(diskPath)
 	if err != nil || len(raw) > 512<<10 {
 		return ""
