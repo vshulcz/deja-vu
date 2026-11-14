@@ -20,6 +20,7 @@ function extract(name) {
 
 const compareVersions = extract("compareVersions");
 const nextPatch = extract("nextPatch");
+const buildWrapperManifest = extract("buildWrapperManifest");
 
 test("plain versions order by number, not by string", () => {
   assert.equal(compareVersions("0.18.0", "0.20.3"), -1);
@@ -51,4 +52,26 @@ test("a package whose line runs ahead is published, not skipped", () => {
   assert.match(source, /const publishAs = live && compareVersions\(version, live\) <= 0 \? nextPatch\(live\) : version/);
   assert.match(source, /outPkg\.version = publishAs/);
   assert.doesNotMatch(source, /continue;\n\s*\}\n\s*const out = path\.join\(work, name\)/);
+});
+
+test("both scoped and unscoped wrapper manifests pin optionalDependencies to the release", () => {
+  const npmPkg = JSON.parse(fs.readFileSync(new URL("../npm/package.json", import.meta.url), "utf8"));
+  assert.equal(npmPkg.bin["deja"], "bin/deja");
+  assert.equal(npmPkg.bin["deja-vu"], "bin/deja");
+
+  const platforms = [
+    ["darwin", "arm64"],
+    ["linux", "amd64"],
+  ];
+  const scoped = buildWrapperManifest(npmPkg, "@vshulcz/deja-vu", "0.24.2", platforms);
+  const unscoped = buildWrapperManifest(npmPkg, "deja-vu", "0.24.2", platforms);
+  assert.equal(scoped.name, "@vshulcz/deja-vu");
+  assert.equal(unscoped.name, "deja-vu");
+  assert.equal(unscoped.version, "0.24.2");
+  assert.deepEqual(unscoped.optionalDependencies, {
+    "@vshulcz/deja-vu-darwin-arm64": "0.24.2",
+    "@vshulcz/deja-vu-linux-amd64": "0.24.2",
+  });
+  assert.match(source, /publishWrapper\("scoped", "@vshulcz\/deja-vu"\)/);
+  assert.match(source, /publishWrapper\("unscoped", "deja-vu"\)/);
 });
