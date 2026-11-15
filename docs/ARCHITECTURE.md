@@ -5,10 +5,15 @@ This document is for people changing `deja` internals.
 ## Source parsers
 
 Parsers live in `internal/sources` and return `[]model.Session`. The table is
-what the loader registers: the forty-three coding agents plus deja's own notes,
+what the loader registers: the forty-eight coding agents plus deja's own notes,
 which is what `deja sources` prints. `docs/registry/` describes each store's
 layout in detail, and `internal/sources/registry_test.go` checks that index
 against the loader list.
+
+The shared `walkFiles` helper accepts regular files. For an entry reported as
+a symlink, it checks the entry's own metadata before excluding it. This allows
+discovery on PRoot filesystems that report regular files as symlinks while
+keeping real links inside a store out of the walk.
 
 | Source | Code | Input |
 | --- | --- | --- |
@@ -55,6 +60,11 @@ against the loader list.
 | Senpi | `senpi.go` | JSONL under `~/.senpi/agent/sessions` |
 | Kimchi Coding | `senpi.go` | JSONL under the harness directory's `sessions`, one directory per encoded cwd |
 | Hermes | `hermes.go`, `hermes_pg.go` | SQLite `state.db` under the Hermes home and per profile, plus Postgres when `DEJA_HERMES_PG_DSN` is set |
+| MiMo-Code | `mimo.go`, `opencode.go`, `opencode_v2.go` | OpenCode-schema SQLite database at `${MIMO_DATA_DIR:-${XDG_DATA_HOME:-~/.local/share}/mimo}/mimo.db` (and `opencode.db`), plus `storage/session_diff/*.json` beside it |
+| Omnigent | `omnigent.go` | SQLite store at `${OMNIGENT_HOME:-~/.omnigent}/omnigent.db` (`sessions`, `messages`, `message_items`) |
+| Orca | `orca.go` | SQLite journal store at `~/Library/Application Support/orca-app/orca.db` (`~/.config/orca-app/orca.db` on Linux, `%APPDATA%\orca-app\orca.db` on Windows) |
+| Claw Code | `clawcode.go` | JSONL transcripts (`session_meta`, `prompt_history`, `message`) and legacy JSON snapshots under `${CLAW_CONFIG_HOME:-~/.claw}/sessions` |
+| CodeArts Desktop | `codearts.go` | JSONL with serde content variants under a two-level session directory |
 | deja notes | `notes.go` | `deja remember` entries in `notes.jsonl` |
 
 File-based sources are parsed with a worker pool sized to `runtime.NumCPU()`. Results are collected by input file index and then appended in sorted path order, so parsing can be parallel while index writes stay deterministic.
@@ -102,6 +112,19 @@ overrides the path. Each record contains an RFC3339 `ts`, `project`, and
 calendar day in the local zone of whichever run indexed them, then redacted and
 indexed like every other source. `deja index` regroups buckets minted in
 another zone. The file is primary data; the index remains a rebuildable cache.
+
+The same store has a second file kind, `deja-repo`: `<repository>/.deja/memory.jsonl`
+(`repo_memory.go`), entries picked with `deja repo add` and committed. One JSON
+object per line, `{"id","kind","text","date","from"}`, sorted and deduped by `id`
+(a hash of kind and folded text) so parallel additions merge, with
+`merge=union` in `.deja/.gitattributes` for the case where they land on the same
+gap. The index reads every such file listed in `repos.txt` beside the notes file
+(added when deja runs in or writes to a checkout that has one) and the current
+checkout's, whole on every change. Each entry is one session, harness `deja`,
+project `repo:<name>` with the name taken from the reader's own checkout path;
+`internal/policy` reads that prefix as the `repo` origin. Session start reads the
+file directly, so a fresh clone needs no index pass to see it. Sync does not
+export these sessions.
 
 ## Secret redaction
 
@@ -237,7 +260,7 @@ Cold rebuild does all parsing first, then writes `records.bin`, buckets, and man
 
 ## MCP server design
 
-`cmd/deja/mcp.go` implements a small JSON-RPC stdio server.
+`cmd/deja/mcp.go` implements a small JSON-RPC stdio server (`cmd/deja/mcp_http.go` adds opt-in Streamable HTTP via `deja mcp --http <addr>`).
 
 Supported methods:
 
@@ -324,7 +347,7 @@ somewhere else moves the binary without any config being rewritten. On Windows
 there is no launcher and the entry holds the binary's path, because a `.cmd`
 cannot be exec'd the way a shebang script can.
 
-`deja hook-context` is intentionally hidden from normal help. It first checks for a pending compaction recovery packet, which can exist before the first index build. For ordinary project recall, it derives the current project from the payload's `cwd`, else `CLAUDE_PROJECT_DIR` if the host exports one, else the directory it was run in, using the same Claude project-name logic as the parser, reads only an existing warm index (`manifest.gob`/`sessions.gob` must already exist), selects the most recent matching sessions by metadata project (ranked by the files the working tree is touching), leaving out a spawned agent's runs and a scheduled job's (`cron`) runs unless they are all the project has, leads them with the project's `accepted` promoted notes, and prints Claude's `SessionStart` response JSON with a compact markdown digest capped at 2KB (4KB in aggressive recall mode). It never builds the index on the session's path: a missing, outdated or damaged index starts `deja index` in a detached process and the hook returns without waiting for it. With no digest to give — the build still running, or no session from this project — it still answers rather than printing nothing: the machine-facts block when there is one, and otherwise, on the JSON path to a host that shows notes, a `systemMessage` saying what the build is doing (or that this machine has no agent history yet); `--plain` prints nothing in that case. Malformed input and other errors produce no output, and agent startup is never blocked. `--plain` prints the digest without the hook envelope, and `--once` gives it to the first turn of a session and nothing after — for a harness whose session-start output goes nowhere, where the digest has to ride the per-prompt hook instead (Kimi Code). `--notes` prints only the notes meant for the person (the one-time built note and the weekly count) and marks them shown; the dsh and OpenClaw plugins add it to their `/deja` reply, since neither host shows a person what a hook prints. Cursor shows a hook's message only when the hook blocks, so a payload carrying `cursor_version` gets no `systemMessage`, and neither does a session start under `--strict` or `--copilot`; the session-start receipt and the once-only notes are left unspent for the next host that shows them. A rewire after an upgrade still runs there and its note is dropped. The per-prompt déjà-vu line's window is kept per session, so the same gate on `hook-prompt` only keeps it from being stamped for a session that cannot show it.
+`deja hook-context` is intentionally hidden from normal help. It first checks for a pending compaction recovery packet, which can exist before the first index build. For ordinary project recall, it derives the current project from the payload's `cwd`, else `CLAUDE_PROJECT_DIR` if the host exports one, else the directory it was run in, using the same Claude project-name logic as the parser, reads only an existing warm index (`manifest.gob`/`sessions.gob` must already exist), selects the most recent matching sessions by metadata project (ranked by the files the working tree is touching), leaving out a spawned agent's runs and a scheduled job's (`cron`) runs unless they are all the project has, leads them with the project's `accepted` promoted notes, and prints Claude's `SessionStart` response JSON with a compact markdown digest capped at 2KB (4KB when `DEJA_RECALL=aggressive`; `DEJA_RECALL=safe` is the default and `DEJA_RECALL=off` silences the hooks). It never builds the index on the session's path: a missing, outdated or damaged index starts `deja index` in a detached process and the hook returns without waiting for it. With no digest to give — the build still running, or no session from this project — it still answers rather than printing nothing: the machine-facts block when there is one, and otherwise, on the JSON path to a host that shows notes, a `systemMessage` saying what the build is doing (or that this machine has no agent history yet); `--plain` prints nothing in that case. Malformed input and other errors produce no output, and agent startup is never blocked. `--plain` prints the digest without the hook envelope, and `--once` gives it to the first turn of a session and nothing after — for a harness whose session-start output goes nowhere, where the digest has to ride the per-prompt hook instead (Kimi Code). `--notes` prints only the notes meant for the person (the one-time built note and the weekly count) and marks them shown; the dsh and OpenClaw plugins add it to their `/deja` reply, since neither host shows a person what a hook prints. Cursor shows a hook's message only when the hook blocks, so a payload carrying `cursor_version` gets no `systemMessage`, and neither does a session start under `--strict` or `--copilot`; the session-start receipt and the once-only notes are left unspent for the next host that shows them. A rewire after an upgrade still runs there and its note is dropped. The per-prompt déjà-vu line's window is kept per session, so the same gate on `hook-prompt` only keeps it from being stamped for a session that cannot show it.
 
 `--auto` wires five more hooks with the same best-effort contract. The ordinary recall paths use a warm index; compaction capture reads the current transcript and stores a bounded packet without building the search index:
 
