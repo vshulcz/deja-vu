@@ -209,3 +209,4 @@ https://vshulcz.github.io/deja-vu/guide/memory-for-claw-code.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-oh-my-claudecode.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-herdr.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-cmux.html
+https://vshulcz.github.io/deja-vu/registry/codearts.html

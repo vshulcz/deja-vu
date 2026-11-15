@@ -4,7 +4,7 @@
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat-square&logo=github&label=deja-vu)](https://github.com/vshulcz/deja-vu)
 
-面向 CodeWhale 的 Claude 兼容插件包——在对话会话中直接提供 `deja` MCP 服务（包含 `recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff` 八个工具）、`deja-history` 技能指引以及 `/deja` 斜杠命令，检索范围覆盖四十七个编程工具（包含本机其他四十六个智能体已经写入磁盘的历史会话）。
+面向 CodeWhale 的 Claude 兼容插件包——在对话会话中直接提供 `deja` MCP 服务（包含 `recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff` 八个工具）、`deja-history` 技能指引以及 `/deja` 斜杠命令，检索范围覆盖四十八个编程工具（包含本机其他四十七个智能体已经写入磁盘的历史会话）。
 
 ## 安装与生命周期钩子
 

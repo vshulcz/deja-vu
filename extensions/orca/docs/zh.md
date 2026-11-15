@@ -4,7 +4,7 @@
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat-square&logo=github&label=deja-vu)](https://github.com/vshulcz/deja-vu)
 
-`deja` 的 Orca v2 `trusted-worker` 插件——为 Orca 提供跨四十七个编程工具（Claude Code、Codex CLI、Cursor、opencode、Gemini CLI、Orca 及其他四十六个智能体）的本地会话记忆，涵盖安装 `deja` 之前已经记录的历史会话。
+`deja` 的 Orca v2 `trusted-worker` 插件——为 Orca 提供跨四十八个编程工具（Claude Code、Codex CLI、Cursor、opencode、Gemini CLI、Orca 及其他四十七个智能体）的本地会话记忆，涵盖安装 `deja` 之前已经记录的历史会话。
 
 ## 安装
 

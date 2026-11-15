@@ -21,6 +21,15 @@
       "indexed_sessions": 0
     },
     {
+      "name": "codearts",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.codearts/kernel/sessions"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "trae",
       "state": "missing",
       "paths": [

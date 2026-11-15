@@ -281,6 +281,102 @@
       }
     },
     {
+      "id": "cherrystudio",
+      "store_paths": [
+        "~/Library/Application Support/CherryStudio/Data/Agents/.claude/projects/*/*.jsonl",
+        "%APPDATA%/CherryStudio/Data/Agents/.claude/projects/*/*.jsonl",
+        "${XDG_CONFIG_HOME}/CherryStudio/Data/Agents/.claude/projects/*/*.jsonl",
+        "<app data>/CherryStudio/.claude/projects/*/*.jsonl",
+        "<app data>/CherryStudio/Data/Agents/.pi/sessions/*.jsonl",
+        "<app data>/CherryStudio/Data/Agents/.dsh/sessions/*/session-*/session*.jsonl*",
+        "<app.user_data_path in ~/.cherrystudio/boot-config.json>/Data/Agents/…",
+        "${DEJA_CHERRYSTUDIO_ROOTS}/*/*.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/cherrystudio/projects/-workspace-registry-demo/registry-cherrystudio.jsonl"
+      ],
+      "parser_source": "internal/sources/cherrystudio.go",
+      "last_verified": "2026-10-07",
+      "display_name": "Cherry Studio",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": false,
+        "resume": false,
+        "handoff": "paste",
+        "prereq": "import the server once in Settings -> MCP; enable the skill for the agent"
+      },
+      "gaps": {
+        "command": {
+          "state": "impossible",
+          "why": "No slash-command surface for a third party: commands are the app's own and an MCP server cannot register one (#3644)."
+        },
+        "resume": {
+          "state": "impossible",
+          "why": "Cherry Studio has no command that reopens a session from outside: the sessions live in the desktop app and are picked from its own UI, so deja hands one over as a paste (#3644)."
+        }
+      },
+      "surfaces": {
+        "digest": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "the agent writes Claude Code's transcript under Data/Agents/.claude/projects"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "partial",
+          "proof": "fixture",
+          "note": "paste only: deja prints the prompt to paste, no command to run it with"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "statusline": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "Cherry Studio has no status line, footer or toast a third party can write to"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
+      }
+    },
+    {
       "id": "claude",
       "store_paths": [
         "${CLAUDE_CONFIG_DIR:-~/.claude}/${CLAUDE_CODE_PROJECT_DIR_NAME:-projects}/**/*.jsonl",
@@ -365,6 +461,96 @@
       }
     },
     {
+      "id": "clawcode",
+      "store_paths": [
+        "${CLAW_CONFIG_HOME:-~/.claw}/sessions",
+        "${DEJA_CLAWCODE_ROOT}",
+        "${DEJA_CLAWCODE_ROOTS}"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/clawcode/session.jsonl",
+        "fixtures/registry/clawcode/legacy.json"
+      ],
+      "parser_source": "internal/sources/clawcode.go",
+      "last_verified": "2026-11-15",
+      "display_name": "Claw Code",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "none"
+      },
+      "gaps": {},
+      "surfaces": {
+        "digest": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "rust/crates/runtime/src/config.rs accepts only PreToolUse, PostToolUse, and PostToolUseFailure and rejects SessionStart as unknown_hook_event"
+        },
+        "prompt": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "rust/crates/runtime/src/config.rs rejects UserPromptSubmit in is_supported_hook_event, so per-prompt recall cannot hook in yet"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_reset": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "rust/crates/runtime/src/config.rs omits PreCompact and PostCompact hooks and compact.rs compacts in-process without emitting a reset hook"
+        },
+        "compaction_capture": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "rust/crates/runtime/src/compact.rs compacts sessions inline without firing a PreCompact hook to trigger deja digest"
+        },
+        "compaction_packet": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "rust/crates/runtime/src/compact.rs builds a fixed summary and tail without invoking an external hook or reading a recovery packet"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "deja handoff --exec launches claw with the handoff prompt"
+        },
+        "session_end": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "rust/crates/runtime/src/config.rs omits SessionEnd from is_supported_hook_event, so exit indexing cannot hook in yet"
+        },
+        "rules": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "rust/crates/runtime/src/prompt.rs walks workspace .claw/CLAUDE.md and project roots but does not load global ~/.claw/CLAUDE.md"
+        },
+        "statusline": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "rust/crates/rusty-claude-cli/src/main.rs does not execute or render a configured settings.json statusLine command"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "reads ~/.claw/sessions/*.jsonl transcripts and legacy .json snapshots while skipping .meta.json and .deleted.json"
+        }
+      }
+    },
+    {
       "id": "cline",
       "store_paths": [
         "${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/*/*.messages.json",
@@ -441,6 +627,305 @@
           "status": "no",
           "proof": "blocked",
           "note": "Cline has no status line, footer or toast a third party can write to"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
+      }
+    },
+    {
+      "id": "codearts",
+      "store_paths": [
+        "~/.codearts/kernel/sessions/<launch-bucket>/<session-uuid>/history.jsonl",
+        "${CODEARTS_HOME}/kernel/sessions/<launch-bucket>/<session-uuid>/history.jsonl"
+      ],
+      "format_kind": "jsonl-directory",
+      "fixture_paths": [
+        "fixtures/registry/codearts/2026-10-30-05-47-28-a198caeba310ddb3/ff119714-beda-42a7-b9c2-06ee66fb0927/history.jsonl"
+      ],
+      "parser_source": "internal/sources/codearts.go",
+      "last_verified": "2026-11-15",
+      "display_name": "CodeArts Desktop",
+      "capabilities": {
+        "mcp": false,
+        "auto": false,
+        "skill": false,
+        "command": false,
+        "resume": false,
+        "handoff": "paste",
+        "prereq": ""
+      },
+      "gaps": {
+        "mcp": {
+          "state": "blocked",
+          "why": "CodeArts Desktop has no MCP client to register deja's server with; its history is still indexed and searchable from every other agent deja serves",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/103"
+        },
+        "auto": {
+          "state": "blocked",
+          "why": "CodeArts Desktop has no hook surface to install into, so recall cannot be wired into its turns; sessions still answer through the MCP server and the index",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/103"
+        },
+        "skill": {
+          "state": "blocked",
+          "why": "the desktop app has no skill catalogue an agent picks from, so there is no place to install a shared skill file; deja can only read its transcripts",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/103"
+        },
+        "command": {
+          "state": "blocked",
+          "why": "the desktop app has no user-definable slash commands, so a /deja command cannot be registered there; recall stays one MCP tool call away",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/103"
+        },
+        "resume": {
+          "state": "impossible",
+          "why": "the desktop app has no CLI that reopens one past session by id, so there is no command to hand back for resuming a session",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/103"
+        }
+      },
+      "surfaces": {
+        "digest": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "the desktop app has no prompt log or status surface a hook could serve a digest into",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/103"
+        },
+        "prompt": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "there is no UserPromptSubmit hook to serve recall on; the app exposes no hook runner at all",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/103"
+        },
+        "pre_tool": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "no PreToolUse hook exists, so a file or command decision cannot reach the model before it acts",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/103"
+        },
+        "failure": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "no PostToolUse hook exists, so a failed command cannot be answered from past runs",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/103"
+        },
+        "compaction_reset": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "the app has no compaction hook to observe; the transcript records summaries the index still reads",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/103"
+        },
+        "compaction_capture": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "no hook surface to capture a compaction event from",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/103"
+        },
+        "compaction_packet": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "no hook surface to deliver a compaction packet through",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/103"
+        },
+        "mcp": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "the app has no MCP client to register deja's server with; its history is still searchable from every other agent",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/103"
+        },
+        "handoff": {
+          "status": "partial",
+          "proof": "stand",
+          "note": "paste only: the desktop app has no CLI to reopen a session, so deja prints the packet to paste",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/103"
+        },
+        "session_end": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "no SessionEnd hook exists to deliver a handoff or digest at",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/103"
+        },
+        "rules": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "the app reads no rules file a third party can write; the runtime's own scope is the only instructions file",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/103"
+        },
+        "statusline": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "the desktop app has no status line, footer or toast a third party can write to",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/103"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "internal/sources/codearts.go reads the two-level session tree"
+        }
+      }
+    },
+    {
+      "id": "codebuddy",
+      "store_paths": [
+        "${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/<mangled-cwd>/<session-id>.jsonl",
+        "${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/<mangled-cwd>/<session-id>/subagents/agent-<id>.jsonl",
+        "${WORKBUDDY_CONFIG_DIR:-~/.workbuddy}/projects/<mangled-cwd>/<session-id>.jsonl",
+        "~/.workbuddy-ai/projects/<mangled-cwd>/<session-id>.jsonl",
+        "${DEJA_CODEBUDDY_ROOTS}/<mangled-cwd>/<session-id>.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/codebuddy/projects/workspace-registry-demo/registry-codebuddy.jsonl"
+      ],
+      "parser_source": "internal/sources/codebuddy.go",
+      "last_verified": "2026-10-05",
+      "display_name": "CodeBuddy Code",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "none"
+      },
+      "gaps": {},
+      "surfaces": {
+        "digest": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "deja handoff --exec opens it with the packet as the first prompt"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "statusline": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "the codebuddy-auto target writes statusLine.command in settings.json"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
+      }
+    },
+    {
+      "id": "codewhale",
+      "store_paths": [
+        "${CODEWHALE_HOME:-~/.codewhale}/sessions/<id>.json",
+        "~/.deepseek/sessions/<id>.json",
+        "${DEJA_CODEWHALE_ROOT}/<id>.json"
+      ],
+      "format_kind": "json",
+      "fixture_paths": [
+        "fixtures/registry/codewhale/sessions/registry-codewhale.json"
+      ],
+      "parser_source": "internal/sources/codewhale.go",
+      "last_verified": "2026-10-08",
+      "display_name": "CodeWhale",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "none"
+      },
+      "gaps": {},
+      "surfaces": {
+        "digest": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "rides the first message_submit of a session; session_start stdout is discarded"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "pre_tool": {
+          "status": "partial",
+          "proof": "stand",
+          "note": "tool_call_before additionalContext reaches the model only on a tool that ran; a call that failed to run goes back as Error: without it, so tool_call_after parks the line and it rides the next message_submit (0.10.1 stand)"
+        },
+        "failure": {
+          "status": "partial",
+          "proof": "stand",
+          "note": "tool_call_after stdout is discarded and it fires after the turn's next tool_call_before, so the fix pair is parked and rides the next message_submit (0.10.1 stand)"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "no compaction hook; the history saved as artifacts/context-transfer-<id>.json beside its .md summary is caught up on the next message or tool call (0.10.0 stand)"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "rides the next message_submit or tool_call_before"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "deja handoff --exec opens it with the packet as the first prompt"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "fires on /quit, not on a kill"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "statusline": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "CodeWhale 0.10.0's footer takes only built-in items (StatusItem in crates/tui/src/config.rs: mode, model, cost, git_branch and the like), and observer hook stdout is discarded"
         },
         "reader": {
           "status": "yes",
@@ -530,6 +1015,185 @@
         "reader": {
           "status": "yes",
           "proof": "fixture"
+        }
+      }
+    },
+    {
+      "id": "commandcode",
+      "store_paths": [
+        "~/.commandcode/projects/*/*.jsonl",
+        "${DEJA_COMMANDCODE_ROOT}/*/*.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/commandcode/-workspace-commandcode-demo/registry-commandcode.jsonl"
+      ],
+      "parser_source": "internal/sources/commandcode.go",
+      "display_name": "Command Code",
+      "last_verified": "2026-10-07",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "none"
+      },
+      "gaps": {},
+      "surfaces": {
+        "digest": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "the mod's transformContext adds the recall to the question on every model call of the turn; a PreToolUse reads a transcript the turn is not yet written to (1.77.0 stand)"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "no compaction shell hook; the transcript gets a compaction record and keeps the turns above it, and the next PreToolUse catches it up (1.77.0 stand)"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "rides the next PreToolUse"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "deja handoff --exec opens it with the packet as the first prompt"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "the mod's onSessionEnd"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "statusline": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "the mod's cmd.ui.setStatus, a footer segment under the input in the TUI (mod-builder ui.md, 1.77.0); headless runs show none"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
+      }
+    },
+    {
+      "id": "continue",
+      "store_paths": [
+        "${CONTINUE_GLOBAL_DIR:-~/.continue}/sessions/*.json",
+        "${DEJA_CONTINUE_ROOT}/sessions/*.json"
+      ],
+      "format_kind": "json",
+      "fixture_paths": [
+        "fixtures/registry/continue/sessions/8f1c2a3e-0000-4000-8000-000000000000.json"
+      ],
+      "parser_source": "internal/sources/continuedev.go",
+      "last_verified": "2026-09-07",
+      "display_name": "Continue",
+      "capabilities": {
+        "mcp": true,
+        "auto": false,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": ""
+      },
+      "gaps": {
+        "auto": {
+          "state": "blocked",
+          "why": "Continue's CLI carries a Claude-shaped hooks system — Claude's own event set, additionalContext, settings read from ~/.continue/settings.json — and nothing fires it in the published release: measured on @continuedev/cli 1.5.47, hooks written for every event loaded (\"Hooks loaded: 8 handler(s)\" in its own log) and no handler ran, while the same run's tool call went through. Becomes work the day a release fires them",
+          "source": "https://github.com/continuedev/continue/tree/main/extensions/cli/src/hooks"
+        }
+      },
+      "surfaces": {
+        "digest": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"
+        },
+        "prompt": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"
+        },
+        "pre_tool": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"
+        },
+        "failure": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"
+        },
+        "compaction_reset": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"
+        },
+        "compaction_capture": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"
+        },
+        "compaction_packet": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "deja handoff --exec opens it with the packet as the first prompt"
+        },
+        "session_end": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "statusline": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "cn has no status line, footer or toast a third party can write to"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "the index keeps the turns a compaction rewrote out of the file (#4800)"
         }
       }
     },
@@ -698,6 +1362,93 @@
           "status": "partial",
           "proof": "fixture",
           "note": "compaction summaries are read from result.metadata; Copilot Chat 0.68 keeps the newest 20 agent transcripts per workspace and deletes older ones (cleanupOldTranscripts), so a transcript not indexed before that is gone"
+        }
+      }
+    },
+    {
+      "id": "crush",
+      "store_paths": [
+        "<project>/.crush/crush.db",
+        "~/.local/share/crush/projects.json",
+        "${XDG_DATA_HOME}/crush/projects.json",
+        "${DEJA_CRUSH_ROOT}/projects.json"
+      ],
+      "format_kind": "sqlite",
+      "fixture_paths": [
+        "fixtures/registry/crush/crush.sql"
+      ],
+      "parser_source": "internal/sources/crush.go",
+      "last_verified": "2026-09-07",
+      "display_name": "Crush",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "sqlite3"
+      },
+      "surfaces": {
+        "digest": {
+          "status": "partial",
+          "proof": "fixture",
+          "note": "PreToolUse is Crush's only hook, so the digest rides the session's first tool call; a session with none gets no digest"
+        },
+        "prompt": {
+          "status": "partial",
+          "proof": "fixture",
+          "note": "PreToolUse is Crush's only hook, so recall for the newest message is read from crush.db and rides the next tool call; a turn with none gets nothing"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "failure": {
+          "status": "partial",
+          "proof": "fixture",
+          "note": "the failed command is read from crush.db and its pair rides the next tool call, not the failed one"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "a new summary_message_id in crush.db, seen on the next PreToolUse"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "crush.db keeps the summarised messages"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "rides the next PreToolUse"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "session_end": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "Crush v0.97.1 (latest release, checked 2026-10-08) and main at 140e8cb have only EventPreToolUse (internal/hooks/hooks.go:13-16); SessionEnd is in charmbracelet/crush#3146, still open"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "statusline": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "Crush has no status line, footer or toast a third party can write to"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
         }
       }
     },
@@ -879,6 +1630,99 @@
       }
     },
     {
+      "id": "devin",
+      "store_paths": [
+        "~/.local/share/devin/cli/sessions.db",
+        "${XDG_DATA_HOME}/devin/cli/sessions.db",
+        "%LOCALAPPDATA%/devin/cli/sessions.db",
+        "cli_sessions.db beside sessions.db (the legacy name)",
+        "${DEJA_DEVIN_DB}"
+      ],
+      "format_kind": "sqlite",
+      "fixture_paths": [
+        "fixtures/registry/devin/devin.sql"
+      ],
+      "parser_source": "internal/sources/devin.go",
+      "last_verified": "2026-10-07",
+      "display_name": "Devin CLI",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": false,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "sqlite3"
+      },
+      "surfaces": {
+        "digest": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "arrives with the tool's result"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "PostCompaction is Devin's reset event; the context hook answers it"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "PostCompaction runs hook-context, which captures the pre-compaction turns from sessions.db (following compact/prior_node_ids across rebuilt chains) before emitting the recovery packet"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "PostCompaction answers with the recovery packet built from the sessions.db capture"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "Devin's docs: a user-global ~/.config/devin/AGENTS.md sets rules for every project (docs.devin.ai/cli/extensibility), beside the hooks and MCP config deja already writes there; not stand-verified against a live host"
+        },
+        "statusline": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "Devin CLI's surface is the six lifecycle hooks plus MCP and skills — no statusline channel exists in its config or plugin manifest (install_devin.go, CLI 3000.11.3)"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
+      },
+      "gaps": {
+        "command": {
+          "state": "impossible",
+          "why": "Devin CLI has no user-registered slash-command file: its plugin manifest and skills directories are the only extension surfaces the docs describe, so a `/deja` command has no file to live in.",
+          "source": "bundled docs at share/devin/docs/extensibility (3000.11.3)"
+        }
+      }
+    },
+    {
       "id": "gemini",
       "store_paths": [
         "${GEMINI_CLI_HOME:-~}/.gemini/tmp/*/chats/**/*.{json,jsonl}",
@@ -953,6 +1797,85 @@
           "status": "no",
           "proof": "blocked",
           "note": "Gemini CLI 0.60 has no statusLine setting in its bundle"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
+      }
+    },
+    {
+      "id": "gjc",
+      "store_paths": [
+        "${GJC_CODING_AGENT_DIR:-~/.gjc/agent}/sessions/*/*.jsonl",
+        "${DEJA_GJC_ROOT}/*/*.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/gjc/-workspace-gjc-demo/session.jsonl"
+      ],
+      "parser_source": "internal/sources/gjc.go",
+      "last_verified": "2026-09-21",
+      "display_name": "gajae-code",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "none"
+      },
+      "gaps": {},
+      "surfaces": {
+        "digest": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "deja handoff --exec opens it with the packet as the first prompt"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "statusline": {
+          "status": "yes",
+          "proof": "fixture"
         },
         "reader": {
           "status": "yes",
@@ -1226,6 +2149,370 @@
       }
     },
     {
+      "id": "jetbrains",
+      "store_paths": [
+        "~/Library/Application Support/JetBrains/<Product><version>/workspace/<project-workspace-id>.xml",
+        "%APPDATA%\\JetBrains\\<Product><version>\\workspace\\<project-workspace-id>.xml",
+        "${XDG_CONFIG_HOME:-~/.config}/JetBrains/<Product><version>/workspace/<project-workspace-id>.xml",
+        "<JetBrains config>/<Product><version>/aia-task-history/<chat-uid>.events",
+        "${DEJA_JETBRAINS_ROOT}/<Product><version>/workspace/<project-workspace-id>.xml"
+      ],
+      "format_kind": "xml-and-base64-jsonl",
+      "fixture_paths": [
+        "fixtures/registry/jetbrains/IntelliJIdea2026.2/workspace/2xQ7mN4bV8cK1pR6tY3wZ9aL0dF.xml"
+      ],
+      "parser_source": "internal/sources/jetbrains.go",
+      "last_verified": "2026-10-08",
+      "display_name": "JetBrains AI Assistant",
+      "capabilities": {
+        "mcp": true,
+        "auto": false,
+        "skill": false,
+        "command": false,
+        "resume": false,
+        "handoff": "paste",
+        "prereq": "none"
+      },
+      "gaps": {
+        "auto": {
+          "state": "blocked",
+          "why": "AI Assistant 262.10968.170 runs no user hooks: no hook configuration or hook runner is in the plugin, so nothing can put recall in front of its chat.",
+          "source": "https://plugins.jetbrains.com/plugin/22282-jetbrains-ai-assistant"
+        },
+        "skill": {
+          "state": "blocked",
+          "why": "AI Assistant 262.10968.170's own chat reads no SKILL.md. Its skill folders (IdeManagedSkillsLayout, ~/.claude/skills, ~/.codex/skills) are handed only to the ACP agents it hosts (AgentSkillsAdditionalRootsProvider: junie, claude-acp, codex), and the chat's skill picker opens only for a Claude or Codex agent (AgentSkillsContextPopupContributor). Those agents already get deja's skill from their own directories.",
+          "source": "https://plugins.jetbrains.com/plugin/22282-jetbrains-ai-assistant"
+        },
+        "command": {
+          "state": "blocked",
+          "why": "AI Assistant 262.10968.170 reads custom chat commands only from a project's .aiassistant/commands (CustomUserCommandsService); there is no user-level directory to write one to.",
+          "source": "https://plugins.jetbrains.com/plugin/22282-jetbrains-ai-assistant"
+        },
+        "resume": {
+          "state": "impossible",
+          "why": "An AI Assistant chat reopens only from the IDE's chat history; no command line takes a chat id, so there is nothing for deja resume to print."
+        }
+      },
+      "surfaces": {
+        "digest": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "AI Assistant 262.10968.170 has no hook runner or session-start event in any of its jars"
+        },
+        "prompt": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "AI Assistant 262.10968.170 has no per-prompt hook in any of its jars; recall reaches the chat only as an MCP tool"
+        },
+        "pre_tool": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "AI Assistant 262.10968.170 has no tool hook in any of its jars; its agent tools run without a callback deja can answer"
+        },
+        "failure": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "AI Assistant 262.10968.170 has no post-tool hook in any of its jars, so a failed command reaches no deja code"
+        },
+        "compaction_reset": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "AI Assistant 262.10968.170 has no compaction event or hook in any of its jars"
+        },
+        "compaction_capture": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "AI Assistant 262.10968.170 has no compaction event or hook in any of its jars"
+        },
+        "compaction_packet": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "AI Assistant 262.10968.170 has no hook that could carry a packet into the next turn"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "~/.ai/mcp/mcp.json, the global file every JetBrains IDE's AI Assistant reads"
+        },
+        "handoff": {
+          "status": "partial",
+          "proof": "fixture",
+          "note": "the chat runs inside the IDE with no command line to take a prompt, so the packet is pasted"
+        },
+        "session_end": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "AI Assistant 262.10968.170 has no session-end event or hook in any of its jars"
+        },
+        "rules": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "AI Assistant 262.10968.170 reads rules only from a project's .aiassistant/rules (AiRulesService); custom instructions are a per-project setting"
+        },
+        "statusline": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "AI Assistant 262.10968.170's chat has no status line a command can write to; the IDE's status bar takes plugin widgets only"
+        },
+        "reader": {
+          "status": "partial",
+          "proof": "fixture",
+          "note": "messages carry no time of their own, so a chat's turns take its start time a millisecond apart; an agent chat run by Junie, Claude, Codex or another agent with its own store is left to that store"
+        }
+      }
+    },
+    {
+      "id": "junie",
+      "store_paths": [
+        "${JUNIE_HOME:-~/.junie}/sessions/<session-id>/events.jsonl",
+        "${JUNIE_HOME:-~/.junie}/sessions/index.jsonl",
+        "${DEJA_JUNIE_ROOT}/<session-id>/events.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/junie/sessions/session-260901-101500-k3m9/events.jsonl"
+      ],
+      "parser_source": "internal/sources/junie.go",
+      "last_verified": "2026-10-08",
+      "display_name": "Junie",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "none"
+      },
+      "gaps": {},
+      "surfaces": {
+        "digest": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "rides the first UserPromptSubmit of a session; SessionStart output is not delivered (3110.7)"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "PreToolUse on Bash, Read and Edit; Junie puts the line in front of the tool's result"
+        },
+        "failure": {
+          "status": "partial",
+          "proof": "stand",
+          "note": "no PostToolUse in 3110.7 (ExternalHookEvent); the pair for a failed command is read from events.jsonl and rides the next PreToolUse or UserPromptSubmit"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "no PreCompact in 3110.7; the ContextCompactionBlockUpdatedEvent in events.jsonl is caught up at the next prompt or tool call"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "rides the next UserPromptSubmit or PreToolUse"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "offered to the model as mcp_deja_deja once Junie's capability filter picks it for the prompt"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "deja handoff --exec runs junie with the packet as its task"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "$JUNIE_HOME/AGENTS.md is in front of every task (3110.7)"
+        },
+        "statusline": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "Junie 3110.7's toolbar takes only built-in items (ToolbarElement in tui/app/state: WorkingDirectory, GitBranch, Model, ContextWindow and the like), no command"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
+      }
+    },
+    {
+      "id": "kilocode",
+      "store_paths": [
+        "<vscode-globalStorage>/kilocode.kilo-code/tasks/*/api_conversation_history.json",
+        "${DEJA_KILO_ROOTS}/tasks/*/api_conversation_history.json",
+        "~/.local/share/kilo/kilo.db",
+        "${XDG_DATA_HOME}/kilo/kilo.db",
+        "${DEJA_KILO_DB}"
+      ],
+      "format_kind": "json+sqlite",
+      "fixture_paths": [
+        "fixtures/registry/kilocode/tasks/registry-kilocode/api_conversation_history.json",
+        "fixtures/registry/kilocode/kilo.sql"
+      ],
+      "parser_source": "internal/sources/kilo.go",
+      "last_verified": "2026-10-07",
+      "display_name": "Kilo Code",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "sqlite3 for the CLI store"
+      },
+      "surfaces": {
+        "digest": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "deja handoff --exec opens it with the packet as the first prompt"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "statusline": {
+          "status": "partial",
+          "proof": "fixture",
+          "note": "a toast in the CLI's TUI; the VS Code extension shows none"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
+      }
+    },
+    {
+      "id": "kimchi",
+      "store_paths": [
+        "~/.config/kimchi/harness/sessions/--<encoded-cwd>--/*.jsonl",
+        "${DEJA_KIMCHI_ROOT}/**/*.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/kimchi/--workspace-kimchi-demo--/session.jsonl"
+      ],
+      "parser_source": "internal/sources/senpi.go",
+      "display_name": "Kimchi Coding",
+      "last_verified": "2026-10-07",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "none"
+      },
+      "gaps": {},
+      "surfaces": {
+        "digest": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "deja handoff --exec opens it with the packet as the first prompt"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "statusline": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
+      }
+    },
+    {
       "id": "kimi",
       "store_paths": [
         "${KIMI_CODE_HOME:-~/.kimi-code}/sessions/*/*/agents/main/wire.jsonl",
@@ -1300,6 +2587,441 @@
           "status": "yes",
           "proof": "fixture",
           "note": "the kimi-auto target writes the [status_line] command in tui.toml"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
+      }
+    },
+    {
+      "id": "kiro",
+      "store_paths": [
+        "~/.kiro/sessions/cli/*.jsonl",
+        "~/.kiro/sessions/*/sess_*/messages.jsonl",
+        "${DEJA_KIRO_ROOT}/cli/*.jsonl",
+        "${DEJA_KIRO_ROOT}/*/sess_*/messages.jsonl",
+        "~/Library/Application Support/kiro-cli/data.sqlite3",
+        "~/.local/share/kiro-cli/data.sqlite3",
+        "${DEJA_KIRO_DB}"
+      ],
+      "format_kind": "jsonl+sqlite",
+      "fixture_paths": [
+        "fixtures/registry/kiro/cli/registry-kiro.jsonl",
+        "fixtures/registry/kiro/w-api/sess_00000000-0000-4000-8000-000000000000/messages.jsonl"
+      ],
+      "parser_source": "internal/sources/kiro.go",
+      "last_verified": "2026-10-08",
+      "display_name": "Kiro",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "sqlite3 for the CLI database"
+      },
+      "gaps": {},
+      "surfaces": {
+        "digest": {
+          "status": "partial",
+          "proof": "stand",
+          "note": "~/.kiro/hooks fire in the IDE and the kiro-cli --v3 TUI in any agent (logged-in 2.22.0 stand), not in --v3 --no-interactive; the default V2 engine runs them only inside the deja agent"
+        },
+        "prompt": {
+          "status": "partial",
+          "proof": "stand",
+          "note": "~/.kiro/hooks fire in the IDE and the kiro-cli --v3 TUI in any agent (logged-in 2.22.0 stand), not in --v3 --no-interactive; the default V2 engine runs them only inside the deja agent"
+        },
+        "pre_tool": {
+          "status": "partial",
+          "proof": "stand",
+          "note": "preToolUse stdout never reaches the model (acp-server.js L5478 sendStdout:false, CLI 2.28.0), so the deja agent parks the line and it arrives with the next userPromptSubmit, after the edit (2.22.0 TUI stand)"
+        },
+        "failure": {
+          "status": "partial",
+          "proof": "stand",
+          "note": "PostToolUse output is dropped at call time, so the line is parked and arrives with the next UserPromptSubmit, not right after the failed step (2.22.0 TUI stand)"
+        },
+        "compaction_reset": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "Kiro's hook triggers have no compaction event (acp-server.js L5478 trigger list, CLI 2.28.0)"
+        },
+        "compaction_capture": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "Kiro's hook triggers have no compaction event (acp-server.js L5478 trigger list, CLI 2.28.0)"
+        },
+        "compaction_packet": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "Kiro's hook triggers have no compaction event (acp-server.js L5478 trigger list, CLI 2.28.0)"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "logged-in 2.22.0 stand: listed by kiro-cli mcp list and called by the model in the V2 deja agent and the V3 default agent"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "deja handoff --exec opens it with the packet as the first prompt"
+        },
+        "session_end": {
+          "status": "partial",
+          "proof": "stand",
+          "note": "V3 only, V2 has none. 2.28.0 fires SessionEnd on leaving the TUI; 2.22.0 maps it to Stop (acp-server.js trigger aliases), so it fires after every turn and nothing fires on /quit (logged-in stand)"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "statusline": {
+          "status": "partial",
+          "proof": "fixture",
+          "note": "the kiro-auto target adds a local extension that shows deja statusline in Kiro IDE's status bar; kiro-cli has no status line a third party can write to"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "stand"
+        }
+      }
+    },
+    {
+      "id": "mcode",
+      "store_paths": [
+        "~/.minimax/v2/sessions/YYYY/MM/DD/<session>/messages.jsonl",
+        "${DEJA_MCODE_ROOT}/YYYY/MM/DD/<session>/messages.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/mcode/v2/sessions/2026/10/20/02-57-27-477-session_bXZzXzBmMWUyZDNjNGI1YTY5Nzg4Nzk2YTViNGMzZDJlMWYw/messages.jsonl"
+      ],
+      "parser_source": "internal/sources/mcode.go",
+      "last_verified": "2026-10-22",
+      "display_name": "MiniMax Code",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": false,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "the MiniMax Code CLI (`mcode`) for `deja resume` and `deja handoff --to mcode --exec`; `sqlite3` for the session's workspace"
+      },
+      "gaps": {
+        "command": {
+          "state": "impossible",
+          "why": "No slash-command surface for a third party: the V1 plugin package carries skills, agents, hooks and scripts, and the manifest has no field for a command, so a /deja command has nowhere to be written (MiniMax plugin reference, package structure and manifest fields)."
+        }
+      },
+      "surfaces": {
+        "digest": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "the package's SessionStart hook runs `deja hook-context --mcode`, whose text goes into hookSpecificOutput.additionalContext"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "the UserPromptSubmit hook runs `deja hook-prompt --mcode`; the payload is Claude-shaped, so the hook reads it unchanged"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "the PreToolUse hook runs `deja hook-tool --mcode` for the shell and file tools"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "the PostToolUse hook runs `deja hook-tool-after --mcode`, which answers with what this machine ran after the same failure"
+        },
+        "compaction_reset": {
+          "status": "partial",
+          "proof": "stand",
+          "note": "the PreCompact hook runs and captures the transcript, but MiniMax Code's PreCompact output can only defer the compaction, so the reset itself is not told to the model"
+        },
+        "compaction_capture": {
+          "status": "partial",
+          "proof": "stand",
+          "note": "the capture runs at PreCompact with --harness mcode and reads the session from the v2 store by its id, not the temporary transcript_path the hook is given; what the model is told about it has no surface to travel on"
+        },
+        "compaction_packet": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "MiniMax Code's PreCompact handler can only answer with a decision to defer the compaction, and its post-compaction event is observation only, so the packet has no surface to travel on and rides the next prompt instead"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "deja install mcode writes the server into ~/.minimax/mcp.json, the shape MCode's own MCP page writes"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "deja handoff --to mcode --exec runs the MiniMax Code CLI with the digest as its first prompt"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "the SessionEnd hook runs `deja hook-session-end`, which records the end; MiniMax Code's SessionEnd is observation only, so nothing is said to the model"
+        },
+        "rules": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "MiniMax Code has no global rules file: it reads AGENTS.md from the workspace the session is in, so a block written into one home directory would reach no session"
+        },
+        "statusline": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "MiniMax Code has no status line a plugin can write to: the plugin hook reference lists the events and their outputs, and none of them is a status surface; the desktop shows the session in its own task panel"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "a compaction rewrites the transcript in place and the summary that takes the cut turns' place is indexed under the summary role, so the turns it replaced stay findable"
+        }
+      }
+    },
+    {
+      "id": "mimo",
+      "store_paths": [
+        "~/.local/share/mimocode/mimocode.db",
+        "${XDG_DATA_HOME}/mimocode/mimocode.db",
+        "${MIMOCODE_HOME}/mimocode.db",
+        "${MIMOCODE_DB}",
+        "${DEJA_MIMO_DB}"
+      ],
+      "format_kind": "sqlite",
+      "fixture_paths": [
+        "fixtures/registry/mimo/mimo.sql"
+      ],
+      "parser_source": "internal/sources/mimo.go",
+      "last_verified": "2026-11-12",
+      "display_name": "MiMo-Code",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "sqlite3"
+      },
+      "gaps": {},
+      "surfaces": {
+        "digest": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "deja handoff --exec opens it with the packet as the first prompt"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "statusline": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "the mimo-auto target installs the opencode 1.x TUI status plugin in ~/.config/mimocode/plugins/deja-status.tsx"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
+      }
+    },
+    {
+      "id": "muse",
+      "store_paths": [
+        "${XDG_DATA_HOME:-~/.local/share}/muse/sessions/YYYY/MM/DD/<id>/session.jsonl",
+        "${XDG_DATA_HOME:-~/.local/share}/muse/sessions/YYYY/MM/DD/<id>/subagent/<child>/session.jsonl",
+        "${DEJA_MUSE_ROOTS}/YYYY/MM/DD/<id>/session.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/muse/sessions/2026/09/18/01a0b7d1-0000-7000-8000-00000000d3a0/session.jsonl"
+      ],
+      "parser_source": "internal/sources/muse.go",
+      "last_verified": "2026-10-08",
+      "display_name": "Muse Code",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "none"
+      },
+      "gaps": {},
+      "surfaces": {
+        "digest": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "deja handoff --exec opens it with the packet as the first prompt"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "the first of <config>/muse/AGENTS.md, ~/.claude/CLAUDE.md and $CODEX_HOME/AGENTS.md, which is the one Muse loads (1.4.3)"
+        },
+        "statusline": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "Muse 1.4.3's bottom bar (/hud, tui.hud) has a fixed item set: model, effort, path, permissions, context, branch, tokens, cost, quota; plugins add skills, commands, hooks, MCP servers and reminders, nothing in the UI"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
+      }
+    },
+    {
+      "id": "omnigent",
+      "store_paths": [
+        "${OMNIGENT_DATA_DIR:-~/.omnigent}/chat.db",
+        "${DEJA_OMNIGENT_ROOT}/chat.db",
+        "${DEJA_OMNIGENT_DB}"
+      ],
+      "format_kind": "sqlite",
+      "fixture_paths": [
+        "fixtures/registry/omnigent/omnigent.sql"
+      ],
+      "parser_source": "internal/sources/omnigent.go",
+      "last_verified": "2026-11-12",
+      "display_name": "Omnigent",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "sqlite3"
+      },
+      "gaps": {},
+      "surfaces": {
+        "digest": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "statusline": {
+          "status": "yes",
+          "proof": "fixture"
         },
         "reader": {
           "status": "yes",
@@ -1414,19 +3136,64 @@
       },
       "gaps": {},
       "surfaces": {
-        "digest": {"status": "yes", "proof": "stand", "note": "the plugin's own agent:bootstrap hook puts it in the Project Context once per session, local and gateway, with or without allowConversationAccess; the gateway's hook pack asks under the same session id (stand on 2026.9.8)"},
-        "prompt": {"status": "yes", "proof": "stand", "note": "OpenClaw 2026.8.1+ runs the plugin's prompt hooks only with plugins.entries.deja.hooks.allowConversationAccess, which install sets (stand on 2026.9.8, local and gateway); the ClawHub package cannot grant it to itself, so it names the key and the openclaw config set command in the gateway log and in /deja (stand on 2026.9.9)"},
-        "pre_tool": {"status": "yes", "proof": "stand"},
-        "failure": {"status": "yes", "proof": "stand"},
-        "compaction_reset": {"status": "yes", "proof": "stand", "note": "the packet rides the prompt hook, so it needs the same allowConversationAccess grant on 2026.8.1+"},
-        "compaction_capture": {"status": "yes", "proof": "stand"},
-        "compaction_packet": {"status": "yes", "proof": "stand"},
-        "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
-        "session_end": {"status": "yes", "proof": "stand"},
-        "rules": {"status": "yes", "proof": "stand", "note": "the agent workspace's AGENTS.md, added to when it exists (2026.9.8)"},
-        "statusline": {"status": "partial", "proof": "stand", "note": "a deja tab in the Control UI sidebar shows the line (gateway-auth route, no Labs switch; 2026.9.8); the TUI footer takes nothing from plugins (formatTuiFooter), and an always-visible session header item needs the Custom plugin UI lab"},
-        "reader": {"status": "yes", "proof": "fixture"}
+        "digest": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "the plugin's own agent:bootstrap hook puts it in the Project Context once per session, local and gateway, with or without allowConversationAccess; the gateway's hook pack asks under the same session id (stand on 2026.9.8)"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "OpenClaw 2026.8.1+ runs the plugin's prompt hooks only with plugins.entries.deja.hooks.allowConversationAccess, which install sets (stand on 2026.9.8, local and gateway); the ClawHub package cannot grant it to itself, so it names the key and the openclaw config set command in the gateway log and in /deja (stand on 2026.9.9)"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "the packet rides the prompt hook, so it needs the same allowConversationAccess grant on 2026.8.1+"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "deja handoff --exec opens it with the packet as the first prompt"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "stand",
+          "note": "the agent workspace's AGENTS.md, added to when it exists (2026.9.8)"
+        },
+        "statusline": {
+          "status": "partial",
+          "proof": "stand",
+          "note": "a deja tab in the Control UI sidebar shows the line (gateway-auth route, no Labs switch; 2026.9.8); the TUI footer takes nothing from plugins (formatTuiFooter), and an always-visible session header item needs the Custom plugin UI lab"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
       }
     },
     {
@@ -1513,115 +3280,21 @@
       }
     },
     {
-      "id": "continue",
+      "id": "orca",
       "store_paths": [
-        "${CONTINUE_GLOBAL_DIR:-~/.continue}/sessions/*.json",
-        "${DEJA_CONTINUE_ROOT}/sessions/*.json"
-      ],
-      "format_kind": "json",
-      "fixture_paths": [
-        "fixtures/registry/continue/sessions/8f1c2a3e-0000-4000-8000-000000000000.json"
-      ],
-      "parser_source": "internal/sources/continuedev.go",
-      "last_verified": "2026-09-07",
-      "display_name": "Continue",
-      "capabilities": {
-        "mcp": true,
-        "auto": false,
-        "skill": true,
-        "command": true,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": ""
-      },
-      "gaps": {
-        "auto": {
-          "state": "blocked",
-          "why": "Continue's CLI carries a Claude-shaped hooks system — Claude's own event set, additionalContext, settings read from ~/.continue/settings.json — and nothing fires it in the published release: measured on @continuedev/cli 1.5.47, hooks written for every event loaded (\"Hooks loaded: 8 handler(s)\" in its own log) and no handler ran, while the same run's tool call went through. Becomes work the day a release fires them",
-          "source": "https://github.com/continuedev/continue/tree/main/extensions/cli/src/hooks"
-        }
-      },
-      "surfaces": {
-        "digest": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"
-        },
-        "prompt": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"
-        },
-        "pre_tool": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"
-        },
-        "failure": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"
-        },
-        "compaction_reset": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"
-        },
-        "compaction_capture": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"
-        },
-        "compaction_packet": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"
-        },
-        "mcp": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "handoff": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "deja handoff --exec opens it with the packet as the first prompt"
-        },
-        "session_end": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"
-        },
-        "rules": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "statusline": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "cn has no status line, footer or toast a third party can write to"
-        },
-        "reader": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "the index keeps the turns a compaction rewrote out of the file (#4800)"
-        }
-      }
-    },
-    {
-      "id": "crush",
-      "store_paths": [
-        "<project>/.crush/crush.db",
-        "~/.local/share/crush/projects.json",
-        "${XDG_DATA_HOME}/crush/projects.json",
-        "${DEJA_CRUSH_ROOT}/projects.json"
+        "~/Library/Application Support/Orca/agent-session-journal.db",
+        "${XDG_CONFIG_HOME:-~/.config}/Orca/agent-session-journal.db",
+        "%APPDATA%/Orca/agent-session-journal.db",
+        "${DEJA_ORCA_ROOT}/agent-session-journal.db",
+        "${DEJA_ORCA_DB}"
       ],
       "format_kind": "sqlite",
       "fixture_paths": [
-        "fixtures/registry/crush/crush.sql"
+        "fixtures/registry/orca/orca.sql"
       ],
-      "parser_source": "internal/sources/crush.go",
-      "last_verified": "2026-09-07",
-      "display_name": "Crush",
+      "parser_source": "internal/sources/orca.go",
+      "last_verified": "2026-11-12",
+      "display_name": "Orca",
       "capabilities": {
         "mcp": true,
         "auto": true,
@@ -1631,40 +3304,35 @@
         "handoff": "exec",
         "prereq": "sqlite3"
       },
+      "gaps": {},
       "surfaces": {
         "digest": {
-          "status": "partial",
-          "proof": "fixture",
-          "note": "PreToolUse is Crush's only hook, so the digest rides the session's first tool call; a session with none gets no digest"
+          "status": "yes",
+          "proof": "fixture"
         },
         "prompt": {
-          "status": "partial",
-          "proof": "fixture",
-          "note": "PreToolUse is Crush's only hook, so recall for the newest message is read from crush.db and rides the next tool call; a turn with none gets nothing"
+          "status": "yes",
+          "proof": "fixture"
         },
         "pre_tool": {
           "status": "yes",
           "proof": "fixture"
         },
         "failure": {
-          "status": "partial",
-          "proof": "fixture",
-          "note": "the failed command is read from crush.db and its pair rides the next tool call, not the failed one"
+          "status": "yes",
+          "proof": "fixture"
         },
         "compaction_reset": {
           "status": "yes",
-          "proof": "fixture",
-          "note": "a new summary_message_id in crush.db, seen on the next PreToolUse"
+          "proof": "fixture"
         },
         "compaction_capture": {
           "status": "yes",
-          "proof": "fixture",
-          "note": "crush.db keeps the summarised messages"
+          "proof": "fixture"
         },
         "compaction_packet": {
           "status": "yes",
-          "proof": "fixture",
-          "note": "rides the next PreToolUse"
+          "proof": "fixture"
         },
         "mcp": {
           "status": "yes",
@@ -1675,18 +3343,16 @@
           "proof": "fixture"
         },
         "session_end": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "Crush v0.97.1 (latest release, checked 2026-10-08) and main at 140e8cb have only EventPreToolUse (internal/hooks/hooks.go:13-16); SessionEnd is in charmbracelet/crush#3146, still open"
+          "status": "yes",
+          "proof": "fixture"
         },
         "rules": {
           "status": "yes",
           "proof": "fixture"
         },
         "statusline": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "Crush has no status line, footer or toast a third party can write to"
+          "status": "yes",
+          "proof": "fixture"
         },
         "reader": {
           "status": "yes",
@@ -1929,114 +3595,25 @@
       }
     },
     {
-      "id": "cherrystudio",
+      "id": "reasonix",
       "store_paths": [
-        "~/Library/Application Support/CherryStudio/Data/Agents/.claude/projects/*/*.jsonl",
-        "%APPDATA%/CherryStudio/Data/Agents/.claude/projects/*/*.jsonl",
-        "${XDG_CONFIG_HOME}/CherryStudio/Data/Agents/.claude/projects/*/*.jsonl",
-        "<app data>/CherryStudio/.claude/projects/*/*.jsonl",
-        "<app data>/CherryStudio/Data/Agents/.pi/sessions/*.jsonl",
-        "<app data>/CherryStudio/Data/Agents/.dsh/sessions/*/session-*/session*.jsonl*",
-        "<app.user_data_path in ~/.cherrystudio/boot-config.json>/Data/Agents/…",
-        "${DEJA_CHERRYSTUDIO_ROOTS}/*/*.jsonl"
+        "${REASONIX_STATE_HOME:-~/.reasonix}/sessions/<id>.jsonl",
+        "${REASONIX_STATE_HOME:-~/.reasonix}/projects/<workspace-slug>/sessions/<id>.jsonl",
+        "%APPDATA%\\reasonix\\sessions\\<id>.jsonl",
+        "%APPDATA%\\reasonix\\projects\\<workspace-slug>\\sessions\\<id>.jsonl",
+        "${DEJA_REASONIX_ROOT}/sessions/<id>.jsonl",
+        "${REASONIX_STATE_HOME:-~/.reasonix}/projects/<workspace-slug>/sessions-v4/<id>/events.frames",
+        "${REASONIX_STATE_HOME:-~/.reasonix}/sessions-v4/<id>/events.frames",
+        "${REASONIX_STATE_HOME:-~/.reasonix}/desktop-sessions-v5/by-id/<id>/events.frames"
       ],
-      "format_kind": "jsonl",
+      "format_kind": "zstd-frames-or-jsonl",
       "fixture_paths": [
-        "fixtures/registry/cherrystudio/projects/-workspace-registry-demo/registry-cherrystudio.jsonl"
+        "fixtures/registry/reasonix/projects/-workspace-reasonix-demo/sessions/registry-reasonix.jsonl",
+        "fixtures/registry/reasonix/projects/-workspace-reasonix-demo/sessions-v4/registry-reasonix-v4/events.frames"
       ],
-      "parser_source": "internal/sources/cherrystudio.go",
-      "last_verified": "2026-10-07",
-      "display_name": "Cherry Studio",
-      "capabilities": {
-        "mcp": true,
-        "auto": true,
-        "skill": true,
-        "command": false,
-        "resume": false,
-        "handoff": "paste",
-        "prereq": "import the server once in Settings -> MCP; enable the skill for the agent"
-      },
-      "gaps": {
-        "command": {
-          "state": "impossible",
-          "why": "No slash-command surface for a third party: commands are the app's own and an MCP server cannot register one (#3644)."
-        },
-        "resume": {
-          "state": "impossible",
-          "why": "Cherry Studio has no command that reopens a session from outside: the sessions live in the desktop app and are picked from its own UI, so deja hands one over as a paste (#3644)."
-        }
-      },
-      "surfaces": {
-        "digest": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "prompt": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "pre_tool": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "failure": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_reset": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_capture": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "the agent writes Claude Code's transcript under Data/Agents/.claude/projects"
-        },
-        "compaction_packet": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "mcp": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "handoff": {
-          "status": "partial",
-          "proof": "fixture",
-          "note": "paste only: deja prints the prompt to paste, no command to run it with"
-        },
-        "session_end": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "rules": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "statusline": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "Cherry Studio has no status line, footer or toast a third party can write to"
-        },
-        "reader": {
-          "status": "yes",
-          "proof": "fixture"
-        }
-      }
-    },
-    {
-      "id": "senpi",
-      "store_paths": [
-        "${SENPI_CODING_AGENT_DIR:-~/.senpi/agent}/sessions/*/*.jsonl",
-        "${DEJA_SENPI_ROOT}/*/*.jsonl"
-      ],
-      "format_kind": "jsonl",
-      "fixture_paths": [
-        "fixtures/registry/senpi/-workspace-senpi-demo/session.jsonl"
-      ],
-      "parser_source": "internal/sources/senpi.go",
-      "display_name": "Senpi",
-      "last_verified": "2026-09-17",
+      "parser_source": "internal/sources/reasonix.go",
+      "last_verified": "2026-09-27",
+      "display_name": "Reasonix",
       "capabilities": {
         "mcp": true,
         "auto": true,
@@ -2044,21 +3621,21 @@
         "command": true,
         "resume": true,
         "handoff": "exec",
-        "prereq": "none"
+        "prereq": "zstd for 1.x sessions"
       },
       "gaps": {},
       "surfaces": {
         "digest": {
           "status": "yes",
-          "proof": "fixture"
+          "proof": "stand"
         },
         "prompt": {
           "status": "yes",
-          "proof": "fixture"
+          "proof": "stand"
         },
         "pre_tool": {
           "status": "yes",
-          "proof": "stand"
+          "proof": "fixture"
         },
         "failure": {
           "status": "yes",
@@ -2066,93 +3643,16 @@
         },
         "compaction_reset": {
           "status": "yes",
-          "proof": "fixture"
+          "proof": "stand"
         },
         "compaction_capture": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_packet": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "mcp": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "handoff": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "session_end": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "rules": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "statusline": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "reader": {
-          "status": "yes",
-          "proof": "fixture"
-        }
-      }
-    },
-    {
-      "id": "gjc",
-      "store_paths": [
-        "${GJC_CODING_AGENT_DIR:-~/.gjc/agent}/sessions/*/*.jsonl",
-        "${DEJA_GJC_ROOT}/*/*.jsonl"
-      ],
-      "format_kind": "jsonl",
-      "fixture_paths": [
-        "fixtures/registry/gjc/-workspace-gjc-demo/session.jsonl"
-      ],
-      "parser_source": "internal/sources/gjc.go",
-      "last_verified": "2026-09-21",
-      "display_name": "gajae-code",
-      "capabilities": {
-        "mcp": true,
-        "auto": true,
-        "skill": true,
-        "command": true,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": "none"
-      },
-      "gaps": {},
-      "surfaces": {
-        "digest": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "prompt": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "pre_tool": {
           "status": "yes",
           "proof": "stand"
         },
-        "failure": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_reset": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_capture": {
-          "status": "yes",
-          "proof": "fixture"
-        },
         "compaction_packet": {
           "status": "yes",
-          "proof": "fixture"
+          "proof": "fixture",
+          "note": "the packet goes into the summarizer's instructions and is held for the turn after, where the next input.receive carries it"
         },
         "mcp": {
           "status": "yes",
@@ -2169,442 +3669,13 @@
         },
         "rules": {
           "status": "yes",
-          "proof": "fixture"
-        },
-        "statusline": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "reader": {
-          "status": "yes",
-          "proof": "fixture"
-        }
-      }
-    },
-    {
-      "id": "kimchi",
-      "store_paths": [
-        "~/.config/kimchi/harness/sessions/--<encoded-cwd>--/*.jsonl",
-        "${DEJA_KIMCHI_ROOT}/**/*.jsonl"
-      ],
-      "format_kind": "jsonl",
-      "fixture_paths": [
-        "fixtures/registry/kimchi/--workspace-kimchi-demo--/session.jsonl"
-      ],
-      "parser_source": "internal/sources/senpi.go",
-      "display_name": "Kimchi Coding",
-      "last_verified": "2026-10-07",
-      "capabilities": {
-        "mcp": true,
-        "auto": true,
-        "skill": true,
-        "command": true,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": "none"
-      },
-      "gaps": {},
-      "surfaces": {
-        "digest": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "prompt": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "pre_tool": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "failure": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_reset": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "compaction_capture": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_packet": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "mcp": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "handoff": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "deja handoff --exec opens it with the packet as the first prompt"
-        },
-        "session_end": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "rules": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "statusline": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "reader": {
-          "status": "yes",
-          "proof": "fixture"
-        }
-      }
-    },
-    {
-      "id": "commandcode",
-      "store_paths": [
-        "~/.commandcode/projects/*/*.jsonl",
-        "${DEJA_COMMANDCODE_ROOT}/*/*.jsonl"
-      ],
-      "format_kind": "jsonl",
-      "fixture_paths": [
-        "fixtures/registry/commandcode/-workspace-commandcode-demo/registry-commandcode.jsonl"
-      ],
-      "parser_source": "internal/sources/commandcode.go",
-      "display_name": "Command Code",
-      "last_verified": "2026-10-07",
-      "capabilities": {
-        "mcp": true,
-        "auto": true,
-        "skill": true,
-        "command": true,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": "none"
-      },
-      "gaps": {},
-      "surfaces": {
-        "digest": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "prompt": {
-          "status": "yes",
           "proof": "stand",
-          "note": "the mod's transformContext adds the recall to the question on every model call of the turn; a PreToolUse reads a transcript the turn is not yet written to (1.77.0 stand)"
-        },
-        "pre_tool": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "failure": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_reset": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "no compaction shell hook; the transcript gets a compaction record and keeps the turns above it, and the next PreToolUse catches it up (1.77.0 stand)"
-        },
-        "compaction_capture": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "compaction_packet": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "rides the next PreToolUse"
-        },
-        "mcp": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "handoff": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "deja handoff --exec opens it with the packet as the first prompt"
-        },
-        "session_end": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "the mod's onSessionEnd"
-        },
-        "rules": {
-          "status": "yes",
-          "proof": "fixture"
+          "note": "AGENTS.md in the Reasonix home (2.30.0)"
         },
         "statusline": {
           "status": "yes",
           "proof": "fixture",
-          "note": "the mod's cmd.ui.setStatus, a footer segment under the input in the TUI (mod-builder ui.md, 1.77.0); headless runs show none"
-        },
-        "reader": {
-          "status": "yes",
-          "proof": "fixture"
-        }
-      }
-    },
-    {
-      "id": "zcode",
-      "store_paths": [
-        "~/.zcode/projects/*/*.jsonl",
-        "${DEJA_ZCODE_ROOT}/*/*.jsonl",
-        "~/.zcode/cli/db/db.sqlite",
-        "${DEJA_ZCODE_DB}",
-        "~/.zcode/v2/sessions/*/*.json",
-        "${DEJA_ZCODE_LEGACY_ROOT}/*/*.json"
-      ],
-      "format_kind": "jsonl+sqlite",
-      "fixture_paths": [
-        "fixtures/registry/zcode/-workspace-zcode-demo/registry-zcode.jsonl",
-        "fixtures/registry/zcode/cli-db.sql"
-      ],
-      "parser_source": "internal/sources/zcode.go",
-      "display_name": "ZCode",
-      "last_verified": "2026-10-07",
-      "capabilities": {
-        "mcp": true,
-        "auto": true,
-        "skill": true,
-        "command": true,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": "sqlite3 for the CLI database"
-      },
-      "gaps": {},
-      "surfaces": {
-        "digest": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "prompt": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "pre_tool": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "failure": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "compaction_reset": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "no PreCompact; the CLI database keeps the turns a compact_summary message replaced, and the next prompt or tool hook catches it up (3.14.4 stand)"
-        },
-        "compaction_capture": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "compaction_packet": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "rides the next UserPromptSubmit or PreToolUse"
-        },
-        "mcp": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "handoff": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "deja handoff --exec opens it with the packet as the first prompt"
-        },
-        "session_end": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "ZCode CLI 0.16.9 has seven hook events and no session end (contracts/src/hooks/index.ts:7-15); Stop fires every turn"
-        },
-        "rules": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "~/.zcode/AGENTS.md, the user scope of its instructions (bls in vendor/zcode.cjs, 3.14.4); a stub endpoint saw it"
-        },
-        "statusline": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "ZCode has no status line, footer or toast a third party can write to"
-        },
-        "reader": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "compaction summaries are read from the CLI database; the 3.14.4 CLI writes no projects/*.jsonl transcript, so that store has no compaction shape to read"
-        }
-      }
-    },
-    {
-      "id": "kiro",
-      "store_paths": [
-        "~/.kiro/sessions/cli/*.jsonl",
-        "~/.kiro/sessions/*/sess_*/messages.jsonl",
-        "${DEJA_KIRO_ROOT}/cli/*.jsonl",
-        "${DEJA_KIRO_ROOT}/*/sess_*/messages.jsonl",
-        "~/Library/Application Support/kiro-cli/data.sqlite3",
-        "~/.local/share/kiro-cli/data.sqlite3",
-        "${DEJA_KIRO_DB}"
-      ],
-      "format_kind": "jsonl+sqlite",
-      "fixture_paths": [
-        "fixtures/registry/kiro/cli/registry-kiro.jsonl",
-        "fixtures/registry/kiro/w-api/sess_00000000-0000-4000-8000-000000000000/messages.jsonl"
-      ],
-      "parser_source": "internal/sources/kiro.go",
-      "last_verified": "2026-10-08",
-      "display_name": "Kiro",
-      "capabilities": {
-        "mcp": true,
-        "auto": true,
-        "skill": true,
-        "command": true,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": "sqlite3 for the CLI database"
-      },
-      "gaps": {},
-      "surfaces": {
-        "digest": {
-          "status": "partial",
-          "proof": "stand",
-          "note": "~/.kiro/hooks fire in the IDE and the kiro-cli --v3 TUI in any agent (logged-in 2.22.0 stand), not in --v3 --no-interactive; the default V2 engine runs them only inside the deja agent"
-        },
-        "prompt": {
-          "status": "partial",
-          "proof": "stand",
-          "note": "~/.kiro/hooks fire in the IDE and the kiro-cli --v3 TUI in any agent (logged-in 2.22.0 stand), not in --v3 --no-interactive; the default V2 engine runs them only inside the deja agent"
-        },
-        "pre_tool": {
-          "status": "partial",
-          "proof": "stand",
-          "note": "preToolUse stdout never reaches the model (acp-server.js L5478 sendStdout:false, CLI 2.28.0), so the deja agent parks the line and it arrives with the next userPromptSubmit, after the edit (2.22.0 TUI stand)"
-        },
-        "failure": {
-          "status": "partial",
-          "proof": "stand",
-          "note": "PostToolUse output is dropped at call time, so the line is parked and arrives with the next UserPromptSubmit, not right after the failed step (2.22.0 TUI stand)"
-        },
-        "compaction_reset": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "Kiro's hook triggers have no compaction event (acp-server.js L5478 trigger list, CLI 2.28.0)"
-        },
-        "compaction_capture": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "Kiro's hook triggers have no compaction event (acp-server.js L5478 trigger list, CLI 2.28.0)"
-        },
-        "compaction_packet": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "Kiro's hook triggers have no compaction event (acp-server.js L5478 trigger list, CLI 2.28.0)"
-        },
-        "mcp": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "logged-in 2.22.0 stand: listed by kiro-cli mcp list and called by the model in the V2 deja agent and the V3 default agent"
-        },
-        "handoff": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "deja handoff --exec opens it with the packet as the first prompt"
-        },
-        "session_end": {
-          "status": "partial",
-          "proof": "stand",
-          "note": "V3 only, V2 has none. 2.28.0 fires SessionEnd on leaving the TUI; 2.22.0 maps it to Stop (acp-server.js trigger aliases), so it fires after every turn and nothing fires on /quit (logged-in stand)"
-        },
-        "rules": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "statusline": {
-          "status": "partial",
-          "proof": "fixture",
-          "note": "the kiro-auto target adds a local extension that shows deja statusline in Kiro IDE's status bar; kiro-cli has no status line a third party can write to"
-        },
-        "reader": {
-          "status": "yes",
-          "proof": "stand"
-        }
-      }
-    },
-    {
-      "id": "kilocode",
-      "store_paths": [
-        "<vscode-globalStorage>/kilocode.kilo-code/tasks/*/api_conversation_history.json",
-        "${DEJA_KILO_ROOTS}/tasks/*/api_conversation_history.json",
-        "~/.local/share/kilo/kilo.db",
-        "${XDG_DATA_HOME}/kilo/kilo.db",
-        "${DEJA_KILO_DB}"
-      ],
-      "format_kind": "json+sqlite",
-      "fixture_paths": [
-        "fixtures/registry/kilocode/tasks/registry-kilocode/api_conversation_history.json",
-        "fixtures/registry/kilocode/kilo.sql"
-      ],
-      "parser_source": "internal/sources/kilo.go",
-      "last_verified": "2026-10-07",
-      "display_name": "Kilo Code",
-      "capabilities": {
-        "mcp": true,
-        "auto": true,
-        "skill": true,
-        "command": true,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": "sqlite3 for the CLI store"
-      },
-      "surfaces": {
-        "digest": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "prompt": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "pre_tool": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "failure": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "compaction_reset": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "compaction_capture": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_packet": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "mcp": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "handoff": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "deja handoff --exec opens it with the packet as the first prompt"
-        },
-        "session_end": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "rules": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "statusline": {
-          "status": "partial",
-          "proof": "fixture",
-          "note": "a toast in the CLI's TUI; the VS Code extension shows none"
+          "note": "host/ui/publish"
         },
         "reader": {
           "status": "yes",
@@ -2708,214 +3779,18 @@
       }
     },
     {
-      "id": "zed",
+      "id": "senpi",
       "store_paths": [
-        "~/Library/Application Support/Zed/threads/threads.db",
-        "${XDG_DATA_HOME}/zed/threads/threads.db",
-        "%LOCALAPPDATA%/Zed/threads/threads.db",
-        "${DEJA_ZED_ROOT}/threads/threads.db",
-        "${DEJA_ZED_DB}"
+        "${SENPI_CODING_AGENT_DIR:-~/.senpi/agent}/sessions/*/*.jsonl",
+        "${DEJA_SENPI_ROOT}/*/*.jsonl"
       ],
-      "format_kind": "sqlite",
+      "format_kind": "jsonl",
       "fixture_paths": [
-        "fixtures/registry/zed/zed.sql"
+        "fixtures/registry/senpi/-workspace-senpi-demo/session.jsonl"
       ],
-      "parser_source": "internal/sources/zed.go",
-      "last_verified": "2026-10-07",
-      "display_name": "Zed",
-      "capabilities": {
-        "mcp": true,
-        "auto": false,
-        "skill": true,
-        "command": true,
-        "resume": false,
-        "handoff": "paste",
-        "prereq": "sqlite3 + zstd"
-      },
-      "gaps": {
-        "auto": {
-          "state": "impossible",
-          "why": "Zed's agent exposes no lifecycle hook: nothing runs before a prompt is sent, and the extension API covers language servers, slash commands, context servers and debuggers only, so there is no point at which recall could be injected. Becomes work the day Zed ships one",
-          "source": "no hook API in Zed 1.22.0 (#52729 closed unmerged) or extension API 0.7"
-        },
-        "resume": {
-          "state": "impossible",
-          "why": "The agent lives in the editor and no zed CLI flag reopens a thread by id, so there is nothing for deja to print. Reopening a thread is a thing the editor does, not a command",
-          "source": "no thread flag in the zed CLI of 1.22.0"
-        }
-      },
-      "surfaces": {
-        "digest": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"
-        },
-        "prompt": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"
-        },
-        "pre_tool": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"
-        },
-        "failure": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"
-        },
-        "compaction_reset": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"
-        },
-        "compaction_capture": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"
-        },
-        "compaction_packet": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"
-        },
-        "mcp": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "handoff": {
-          "status": "partial",
-          "proof": "fixture",
-          "note": "paste only: deja prints the prompt to paste, no command to run it with"
-        },
-        "session_end": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"
-        },
-        "rules": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "statusline": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"
-        },
-        "reader": {
-          "status": "yes",
-          "proof": "fixture"
-        }
-      }
-    },
-    {
-      "id": "devin",
-      "store_paths": [
-        "~/.local/share/devin/cli/sessions.db",
-        "${XDG_DATA_HOME}/devin/cli/sessions.db",
-        "%LOCALAPPDATA%/devin/cli/sessions.db",
-        "cli_sessions.db beside sessions.db (the legacy name)",
-        "${DEJA_DEVIN_DB}"
-      ],
-      "format_kind": "sqlite",
-      "fixture_paths": [
-        "fixtures/registry/devin/devin.sql"
-      ],
-      "parser_source": "internal/sources/devin.go",
-      "last_verified": "2026-10-07",
-      "display_name": "Devin CLI",
-      "capabilities": {
-        "mcp": true,
-        "auto": true,
-        "skill": true,
-        "command": false,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": "sqlite3"
-      },
-      "surfaces": {
-        "digest": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "prompt": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "pre_tool": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "arrives with the tool's result"
-        },
-        "failure": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "compaction_reset": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "PostCompaction is Devin's reset event; the context hook answers it"
-        },
-        "compaction_capture": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "PostCompaction runs hook-context, which captures the pre-compaction turns from sessions.db (following compact/prior_node_ids across rebuilt chains) before emitting the recovery packet"
-        },
-        "compaction_packet": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "PostCompaction answers with the recovery packet built from the sessions.db capture"
-        },
-        "mcp": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "handoff": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "session_end": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "rules": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "Devin's docs: a user-global ~/.config/devin/AGENTS.md sets rules for every project (docs.devin.ai/cli/extensibility), beside the hooks and MCP config deja already writes there; not stand-verified against a live host"
-        },
-        "statusline": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "Devin CLI's surface is the six lifecycle hooks plus MCP and skills — no statusline channel exists in its config or plugin manifest (install_devin.go, CLI 3000.11.3)"
-        },
-        "reader": {
-          "status": "yes",
-          "proof": "fixture"
-        }
-      },
-      "gaps": {
-        "command": {
-          "state": "impossible",
-          "why": "Devin CLI has no user-registered slash-command file: its plugin manifest and skills directories are the only extension surfaces the docs describe, so a `/deja` command has no file to live in.",
-          "source": "bundled docs at share/devin/docs/extensibility (3000.11.3)"
-        }
-      }
-    },
-    {
-      "id": "codewhale",
-      "store_paths": [
-        "${CODEWHALE_HOME:-~/.codewhale}/sessions/<id>.json",
-        "~/.deepseek/sessions/<id>.json",
-        "${DEJA_CODEWHALE_ROOT}/<id>.json"
-      ],
-      "format_kind": "json",
-      "fixture_paths": [
-        "fixtures/registry/codewhale/sessions/registry-codewhale.json"
-      ],
-      "parser_source": "internal/sources/codewhale.go",
-      "last_verified": "2026-10-08",
-      "display_name": "CodeWhale",
+      "parser_source": "internal/sources/senpi.go",
+      "display_name": "Senpi",
+      "last_verified": "2026-09-17",
       "capabilities": {
         "mcp": true,
         "auto": true,
@@ -2929,27 +3804,104 @@
       "surfaces": {
         "digest": {
           "status": "yes",
-          "proof": "stand",
-          "note": "rides the first message_submit of a session; session_start stdout is discarded"
+          "proof": "fixture"
+        },
+        "prompt": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "pre_tool": {
+          "status": "yes",
+          "proof": "stand"
+        },
+        "failure": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_reset": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_capture": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "compaction_packet": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "session_end": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "statusline": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
+      }
+    },
+    {
+      "id": "trae",
+      "store_paths": [
+        "${TRAE_HOME:-~/.trae}/cli/sessions/**/rollout-*.jsonl",
+        "${TRAE_HOME:-~/.trae}/cli/sessions/**/rollout-*.jsonl.zst",
+        "${TRAE_HOME:-~/.trae}/cli/archived_sessions/**/rollout-*.jsonl",
+        "${TRAE_HOME:-~/.trae}/cli/history.jsonl",
+        "${DEJA_TRAE_ROOT}/sessions/**/rollout-*.jsonl"
+      ],
+      "format_kind": "jsonl-rollout-and-history",
+      "fixture_paths": [
+        "fixtures/registry/trae/rollout-2026-10-01T09-00-00-019fbcca-0000-7000-8000-00000000trae.jsonl"
+      ],
+      "parser_source": "internal/sources/trae.go",
+      "last_verified": "2026-10-08",
+      "display_name": "TRAE CLI",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "none"
+      },
+      "gaps": {},
+      "surfaces": {
+        "digest": {
+          "status": "yes",
+          "proof": "stand"
         },
         "prompt": {
           "status": "yes",
           "proof": "stand"
         },
         "pre_tool": {
-          "status": "partial",
-          "proof": "stand",
-          "note": "tool_call_before additionalContext reaches the model only on a tool that ran; a call that failed to run goes back as Error: without it, so tool_call_after parks the line and it rides the next message_submit (0.10.1 stand)"
+          "status": "yes",
+          "proof": "stand"
         },
         "failure": {
-          "status": "partial",
-          "proof": "stand",
-          "note": "tool_call_after stdout is discarded and it fires after the turn's next tool_call_before, so the fix pair is parked and rides the next message_submit (0.10.1 stand)"
+          "status": "yes",
+          "proof": "stand"
         },
         "compaction_reset": {
           "status": "yes",
-          "proof": "stand",
-          "note": "no compaction hook; the history saved as artifacts/context-transfer-<id>.json beside its .md summary is caught up on the next message or tool call (0.10.0 stand)"
+          "proof": "stand"
         },
         "compaction_capture": {
           "status": "yes",
@@ -2957,237 +3909,34 @@
         },
         "compaction_packet": {
           "status": "yes",
-          "proof": "stand",
-          "note": "rides the next message_submit or tool_call_before"
+          "proof": "stand"
         },
         "mcp": {
           "status": "yes",
-          "proof": "stand"
+          "proof": "stand",
+          "note": "the model reaches MCP tools only from a code-mode exec script, and each call asks for approval"
         },
         "handoff": {
           "status": "yes",
-          "proof": "fixture",
+          "proof": "stand",
           "note": "deja handoff --exec opens it with the packet as the first prompt"
         },
         "session_end": {
           "status": "yes",
-          "proof": "stand",
-          "note": "fires on /quit, not on a kill"
-        },
-        "rules": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "statusline": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "CodeWhale 0.10.0's footer takes only built-in items (StatusItem in crates/tui/src/config.rs: mode, model, cost, git_branch and the like), and observer hook stdout is discarded"
-        },
-        "reader": {
-          "status": "yes",
-          "proof": "fixture"
-        }
-      }
-    },
-    {
-      "id": "junie",
-      "store_paths": [
-        "${JUNIE_HOME:-~/.junie}/sessions/<session-id>/events.jsonl",
-        "${JUNIE_HOME:-~/.junie}/sessions/index.jsonl",
-        "${DEJA_JUNIE_ROOT}/<session-id>/events.jsonl"
-      ],
-      "format_kind": "jsonl",
-      "fixture_paths": [
-        "fixtures/registry/junie/sessions/session-260901-101500-k3m9/events.jsonl"
-      ],
-      "parser_source": "internal/sources/junie.go",
-      "last_verified": "2026-10-08",
-      "display_name": "Junie",
-      "capabilities": {
-        "mcp": true,
-        "auto": true,
-        "skill": true,
-        "command": true,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": "none"
-      },
-      "gaps": {},
-      "surfaces": {
-        "digest": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "rides the first UserPromptSubmit of a session; SessionStart output is not delivered (3110.7)"
-        },
-        "prompt": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "pre_tool": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "PreToolUse on Bash, Read and Edit; Junie puts the line in front of the tool's result"
-        },
-        "failure": {
-          "status": "partial",
-          "proof": "stand",
-          "note": "no PostToolUse in 3110.7 (ExternalHookEvent); the pair for a failed command is read from events.jsonl and rides the next PreToolUse or UserPromptSubmit"
-        },
-        "compaction_reset": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "no PreCompact in 3110.7; the ContextCompactionBlockUpdatedEvent in events.jsonl is caught up at the next prompt or tool call"
-        },
-        "compaction_capture": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "compaction_packet": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "rides the next UserPromptSubmit or PreToolUse"
-        },
-        "mcp": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "offered to the model as mcp_deja_deja once Junie's capability filter picks it for the prompt"
-        },
-        "handoff": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "deja handoff --exec runs junie with the packet as its task"
-        },
-        "session_end": {
-          "status": "yes",
           "proof": "stand"
         },
         "rules": {
           "status": "yes",
+          "proof": "stand"
+        },
+        "statusline": {
+          "status": "yes",
           "proof": "stand",
-          "note": "$JUNIE_HOME/AGENTS.md is in front of every task (3110.7)"
-        },
-        "statusline": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "Junie 3110.7's toolbar takes only built-in items (ToolbarElement in tui/app/state: WorkingDirectory, GitBranch, Model, ContextWindow and the like), no command"
+          "note": "the trae-auto target writes [tui.statusline] type = command in traecli.toml; the 0.208.1-alpha.5 TUI shows it, and the 0.207.1 enterprise build runs nothing before a login"
         },
         "reader": {
           "status": "yes",
-          "proof": "fixture"
-        }
-      }
-    },
-    {
-      "id": "jetbrains",
-      "store_paths": [
-        "~/Library/Application Support/JetBrains/<Product><version>/workspace/<project-workspace-id>.xml",
-        "%APPDATA%\\JetBrains\\<Product><version>\\workspace\\<project-workspace-id>.xml",
-        "${XDG_CONFIG_HOME:-~/.config}/JetBrains/<Product><version>/workspace/<project-workspace-id>.xml",
-        "<JetBrains config>/<Product><version>/aia-task-history/<chat-uid>.events",
-        "${DEJA_JETBRAINS_ROOT}/<Product><version>/workspace/<project-workspace-id>.xml"
-      ],
-      "format_kind": "xml-and-base64-jsonl",
-      "fixture_paths": [
-        "fixtures/registry/jetbrains/IntelliJIdea2026.2/workspace/2xQ7mN4bV8cK1pR6tY3wZ9aL0dF.xml"
-      ],
-      "parser_source": "internal/sources/jetbrains.go",
-      "last_verified": "2026-10-08",
-      "display_name": "JetBrains AI Assistant",
-      "capabilities": {
-        "mcp": true,
-        "auto": false,
-        "skill": false,
-        "command": false,
-        "resume": false,
-        "handoff": "paste",
-        "prereq": "none"
-      },
-      "gaps": {
-        "auto": {
-          "state": "blocked",
-          "why": "AI Assistant 262.10968.170 runs no user hooks: no hook configuration or hook runner is in the plugin, so nothing can put recall in front of its chat.",
-          "source": "https://plugins.jetbrains.com/plugin/22282-jetbrains-ai-assistant"
-        },
-        "skill": {
-          "state": "blocked",
-          "why": "AI Assistant 262.10968.170's own chat reads no SKILL.md. Its skill folders (IdeManagedSkillsLayout, ~/.claude/skills, ~/.codex/skills) are handed only to the ACP agents it hosts (AgentSkillsAdditionalRootsProvider: junie, claude-acp, codex), and the chat's skill picker opens only for a Claude or Codex agent (AgentSkillsContextPopupContributor). Those agents already get deja's skill from their own directories.",
-          "source": "https://plugins.jetbrains.com/plugin/22282-jetbrains-ai-assistant"
-        },
-        "command": {
-          "state": "blocked",
-          "why": "AI Assistant 262.10968.170 reads custom chat commands only from a project's .aiassistant/commands (CustomUserCommandsService); there is no user-level directory to write one to.",
-          "source": "https://plugins.jetbrains.com/plugin/22282-jetbrains-ai-assistant"
-        },
-        "resume": {
-          "state": "impossible",
-          "why": "An AI Assistant chat reopens only from the IDE's chat history; no command line takes a chat id, so there is nothing for deja resume to print."
-        }
-      },
-      "surfaces": {
-        "digest": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "AI Assistant 262.10968.170 has no hook runner or session-start event in any of its jars"
-        },
-        "prompt": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "AI Assistant 262.10968.170 has no per-prompt hook in any of its jars; recall reaches the chat only as an MCP tool"
-        },
-        "pre_tool": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "AI Assistant 262.10968.170 has no tool hook in any of its jars; its agent tools run without a callback deja can answer"
-        },
-        "failure": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "AI Assistant 262.10968.170 has no post-tool hook in any of its jars, so a failed command reaches no deja code"
-        },
-        "compaction_reset": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "AI Assistant 262.10968.170 has no compaction event or hook in any of its jars"
-        },
-        "compaction_capture": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "AI Assistant 262.10968.170 has no compaction event or hook in any of its jars"
-        },
-        "compaction_packet": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "AI Assistant 262.10968.170 has no hook that could carry a packet into the next turn"
-        },
-        "mcp": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "~/.ai/mcp/mcp.json, the global file every JetBrains IDE's AI Assistant reads"
-        },
-        "handoff": {
-          "status": "partial",
-          "proof": "fixture",
-          "note": "the chat runs inside the IDE with no command line to take a prompt, so the packet is pasted"
-        },
-        "session_end": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "AI Assistant 262.10968.170 has no session-end event or hook in any of its jars"
-        },
-        "rules": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "AI Assistant 262.10968.170 reads rules only from a project's .aiassistant/rules (AiRulesService); custom instructions are a per-project setting"
-        },
-        "statusline": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "AI Assistant 262.10968.170's chat has no status line a command can write to; the IDE's status bar takes plugin widgets only"
-        },
-        "reader": {
-          "status": "partial",
-          "proof": "fixture",
-          "note": "messages carry no time of their own, so a chat's turns take its start time a millisecond apart; an agent chat run by Junie, Claude, Codex or another agent with its own store is left to that store"
+          "proof": "stand"
         }
       }
     },
@@ -3296,21 +4045,23 @@
       }
     },
     {
-      "id": "codebuddy",
+      "id": "zcode",
       "store_paths": [
-        "${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/<mangled-cwd>/<session-id>.jsonl",
-        "${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/<mangled-cwd>/<session-id>/subagents/agent-<id>.jsonl",
-        "${WORKBUDDY_CONFIG_DIR:-~/.workbuddy}/projects/<mangled-cwd>/<session-id>.jsonl",
-        "~/.workbuddy-ai/projects/<mangled-cwd>/<session-id>.jsonl",
-        "${DEJA_CODEBUDDY_ROOTS}/<mangled-cwd>/<session-id>.jsonl"
+        "~/.zcode/projects/*/*.jsonl",
+        "${DEJA_ZCODE_ROOT}/*/*.jsonl",
+        "~/.zcode/cli/db/db.sqlite",
+        "${DEJA_ZCODE_DB}",
+        "~/.zcode/v2/sessions/*/*.json",
+        "${DEJA_ZCODE_LEGACY_ROOT}/*/*.json"
       ],
-      "format_kind": "jsonl",
+      "format_kind": "jsonl+sqlite",
       "fixture_paths": [
-        "fixtures/registry/codebuddy/projects/workspace-registry-demo/registry-codebuddy.jsonl"
+        "fixtures/registry/zcode/-workspace-zcode-demo/registry-zcode.jsonl",
+        "fixtures/registry/zcode/cli-db.sql"
       ],
-      "parser_source": "internal/sources/codebuddy.go",
-      "last_verified": "2026-10-05",
-      "display_name": "CodeBuddy Code",
+      "parser_source": "internal/sources/zcode.go",
+      "display_name": "ZCode",
+      "last_verified": "2026-10-07",
       "capabilities": {
         "mcp": true,
         "auto": true,
@@ -3318,7 +4069,7 @@
         "command": true,
         "resume": true,
         "handoff": "exec",
-        "prereq": "none"
+        "prereq": "sqlite3 for the CLI database"
       },
       "gaps": {},
       "surfaces": {
@@ -3336,19 +4087,21 @@
         },
         "failure": {
           "status": "yes",
-          "proof": "fixture"
+          "proof": "stand"
         },
         "compaction_reset": {
           "status": "yes",
-          "proof": "fixture"
+          "proof": "stand",
+          "note": "no PreCompact; the CLI database keeps the turns a compact_summary message replaced, and the next prompt or tool hook catches it up (3.14.4 stand)"
         },
         "compaction_capture": {
           "status": "yes",
-          "proof": "fixture"
+          "proof": "stand"
         },
         "compaction_packet": {
           "status": "yes",
-          "proof": "fixture"
+          "proof": "stand",
+          "note": "rides the next UserPromptSubmit or PreToolUse"
         },
         "mcp": {
           "status": "yes",
@@ -3360,662 +4113,126 @@
           "note": "deja handoff --exec opens it with the packet as the first prompt"
         },
         "session_end": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "rules": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "statusline": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "the codebuddy-auto target writes statusLine.command in settings.json"
-        },
-        "reader": {
-          "status": "yes",
-          "proof": "fixture"
-        }
-      }
-    },
-    {
-      "id": "reasonix",
-      "store_paths": [
-        "${REASONIX_STATE_HOME:-~/.reasonix}/sessions/<id>.jsonl",
-        "${REASONIX_STATE_HOME:-~/.reasonix}/projects/<workspace-slug>/sessions/<id>.jsonl",
-        "%APPDATA%\\reasonix\\sessions\\<id>.jsonl",
-        "%APPDATA%\\reasonix\\projects\\<workspace-slug>\\sessions\\<id>.jsonl",
-        "${DEJA_REASONIX_ROOT}/sessions/<id>.jsonl",
-        "${REASONIX_STATE_HOME:-~/.reasonix}/projects/<workspace-slug>/sessions-v4/<id>/events.frames",
-        "${REASONIX_STATE_HOME:-~/.reasonix}/sessions-v4/<id>/events.frames",
-        "${REASONIX_STATE_HOME:-~/.reasonix}/desktop-sessions-v5/by-id/<id>/events.frames"
-      ],
-      "format_kind": "zstd-frames-or-jsonl",
-      "fixture_paths": [
-        "fixtures/registry/reasonix/projects/-workspace-reasonix-demo/sessions/registry-reasonix.jsonl",
-        "fixtures/registry/reasonix/projects/-workspace-reasonix-demo/sessions-v4/registry-reasonix-v4/events.frames"
-      ],
-      "parser_source": "internal/sources/reasonix.go",
-      "last_verified": "2026-09-27",
-      "display_name": "Reasonix",
-      "capabilities": {
-        "mcp": true,
-        "auto": true,
-        "skill": true,
-        "command": true,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": "zstd for 1.x sessions"
-      },
-      "gaps": {},
-      "surfaces": {
-        "digest": {"status": "yes", "proof": "stand"},
-        "prompt": {"status": "yes", "proof": "stand"},
-        "pre_tool": {"status": "yes", "proof": "fixture"},
-        "failure": {"status": "yes", "proof": "fixture"},
-        "compaction_reset": {"status": "yes", "proof": "stand"},
-        "compaction_capture": {"status": "yes", "proof": "stand"},
-        "compaction_packet": {"status": "yes", "proof": "fixture", "note": "the packet goes into the summarizer's instructions and is held for the turn after, where the next input.receive carries it"},
-        "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
-        "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "yes", "proof": "stand", "note": "AGENTS.md in the Reasonix home (2.30.0)"},
-        "statusline": {"status": "yes", "proof": "fixture", "note": "host/ui/publish"},
-        "reader": {"status": "yes", "proof": "fixture"}
-      }
-    },
-    {
-      "id": "trae",
-      "store_paths": [
-        "${TRAE_HOME:-~/.trae}/cli/sessions/**/rollout-*.jsonl",
-        "${TRAE_HOME:-~/.trae}/cli/sessions/**/rollout-*.jsonl.zst",
-        "${TRAE_HOME:-~/.trae}/cli/archived_sessions/**/rollout-*.jsonl",
-        "${TRAE_HOME:-~/.trae}/cli/history.jsonl",
-        "${DEJA_TRAE_ROOT}/sessions/**/rollout-*.jsonl"
-      ],
-      "format_kind": "jsonl-rollout-and-history",
-      "fixture_paths": [
-        "fixtures/registry/trae/rollout-2026-10-01T09-00-00-019fbcca-0000-7000-8000-00000000trae.jsonl"
-      ],
-      "parser_source": "internal/sources/trae.go",
-      "last_verified": "2026-10-08",
-      "display_name": "TRAE CLI",
-      "capabilities": {
-        "mcp": true,
-        "auto": true,
-        "skill": true,
-        "command": true,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": "none"
-      },
-      "gaps": {},
-      "surfaces": {
-        "digest": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "prompt": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "pre_tool": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "failure": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "compaction_reset": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "compaction_capture": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "compaction_packet": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "mcp": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "the model reaches MCP tools only from a code-mode exec script, and each call asks for approval"
-        },
-        "handoff": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "deja handoff --exec opens it with the packet as the first prompt"
-        },
-        "session_end": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "rules": {
-          "status": "yes",
-          "proof": "stand"
-        },
-        "statusline": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "the trae-auto target writes [tui.statusline] type = command in traecli.toml; the 0.208.1-alpha.5 TUI shows it, and the 0.207.1 enterprise build runs nothing before a login"
-        },
-        "reader": {
-          "status": "yes",
-          "proof": "stand"
-        }
-      }
-    },
-    {
-      "id": "muse",
-      "store_paths": [
-        "${XDG_DATA_HOME:-~/.local/share}/muse/sessions/YYYY/MM/DD/<id>/session.jsonl",
-        "${XDG_DATA_HOME:-~/.local/share}/muse/sessions/YYYY/MM/DD/<id>/subagent/<child>/session.jsonl",
-        "${DEJA_MUSE_ROOTS}/YYYY/MM/DD/<id>/session.jsonl"
-      ],
-      "format_kind": "jsonl",
-      "fixture_paths": [
-        "fixtures/registry/muse/sessions/2026/09/18/01a0b7d1-0000-7000-8000-00000000d3a0/session.jsonl"
-      ],
-      "parser_source": "internal/sources/muse.go",
-      "last_verified": "2026-10-08",
-      "display_name": "Muse Code",
-      "capabilities": {
-        "mcp": true,
-        "auto": true,
-        "skill": true,
-        "command": true,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": "none"
-      },
-      "gaps": {},
-      "surfaces": {
-        "digest": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "prompt": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "pre_tool": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "failure": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_reset": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_capture": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_packet": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "mcp": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "handoff": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "deja handoff --exec opens it with the packet as the first prompt"
-        },
-        "session_end": {
-          "status": "yes",
-          "proof": "fixture"
+          "status": "no",
+          "proof": "blocked",
+          "note": "ZCode CLI 0.16.9 has seven hook events and no session end (contracts/src/hooks/index.ts:7-15); Stop fires every turn"
         },
         "rules": {
           "status": "yes",
           "proof": "stand",
-          "note": "the first of <config>/muse/AGENTS.md, ~/.claude/CLAUDE.md and $CODEX_HOME/AGENTS.md, which is the one Muse loads (1.4.3)"
+          "note": "~/.zcode/AGENTS.md, the user scope of its instructions (bls in vendor/zcode.cjs, 3.14.4); a stub endpoint saw it"
         },
         "statusline": {
           "status": "no",
           "proof": "blocked",
-          "note": "Muse 1.4.3's bottom bar (/hud, tui.hud) has a fixed item set: model, effort, path, permissions, context, branch, tokens, cost, quota; plugins add skills, commands, hooks, MCP servers and reminders, nothing in the UI"
+          "note": "ZCode has no status line, footer or toast a third party can write to"
         },
         "reader": {
           "status": "yes",
-          "proof": "fixture"
+          "proof": "fixture",
+          "note": "compaction summaries are read from the CLI database; the 3.14.4 CLI writes no projects/*.jsonl transcript, so that store has no compaction shape to read"
         }
       }
     },
     {
-      "id": "mcode",
+      "id": "zed",
       "store_paths": [
-        "~/.minimax/v2/sessions/YYYY/MM/DD/<session>/messages.jsonl",
-        "${DEJA_MCODE_ROOT}/YYYY/MM/DD/<session>/messages.jsonl"
+        "~/Library/Application Support/Zed/threads/threads.db",
+        "${XDG_DATA_HOME}/zed/threads/threads.db",
+        "%LOCALAPPDATA%/Zed/threads/threads.db",
+        "${DEJA_ZED_ROOT}/threads/threads.db",
+        "${DEJA_ZED_DB}"
       ],
-      "format_kind": "jsonl",
+      "format_kind": "sqlite",
       "fixture_paths": [
-        "fixtures/registry/mcode/v2/sessions/2026/10/20/02-57-27-477-session_bXZzXzBmMWUyZDNjNGI1YTY5Nzg4Nzk2YTViNGMzZDJlMWYw/messages.jsonl"
+        "fixtures/registry/zed/zed.sql"
       ],
-      "parser_source": "internal/sources/mcode.go",
-      "last_verified": "2026-10-22",
-      "display_name": "MiniMax Code",
+      "parser_source": "internal/sources/zed.go",
+      "last_verified": "2026-10-07",
+      "display_name": "Zed",
       "capabilities": {
         "mcp": true,
-        "auto": true,
+        "auto": false,
         "skill": true,
-        "command": false,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": "the MiniMax Code CLI (`mcode`) for `deja resume` and `deja handoff --to mcode --exec`; `sqlite3` for the session's workspace"
+        "command": true,
+        "resume": false,
+        "handoff": "paste",
+        "prereq": "sqlite3 + zstd"
       },
       "gaps": {
-        "command": {
+        "auto": {
           "state": "impossible",
-          "why": "No slash-command surface for a third party: the V1 plugin package carries skills, agents, hooks and scripts, and the manifest has no field for a command, so a /deja command has nowhere to be written (MiniMax plugin reference, package structure and manifest fields)."
+          "why": "Zed's agent exposes no lifecycle hook: nothing runs before a prompt is sent, and the extension API covers language servers, slash commands, context servers and debuggers only, so there is no point at which recall could be injected. Becomes work the day Zed ships one",
+          "source": "no hook API in Zed 1.22.0 (#52729 closed unmerged) or extension API 0.7"
+        },
+        "resume": {
+          "state": "impossible",
+          "why": "The agent lives in the editor and no zed CLI flag reopens a thread by id, so there is nothing for deja to print. Reopening a thread is a thing the editor does, not a command",
+          "source": "no thread flag in the zed CLI of 1.22.0"
         }
       },
       "surfaces": {
         "digest": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "the package's SessionStart hook runs `deja hook-context --mcode`, whose text goes into hookSpecificOutput.additionalContext"
+          "status": "no",
+          "proof": "blocked",
+          "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"
         },
         "prompt": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "the UserPromptSubmit hook runs `deja hook-prompt --mcode`; the payload is Claude-shaped, so the hook reads it unchanged"
+          "status": "no",
+          "proof": "blocked",
+          "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"
         },
         "pre_tool": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "the PreToolUse hook runs `deja hook-tool --mcode` for the shell and file tools"
+          "status": "no",
+          "proof": "blocked",
+          "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"
         },
         "failure": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "the PostToolUse hook runs `deja hook-tool-after --mcode`, which answers with what this machine ran after the same failure"
+          "status": "no",
+          "proof": "blocked",
+          "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"
         },
         "compaction_reset": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"
+        },
+        "compaction_capture": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"
+        },
+        "compaction_packet": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
           "status": "partial",
-          "proof": "stand",
-          "note": "the PreCompact hook runs and captures the transcript, but MiniMax Code's PreCompact output can only defer the compaction, so the reset itself is not told to the model"
-        },
-        "compaction_capture": {
-          "status": "partial",
-          "proof": "stand",
-          "note": "the capture runs at PreCompact with --harness mcode and reads the session from the v2 store by its id, not the temporary transcript_path the hook is given; what the model is told about it has no surface to travel on"
-        },
-        "compaction_packet": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "MiniMax Code's PreCompact handler can only answer with a decision to defer the compaction, and its post-compaction event is observation only, so the packet has no surface to travel on and rides the next prompt instead"
-        },
-        "mcp": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "deja install mcode writes the server into ~/.minimax/mcp.json, the shape MCode's own MCP page writes"
-        },
-        "handoff": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "deja handoff --to mcode --exec runs the MiniMax Code CLI with the digest as its first prompt"
+          "proof": "fixture",
+          "note": "paste only: deja prints the prompt to paste, no command to run it with"
         },
         "session_end": {
-          "status": "yes",
-          "proof": "stand",
-          "note": "the SessionEnd hook runs `deja hook-session-end`, which records the end; MiniMax Code's SessionEnd is observation only, so nothing is said to the model"
-        },
-        "rules": {
           "status": "no",
           "proof": "blocked",
-          "note": "MiniMax Code has no global rules file: it reads AGENTS.md from the workspace the session is in, so a block written into one home directory would reach no session"
-        },
-        "statusline": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "MiniMax Code has no status line a plugin can write to: the plugin hook reference lists the events and their outputs, and none of them is a status surface; the desktop shows the session in its own task panel"
-        },
-        "reader": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "a compaction rewrites the transcript in place and the summary that takes the cut turns' place is indexed under the summary role, so the turns it replaced stay findable"
-        }
-      }
-    },
-    {
-      "id": "mimo",
-      "store_paths": [
-        "~/.local/share/mimocode/mimocode.db",
-        "${XDG_DATA_HOME}/mimocode/mimocode.db",
-        "${MIMOCODE_HOME}/mimocode.db",
-        "${MIMOCODE_DB}",
-        "${DEJA_MIMO_DB}"
-      ],
-      "format_kind": "sqlite",
-      "fixture_paths": [
-        "fixtures/registry/mimo/mimo.sql"
-      ],
-      "parser_source": "internal/sources/mimo.go",
-      "last_verified": "2026-11-12",
-      "display_name": "MiMo-Code",
-      "capabilities": {
-        "mcp": true,
-        "auto": true,
-        "skill": true,
-        "command": true,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": "sqlite3"
-      },
-      "gaps": {},
-      "surfaces": {
-        "digest": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "prompt": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "pre_tool": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "failure": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_reset": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_capture": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_packet": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "mcp": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "handoff": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "deja handoff --exec opens it with the packet as the first prompt"
-        },
-        "session_end": {
-          "status": "yes",
-          "proof": "fixture"
+          "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"
         },
         "rules": {
           "status": "yes",
           "proof": "fixture"
         },
         "statusline": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "the mimo-auto target installs the opencode 1.x TUI status plugin in ~/.config/mimocode/plugins/deja-status.tsx"
+          "status": "no",
+          "proof": "blocked",
+          "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"
         },
         "reader": {
           "status": "yes",
           "proof": "fixture"
-        }
-      }
-    },
-    {
-      "id": "omnigent",
-      "store_paths": [
-        "${OMNIGENT_DATA_DIR:-~/.omnigent}/chat.db",
-        "${DEJA_OMNIGENT_ROOT}/chat.db",
-        "${DEJA_OMNIGENT_DB}"
-      ],
-      "format_kind": "sqlite",
-      "fixture_paths": [
-        "fixtures/registry/omnigent/omnigent.sql"
-      ],
-      "parser_source": "internal/sources/omnigent.go",
-      "last_verified": "2026-11-12",
-      "display_name": "Omnigent",
-      "capabilities": {
-        "mcp": true,
-        "auto": true,
-        "skill": true,
-        "command": true,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": "sqlite3"
-      },
-      "gaps": {},
-      "surfaces": {
-        "digest": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "prompt": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "pre_tool": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "failure": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_reset": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_capture": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_packet": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "mcp": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "handoff": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "session_end": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "rules": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "statusline": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "reader": {
-          "status": "yes",
-          "proof": "fixture"
-        }
-      }
-    },
-    {
-      "id": "orca",
-      "store_paths": [
-        "~/Library/Application Support/Orca/agent-session-journal.db",
-        "${XDG_CONFIG_HOME:-~/.config}/Orca/agent-session-journal.db",
-        "%APPDATA%/Orca/agent-session-journal.db",
-        "${DEJA_ORCA_ROOT}/agent-session-journal.db",
-        "${DEJA_ORCA_DB}"
-      ],
-      "format_kind": "sqlite",
-      "fixture_paths": [
-        "fixtures/registry/orca/orca.sql"
-      ],
-      "parser_source": "internal/sources/orca.go",
-      "last_verified": "2026-11-12",
-      "display_name": "Orca",
-      "capabilities": {
-        "mcp": true,
-        "auto": true,
-        "skill": true,
-        "command": true,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": "sqlite3"
-      },
-      "gaps": {},
-      "surfaces": {
-        "digest": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "prompt": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "pre_tool": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "failure": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_reset": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_capture": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_packet": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "mcp": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "handoff": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "session_end": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "rules": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "statusline": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "reader": {
-          "status": "yes",
-          "proof": "fixture"
-        }
-      }
-    },
-    {
-      "id": "clawcode",
-      "store_paths": [
-        "${CLAW_CONFIG_HOME:-~/.claw}/sessions",
-        "${DEJA_CLAWCODE_ROOT}",
-        "${DEJA_CLAWCODE_ROOTS}"
-      ],
-      "format_kind": "jsonl",
-      "fixture_paths": [
-        "fixtures/registry/clawcode/session.jsonl",
-        "fixtures/registry/clawcode/legacy.json"
-      ],
-      "parser_source": "internal/sources/clawcode.go",
-      "last_verified": "2026-11-15",
-      "display_name": "Claw Code",
-      "capabilities": {
-        "mcp": true,
-        "auto": true,
-        "skill": true,
-        "command": true,
-        "resume": true,
-        "handoff": "exec",
-        "prereq": "none"
-      },
-      "gaps": {},
-      "surfaces": {
-        "digest": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "rust/crates/runtime/src/config.rs accepts only PreToolUse, PostToolUse, and PostToolUseFailure and rejects SessionStart as unknown_hook_event"
-        },
-        "prompt": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "rust/crates/runtime/src/config.rs rejects UserPromptSubmit in is_supported_hook_event, so per-prompt recall cannot hook in yet"
-        },
-        "pre_tool": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "failure": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "compaction_reset": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "rust/crates/runtime/src/config.rs omits PreCompact and PostCompact hooks and compact.rs compacts in-process without emitting a reset hook"
-        },
-        "compaction_capture": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "rust/crates/runtime/src/compact.rs compacts sessions inline without firing a PreCompact hook to trigger deja digest"
-        },
-        "compaction_packet": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "rust/crates/runtime/src/compact.rs builds a fixed summary and tail without invoking an external hook or reading a recovery packet"
-        },
-        "mcp": {
-          "status": "yes",
-          "proof": "fixture"
-        },
-        "handoff": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "deja handoff --exec launches claw with the handoff prompt"
-        },
-        "session_end": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "rust/crates/runtime/src/config.rs omits SessionEnd from is_supported_hook_event, so exit indexing cannot hook in yet"
-        },
-        "rules": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "rust/crates/runtime/src/prompt.rs walks workspace .claw/CLAUDE.md and project roots but does not load global ~/.claw/CLAUDE.md"
-        },
-        "statusline": {
-          "status": "no",
-          "proof": "blocked",
-          "note": "rust/crates/rusty-claude-cli/src/main.rs does not execute or render a configured settings.json statusLine command"
-        },
-        "reader": {
-          "status": "yes",
-          "proof": "fixture",
-          "note": "reads ~/.claw/sessions/*.jsonl transcripts and legacy .json snapshots while skipping .meta.json and .deleted.json"
         }
       }
     }

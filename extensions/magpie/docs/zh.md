@@ -6,7 +6,7 @@
 
 属于 **[deja-vu](https://github.com/vshulcz/deja-vu)** 项目（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · Token 用量仅为 agentmemory 的**一半**）· [官网与在线搜索](https://vshulcz.github.io/deja-vu/) · [浏览器在线演示](https://vshulcz.github.io/deja-vu/view/) · **[★ 在 GitHub 上给 deja-vu 点 Star](https://github.com/vshulcz/deja-vu)**
 
-> 面向 Claude Code、Codex、Cursor、Gemini CLI、OpenClaw、Hermes 及其他四十六个智能体的本机跨工具会话记忆索引（零大模型依赖、单 Go 二进制）。
+> 面向 Claude Code、Codex、Cursor、Gemini CLI、OpenClaw、Hermes 及其他四十七个智能体的本机跨工具会话记忆索引（零大模型依赖、单 Go 二进制）。
 
 多工具切换或重开会话时，单个客户端只能看到自己的对话记录。[Magpie](https://github.com/yetone/magpie) 在 `onRequest` 阶段通过本插件查询本机 `deja` 索引，将当前项目的历史决议注入 OpenAI（`chat`、`responses`）、Anthropic（`anthropic`）与 Gemini（`gemini`）网关请求。
 
@@ -16,7 +16,7 @@
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-`@vshulcz/magpie-deja` 依赖 `@vshulcz/deja-vu`，若本机 `PATH` 中尚未安装 `deja`，安装插件时会自动拉取对应平台的二进制。首次使用前可执行一次 `deja index` 建立本地会话索引，或运行 `deja install --auto` 为本机四十七个编程工具配置原生 MCP 工具（`recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff`）与生命周期钩子；当客户端自身已通过 `deja install` 注入记忆时，网关钩子会自动让步，不会重复注入。
+`@vshulcz/magpie-deja` 依赖 `@vshulcz/deja-vu`，若本机 `PATH` 中尚未安装 `deja`，安装插件时会自动拉取对应平台的二进制。首次使用前可执行一次 `deja index` 建立本地会话索引，或运行 `deja install --auto` 为本机四十八个编程工具配置原生 MCP 工具（`recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff`）与生命周期钩子；当客户端自身已通过 `deja install` 注入记忆时，网关钩子会自动让步，不会重复注入。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh

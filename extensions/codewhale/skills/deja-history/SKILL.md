@@ -1,6 +1,6 @@
 ---
 name: deja-history
-description: Search this machine's past AI coding sessions (Claude Code, Codex, Cursor, opencode, CodeWhale, and forty-two more) before editing, re-debugging, or repeating resolved setup work.
+description: Search this machine's past AI coding sessions (Claude Code, Codex, Cursor, opencode, CodeWhale, and forty-three more) before editing, re-debugging, or repeating resolved setup work.
 ---
 
 # deja session memory

@@ -6,7 +6,7 @@ English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/openc
 
 Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S · **13.6 s** to index 19,195 sessions · **half the tokens** of agentmemory) · [Documentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Live demo](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-opencode remembers its own sessions. When you switch between coding tools or reopen a repo months later, this plugin answers the other question: what you did in the forty-six other coding agents on this machine — Claude Code, Codex, Cursor, Gemini, Hermes, and Zed among them — including transcripts recorded before `deja` was installed.
+opencode remembers its own sessions. When you switch between coding tools or reopen a repo months later, this plugin answers the other question: what you did in the forty-seven other coding agents on this machine — Claude Code, Codex, Cursor, Gemini, Hermes, and Zed among them — including transcripts recorded before `deja` was installed.
 
 It runs [deja](https://github.com/vshulcz/deja-vu), a single local Go binary with a local BM25 index: no LLM, no embeddings required, and no network path besides an optional daily release check that `DEJA_OFFLINE=1` turns off.
 

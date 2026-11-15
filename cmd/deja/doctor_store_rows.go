@@ -239,6 +239,9 @@ func (r *doctorStoreRows) filesBeside(name, path string, present bool, seen []st
 func (r *doctorStoreRows) laterStores(sqlite bool) {
 	// Four stores whose formats deja already had: two pi descendants and two
 	// flat-transcript clients (#3647).
+	// CodeArts Desktop: one two-level directory tree of JSONL transcripts.
+	caRoot := sources.CodeArtsRoot()
+	r.files("codearts", caRoot, doctorExists(caRoot), sources.CodeArtsFiles())
 	senpiRoot := sources.SenpiRoot()
 	r.files("senpi", senpiRoot, doctorExists(senpiRoot), sources.SenpiSessionFiles())
 	kimchiRoot := sources.KimchiRoot()

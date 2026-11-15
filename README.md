@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-<p align="center"><b>Shared local memory, session history search, cross-agent handoff, and code recovery across 47 coding agents.</b><br>
+<p align="center"><b>Shared local memory, session history search, cross-agent handoff, and code recovery across 48 coding agents.</b><br>
 Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes and 40 more agents already save every session to disk.<br>
 <b>deja-vu</b> (<code>deja</code>) indexes all of it locally in one Go binary — zero LLM calls, 0.7 ms in-process lookup, ~4% index footprint.</p>
 
@@ -65,7 +65,7 @@ Prefer a browser? `deja view` exports the store — sessions, the recall audit t
 
 ## Highlights
 
-- **Starts full on day one.** Months of existing transcripts across all [forty-seven agents](#supported-harnesses) are searchable immediately — fix a bug in Codex and Claude Code, Cursor or OpenCode recalls it.
+- **Starts full on day one.** Months of existing transcripts across all [forty-eight agents](#supported-harnesses) are searchable immediately — fix a bug in Codex and Claude Code, Cursor or OpenCode recalls it.
 - **Survives `/compact` and context resets.** Over 43 measured compactions, summaries kept 77% of decisions and 0.2% of commands; deja hands back the exact commands, errors, and decisions ([how](docs/compaction.md)).
 - **Cross-agent handoff (`deja handoff`).** Hit a rate limit or get stuck in Claude Code? Hand the active session's goal, decisions, touched files, and open work straight into Codex, Cursor, or OpenCode.
 - **Undo overwritten code (`deja restore` & `deja blame`).** Indexes opened files, commands with exit codes, and exact `Edit` spans so `deja restore <path>` recovers code an agent clobbered even before `git commit` (`deja blame <file>:<line>`).
@@ -290,7 +290,7 @@ whether or not the tool is called.
 ## Supported harnesses
 
 <!-- matrix:start -->
-aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; Devin CLI &middot; CodeWhale &middot; Junie &middot; JetBrains AI Assistant &middot; Windsurf / Devin Desktop &middot; CodeBuddy Code &middot; Reasonix &middot; TRAE CLI &middot; Muse Code &middot; MiniMax Code &middot; MiMo-Code &middot; Omnigent &middot; Orca &middot; Claw Code.
+aider &middot; Amp &middot; Antigravity &middot; Cherry Studio &middot; Claude Code &middot; Claw Code &middot; Cline &middot; CodeArts Desktop &middot; CodeBuddy Code &middot; CodeWhale &middot; Codex CLI &middot; Command Code &middot; Continue &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Crush &middot; Cursor &middot; DeepSeek Harness &middot; Devin CLI &middot; Gemini CLI &middot; gajae-code &middot; Goose &middot; Grok Build &middot; Hermes &middot; JetBrains AI Assistant &middot; Junie &middot; Kilo Code &middot; Kimchi Coding &middot; Kimi Code &middot; Kiro &middot; MiniMax Code &middot; MiMo-Code &middot; Muse Code &middot; Omnigent &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Orca &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Reasonix &middot; Roo Code &middot; Senpi &middot; TRAE CLI &middot; Windsurf / Devin Desktop &middot; ZCode &middot; Zed.
 
 <details>
 <summary>What each one supports</summary>
@@ -300,50 +300,51 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | aider | ⚠ | ✅ | ✕ | ⚠ | ✕ | ✅ | deja aider |
 | Amp | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | threads from 0.0.1774963753 on live on ampcode.com; deja reads those its plugin has written out, and older local ones |
 | Antigravity | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| Cherry Studio | ✅ | ✅ | ✅ | ✕ | ✕ | paste | import the server once in Settings -> MCP; enable the skill for the agent |
 | Claude Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| Claw Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
 | Cline | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| CodeArts Desktop | ⚠ | ⚠ | ⚠ | ⚠ | ✕ | paste | — |
+| CodeBuddy Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
+| CodeWhale | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
 | Codex CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| Command Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
+| Continue | ✅ | ⚠ | ✅ | ✅ | ✅ | ✅ | — |
 | Copilot CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | VS Code Copilot Chat | ✅ | ✅ | ✅ | ✅ | ✕ | ✅ | — |
+| Crush | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
 | Cursor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 (IDE chats, CLI tool output) |
 | DeepSeek Harness | ✅ | ✅ | ✅ | ✅ | ✕ | ✅ | zstd |
+| Devin CLI | ✅ | ✅ | ✅ | ✕ | ✅ | ✅ | sqlite3 |
 | Gemini CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| gajae-code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
 | Goose | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | deja goose |
 | Grok Build | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 (grok-dev store) |
 | Hermes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
+| JetBrains AI Assistant | ✅ | ⚠ | ⚠ | ⚠ | ✕ | paste | none |
+| Junie | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
+| Kilo Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 for the CLI store |
+| Kimchi Coding | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
 | Kimi Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| Kiro | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 for the CLI database |
+| MiniMax Code | ✅ | ✅ | ✅ | ✕ | ✅ | ✅ | the MiniMax Code CLI (`mcode`) for `deja resume` and `deja handoff --to mcode --exec`; `sqlite3` for the session's workspace |
+| MiMo-Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
+| Muse Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
+| Omnigent | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
 | omp (Oh My Pi) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | OpenClaw | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 (2026.8+ store); zstd for .zst archives and compressed events (2026.9.9+) |
 | opencode | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
-| Continue | ✅ | ⚠ | ✅ | ✅ | ✅ | ✅ | — |
-| Crush | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
+| Orca | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
 | pi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | prime-agent (PrimeIntellect) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Qwen Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| Cherry Studio | ✅ | ✅ | ✅ | ✕ | ✕ | paste | import the server once in Settings -> MCP; enable the skill for the agent |
-| Senpi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
-| gajae-code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
-| Kimchi Coding | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
-| Command Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
-| ZCode | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 for the CLI database |
-| Kiro | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 for the CLI database |
-| Kilo Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 for the CLI store |
-| Roo Code | ✅ | ✕ | ✅ | ✅ | ✅ | paste | roo CLI (editor tasks reopen in the editor) |
-| Zed | ✅ | ✕ | ✅ | ✅ | ✕ | paste | sqlite3 + zstd |
-| Devin CLI | ✅ | ✅ | ✅ | ✕ | ✅ | ✅ | sqlite3 |
-| CodeWhale | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
-| Junie | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
-| JetBrains AI Assistant | ✅ | ⚠ | ⚠ | ⚠ | ✕ | paste | none |
-| Windsurf / Devin Desktop | ✅ | ⚠ | ✅ | ✅ | ✕ | paste | none |
-| CodeBuddy Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
 | Reasonix | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | zstd for 1.x sessions |
+| Roo Code | ✅ | ✕ | ✅ | ✅ | ✅ | paste | roo CLI (editor tasks reopen in the editor) |
+| Senpi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
 | TRAE CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
-| Muse Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
-| MiniMax Code | ✅ | ✅ | ✅ | ✕ | ✅ | ✅ | the MiniMax Code CLI (`mcode`) for `deja resume` and `deja handoff --to mcode --exec`; `sqlite3` for the session's workspace |
-| MiMo-Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
-| Omnigent | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
-| Orca | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
-| Claw Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
+| Windsurf / Devin Desktop | ✅ | ⚠ | ✅ | ✅ | ✕ | paste | none |
+| ZCode | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 for the CLI database |
+| Zed | ✅ | ✕ | ✅ | ✅ | ✕ | paste | sqlite3 + zstd |
 
 ✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ waiting on the harness itself &middot; ? not investigated
 
@@ -545,7 +546,7 @@ and a search for a word most sessions hold takes about a second.
 | Capability | `deja-vu` | `claude-mem` | `MemPalace` |
 | --- | --- | --- | --- |
 | History before install ([day zero](https://vshulcz.github.io/deja-vu/guide/day-zero.html)) | Yes — indexes existing transcripts (`36/100` hit@1) | No — records from install onward (`0/100`) | Claude Code, Codex, Cursor (`16/100`) |
-| Agents shared | 47 harnesses | 9 (hooks) | 3 (CLI) |
+| Agents shared | 48 harnesses | 9 (hooks) | 3 (CLI) |
 | LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
 | Runtime & dependencies | 1 Go binary | Bun worker + SQLite + Chroma | Python + 300 MB embedding model |
 | LLM calls / account required | None | Observer LLM calls | None |

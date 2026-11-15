@@ -55,6 +55,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Omnigent](omnigent.md) | SQLite session, message, and typed item store |
 | [Orca](orca.md) | SQLite journal entry and JSON block store |
 | [Claw Code](clawcode.md) | JSONL transcripts and legacy JSON snapshots under `~/.claw/sessions` |
+| [CodeArts Desktop](codearts.md) | JSONL transcript in a two-level session directory |
 
 ## Reporting drift
 
