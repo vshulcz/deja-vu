@@ -412,8 +412,9 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 		// fleet works against a stale index until its parent types something
 		// (#2567). requestWarmup writes a sentinel and detaches a child; the
 		// action pays neither the read nor the wait.
+		// Keep running index-free repo-memory and AST checks on cold stores.
 		requestWarmup(dir)
-		if repoMemoryStamp(hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots))) == "" {
+		if hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)) == "" {
 			return nil
 		}
 	}
@@ -829,7 +830,7 @@ func fileReadGuardLine(dir, cwd string, input toolHookInput) string {
 // question, and a cut source's records only for the file in hand.
 func askerSkip(dir string, input toolHookInput) func(index.SessionMeta, string) bool {
 	sid := strings.TrimSpace(input.SessionID)
-	if sid == "" {
+	if sid == "" || !planIndexReady(dir) {
 		return nil
 	}
 	lineage := sync.OnceValues(func() (map[string]bool, map[string]time.Time) {

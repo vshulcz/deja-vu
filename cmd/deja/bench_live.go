@@ -12,9 +12,11 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/prompt"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -396,24 +398,38 @@ func measureLiveLocalization(indexDir, root string, projNames []string, pol poli
 	var audit liveLocalizationAudit
 	var durations []float64
 	var byteSizes []int
+	seenTitle := map[string]bool{}
+	seenAsked := map[string]bool{}
 	for _, meta := range metas {
 		if audit.Tasks >= liveBenchMaxTasks {
 			break
 		}
-		if meta.AgentTitle || meta.Started.IsZero() || !pol.Allows(policy.ActivationAuto, meta.Project) {
+		if meta.AgentTitle || meta.Kind == model.KindSubagent || meta.Kind == model.KindSubagentFork || meta.Kind == "cron" || meta.Started.IsZero() || !pol.Allows(policy.ActivationAuto, meta.Project) {
 			continue
 		}
 		if !slices.Contains(projNames, meta.Project) {
 			continue
 		}
-		asked := strings.TrimSpace(meta.Title)
-		if len([]rune(asked)) < 20 || index.TitleIsBorrowed(asked) || digest.IsAgentArtifact(asked) {
+		titleNorm := strings.Join(strings.Fields(strings.ToLower(strings.TrimSpace(meta.Title))), " ")
+		if titleNorm != "" && seenTitle[titleNorm] {
 			continue
 		}
 		targets := liveExistingEditedTargets(root, meta.Touched)
 		if len(targets) == 0 || len(targets) > 8 {
 			continue
 		}
+		if titleNorm != "" {
+			seenTitle[titleNorm] = true
+		}
+		asked := liveOpeningPrompt(indexDir, meta)
+		if utf8.RuneCountInString(asked) < 20 || index.TitleIsBorrowed(asked) || digest.IsAgentArtifact(asked) {
+			continue
+		}
+		normAsked := strings.Join(strings.Fields(strings.ToLower(asked)), " ")
+		if seenAsked[normAsked] {
+			continue
+		}
+		seenAsked[normAsked] = true
 		skip := make(map[string]bool, 32)
 		skip[meta.ID] = true
 		for _, other := range metas {
@@ -459,6 +475,27 @@ func measureLiveLocalization(indexDir, root string, projNames []string, pol poli
 		audit.MedianBytes = byteSizes[len(byteSizes)/2]
 	}
 	return audit
+}
+
+func liveOpeningPrompt(indexDir string, meta index.SessionMeta) string {
+	if sess, ok, err := index.FindByIdentityInRoles(indexDir, meta.Harness, meta.ID, map[string]bool{model.RoleUser: true}); err == nil && ok {
+		for _, m := range sess.Messages {
+			txt := strings.TrimSpace(prompt.Unwrap(digest.StripHarnessBlocks(m.Text)))
+			if utf8.RuneCountInString(txt) < 12 || index.TitleIsBorrowed(txt) || digest.IsAgentArtifact(txt) {
+				continue
+			}
+			return clipLiveOpeningPrompt(txt)
+		}
+	}
+	return clipLiveOpeningPrompt(strings.TrimSpace(meta.Title))
+}
+
+func clipLiveOpeningPrompt(s string) string {
+	runes := []rune(s)
+	if len(runes) <= 2400 {
+		return s
+	}
+	return string(runes[:1600]) + "\n" + string(runes[len(runes)-800:])
 }
 
 func liveExistingEditedTargets(root string, touched []string) []string {
@@ -534,7 +571,7 @@ func liveOutputHasTestRecipe(out string) bool {
 func evalPromptTurn0ReadOnly(dir, cwd, asked string, names []string, skip map[string]bool) string {
 	asked = prompt.Unwrap(digest.StripHarnessBlocks(asked))
 	nudge := promptDirectContextIn(dir, cwd, "", asked, true, skip)
-	terms := prompt.Terms(asked)
+	terms := prompt.Terms(focusPromptForTaskRecall(asked))
 	if !promptTermsWorthAsking(terms) {
 		return nudge
 	}
@@ -543,7 +580,7 @@ func evalPromptTurn0ReadOnly(dir, cwd, asked string, names []string, skip map[st
 		return nudge
 	}
 	if len(sel.ss) == 0 {
-		return attachRankedConsensusFallback(dir, cwd, "", nudge, sel.ranked, sel.matched, sel.strong, nil, skip, true)
+		return attachRankedConsensusFallback(dir, cwd, "", asked, nudge, sel.ranked, sel.matched, sel.strong, nil, skip, true)
 	}
 	ss := sel.ss
 	if len(names) > 0 || !projectMatchesAnyTerm(ss[0].Project, terms) {
@@ -554,10 +591,10 @@ func evalPromptTurn0ReadOnly(dir, cwd, asked string, names []string, skip map[st
 	}
 	ss, rejectedWarning := orderForInjection(ss)
 	if sel.worthDigest {
-		if full, ok := promptDigestBodyIn(dir, cwd, "", ss, sel.confident, terms, sel.idfOf, asked, nudge, rejectedWarning, sel.ranked, sel.matched, sel.strong, skip); ok {
+		if full, ok := promptDigestBodyWithLead(dir, cwd, "", false, ss, sel.confident, terms, sel.idfOf, asked, nudge, rejectedWarning, sel.ranked, sel.matched, sel.strong, skip); ok {
 			return full
 		}
-		return attachRankedConsensusFallback(dir, cwd, "", nudge, sel.ranked, sel.matched, sel.strong, nil, skip, true)
+		return attachRankedConsensusFallback(dir, cwd, "", asked, nudge, sel.ranked, sel.matched, sel.strong, nil, skip, true)
 	}
-	return buildWeakPromptPointerBody(dir, cwd, ss, terms, nudge, sel.ranked, sel.matched, sel.strong, nil, skip)
+	return buildWeakPromptPointerBody(dir, cwd, asked, ss, terms, nudge, sel.ranked, sel.matched, sel.strong, nil, skip)
 }

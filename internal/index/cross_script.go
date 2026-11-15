@@ -1,10 +1,12 @@
 package index
 
 import (
+	"math"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/query"
+	"github.com/vshulcz/deja-vu/internal/search"
 )
 
 const bridgeTerms = 4
@@ -31,7 +33,7 @@ const bridgeTerms = 4
 // which is the sentence that explains the term — the thing a rephrasing has
 // and an absent subject does not.
 func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip map[string]bool,
-	strong []int, idfOf map[string]float64) ([]SessionMeta, []int, []int, map[string]float64, map[uint32][]int64, bool) {
+	strong []int, idfOf map[string]float64) ([]SessionMeta, []int, []int, []int, map[string]float64, map[uint32][]int64, bool) {
 	was := 0
 	for _, v := range strong {
 		if v > was {
@@ -44,11 +46,7 @@ func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip 
 		crossCands = crossScriptBridgeTerms(terms)
 	}
 	if !hasStrongTerm && len(crossCands) == 0 {
-		return nil, nil, nil, nil, nil, false
-	}
-	var neighbours map[string][]string
-	if hasStrongTerm {
-		neighbours = readCooccur(dir)
+		return nil, nil, nil, nil, nil, nil, false
 	}
 	var inProject map[uint32]bool
 	projectOrds := func() map[uint32]bool {
@@ -56,6 +54,10 @@ func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip 
 			inProject = projectOrdSet(m, projects)
 		}
 		return inProject
+	}
+	var neighbours map[string][]string
+	if hasStrongTerm && !shouldBlockSameScriptBridge(dir, m, terms, idfOf, projectOrds) {
+		neighbours = readCooccur(dir)
 	}
 	have := make(map[string]bool, len(terms))
 	for _, t := range terms {
@@ -145,22 +147,75 @@ func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip 
 		}
 	}
 	if len(added) == 0 {
-		return nil, nil, nil, nil, nil, false
+		return nil, nil, nil, nil, nil, nil, false
 	}
-	metas, matched, bstrong, idf, offsets, err := relevantMetasMatched(dir, m, projects,
-		append(append([]string{}, terms...), added...), n, skip)
-	if err != nil || len(metas) == 0 {
-		return nil, nil, nil, nil, nil, false
+	var keep func(SessionMeta) bool
+	if len(skip) > 0 {
+		keep = func(meta SessionMeta) bool { return !skip[meta.ID] }
+	}
+	rank, err := relevantMetasCounts(dir, m, projects,
+		append(append([]string{}, terms...), added...), n, keep)
+	if err != nil || len(rank.metas) == 0 {
+		return nil, nil, nil, nil, nil, nil, false
 	}
 	// Taken only when the bridge found something more identifying than the
 	// question's own words did. Otherwise the project has no better answer and
 	// the first ranking stands.
-	for i, v := range bstrong {
-		if v > was || (crossScript && i < len(matched) && matched[i] >= 2) {
-			return metas, matched, bstrong, idf, offsets, true
+	for i, v := range rank.strong {
+		if v > was || (crossScript && i < len(rank.informative) && rank.informative[i] >= 2) {
+			return rank.metas, rank.informative, rank.strong, rank.naming, rank.idf, rank.offsets, true
 		}
 	}
-	return nil, nil, nil, nil, nil, false
+	return nil, nil, nil, nil, nil, nil, false
+}
+
+// shouldBlockSameScriptBridge reports whether a strong ASCII identifier in the query
+// exists elsewhere in the corpus yet has zero postings in the target projects,
+// unless at least two in-project strong terms already anchor the question.
+// Blocking same-script neighbour expansion in that case prevents an unrelated
+// high-IDF verb from pulling in a co-occurring neighbour and fabricating a
+// multi-term match when the actual subject is absent.
+func shouldBlockSameScriptBridge(dir string, m Manifest, terms []string, idfOf map[string]float64, projectOrds func() map[uint32]bool) bool {
+	blockFloor := math.Min(search.IdentifierIDFFloor, topIDF(len(m.Sessions)))
+	seenStrong := 0
+	seenIdent := 0
+	for _, t := range terms {
+		if idfOf[t] >= dejaVuStrongIDFFloor {
+			seenStrong++
+		}
+		if idfOf[t] >= blockFloor && search.HasIdentifierTerm([]string{t}) {
+			seenIdent++
+		}
+	}
+	if seenStrong >= 2 || (len(terms) > 3 && seenIdent >= 1 && seenStrong >= 1) {
+		return false
+	}
+	for _, t := range terms {
+		if !hasASCIILetterOrDigit(t) || len(t) < 3 || idfOf[t] > 0 || !search.HasIdentifierTerm([]string{t}) {
+			continue
+		}
+		tPosts, err := postingsFor(dir, "t"+t)
+		if err != nil || len(tPosts) == 0 {
+			continue
+		}
+		inProj := projectOrds()
+		seenInProj := false
+		seenSids := make(map[uint32]bool, len(tPosts))
+		for _, pp := range tPosts {
+			seenSids[pp.Sid] = true
+			if inProj[pp.Sid] {
+				seenInProj = true
+				break
+			}
+		}
+		if seenInProj {
+			continue
+		}
+		if rankIDF(len(m.Sessions), len(seenSids)) >= blockFloor {
+			return true
+		}
+	}
+	return false
 }
 
 func hasTermAboveFloor(terms []string, idfOf map[string]float64, floor float64) bool {
@@ -215,6 +270,36 @@ var trilingualLexicon = []trilingualConcept{
 	{en: []string{"queue"}, ru: []string{"очеред"}, zh: []string{"队列"}},
 	{en: []string{"worker", "goroutine"}, ru: []string{"воркер", "горутин"}, zh: []string{"协程"}},
 	{en: []string{"migration"}, ru: []string{"миграц"}, zh: []string{"迁移"}},
+	{en: []string{"localize", "localization"}, ru: []string{"локализ", "таргет"}, zh: []string{"定位"}},
+	{en: []string{"inject", "injection"}, ru: []string{"инъекц", "вставк"}, zh: []string{"注入"}},
+	{en: []string{"dedup", "dedupe", "duplicate"}, ru: []string{"дедуп", "дубликат"}, zh: []string{"去重"}},
+	{en: []string{"compact", "compaction"}, ru: []string{"компакт", "сжат"}, zh: []string{"压缩"}},
+	{en: []string{"prompt"}, ru: []string{"промпт", "запрос"}, zh: []string{"提示词"}},
+	{en: []string{"bench", "benchmark"}, ru: []string{"бенч", "бенчмарк", "замер"}, zh: []string{"基准"}},
+	{en: []string{"session"}, ru: []string{"сесси", "истори"}, zh: []string{"会话"}},
+	{en: []string{"search", "recall"}, ru: []string{"поиск", "воспоминан"}, zh: []string{"检索", "召回"}},
+	{en: []string{"snippet", "quote"}, ru: []string{"сниппет", "цитат"}, zh: []string{"片段", "引用"}},
+	{en: []string{"subagent"}, ru: []string{"сабагент", "субагент"}, zh: []string{"子代理"}},
+	{en: []string{"context"}, ru: []string{"контекст"}, zh: []string{"上下文"}},
+	{en: []string{"policy", "rule"}, ru: []string{"правил", "политик"}, zh: []string{"规则", "策略"}},
+	{en: []string{"filter", "noise"}, ru: []string{"фильтр", "шум"}, zh: []string{"过滤", "噪声"}},
+	{en: []string{"paraphrase"}, ru: []string{"парафраз", "перефраз"}, zh: []string{"改写"}},
+	{en: []string{"symbol", "signature"}, ru: []string{"символ", "сигнатур"}, zh: []string{"符号", "签名"}},
+	{en: []string{"install", "setup"}, ru: []string{"установк", "инсталл"}, zh: []string{"安装"}},
+	{en: []string{"doctor", "diagnostic"}, ru: []string{"доктор", "диагностик"}, zh: []string{"诊断"}},
+	{en: []string{"delete", "remove"}, ru: []string{"удален", "удалит"}, zh: []string{"删除"}},
+	{en: []string{"ingest", "import"}, ru: []string{"инжест", "импорт"}, zh: []string{"导入"}},
+	{en: []string{"manifest"}, ru: []string{"манифест"}, zh: []string{"清单"}},
+	{en: []string{"table", "schema"}, ru: []string{"таблиц", "схем"}, zh: []string{"表结构"}},
+	{en: []string{"redact", "secret"}, ru: []string{"секрет", "маскир", "редакц"}, zh: []string{"脱敏"}},
+	{en: []string{"stream", "jsonl"}, ru: []string{"стрим"}, zh: []string{"流式"}},
+	{en: []string{"spawn"}, ru: []string{"спавн"}, zh: []string{"派生"}},
+	{en: []string{"ranking", "score"}, ru: []string{"ранжир", "скоринг"}, zh: []string{"排序"}},
+}
+
+// CrossScriptTerms maps domain terms in one script to known equivalents in other scripts.
+func CrossScriptTerms(terms []string) []string {
+	return crossScriptBridgeTerms(terms)
 }
 
 // crossScriptBridgeTerms maps technical terms in one script (Latin, Cyrillic,
@@ -242,7 +327,7 @@ func crossScriptBridgeTerms(terms []string) []string {
 				}
 			}
 			for _, ru := range c.ru {
-				if t == ru || (len(ru) >= 4 && strings.HasPrefix(t, ru)) {
+				if t == ru || (len(ru) >= 4 && strings.HasPrefix(t, ru) && (ru != "правил" || !strings.HasPrefix(t, "правиль"))) {
 					add(c.en)
 					add(c.zh)
 				}

@@ -271,3 +271,282 @@ func TestShellLevelDiagnosticFixPairAnsweredFromAnyProject(t *testing.T) {
 		t.Errorf("project-specific error from another project leaked: %q", line)
 	}
 }
+
+func TestHookToolAfterColdStoreAttributeAndNearMissRecovery(t *testing.T) {
+	tmp := hermeticEnv(t)
+	coldDir := filepath.Join(tmp, "cold-index")
+	t.Setenv("DEJA_INDEX_DIR", coldDir)
+
+	repo := filepath.Join(tmp, "repo")
+	files := map[string]string{
+		filepath.Join(repo, ".git", "HEAD"): "ref: refs/heads/main\n",
+		filepath.Join(repo, "billing", "ledger.py"): `class InvoiceLedger:
+    def compute_total(self, rows):
+        return 0
+
+    def settle_balance(self, account_id):
+        return True
+`,
+		filepath.Join(repo, "web", "client.ts"): `export interface RetryPolicy {
+  maxAttempts: number;
+  backoffMillis: number;
+  retryBudget?: number;
+}
+`,
+		filepath.Join(repo, "src", "lease.rs"): `pub struct LeaseGuard {
+    epoch: u64,
+}
+
+impl LeaseGuard {
+    pub fn renew_epoch(&mut self, ttl_ms: u64) -> u64 {
+        self.epoch + ttl_ms
+    }
+
+    pub fn release_lock(&mut self) {}
+}
+`,
+		filepath.Join(repo, "internal", "cache", "store.go"): `package cache
+
+type ShardRouter struct{}
+
+func (s *ShardRouter) RebalanceKeys(limit int) error {
+	return nil
+}
+
+func (s *ShardRouter) FlushPending() {}
+`,
+	}
+	for p, content := range files {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	callAfter := func(command, stderr string) string {
+		t.Helper()
+		raw, err := json.Marshal(map[string]any{
+			"hook_event_name": "PostToolUse",
+			"tool_name":       "Bash",
+			"cwd":             repo,
+			"session_id":      "cold-s1",
+			"tool_input":      map[string]any{"command": command},
+			"tool_response":   map[string]any{"stdout": "", "stderr": stderr, "interrupted": false},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out bytes.Buffer
+		if err := runHookToolAfter(coldDir, bytes.NewReader(raw), &out); err != nil {
+			t.Fatal(err)
+		}
+		if out.Len() == 0 {
+			return ""
+		}
+		var resp sessionStartHookResponse
+		if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
+			t.Fatalf("undecodable hook response %q: %v", out.String(), err)
+		}
+		return resp.HookSpecificOutput.AdditionalContext
+	}
+
+	pyOut := callAfter("pytest billing/test_ledger.py", "AttributeError: 'InvoiceLedger' object has no attribute 'comput_total'")
+	if !strings.Contains(pyOut, "attribute hint for InvoiceLedger") || !strings.Contains(pyOut, "compute_total") {
+		t.Errorf("expected cold Python attribute hint, got %q", pyOut)
+	}
+
+	tsOut := callAfter("npx tsc --noEmit", "web/client.ts(10,5): error TS2339: Property 'maxAttempt' does not exist on type 'RetryPolicy'.")
+	if !strings.Contains(tsOut, "attribute hint for RetryPolicy") || !strings.Contains(tsOut, "maxAttempts") {
+		t.Errorf("expected cold TS attribute hint, got %q", tsOut)
+	}
+
+	rsOut := callAfter("cargo test", "error[E0599]: no method named `renew_epch` found for struct `LeaseGuard` in the current scope")
+	if !strings.Contains(rsOut, "attribute hint for LeaseGuard") || !strings.Contains(rsOut, "renew_epoch") {
+		t.Errorf("expected cold Rust attribute hint, got %q", rsOut)
+	}
+
+	goAttrOut := callAfter("go test ./...", "./main.go:12:9: r.RebalnceKeys undefined (type *ShardRouter has no field or method RebalnceKeys)")
+	if !strings.Contains(goAttrOut, "attribute hint for ShardRouter") || !strings.Contains(goAttrOut, "RebalanceKeys") {
+		t.Errorf("expected cold Go attribute hint, got %q", goAttrOut)
+	}
+
+	goNearOut := callAfter("go test ./...", "./main.go:18:4: undefined: ShardRoutre")
+	if !strings.Contains(goNearOut, "symbol near-match in repo") || !strings.Contains(goNearOut, "ShardRouter") {
+		t.Errorf("expected cold Go near-miss symbol hint, got %q", goNearOut)
+	}
+
+	if negOut := callAfter("curl http://203.0.113.10:8080/health", "error: connection timed out"); negOut != "" {
+		t.Errorf("expected empty output for unrelated failure, got %q", negOut)
+	}
+}
+
+func TestHookToolAfterColdExoskeletonStage2(t *testing.T) {
+	tmp := hermeticEnv(t)
+	coldDir := filepath.Join(tmp, "cold-index")
+	t.Setenv("DEJA_INDEX_DIR", coldDir)
+
+	repo := filepath.Join(tmp, "repo")
+	files := map[string]string{
+		filepath.Join(repo, ".git", "HEAD"): "ref: refs/heads/main\n",
+		filepath.Join(repo, "web", "reconcile.ts"): `export interface ReconcileOpts {
+  batchSize: number;
+  dryRun: boolean;
+}
+
+export async function reconcileLedger(
+  accountId: string,
+  batchSize: number,
+  dryRun: boolean,
+): Promise<number> {
+  return batchSize;
+}
+
+export class ReconcileEngine {
+  async applyAdjustment(
+    accountId: string,
+    deltaCents: number,
+    dryRun: boolean,
+  ): Promise<void> {}
+}
+`,
+		filepath.Join(repo, "web", "runner.ts"): `import { reconcileLedger, ReconcileEngine } from "./reconcile";
+
+export function runReconcile(engine: ReconcileEngine) {
+  reconcileLedger("acct-1", 10);
+  return engine.applyAdjustment("acct-1", 50);
+}
+`,
+		filepath.Join(repo, "src", "ledger.rs"): `pub struct LedgerSync {
+    pub epoch: u64,
+}
+
+impl LedgerSync {
+    pub fn commit_entries(
+        &mut self,
+        batch_id: &str,
+        dry_run: bool,
+    ) -> u64 {
+        let _ = (batch_id, dry_run);
+        self.epoch
+    }
+}
+`,
+		filepath.Join(repo, "src", "main.rs"): `mod ledger;
+fn sync(syncer: &mut ledger::LedgerSync) {
+    syncer.commit_entries("b1");
+}
+`,
+		filepath.Join(repo, "billing", "ledger.go"): `package billing
+
+type ReconcileConfig struct {
+	AccountID string
+	BatchSize int
+}
+
+func ReconcileBatch(
+	accountID string,
+	limit int,
+	dryRun bool,
+) error {
+	return nil
+}
+`,
+		filepath.Join(repo, "billing", "ledger_test.go"): `package billing
+
+import "testing"
+
+func TestReconcileBatch(t *testing.T) {
+	if err := ReconcileBatch("acct-1", 10, true); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+`,
+		filepath.Join(repo, "billing", "book.py"): `class LedgerBook:
+    def apply_entries(
+        self,
+        account_id: str,
+        dry_run: bool = False,
+    ) -> int:
+        return 0
+`,
+	}
+	for p, content := range files {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	callAfter := func(command, stderr string) string {
+		t.Helper()
+		raw, err := json.Marshal(map[string]any{
+			"hook_event_name": "PostToolUse",
+			"tool_name":       "Bash",
+			"cwd":             repo,
+			"session_id":      "cold-s2",
+			"tool_input":      map[string]any{"command": command},
+			"tool_response":   map[string]any{"stdout": "", "stderr": stderr, "interrupted": false},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out bytes.Buffer
+		if err := runHookToolAfter(coldDir, bytes.NewReader(raw), &out); err != nil {
+			t.Fatal(err)
+		}
+		if out.Len() == 0 {
+			return ""
+		}
+		var resp sessionStartHookResponse
+		if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
+			t.Fatalf("undecodable hook response %q: %v", out.String(), err)
+		}
+		return resp.HookSpecificOutput.AdditionalContext
+	}
+
+	tsCallOut := callAfter("npx tsc --noEmit", "web/runner.ts(4,3): error TS2554: Expected 3 arguments, but got 2.")
+	if !strings.Contains(tsCallOut, "symbol signature in repo — web/reconcile.ts:6:") || !strings.Contains(tsCallOut, "dryRun: boolean") {
+		t.Errorf("expected cold TS2554 5-line signature, got %q", tsCallOut)
+	}
+
+	tsMethodOut := callAfter("npx tsc --noEmit", "web/runner.ts(5,10): error TS2554: Expected 3 arguments, but got 2.")
+	if !strings.Contains(tsMethodOut, "symbol signature in repo — web/reconcile.ts:15:") || !strings.Contains(tsMethodOut, "deltaCents: number, dryRun: boolean") {
+		t.Errorf("expected cold TS2554 multi-line class method signature, got %q", tsMethodOut)
+	}
+
+	rsCallOut := callAfter("cargo test", "error[E0061]: this method takes 2 arguments but 1 argument was supplied\n  --> src/main.rs:3:12")
+	if !strings.Contains(rsCallOut, "symbol signature in repo — src/ledger.rs:6:") || !strings.Contains(rsCallOut, "dry_run: bool") {
+		t.Errorf("expected cold Rust E0061 multi-line impl signature, got %q", rsCallOut)
+	}
+
+	goFieldOut := callAfter("go test ./...", "./billing/run.go:12:18: unknown field BatchLimt in struct literal of type ReconcileConfig")
+	if !strings.Contains(goFieldOut, "attribute hint for ReconcileConfig") || !strings.Contains(goFieldOut, "BatchSize") {
+		t.Errorf("expected cold Go unknown field hint, got %q", goFieldOut)
+	}
+
+	rsFieldOut := callAfter("cargo build", "error[E0560]: struct `LedgerSync` has no field named `epch`")
+	if !strings.Contains(rsFieldOut, "attribute hint for LedgerSync") || !strings.Contains(rsFieldOut, "epoch") {
+		t.Errorf("expected cold Rust E0560 field hint, got %q", rsFieldOut)
+	}
+
+	tsObjOut := callAfter("npx tsc --noEmit", "web/runner.ts(9,5): error TS2353: Object literal may only specify known properties, and 'dry_run' does not exist in type 'ReconcileOpts'.")
+	if !strings.Contains(tsObjOut, "attribute hint for ReconcileOpts") || !strings.Contains(tsObjOut, "dryRun") {
+		t.Errorf("expected cold TS2353 object literal hint, got %q", tsObjOut)
+	}
+
+	pyMethodOut := callAfter("pytest billing", "AttributeError: 'LedgerBook' object has no attribute 'apply_entry'")
+	if !strings.Contains(pyMethodOut, "attribute hint for LedgerBook") || !strings.Contains(pyMethodOut, "apply_entries") || !strings.Contains(pyMethodOut, "dry_run: bool = False") {
+		t.Errorf("expected cold Python multi-line method attribute hint, got %q", pyMethodOut)
+	}
+
+	goTestOut := callAfter("go test ./billing", "--- FAIL: TestReconcileBatch (0.00s)\n    ledger_test.go:7: unexpected error: mismatch\nFAIL")
+	if !strings.Contains(goTestOut, "failing test line — billing/ledger_test.go:7 (TestReconcileBatch):") ||
+		!strings.Contains(goTestOut, "| target: billing/ledger.go:8:") ||
+		!strings.Contains(goTestOut, "ReconcileBatch(accountID string, limit int, dryRun bool)") {
+		t.Errorf("expected cold failing test line + multi-line SUT target, got %q", goTestOut)
+	}
+}

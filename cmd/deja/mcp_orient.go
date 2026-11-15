@@ -391,26 +391,37 @@ func stripWorktreeSegment(p string) string {
 	return p
 }
 
+type mainRootCacheEntry struct {
+	root string
+	at   time.Time
+}
+
+var orientMainRepoRootCache sync.Map
+
 func orientMainRepoRoot(cwd string) string {
+	if cwd == "" {
+		return ""
+	}
+	if v, ok := orientMainRepoRootCache.Load(cwd); ok {
+		if cached, ok := v.(mainRootCacheEntry); ok && time.Since(cached.at) < 2*time.Second {
+			return cached.root
+		}
+	}
+	root := ""
 	gitPath := filepath.Join(cwd, ".git")
-	fi, err := os.Stat(gitPath)
-	if err != nil || fi.IsDir() {
-		return ""
+	if fi, err := os.Stat(gitPath); err == nil && !fi.IsDir() {
+		if raw, err := os.ReadFile(gitPath); err == nil {
+			line := strings.TrimSpace(string(raw))
+			if after, ok := strings.CutPrefix(line, "gitdir:"); ok {
+				gitDir := filepath.ToSlash(strings.TrimSpace(after))
+				if idx := strings.Index(gitDir, "/.git/worktrees/"); idx > 0 {
+					root = filepath.FromSlash(gitDir[:idx])
+				}
+			}
+		}
 	}
-	raw, err := os.ReadFile(gitPath)
-	if err != nil {
-		return ""
-	}
-	line := strings.TrimSpace(string(raw))
-	after, ok := strings.CutPrefix(line, "gitdir:")
-	if !ok {
-		return ""
-	}
-	gitDir := filepath.ToSlash(strings.TrimSpace(after))
-	if idx := strings.Index(gitDir, "/.git/worktrees/"); idx > 0 {
-		return filepath.FromSlash(gitDir[:idx])
-	}
-	return ""
+	orientMainRepoRootCache.Store(cwd, mainRootCacheEntry{root: root, at: time.Now()})
+	return root
 }
 
 // orientFile is one path and how many sessions in the scope touched it.

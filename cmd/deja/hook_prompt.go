@@ -229,7 +229,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if asked == "" || digest.IsAgentArtifact(asked) {
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
-	terms := prompt.Terms(asked)
+	terms := prompt.Terms(focusPromptForTaskRecall(asked))
 	if !promptTermsWorthAsking(terms) {
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
@@ -288,7 +288,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	//
 	// The names are asked for once: each ask runs `git worktree list`, and in a
 	// repository with hundreds of worktrees that is tens of milliseconds.
-	names := digest.ProjectNameCandidates(cwd)
+	names := cachedProjectNameCandidates(cwd)
 	projectKey := ""
 	if len(names) > 0 {
 		projectKey = names[0]
@@ -320,7 +320,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	}
 	ss, confident, worthDigest := sel.ss, sel.confident, sel.worthDigest
 	if len(ss) == 0 {
-		nudge = attachRankedConsensusFallback(dir, cwd, input.SessionID, nudge, ranked, matched, strong, seen, skip, false)
+		nudge = attachRankedConsensusFallback(dir, cwd, input.SessionID, asked, nudge, ranked, matched, strong, seen, skip, false)
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
 	// Of the two candidates, lead with the one that settled something about the
@@ -373,12 +373,12 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if worthDigest {
 		full, ok := promptDigestBodyIn(dir, cwd, input.SessionID, ss, confident, terms, idfOf, asked, nudge, rejectedWarning, ranked, matched, strong, skip)
 		if !ok {
-			nudge = attachRankedConsensusFallback(dir, cwd, input.SessionID, nudge, ranked, matched, strong, seen, skip, false)
+			nudge = attachRankedConsensusFallback(dir, cwd, input.SessionID, asked, nudge, ranked, matched, strong, seen, skip, false)
 			return emitNudgeOnly(stdout, plain, nudge)
 		}
 		body = full
 	} else {
-		body = buildWeakPromptPointerBody(dir, cwd, ss, terms, nudge, ranked, matched, strong, seen, skip)
+		body = buildWeakPromptPointerBody(dir, cwd, asked, ss, terms, nudge, ranked, matched, strong, seen, skip)
 	}
 	// The same block twice is wallpaper, and the reader stops looking. Judged
 	// on what would be shown, so a session whose other lines answer the next
@@ -443,7 +443,7 @@ func selectPromptRankedCandidates(
 	// builds a search.Hit, so it had no note-over-source rule at all and the
 	// two slots below could go to the transcript while its own note waited
 	// behind it (#2803).
-	search.LiftNoteSessionsAboveTheirSource(ranked)
+	search.LiftNoteSessionsAligned(ranked, matched, strong, naming)
 	rankedAlreadyShown = 0
 	for _, s := range ranked {
 		if skip[s.ID] {
@@ -469,6 +469,7 @@ func selectPromptRankedCandidates(
 		leadTerms:    leadTerms,
 		unscoped:     len(names) == 0,
 		cwdPlain:     sources.PlainProjectName(cwd),
+		cwd:          cwd,
 		deadline:     promptStart.Add(promptSoftBudget),
 		ss:           make([]model.Session, 0, 2),
 	}
@@ -504,28 +505,219 @@ func selectPromptRankedCandidates(
 	}
 }
 
+func cleanTargetPathToken(raw string) string {
+	p := strings.TrimSpace(raw)
+	if after, ok := strings.CutPrefix(p, "defined in "); ok {
+		p = strings.TrimSpace(after)
+	}
+	if idx := strings.Index(p, " ("); idx > 0 {
+		p = strings.TrimSpace(p[:idx])
+	}
+	if idx := strings.IndexByte(p, ':'); idx > 0 {
+		p = strings.TrimSpace(p[:idx])
+	}
+	if p == "" || strings.ContainsAny(p, " \t\n") || (!strings.Contains(p, "/") && !looksLikePromptFileRef(p)) {
+		return ""
+	}
+	return p
+}
+
+func extractLeadTargetPaths(line string) []string {
+	seg, _, _ := strings.Cut(line, " | ")
+	head, _, _ := strings.Cut(seg, " — ")
+	isDefined := false
+	for _, pfx := range []string{
+		"likely targets: ",
+		"likely target: ",
+		"files edited in related sessions: ",
+		"files edited in related session: ",
+		"files edited there: ",
+		"defined in ",
+	} {
+		if after, ok := strings.CutPrefix(head, pfx); ok {
+			head = after
+			isDefined = pfx == "defined in "
+			break
+		}
+	}
+	var out []string
+	seen := map[string]bool{}
+	add := func(raw string) {
+		if p := cleanTargetPathToken(raw); p != "" && !seen[p] {
+			seen[p] = true
+			out = append(out, p)
+		}
+	}
+	if isDefined {
+		add(head)
+		if _, alsoRest, ok := strings.Cut(head, " (also "); ok {
+			add(strings.TrimSuffix(alsoRest, ")"))
+		}
+		return out
+	}
+	if colon := strings.Index(head, ": "); colon >= 0 && !strings.Contains(head[:colon], "/") && !looksLikePromptFileRef(strings.TrimSpace(head[:colon])) {
+		head = head[colon+2:]
+	}
+	for part := range strings.SplitSeq(head, ",") {
+		add(part)
+	}
+	return out
+}
+
+func extractAllGuidancePaths(text string) map[string]bool {
+	paths := map[string]bool{}
+	for rawLine := range strings.SplitSeq(text, "\n") {
+		for adv := range strings.SplitSeq(rawLine, " | ") {
+			adv = strings.TrimSpace(adv)
+			if adv == "" || strings.HasPrefix(adv, standingLabel) || strings.HasPrefix(adv, "in .deja/memory.jsonl") {
+				continue
+			}
+			for _, p := range extractLeadTargetPaths(adv) {
+				paths[strings.ToLower(p)] = true
+			}
+			if _, rest, ok := strings.Cut(adv, " — "); ok {
+				for sfx := range strings.SplitSeq(rest, " — ") {
+					sfx = strings.TrimSpace(sfx)
+					if strings.HasPrefix(sfx, "callers of ") {
+						if _, after, ok := strings.Cut(sfx, ": "); ok {
+							for part := range strings.SplitSeq(after, ",") {
+								if p := cleanTargetPathToken(part); p != "" {
+									paths[strings.ToLower(p)] = true
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return paths
+}
+
+func lineAddsNewTargetPath(existingNudge, candidateLine string) bool {
+	if candidateLine == "" {
+		return false
+	}
+	candPaths := extractLeadTargetPaths(candidateLine)
+	if len(candPaths) == 0 {
+		return !nudgeHasLocalizedGuidance(existingNudge)
+	}
+	existing := extractAllGuidancePaths(existingNudge)
+	for _, p := range candPaths {
+		if !existing[strings.ToLower(p)] {
+			return true
+		}
+	}
+	return false
+}
+
+func nudgeHasLocalizedGuidance(nudge string) bool {
+	if strings.Contains(nudge, "likely targets:") ||
+		strings.Contains(nudge, "likely target:") ||
+		strings.Contains(nudge, "defined in ") {
+		return true
+	}
+	return len(extractAllGuidancePaths(nudge)) > 0
+}
+
+func textHasLiveGuardrail(s string) bool {
+	for _, m := range []string{standingLabel, repoDecisionLabel, decisionLabel, modelOrderLabel, revertedLabel, breakageLabel} {
+		if m != "" && strings.Contains(s, m) {
+			return true
+		}
+	}
+	return false
+}
+
+func textHasLiveTestRecipe(s string) bool {
+	low := strings.ToLower(s)
+	for _, m := range []string{"go test", "pytest", "cargo test", "npm test", "test target:", "verified"} {
+		if strings.Contains(low, m) {
+			return true
+		}
+	}
+	return false
+}
+
+func compactTargetSupplementLine(existing, candidate string) string {
+	return compactTargetSupplementLineWithPrefix(existing, candidate, "files edited there: ", 3)
+}
+
+func compactTargetSupplementLineWithPrefix(existing, candidate, prefix string, maxPaths int) string {
+	if candidate == "" {
+		return ""
+	}
+	if !nudgeHasLocalizedGuidance(existing) {
+		return candidate
+	}
+	existingPaths := extractAllGuidancePaths(existing)
+	existingLow := strings.ToLower(existing)
+	var newPaths []string
+	seen := map[string]bool{}
+	for _, p := range extractLeadTargetPaths(candidate) {
+		lowP := strings.ToLower(p)
+		if p == "" || seen[lowP] || existingPaths[lowP] || strings.Contains(existingLow, lowP) {
+			continue
+		}
+		seen[lowP] = true
+		newPaths = append(newPaths, p)
+		if maxPaths > 0 && len(newPaths) >= maxPaths {
+			break
+		}
+	}
+	if len(newPaths) == 0 {
+		return ""
+	}
+	var out strings.Builder
+	out.WriteString(prefix)
+	out.WriteString(strings.Join(newPaths, ", "))
+	parts := strings.Split(candidate, " — ")
+	if len(parts) > 1 {
+		needGuard := !textHasLiveGuardrail(existing)
+		needTest := !textHasLiveTestRecipe(existing)
+		for _, seg := range parts[1:] {
+			seg = strings.TrimSpace(seg)
+			if seg == "" {
+				continue
+			}
+			tagged := " — " + seg
+			if needGuard && textHasLiveGuardrail(tagged) {
+				out.WriteString(tagged)
+				needGuard = false
+				continue
+			}
+			if needTest && textHasLiveTestRecipe(tagged) {
+				out.WriteString(tagged)
+				needTest = false
+			}
+		}
+	}
+	return out.String()
+}
+
 func attachRankedConsensusFallback(
-	dir, cwd, sessionID, nudge string,
+	dir, cwd, sessionID, asked, nudge string,
 	ranked []model.Session,
 	matched, strong []int,
 	seen, skip map[string]bool,
 	dryRun bool,
 ) string {
-	if strings.Contains(nudge, "likely target:") {
+	rcLine, rcTok := rankedTouchedConsensusLineForPrompt(dir, cwd, asked, ranked, matched, strong, seen, skip)
+	if rcLine == "" || !lineAddsNewTargetPath(nudge, rcLine) {
 		return nudge
 	}
-	rcLine, rcTok := rankedTouchedConsensusLine(dir, cwd, ranked, matched, strong, seen, skip)
-	if rcLine == "" {
+	compact := compactTargetSupplementLine(nudge, rcLine)
+	if compact == "" {
 		return nudge
 	}
 	if !dryRun {
 		rememberInjectedIDs(dir, sessionID, rcTok)
 	}
-	return joinPromptAdvisories(nudge, rcLine)
+	return joinPromptAdvisories(nudge, compact)
 }
 
 func buildWeakPromptPointerBody(
-	dir, cwd string,
+	dir, cwd, asked string,
 	ss []model.Session,
 	terms []string,
 	nudge string,
@@ -533,10 +725,12 @@ func buildWeakPromptPointerBody(
 	matched, strong []int,
 	seen, skip map[string]bool,
 ) string {
-	ptr := weakRecallPointerIn(dir, cwd, ss, terms, skip)
-	if !strings.Contains(ptr, "files edited ") && !strings.Contains(nudge, "likely target:") {
-		if rcLine, _ := rankedTouchedConsensusLine(dir, cwd, ranked, matched, strong, seen, skip); rcLine != "" {
-			ptr += rcLine + "\n"
+	ptr := weakRecallPointerAskedWithNudgeIn(dir, cwd, asked, ss, terms, nudge, skip)
+	if !strings.Contains(ptr, "files edited ") {
+		if rcLine, _ := rankedTouchedConsensusLineForPrompt(dir, cwd, asked, ranked, matched, strong, seen, skip); rcLine != "" && lineAddsNewTargetPath(nudge, rcLine) {
+			if compact := compactTargetSupplementLine(nudge, rcLine); compact != "" {
+				ptr += compact + "\n"
+			}
 		}
 	}
 	body := ptr + shownInjectionWarning(ss, ss[:1])
@@ -592,12 +786,26 @@ func promptDigestBody(dir, sessionID string, ss []model.Session, confident bool,
 }
 
 func promptDigestBodyIn(dir, cwd, sessionID string, ss []model.Session, confident bool, terms []string, idfOf map[string]float64, asked, nudge, rejectedWarning string, ranked []model.Session, matched, strong []int, skip map[string]bool) (string, bool) {
-	cwdProjects := digest.ProjectNameCandidates(cwd)
+	return promptDigestBodyWithLead(dir, cwd, sessionID, !blockAlreadySentThisSession(dir, sessionID), ss, confident, terms, idfOf, asked, nudge, rejectedWarning, ranked, matched, strong, skip)
+}
+
+func promptDigestBodyWithLead(dir, cwd, sessionID string, includeLead bool, ss []model.Session, confident bool, terms []string, idfOf map[string]float64, asked, nudge, rejectedWarning string, ranked []model.Session, matched, strong []int, skip map[string]bool) (string, bool) {
+	cwdProjects := cachedProjectNameCandidates(cwd)
+	lead := ""
+	if includeLead {
+		lead = promptHookLead
+	}
 	// Hand the digest the query's words most-identifying first. It has no
 	// way of its own to tell "mm_status" from "decide", and the session
 	// that answers often says both — measured live, ten of the answers
 	// this hook newly returns open on the ordinary word.
-	digestText, shown := search.AutoRecallDigestShowing(ss, digestBudget(confident), byIdentifying(terms, idfOf), asked)
+	budget := digestBudget(confident)
+	if !includeLead {
+		budget = min(budget, max(190, 320-min(len(nudge), 130)))
+	} else if nudge != "" {
+		budget = max(280, budget-len(lead)/2-min(len(nudge), 420)-130)
+	}
+	digestText, shown := search.AutoRecallDigestShowing(ss, budget, byIdentifying(terms, idfOf), asked)
 	if strings.TrimSpace(digestText) == "" {
 		return "", false
 	}
@@ -637,23 +845,60 @@ func promptDigestBodyIn(dir, cwd, sessionID string, ss []model.Session, confiden
 		rejectedWarning = shownInjectionWarning(ss, shown)
 	}
 	actionLine := ""
-	if !strings.Contains(nudge, "likely target:") {
-		al := sessionActionMapLineForPrompt(dir, cwd, asked, actionSources, skip)
-		if al == "" {
-			al, _ = rankedTouchedConsensusLine(dir, cwd, ranked, matched, strong, nil, skip)
+	al := sessionActionMapLineForPrompt(dir, cwd, asked, actionSources, skip)
+	var rc string
+	if len(ranked) > 0 {
+		rc, _ = rankedTouchedConsensusLineForPrompt(dir, cwd, asked, ranked, matched, strong, nil, skip)
+	}
+	if al == "" {
+		al = rc
+	} else if rc != "" {
+		alPaths := extractLeadTargetPaths(al)
+		rcPaths := extractLeadTargetPaths(rc)
+		if len(alPaths) < 3 && len(rcPaths) > 0 {
+			seenPath := make(map[string]bool, 3)
+			var merged []string
+			addPath := func(p string) {
+				if p == "" || seenPath[p] || len(merged) >= 3 {
+					return
+				}
+				seenPath[p] = true
+				merged = append(merged, p)
+			}
+			if len(alPaths) < 2 && strings.HasPrefix(rc, "files edited in related sessions:") {
+				for _, p := range rcPaths {
+					addPath(p)
+				}
+				for _, p := range alPaths {
+					addPath(p)
+				}
+			} else {
+				for _, p := range alPaths {
+					addPath(p)
+				}
+				for _, p := range rcPaths {
+					addPath(p)
+				}
+			}
+			if len(merged) > len(alPaths) {
+				if formatted := formatLocalizedTargetsLine(dir, cwd, "files edited there: ", merged, skip); formatted != "" {
+					al = formatted
+				}
+			}
 		}
-		if al != "" {
+	}
+	if al != "" && lineAddsNewTargetPath(nudge, al) {
+		if compact := compactTargetSupplementLine(nudge, al); compact != "" {
 			if !strings.HasSuffix(digestText, "\n") {
 				digestText += "\n"
 			}
-			actionLine = al + "\n"
+			actionLine = compact + "\n"
 		}
 	}
 	tail := openerLine(cite, byIdentifying(terms, idfOf))
 	if nudge != "" {
 		tail += "\n" + nudge
 	}
-	lead := promptHookLead
 	// After the first block of a session the two explanatory sentences are
 	// words the agent has already read, and the third repeats the line this
 	// block ends with. In real-world stores, a session receives a median
@@ -671,9 +916,7 @@ func promptDigestBodyIn(dir, cwd, sessionID string, ss []model.Session, confiden
 	// The untrusted-data frame is a different matter and stays on every
 	// block: dropping its sentence doubled how often a directive planted in
 	// the recalled text was obeyed (8/48 against 19/48).
-	if blockAlreadySentThisSession(dir, sessionID) {
-		lead = ""
-	}
+	_ = sessionID
 	// A repeat of the question itself is a different claim than a session
 	// about the subject, and a stronger one: the agent does not have to
 	// decide whether the history is relevant, only whether the answer
@@ -681,7 +924,9 @@ func promptDigestBodyIn(dir, cwd, sessionID string, ss []model.Session, confiden
 	// substantial questions are asked again in a later session, and the
 	// exact-match counter in `deja stats` sees a fifth of them.
 	if again := search.AskedBefore(cite, terms); again != "" {
-		lead = repeatLead(cite, again)
+		if includeLead {
+			lead = repeatLead(cite, again)
+		}
 		tail = repeatOpener(cite, again)
 		if nudge != "" {
 			tail += "\n" + nudge
@@ -705,6 +950,7 @@ type promptPicker struct {
 	leadTerms []string
 	unscoped  bool
 	cwdPlain  string
+	cwd       string
 
 	ss        []model.Session
 	confident bool
@@ -723,6 +969,19 @@ type promptPicker struct {
 
 // pick walks one ranking and takes the sessions worth injecting.
 func (p *promptPicker) pick(ranked []model.Session, matched, strong, naming []int) {
+	strongNative := search.IdentifyingTerms(p.terms, p.idfOf, p.topIDF)
+	if len(strongNative) > 0 {
+		projSelf := selfProjectWordSet(p.cwd)
+		filtered := strongNative[:0]
+		for _, t := range strongNative {
+			low := strings.ToLower(t)
+			if projSelf[low] || isHexHashLike(low) {
+				continue
+			}
+			filtered = append(filtered, t)
+		}
+		strongNative = filtered
+	}
 	for i, s := range ranked {
 		if len(p.ss) > 0 && !p.deadline.IsZero() && time.Now().After(p.deadline) {
 			return
@@ -754,6 +1013,19 @@ func (p *promptPicker) pick(ranked []model.Session, matched, strong, naming []in
 		if !search.RecallWorthShowingNaming(p.terms, matched[i], strong[i], named, p.idfOf) {
 			continue
 		}
+		// The session being written right now is never worth recalling to
+		// itself. Work merely fresh is a different case: "what did we just
+		// change" is a question about the last ten minutes, so age alone no
+		// longer withholds an answer — it only withholds the unprompted
+		// déjà vu line below.
+		//
+		// Asked before bridged anchoring and narrowing below: narrowing scans
+		// every message, the session being written is usually the longest one
+		// on the store, and it was scanned in full only to be dropped right
+		// after.
+		if p.self[s.ID] {
+			continue
+		}
 		// A word rare enough to identify something is a real match on its own —
 		// the bar just above says so in as many words, and lets such a question
 		// through. The payload rule did not: it asked only for two informative
@@ -765,25 +1037,24 @@ func (p *promptPicker) pick(ranked []model.Session, matched, strong, naming []in
 		// "напомни, что мы решали про X" returned content 63% of the time and
 		// "what did we decide about X" returned it never — the same question,
 		// the same answer sitting in the same session.
-		if matched[i] >= 2 {
-			p.confident = true
+		hasStrongNative := len(strongNative) > 0 && search.SpeechCarriesAnyTerm(s, strongNative)
+		askedHit := search.AskedBefore(s, p.terms) != ""
+		shortAskedHit := askedHit && len(p.terms) <= 6
+		unanchoredBridged := false
+		if named < 0 {
+			unanchoredBridged = !hasStrongNative && !askedHit
 		}
-		if matched[i] >= 2 || strong[i] >= 1 {
-			p.worthDigest = true
-		}
-		// The session being written right now is never worth recalling to
-		// itself. Work merely fresh is a different case: "what did we just
-		// change" is a question about the last ten minutes, so age alone no
-		// longer withholds an answer — it only withholds the unprompted
-		// déjà vu line below.
-		//
-		// Asked before the narrowing below, not after: narrowing scans every
-		// message, the session being written is usually the longest one on the
-		// store, and it was scanned in full only to be dropped on the next
-		// line. Measured on a 1149-session store, moving these two checks up
-		// takes the hook's median from 181 ms to 136 ms.
-		if p.self[s.ID] {
-			continue
+		if !unanchoredBridged {
+			if matched[i] >= 2 {
+				p.confident = true
+			}
+			if named < 0 {
+				if (hasStrongNative && matched[i] >= 2) || shortAskedHit {
+					p.worthDigest = true
+				}
+			} else if matched[i] >= 2 || (strong[i] >= 1 && (len(p.terms) <= 2 || shortAskedHit || (hasStrongNative && len(p.terms) <= 4))) {
+				p.worthDigest = true
+			}
 		}
 		if !p.leadTermsMeet(s) {
 			// The subject matched, but only where a tool printed it: a
@@ -847,12 +1118,12 @@ func (p *promptPicker) pick(ranked []model.Session, matched, strong, naming []in
 // Asking a long session for three words together instead of two was
 // measured too: it emptied 2 of 5 blocks that answered the prompt.
 func (p *promptPicker) leadTermsMeet(s model.Session) bool {
-	if fixedNamed := namedLeadTerms(p.leadTerms, p.idfOf, 1e9); len(fixedNamed) >= 2 {
+	if fixedNamed := namedLeadTerms(p.orderedTerms, p.idfOf, 1e9); len(fixedNamed) >= 2 {
 		sort.SliceStable(fixedNamed, func(i, j int) bool {
 			return p.idfOf[fixedNamed[i]] > p.idfOf[fixedNamed[j]]
 		})
-		if len(fixedNamed) > 2 {
-			fixedNamed = fixedNamed[:2]
+		if len(fixedNamed) > 4 {
+			fixedNamed = fixedNamed[:4]
 		}
 		for _, t := range fixedNamed {
 			if !search.SpeechCarriesAnyTerm(s, []string{t}) && !projectMatchesAnyTerm(s.Project, []string{t}) {
@@ -1543,7 +1814,7 @@ func pinExtractedLiveRule(dir, cwd, sessionID, ruleText string, extraSyms ...str
 		root := sources.RepoRoot(cwd)
 		if root != "" {
 			targets = append(targets, filepath.Join(root, ".deja", "live_rules.jsonl"))
-		} else if len(digest.ProjectNameCandidates(cwd)) > 0 {
+		} else if len(cachedProjectNameCandidates(cwd)) > 0 {
 			targets = append(targets, filepath.Join(cwd, ".deja", "live_rules.jsonl"))
 		}
 	}
@@ -1660,7 +1931,7 @@ func sessionStandingRuleLine(dir, cwd, sessionID, asked string, seen map[string]
 	if cwd != "" {
 		if root := sources.RepoRoot(cwd); root != "" {
 			paths = append(paths, filepath.Join(root, ".deja", "live_rules.jsonl"))
-		} else if len(digest.ProjectNameCandidates(cwd)) > 0 {
+		} else if len(cachedProjectNameCandidates(cwd)) > 0 {
 			paths = append(paths, filepath.Join(cwd, ".deja", "live_rules.jsonl"))
 		}
 	}

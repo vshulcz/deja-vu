@@ -499,10 +499,18 @@ func digestBudget(confident bool) int {
 // digest on a hint is where most of deja's unprompted context cost went.
 // Naming the topic and the date is what makes the pointer worth following.
 func weakRecallPointer(ss []model.Session, terms []string) string {
-	return weakRecallPointerIn("", "", ss, terms, nil)
+	return weakRecallPointerAskedIn("", "", "", ss, terms, nil)
 }
 
 func weakRecallPointerIn(dir, cwd string, ss []model.Session, terms []string, skip map[string]bool) string {
+	return weakRecallPointerAskedIn(dir, cwd, "", ss, terms, skip)
+}
+
+func weakRecallPointerAskedIn(dir, cwd, asked string, ss []model.Session, terms []string, skip map[string]bool) string {
+	return weakRecallPointerAskedWithNudgeIn(dir, cwd, asked, ss, terms, "", skip)
+}
+
+func weakRecallPointerAskedWithNudgeIn(dir, cwd, asked string, ss []model.Session, terms []string, nudge string, skip map[string]bool) string {
 	if len(ss) == 0 {
 		return ""
 	}
@@ -535,8 +543,14 @@ func weakRecallPointerIn(dir, cwd string, ss []model.Session, terms []string, sk
 	}
 	out := fmt.Sprintf("deja: this project has history on %q from %s%s — call deja in \"recall\" mode (or recall) with a specific token if it matters here.\n",
 		search.SafeLine(topic), when, more)
-	if actionLine := sessionActionMapLineForPrompt(dir, cwd, strings.Join(terms, " "), ss, skip); actionLine != "" {
-		out += actionLine + "\n"
+	actionAsked := asked
+	if strings.TrimSpace(actionAsked) == "" {
+		actionAsked = strings.Join(terms, " ")
+	}
+	if actionLine := sessionActionMapLineForPrompt(dir, cwd, actionAsked, ss, skip); actionLine != "" && lineAddsNewTargetPath(nudge, actionLine) {
+		if compact := compactTargetSupplementLine(nudge, actionLine); compact != "" {
+			out += compact + "\n"
+		}
 	}
 	return out
 }

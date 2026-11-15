@@ -90,3 +90,43 @@ func TestAnAbsentSubjectIsNotBridgedTo(t *testing.T) {
 		}
 	}
 }
+
+func TestUnseenStrongSubjectBlocksVerbNeighbourBridge(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	dir := filepath.Join(tmp, "idx")
+	sessions := make([]model.Session, 0, 86)
+	for i := range 80 {
+		sessions = append(sessions, model.Session{
+			ID: fmt.Sprintf("bg%02d", i), Harness: "claude", Project: "other", Updated: time.Now(),
+			Messages: []model.Message{{Role: "user", Text: "weekly changelog cleanup and invoice check"}},
+		})
+	}
+	// Three sessions tie "postpone" and "backlog" inside project "home".
+	for i := range 3 {
+		sessions = append(sessions, model.Session{
+			ID: fmt.Sprintf("pair%02d", i), Harness: "claude", Project: "home", Updated: time.Now(),
+			Messages: []model.Message{{Role: "user", Text: "we will postpone that item until the backlog review"}},
+		})
+	}
+	// Rare subject "ambergris" lives only in "away", never in "home".
+	sessions = append(sessions, model.Session{
+		ID: "away01", Harness: "claude", Project: "away", Updated: time.Now(),
+		Messages: []model.Message{{Role: "user", Text: "ambergris shard rotation uses a 12h lease"}},
+	})
+	if err := os.MkdirAll(filepath.Join(dir+".tmp", "buckets"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeSessions(dir+".tmp", dir, sessions, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	ranked, matched, strong, naming, _, err := ProjectRelevantNaming(dir, []string{"home"}, []string{"postpone", "ambergris"}, 5, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, s := range ranked {
+		if matched[i] >= 2 || strong[i] >= 2 || naming[i] > 0 {
+			t.Fatalf("unexpected cross-project bridge on %q: matched=%d strong=%d naming=%d",
+				s.ID, matched[i], strong[i], naming[i])
+		}
+	}
+}

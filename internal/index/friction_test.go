@@ -254,3 +254,18 @@ func TestFrictionSignatureFoldsZshEqualsAndIncludeGlobs(t *testing.T) {
 		t.Fatalf("expected --include=<glob> zsh errors to share one signature: ok1=%v ok2=%v %x vs %x", ok1, ok2, inc1, inc2)
 	}
 }
+
+func TestFrictionLineRecognisesAddressAlreadyInUse(t *testing.T) {
+	lineGo, sigGo, okGo := FrictionSignature("listen tcp 127.0.0.1:8080: bind: address already in use")
+	if !okGo || lineGo == "" {
+		t.Fatalf("expected bind address already in use to match friction, got ok=%v line=%q", okGo, lineGo)
+	}
+	_, sigGoAltPort, okAlt := FrictionSignature("listen tcp 127.0.0.1:9090: bind: address already in use")
+	if !okAlt || sigGo != sigGoAltPort {
+		t.Fatalf("expected different ports to share signature: ok=%v %x vs %x", okAlt, sigGo, sigGoAltPort)
+	}
+	lineNode, _, okNode := FrictionSignature("Error: listen EADDRINUSE: address already in use :::3000")
+	if !okNode || lineNode == "" {
+		t.Fatalf("expected EADDRINUSE line to match friction, got ok=%v line=%q", okNode, lineNode)
+	}
+}

@@ -147,8 +147,8 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 		// fleet works against a stale index until its parent types something
 		// (#2567). requestWarmup writes a sentinel and detaches a child; the
 		// action pays neither the read nor the wait.
+		// Keep running index-free repo-memory and AST/symbol recovery on cold stores.
 		requestWarmup(dir)
-		return nil
 	}
 	// A payload the decoder could not read has no tool name either, and the
 	// gate below would drop it before the salvage a few lines down. Read the
@@ -520,10 +520,14 @@ func fixPairLineFor(dir, cwd, command, output string) string {
 	}
 	// A few, not one: the newest pair for an error can be a remedy that failed,
 	// and silence is the wrong answer when the one behind it worked.
+	ready := planIndexReady(dir)
 	allowHere := func(project string) bool {
 		return pol.Allows(policy.ActivationAuto, project) && !others(project)
 	}
-	pairs := index.FixesForCommand(dir, command, output, 4, allowHere)
+	var pairs []index.FixPair
+	if ready {
+		pairs = index.FixesForCommand(dir, command, output, 4, allowHere)
+	}
 	for _, p := range pairs {
 		if p.Candidate || orientSkipFixPairForHook(p) {
 			continue
@@ -540,6 +544,9 @@ func fixPairLineFor(dir, cwd, command, output string) string {
 	}
 	if line := failingTestSourceLine(cwd, output, pol); line != "" {
 		return line
+	}
+	if !ready {
+		return ""
 	}
 	for _, p := range pairs {
 		if !p.Candidate || orientSkipFixPairForHook(p) {
@@ -769,22 +776,31 @@ func relativizeToScanRoot(scanRoot, diskPath, fallback string) string {
 	return fallback
 }
 
-func resolveFailingTargetSnippet(scanRoot string, tree repoFileTree, target failingTestTarget) string {
-	rel := target.filePart
-	if resolved := tree.resolveRel(target.filePart); resolved != "" {
+func resolveSourceTargetPath(scanRoot string, tree repoFileTree, filePart string) (diskPath, rel string) {
+	rawTrim := strings.TrimSpace(filePart)
+	rel = filepath.ToSlash(rawTrim)
+	for strings.HasPrefix(rel, "./") {
+		rel = rel[2:]
+	}
+	if resolved := tree.resolveRel(rel); resolved != "" {
 		rel = resolved
 	}
-	diskPath := rel
+	diskPath = rel
 	if !filepath.IsAbs(diskPath) {
-		diskPath = filepath.Join(scanRoot, diskPath)
+		diskPath = filepath.Join(scanRoot, filepath.FromSlash(diskPath))
 	}
-	if !fileThere(diskPath) && !strings.ContainsAny(target.filePart, `/\`) {
-		diskPath, rel = locateFailingFileInScanRoot(scanRoot, target.filePart, diskPath, rel)
+	if !fileThere(diskPath) && !strings.ContainsAny(rawTrim, `/\`) {
+		diskPath, rel = locateFailingFileInScanRoot(scanRoot, rawTrim, diskPath, rel)
 	}
-	if filepath.IsAbs(rel) {
+	if filepath.IsAbs(diskPath) || filepath.IsAbs(rel) {
 		rel = relativizeToScanRoot(scanRoot, diskPath, rel)
 	}
 	rel = filepath.ToSlash(rel)
+	return diskPath, rel
+}
+
+func resolveFailingTargetSnippet(scanRoot string, tree repoFileTree, target failingTestTarget) string {
+	diskPath, rel := resolveSourceTargetPath(scanRoot, tree, target.filePart)
 	raw, err := os.ReadFile(diskPath)
 	if err != nil || len(raw) > 512<<10 {
 		return ""
@@ -807,13 +823,28 @@ func resolveFailingTargetSnippet(scanRoot string, tree repoFileTree, target fail
 			}
 		}
 	}
+	var base string
 	if curTest != "" {
-		return fmt.Sprintf("failing test line — %s:%d (%s): %s",
+		base = fmt.Sprintf("failing test line — %s:%d (%s): %s",
 			search.SafePath(rel), target.lineNo, search.SafeLine(curTest),
 			clipDecision(search.SafeText(srcLine), 140))
+	} else {
+		base = fmt.Sprintf("failing test line — %s:%d: %s",
+			search.SafePath(rel), target.lineNo, clipDecision(search.SafeText(srcLine), 140))
 	}
-	return fmt.Sprintf("failing test line — %s:%d: %s",
-		search.SafePath(rel), target.lineNo, clipDecision(search.SafeText(srcLine), 140))
+	if sut := findFailingTestSUTTarget(scanRoot, lines, target.lineNo); sut != "" {
+		return base + " | target: " + sut
+	}
+	return base
+}
+
+func findFailingTestSUTTarget(scanRoot string, lines []string, targetLineNo int) string {
+	rel, declLine, sig := resolveCallFromSourceWindow(scanRoot, lines, targetLineNo, true)
+	if rel == "" || sig == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s:%d: %s",
+		search.SafePath(rel), declLine, clipDecision(search.SafeText(sig), 110))
 }
 
 func locateFailingFileInScanRoot(scanRoot, filePart, defaultDisk, defaultRel string) (string, string) {
@@ -848,6 +879,9 @@ func compilerSymbolSignatureLine(cwd, output string, pol policy.Policy) string {
 	if cwd == "" || output == "" || !pol.Allows(policy.ActivationAuto, "") {
 		return ""
 	}
+	if line := attributeErrorSignatureLine(cwd, output); line != "" {
+		return line
+	}
 	markers := []string{
 		"not enough arguments in call to ",
 		"too many arguments in call to ",
@@ -858,8 +892,15 @@ func compilerSymbolSignatureLine(cwd, output string, pol policy.Policy) string {
 		"undefined: ",
 		"has no field or method ",
 		"cannot import name '",
+		"NameError: name '",
+		"Cannot find name '",
+		"has no exported member '",
+		"cannot find function `",
+		"cannot find value `",
+		"cannot find struct `",
 		"TypeError: ",
 	}
+	var fallbackSym, fallbackMod string
 	for line := range strings.SplitSeq(output, "\n") {
 		trimmed := strings.TrimSpace(line)
 		for _, m := range markers {
@@ -868,23 +909,1277 @@ func compilerSymbolSignatureLine(cwd, output string, pol policy.Policy) string {
 				continue
 			}
 			cand := strings.TrimSpace(after)
-			if idx := strings.IndexAny(cand, " \t'\"():;,"); idx > 0 {
+			if idx := strings.IndexAny(cand, " \t'\"`();,"); idx > 0 {
 				cand = cand[:idx]
 			}
-			if dot := strings.LastIndexByte(cand, '.'); dot >= 0 && dot+1 < len(cand) {
+			cand = strings.TrimRight(cand, ":")
+			var qual string
+			if sep := strings.LastIndex(cand, "::"); sep > 0 && sep+2 < len(cand) {
+				qual = cleanRustTypeIdent(cand[:sep])
+				cand = cand[sep+2:]
+			} else if dot := strings.LastIndexByte(cand, '.'); dot >= 0 && dot+1 < len(cand) {
+				qual = lastDotIdent(cand[:dot])
 				cand = cand[dot+1:]
 			}
 			sym := leadingIdent(cand)
-			if len(sym) < 4 {
+			if len(sym) < 3 || (qual == "" && len(sym) < 4) {
 				continue
 			}
-			if rel, lineNo, sig := findSymbolDeclarationInRepo(cwd, sym); rel != "" && sig != "" {
-				return fmt.Sprintf("symbol signature in repo — %s:%d: %s",
-					search.SafePath(rel), lineNo, clipDecision(search.SafeText(sig), 160))
+			if qual != "" {
+				if rel, lineNo, sig := findQualifiedMemberSignatureInRepo(cwd, qual, sym); rel != "" && sig != "" {
+					return formatSymbolSignatureLine(rel, lineNo, sig)
+				}
+			}
+			if len(sym) >= 4 {
+				if rel, lineNo, sig := findSymbolDeclarationInRepo(cwd, sym); rel != "" && sig != "" {
+					return formatSymbolSignatureLine(rel, lineNo, sig)
+				}
+			}
+			if qual != "" && len(sym) >= 5 && !isCommonTrivialMethod(sym) {
+				if rel, lineNo, sig := findTSMethodByNameInRepo(cwd, sym, true); rel != "" && sig != "" {
+					return formatSymbolSignatureLine(rel, lineNo, sig)
+				}
+			}
+			if fallbackSym == "" && len(sym) >= 4 && isNearMissMarker(m) {
+				fallbackSym = sym
+				fallbackMod = extractModuleHintFromErrorLine(trimmed)
 			}
 		}
 	}
+	if fallbackSym == "" {
+		if line := callErrorSourceSignatureLine(cwd, output); line != "" {
+			return line
+		}
+	}
+	if fallbackSym != "" {
+		return nearMissSymbolSignatureLine(cwd, fallbackSym, fallbackMod)
+	}
 	return ""
+}
+
+func formatSymbolSignatureLine(rel string, lineNo int, sig string) string {
+	return fmt.Sprintf("symbol signature in repo — %s:%d: %s",
+		search.SafePath(rel), lineNo, clipDecision(search.SafeText(sig), 160))
+}
+
+func lastDotIdent(prefix string) string {
+	if dot := strings.LastIndexByte(prefix, '.'); dot >= 0 && dot+1 < len(prefix) {
+		prefix = prefix[dot+1:]
+	}
+	return leadingIdent(strings.TrimSpace(prefix))
+}
+
+func findQualifiedMemberSignatureInRepo(cwd, qualifier, member string) (string, int, string) {
+	if cwd == "" || len(qualifier) < 2 || len(member) < 2 {
+		return "", 0, ""
+	}
+	for _, isMod := range []bool{false, true} {
+		_, _, members := collectTypeMembersInRepo(cwd, qualifier, isMod)
+		for _, m := range members {
+			if m.name == member && m.sig != "" {
+				return m.rel, m.lineNo, m.sig
+			}
+		}
+	}
+	return "", 0, ""
+}
+
+func findTSMethodByNameInRepo(cwd, member string, excludeTestFiles bool) (string, int, string) {
+	scanRoot := safeScanRoot(cwd)
+	if scanRoot == "" || len(member) < 4 {
+		return "", 0, ""
+	}
+	type tsScanFile struct {
+		abs string
+		rel string
+	}
+	var files []tsScanFile
+	_ = filepath.WalkDir(scanRoot, func(p string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return nil //nolint:nilerr // skip unreadable paths during symbol lookup
+		}
+		if d.IsDir() {
+			name := d.Name()
+			if p != scanRoot && (strings.HasPrefix(name, ".") || isSkippedScanDir(name) || name == "target") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if len(files) >= 300 {
+			return filepath.SkipAll
+		}
+		ext := strings.ToLower(filepath.Ext(d.Name()))
+		switch ext {
+		case ".ts", ".tsx", ".js", ".jsx", ".mjs":
+		default:
+			return nil
+		}
+		rel, rErr := filepath.Rel(scanRoot, p)
+		if rErr != nil || strings.HasPrefix(rel, "..") {
+			return nil //nolint:nilerr // ignore paths outside scanRoot
+		}
+		rel = filepath.ToSlash(rel)
+		if excludeTestFiles && isTestFilePath(rel) {
+			return nil
+		}
+		files = append(files, tsScanFile{abs: p, rel: rel})
+		return nil
+	})
+	for _, f := range files {
+		raw, err := os.ReadFile(f.abs)
+		if err != nil || len(raw) > 256<<10 {
+			continue
+		}
+		content := string(raw)
+		if !strings.Contains(content, member) {
+			continue
+		}
+		_, _, ms := parseTSTypeMembers(f.rel, "*", content)
+		for _, m := range ms {
+			if m.name == member && m.sig != "" {
+				return m.rel, m.lineNo, m.sig
+			}
+		}
+	}
+	return "", 0, ""
+}
+
+type callCandidate struct {
+	qualifier string
+	name      string
+}
+
+func resolveCallFromSourceWindow(scanRoot string, lines []string, lineNo int, excludeTestFiles bool) (string, int, string) {
+	if scanRoot == "" || lineNo < 1 || lineNo > len(lines) {
+		return "", 0, ""
+	}
+	low := max(0, lineNo-6)
+	for idx := lineNo - 1; idx >= low; idx-- {
+		trimmed := strings.TrimSpace(lines[idx])
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if idx < lineNo-1 && (testHeaderName(trimmed) != "" || startsWithDeclKeyword(trimmed)) {
+			break
+		}
+		for _, cand := range extractCallCandidates(lines[idx]) {
+			if rel, declLine, sig := resolveCallCandidateInRepo(scanRoot, cand, excludeTestFiles); rel != "" && sig != "" {
+				return rel, declLine, sig
+			}
+		}
+	}
+	return "", 0, ""
+}
+
+func resolveCallCandidateInRepo(cwd string, cand callCandidate, excludeTestFiles bool) (string, int, string) {
+	if cand.qualifier != "" {
+		if rel, lineNo, sig := findQualifiedMemberSignatureInRepo(cwd, cand.qualifier, cand.name); rel != "" && sig != "" {
+			if !excludeTestFiles || !isTestFilePath(rel) {
+				return rel, lineNo, sig
+			}
+		}
+	}
+	if len(cand.name) >= 4 {
+		if rel, lineNo, sig := findSymbolDeclarationInRepo(cwd, cand.name); rel != "" && sig != "" {
+			if !excludeTestFiles || !isTestFilePath(rel) {
+				return rel, lineNo, sig
+			}
+		}
+	}
+	if cand.qualifier != "" && len(cand.name) >= 5 && !isCommonTrivialMethod(cand.name) {
+		if rel, lineNo, sig := findTSMethodByNameInRepo(cwd, cand.name, excludeTestFiles); rel != "" && sig != "" {
+			return rel, lineNo, sig
+		}
+	}
+	return "", 0, ""
+}
+
+func isIdentContByte(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9') || b == '_'
+}
+
+func isIdentStartByte(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || b == '_'
+}
+
+func readIdentBackward(s string, end int) (string, int) {
+	j := end
+	for j > 0 && isIdentContByte(s[j-1]) {
+		j--
+	}
+	if j == end || !isIdentStartByte(s[j]) {
+		return "", end
+	}
+	return s[j:end], j
+}
+
+func isSkippedCallName(qual, name string) bool {
+	switch strings.ToLower(qual) {
+	case "t", "b", "assert", "require", "pytest", "expect", "fmt", "strings", "strconv", "errors", "os", "filepath", "json", "console", "math":
+		return true
+	}
+	switch name {
+	case "if", "for", "while", "switch", "match", "catch", "return", "sizeof", "typeof",
+		"len", "cap", "make", "new", "append", "copy", "delete", "close", "panic", "recover",
+		"print", "println", "printf", "format", "assert", "assert_eq", "assert_ne",
+		"expect", "toEqual", "toBe", "toThrow", "isinstance", "range", "list", "dict", "set", "str", "int", "float", "bool", "super", "Super":
+		return true
+	}
+	return false
+}
+
+func isCommonTrivialMethod(name string) bool {
+	switch strings.ToLower(name) {
+	case "apply", "reset", "close", "clear", "parse", "write", "fetch", "build", "render", "value", "clone", "start", "check":
+		return true
+	default:
+		return false
+	}
+}
+
+func extractCallCandidates(line string) []callCandidate {
+	var out []callCandidate
+	seen := map[string]bool{}
+	var quote byte
+	escaped := false
+	for i := range len(line) {
+		c := line[i]
+		if quote != 0 {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if c == '\\' && quote != '`' {
+				escaped = true
+				continue
+			}
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		if c == '"' || c == '\'' || c == '`' {
+			quote = c
+			continue
+		}
+		if c == '/' && i+1 < len(line) && line[i+1] == '/' {
+			break
+		}
+		if c == '#' && (i == 0 || line[i-1] == ' ' || line[i-1] == '\t') {
+			break
+		}
+		if c != '(' {
+			continue
+		}
+		end := i
+		for end > 0 && (line[end-1] == ' ' || line[end-1] == '\t') {
+			end--
+		}
+		if end > 0 && line[end-1] == '>' {
+			if lt := strings.LastIndexByte(line[:end-1], '<'); lt > 0 && end-lt <= 64 && !strings.ContainsAny(line[lt:end], ";{}") {
+				end = lt
+				if end >= 2 && line[end-2] == ':' && line[end-1] == ':' {
+					end -= 2
+				}
+			}
+		}
+		name, nameStart := readIdentBackward(line, end)
+		if len(name) < 3 {
+			continue
+		}
+		var qual string
+		if nameStart >= 2 && line[nameStart-2] == ':' && line[nameStart-1] == ':' {
+			qual, _ = readIdentBackward(line, nameStart-2)
+		} else if nameStart >= 1 && line[nameStart-1] == '.' {
+			qual, _ = readIdentBackward(line, nameStart-1)
+		}
+		if qual == "this" || qual == "self" || qual == "cls" {
+			qual = ""
+		}
+		if isSkippedCallName(qual, name) {
+			continue
+		}
+		key := qual + "." + name
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, callCandidate{qualifier: qual, name: name})
+	}
+	return out
+}
+
+func looksLikeCallError(output string) bool {
+	if strings.Contains(output, "error TS2554") || strings.Contains(output, "error TS2555") ||
+		strings.Contains(output, "error TS2345") || strings.Contains(output, "error TS2349") ||
+		strings.Contains(output, "error TS2769") ||
+		strings.Contains(output, "error[E0061]") || strings.Contains(output, "error[E0308]") ||
+		strings.Contains(output, "TypeError:") ||
+		strings.Contains(output, "not enough arguments") || strings.Contains(output, "too many arguments") ||
+		strings.Contains(output, "too few arguments") || strings.Contains(output, "Missing positional argument") ||
+		strings.Contains(output, "Unexpected keyword argument") || strings.Contains(output, "[call-arg]") ||
+		strings.Contains(output, "this function takes ") || strings.Contains(output, "this method takes ") ||
+		strings.Contains(output, "mismatched types") || strings.Contains(output, "in argument to ") ||
+		strings.Contains(output, "positional argument") {
+		return true
+	}
+	return strings.Contains(output, "Expected ") && strings.Contains(output, "argument")
+}
+
+func extractCallSiteTargets(output string) []failingTestTarget {
+	var targets []failingTestTarget
+	seen := map[string]bool{}
+	add := func(filePart string, lineNo int) {
+		if filePart == "" || lineNo <= 0 || !isCodeExtForSymbolScan(strings.ToLower(filepath.Ext(filePart))) {
+			return
+		}
+		key := fmt.Sprintf("%s:%d", filePart, lineNo)
+		if !seen[key] {
+			seen[key] = true
+			targets = append(targets, failingTestTarget{filePart: filePart, lineNo: lineNo})
+		}
+	}
+	for line := range strings.SplitSeq(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if rest, ok := strings.CutPrefix(trimmed, `File "`); ok {
+			if qIdx := strings.IndexByte(rest, '"'); qIdx > 0 {
+				filePart := rest[:qIdx]
+				if !strings.HasPrefix(filePart, "<") && !strings.Contains(filePart, "site-packages") &&
+					!strings.Contains(filePart, "/venv/") && !strings.Contains(filePart, "/.venv/") &&
+					!strings.Contains(filePart, "/lib/python") {
+					if _, afterLine, ok := strings.Cut(rest[qIdx+1:], ", line "); ok {
+						numStr := strings.TrimSpace(afterLine)
+						if comma := strings.IndexAny(numStr, ", "); comma >= 0 {
+							numStr = numStr[:comma]
+						}
+						if n, err := strconv.Atoi(numStr); err == nil {
+							add(filePart, n)
+						}
+					}
+				}
+			}
+		}
+		for tok := range strings.FieldsSeq(trimmed) {
+			tok = strings.TrimRight(strings.Trim(tok, "\"'`[],;!?{}<>❯"), ":")
+			if tok == "" {
+				continue
+			}
+			if strings.HasSuffix(tok, ")") {
+				if lp := strings.LastIndexByte(tok, '('); lp > 0 {
+					filePart := tok[:lp]
+					inside := tok[lp+1 : len(tok)-1]
+					if comma := strings.IndexByte(inside, ','); comma >= 0 {
+						inside = inside[:comma]
+					}
+					if n, err := strconv.Atoi(strings.TrimSpace(inside)); err == nil {
+						add(filePart, n)
+						continue
+					}
+				}
+			}
+			if colon1 := strings.IndexByte(tok, ':'); colon1 > 0 {
+				filePart := tok[:colon1]
+				rest := tok[colon1+1:]
+				if colon2 := strings.IndexByte(rest, ':'); colon2 >= 0 {
+					rest = rest[:colon2]
+				}
+				if n, err := strconv.Atoi(rest); err == nil {
+					add(filePart, n)
+				}
+			}
+		}
+	}
+	return targets
+}
+
+func callErrorSourceSignatureLine(cwd, output string) string {
+	if !looksLikeCallError(output) {
+		return ""
+	}
+	targets := extractCallSiteTargets(output)
+	if len(targets) == 0 {
+		return ""
+	}
+	scanRoot := safeScanRoot(cwd)
+	if scanRoot == "" {
+		return ""
+	}
+	tree := orientRepoTree(scanRoot)
+	for _, target := range targets {
+		diskPath, _ := resolveSourceTargetPath(scanRoot, tree, target.filePart)
+		raw, err := os.ReadFile(diskPath)
+		if err != nil || len(raw) > 512<<10 {
+			continue
+		}
+		lines := strings.Split(string(raw), "\n")
+		if rel, declLine, sig := resolveCallFromSourceWindow(scanRoot, lines, target.lineNo, true); rel != "" && sig != "" {
+			return formatSymbolSignatureLine(rel, declLine, sig)
+		}
+	}
+	return ""
+}
+
+func isNearMissMarker(marker string) bool {
+	switch marker {
+	case "undefined: ",
+		"has no field or method ",
+		"cannot import name '",
+		"NameError: name '",
+		"Cannot find name '",
+		"has no exported member '",
+		"cannot find function `",
+		"cannot find value `",
+		"cannot find struct `":
+		return true
+	default:
+		return false
+	}
+}
+
+func extractModuleHintFromErrorLine(line string) string {
+	for _, pat := range []string{" from '", " from \"", "Module '\"", "Module \"'"} {
+		_, after, ok := strings.Cut(line, pat)
+		if !ok {
+			continue
+		}
+		if end := strings.IndexAny(after, "'\""); end > 0 {
+			mod := strings.TrimSpace(after[:end])
+			mod = strings.TrimPrefix(mod, "./")
+			mod = strings.TrimPrefix(mod, "../")
+			mod = strings.TrimPrefix(mod, "@/")
+			return strings.ReplaceAll(mod, ".", "/")
+		}
+	}
+	return ""
+}
+
+func attributeErrorSignatureLine(cwd, output string) string {
+	for line := range strings.SplitSeq(output, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		typeName, attr, isModule, ok := parseAttributeErrorLine(trimmed)
+		if !ok {
+			continue
+		}
+		if hint := lookupTypeMemberHint(cwd, typeName, attr, isModule); hint != "" {
+			return hint
+		}
+	}
+	return ""
+}
+
+func parseAttributeErrorLine(line string) (typeName, attr string, isModule, ok bool) {
+	if _, after, found := strings.Cut(line, "AttributeError: module '"); found {
+		if mod, rest, foundAttr := strings.Cut(after, "' has no attribute '"); foundAttr {
+			name, _, _ := strings.Cut(rest, "'")
+			attr = leadingIdent(strings.TrimSpace(name))
+			if mod != "" && len(attr) >= 2 {
+				return strings.TrimSpace(mod), attr, true, true
+			}
+		}
+	}
+	if _, after, found := strings.Cut(line, "AttributeError: '"); found {
+		if typ, rest, foundAttr := strings.Cut(after, "' object has no attribute '"); foundAttr {
+			name, _, _ := strings.Cut(rest, "'")
+			if dot := strings.LastIndexByte(typ, '.'); dot >= 0 && dot+1 < len(typ) {
+				typ = typ[dot+1:]
+			}
+			typeName = leadingIdent(strings.TrimSpace(typ))
+			attr = leadingIdent(strings.TrimSpace(name))
+			if len(typeName) >= 2 && len(attr) >= 2 {
+				return typeName, attr, false, true
+			}
+		}
+	}
+	if _, after, found := strings.Cut(line, "Property '"); found {
+		if prop, rest, foundType := strings.Cut(after, "' does not exist on type '"); foundType {
+			typ, _, _ := strings.Cut(rest, "'")
+			typeName = cleanTSTypeIdent(typ)
+			attr = leadingIdent(strings.TrimSpace(prop))
+			if len(typeName) >= 2 && len(attr) >= 2 {
+				return typeName, attr, false, true
+			}
+		}
+	}
+	if strings.Contains(line, "Object literal may only specify known properties") {
+		if idx := strings.Index(line, "' does not exist in type '"); idx > 0 {
+			before := line[:idx]
+			if q := strings.LastIndexByte(before, '\''); q >= 0 && q+1 < len(before) {
+				prop := before[q+1:]
+				rest := line[idx+len("' does not exist in type '"):]
+				typ, _, _ := strings.Cut(rest, "'")
+				typeName = cleanTSTypeIdent(typ)
+				attr = leadingIdent(strings.TrimSpace(prop))
+				if len(typeName) >= 2 && len(attr) >= 2 {
+					return typeName, attr, false, true
+				}
+			}
+		}
+	}
+	if _, after, found := strings.Cut(line, "no method named `"); found {
+		if method, rest, foundFor := strings.Cut(after, "` found for "); foundFor {
+			if _, inTick, hasTick := strings.Cut(rest, "`"); hasTick {
+				typ, _, _ := strings.Cut(inTick, "`")
+				typeName = cleanRustTypeIdent(typ)
+				attr = leadingIdent(strings.TrimSpace(method))
+				if len(typeName) >= 2 && len(attr) >= 2 {
+					return typeName, attr, false, true
+				}
+			}
+		}
+	}
+	if _, after, found := strings.Cut(line, "struct `"); found {
+		if typPart, rest, hasField := strings.Cut(after, "` has no field named `"); hasField {
+			fieldName, _, _ := strings.Cut(rest, "`")
+			typeName = cleanRustTypeIdent(typPart)
+			attr = leadingIdent(strings.TrimSpace(fieldName))
+			if len(typeName) >= 2 && len(attr) >= 2 {
+				return typeName, attr, false, true
+			}
+		}
+	}
+	if _, after, found := strings.Cut(line, "no field `"); found {
+		if fieldPart, rest, hasType := strings.Cut(after, "` on type `"); hasType {
+			typPart, _, _ := strings.Cut(rest, "`")
+			typeName = cleanRustTypeIdent(typPart)
+			attr = leadingIdent(strings.TrimSpace(fieldPart))
+			if len(typeName) >= 2 && len(attr) >= 2 {
+				return typeName, attr, false, true
+			}
+		}
+	}
+	if before, after, found := strings.Cut(line, " has no field or method "); found {
+		attr = leadingIdent(strings.TrimSpace(after))
+		if idx := strings.LastIndex(before, "type "); idx >= 0 {
+			typeName = cleanGoTypeIdent(before[idx+len("type "):])
+			if len(typeName) >= 2 && len(attr) >= 2 {
+				return typeName, attr, false, true
+			}
+		}
+	}
+	if _, after, found := strings.Cut(line, "unknown field "); found {
+		if fieldPart, rest, hasType := strings.Cut(after, " in struct literal of type "); hasType {
+			attr = leadingIdent(strings.Trim(strings.TrimSpace(fieldPart), "'\"`"))
+			typeName = cleanGoTypeIdent(rest)
+			if len(typeName) >= 2 && len(attr) >= 2 {
+				return typeName, attr, false, true
+			}
+		}
+	}
+	return "", "", false, false
+}
+
+func cleanTSTypeIdent(typ string) string {
+	typ = strings.TrimSpace(typ)
+	typ = strings.TrimPrefix(typ, "typeof ")
+	typ = strings.TrimPrefix(typ, "readonly ")
+	if idx := strings.IndexAny(typ, "<|["); idx > 0 {
+		typ = typ[:idx]
+	}
+	return leadingIdent(strings.TrimSpace(typ))
+}
+
+func cleanRustTypeIdent(typ string) string {
+	typ = strings.TrimLeft(strings.TrimSpace(typ), "&")
+	typ = strings.TrimPrefix(typ, "mut ")
+	if idx := strings.IndexAny(typ, "< \t"); idx > 0 {
+		typ = typ[:idx]
+	}
+	if sep := strings.LastIndex(typ, "::"); sep >= 0 && sep+2 < len(typ) {
+		typ = typ[sep+2:]
+	}
+	return leadingIdent(strings.TrimSpace(typ))
+}
+
+func cleanGoTypeIdent(typ string) string {
+	typ = strings.TrimLeft(strings.TrimSpace(typ), "*&")
+	if end := strings.IndexAny(typ, " \t()[{,;:"); end > 0 {
+		typ = typ[:end]
+	}
+	if dot := strings.LastIndexByte(typ, '.'); dot >= 0 && dot+1 < len(typ) {
+		typ = typ[dot+1:]
+	}
+	return leadingIdent(typ)
+}
+
+type repoMemberDecl struct {
+	name   string
+	rel    string
+	lineNo int
+	sig    string
+}
+
+func lookupTypeMemberHint(cwd, typeName, missingAttr string, isModule bool) string {
+	defRel, defLine, members := collectTypeMembersInRepo(cwd, typeName, isModule)
+	if len(members) == 0 {
+		return ""
+	}
+	bestIdx := -1
+	bestScore := 1 << 20
+	for i, m := range members {
+		score, ok := nearMissScore(missingAttr, m.name)
+		if !ok {
+			continue
+		}
+		if score < bestScore {
+			bestScore = score
+			bestIdx = i
+		}
+	}
+	var names []string
+	seen := map[string]bool{}
+	if bestIdx >= 0 {
+		names = append(names, members[bestIdx].name)
+		seen[members[bestIdx].name] = true
+	}
+	for _, passDunder := range []bool{false, true} {
+		for _, m := range members {
+			if seen[m.name] {
+				continue
+			}
+			isDunder := strings.HasPrefix(m.name, "__") && strings.HasSuffix(m.name, "__")
+			if isDunder != passDunder {
+				continue
+			}
+			seen[m.name] = true
+			names = append(names, m.name)
+			if len(names) >= 5 {
+				break
+			}
+		}
+		if len(names) >= 5 {
+			break
+		}
+	}
+	if bestIdx >= 0 {
+		best := members[bestIdx]
+		return fmt.Sprintf("attribute hint for %s — %s.%s (%s:%d: %s); members: %s",
+			search.SafeLine(typeName), search.SafeLine(typeName), search.SafeLine(best.name),
+			search.SafePath(best.rel), best.lineNo, clipDecision(search.SafeText(best.sig), 120),
+			search.SafeLine(strings.Join(names, ", ")))
+	}
+	if defRel == "" {
+		defRel = members[0].rel
+		defLine = members[0].lineNo
+	}
+	return fmt.Sprintf("attributes on %s (%s:%d) — members: %s (e.g. %s)",
+		search.SafeLine(typeName), search.SafePath(defRel), defLine,
+		search.SafeLine(strings.Join(names, ", ")), clipDecision(search.SafeText(members[0].sig), 100))
+}
+
+func collectTypeMembersInRepo(cwd, typeName string, isModule bool) (defRel string, defLine int, members []repoMemberDecl) {
+	scanRoot := safeScanRoot(cwd)
+	if scanRoot == "" {
+		return "", 0, nil
+	}
+	modPath := strings.ReplaceAll(typeName, ".", "/")
+	filesScanned := 0
+	var paths []string
+	_ = filepath.WalkDir(scanRoot, func(p string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return nil //nolint:nilerr // skip unreadable paths during symbol lookup
+		}
+		if d.IsDir() {
+			name := d.Name()
+			if p != scanRoot && (strings.HasPrefix(name, ".") || isSkippedScanDir(name) || name == "__pycache__" || name == ".venv" || name == "target") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if filesScanned >= 300 {
+			return filepath.SkipAll
+		}
+		ext := strings.ToLower(filepath.Ext(d.Name()))
+		if !isCodeExtForSymbolScan(ext) {
+			return nil
+		}
+		rel, rErr := filepath.Rel(scanRoot, p)
+		if rErr != nil || strings.HasPrefix(rel, "..") {
+			return nil //nolint:nilerr // ignore paths outside scanRoot
+		}
+		rel = filepath.ToSlash(rel)
+		if isTestFilePath(rel) {
+			return nil
+		}
+		if isModule && ext != ".py" {
+			return nil
+		}
+		filesScanned++
+		paths = append(paths, rel)
+		return nil
+	})
+	for _, rel := range paths {
+		ext := strings.ToLower(filepath.Ext(rel))
+		if isModule && !matchesPythonModuleRel(rel, modPath) {
+			continue
+		}
+		raw, err := os.ReadFile(filepath.Join(scanRoot, filepath.FromSlash(rel)))
+		if err != nil || len(raw) > 256<<10 {
+			continue
+		}
+		if isModule {
+			dr, dl, ms := parsePythonModuleMembers(rel, string(raw))
+			if len(ms) > 0 {
+				return dr, dl, ms
+			}
+			continue
+		}
+		switch ext {
+		case ".py":
+			dr, dl, ms := parsePythonClassMembers(rel, typeName, string(raw))
+			if dr != "" && defRel == "" {
+				defRel, defLine = dr, dl
+			}
+			members = append(members, ms...)
+		case ".go":
+			dr, dl, ms := parseGoTypeMembers(rel, typeName, string(raw))
+			if dr != "" && defRel == "" {
+				defRel, defLine = dr, dl
+			}
+			members = append(members, ms...)
+		case ".ts", ".tsx", ".js", ".jsx", ".mjs":
+			dr, dl, ms := parseTSTypeMembers(rel, typeName, string(raw))
+			if dr != "" && defRel == "" {
+				defRel, defLine = dr, dl
+			}
+			members = append(members, ms...)
+		case ".rs":
+			dr, dl, ms := parseRustTypeMembers(rel, typeName, string(raw))
+			if dr != "" && defRel == "" {
+				defRel, defLine = dr, dl
+			}
+			members = append(members, ms...)
+		}
+	}
+	return defRel, defLine, members
+}
+
+func isCodeExtForSymbolScan(ext string) bool {
+	switch ext {
+	case ".go", ".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".rs":
+		return true
+	default:
+		return false
+	}
+}
+
+func matchesPythonModuleRel(rel, modPath string) bool {
+	noExt := strings.TrimSuffix(rel, ".py")
+	if noExt == modPath || strings.HasSuffix(noExt, "/"+modPath) {
+		return true
+	}
+	if noExt == modPath+"/__init__" || strings.HasSuffix(noExt, "/"+modPath+"/__init__") {
+		return true
+	}
+	if idx := strings.LastIndexByte(modPath, '/'); idx >= 0 {
+		base := modPath[idx+1:]
+		return filepath.Base(noExt) == base
+	}
+	return false
+}
+
+func parsePythonModuleMembers(rel, content string) (string, int, []repoMemberDecl) {
+	var members []repoMemberDecl
+	lines := strings.Split(content, "\n")
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+		lineNo := i + 1
+		if line == "" || line[0] == ' ' || line[0] == '\t' || strings.HasPrefix(line, "#") {
+			continue
+		}
+		collapsed, endIdx := collapseMemberLineWindow(lines, i)
+		if name, sig := parseDeclarationLine(collapsed); name != "" {
+			members = append(members, repoMemberDecl{name: name, rel: rel, lineNo: lineNo, sig: cleanMemberSig(sig)})
+			i = endIdx
+			continue
+		}
+		if id, rest, ok := strings.Cut(collapsed, "="); ok {
+			name := leadingIdent(strings.TrimSpace(id))
+			if name != "" && name == strings.TrimSpace(id) && !strings.HasPrefix(rest, "=") {
+				members = append(members, repoMemberDecl{name: name, rel: rel, lineNo: lineNo, sig: cleanMemberSig(collapsed)})
+				i = endIdx
+			}
+		}
+	}
+	return rel, 1, members
+}
+
+func parsePythonClassMembers(rel, typeName, content string) (defRel string, defLine int, members []repoMemberDecl) {
+	inClass := false
+	baseIndent := 0
+	memberIndent := -1
+	lines := strings.Split(content, "\n")
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+		lineNo := i + 1
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		indent := leadingWhitespaceCount(line)
+		if inClass && indent <= baseIndent {
+			inClass = false
+			memberIndent = -1
+		}
+		if !inClass {
+			if matchDeclKeywordTarget(trimmed, "class", typeName) {
+				inClass = true
+				baseIndent = indent
+				defRel = rel
+				defLine = lineNo
+			}
+			continue
+		}
+		if memberIndent < 0 {
+			memberIndent = indent
+		}
+		if indent != memberIndent {
+			continue
+		}
+		collapsed, endIdx := collapseMemberLineWindow(lines, i)
+		if name, sig := parseDeclarationLine(collapsed); name != "" {
+			members = append(members, repoMemberDecl{name: name, rel: rel, lineNo: lineNo, sig: cleanMemberSig(sig)})
+			i = endIdx
+			continue
+		}
+		if left, ok := cutClassFieldAssign(collapsed); ok {
+			members = append(members, repoMemberDecl{name: left, rel: rel, lineNo: lineNo, sig: cleanMemberSig(collapsed)})
+		}
+		if endIdx > i {
+			i = endIdx
+		}
+	}
+	return defRel, defLine, members
+}
+
+func cutClassFieldAssign(trimmed string) (string, bool) {
+	if strings.HasPrefix(trimmed, "def ") || strings.HasPrefix(trimmed, "async ") || strings.HasPrefix(trimmed, "@") {
+		return "", false
+	}
+	for _, sep := range []string{":", "="} {
+		if left, _, ok := strings.Cut(trimmed, sep); ok {
+			cand := strings.TrimSpace(left)
+			id := leadingIdent(cand)
+			if id != "" && id == cand {
+				return id, true
+			}
+		}
+	}
+	return "", false
+}
+
+func parseGoTypeMembers(rel, typeName, content string) (defRel string, defLine int, members []repoMemberDecl) {
+	inStruct := false
+	depth := 0
+	lines := strings.Split(content, "\n")
+	for i := 0; i < len(lines); i++ {
+		lineNo := i + 1
+		trimmed := strings.TrimSpace(lines[i])
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") {
+			continue
+		}
+		if !inStruct && matchDeclKeywordTarget(trimmed, "type", typeName) && strings.Contains(trimmed, "struct") {
+			defRel = rel
+			defLine = lineNo
+			if strings.Contains(trimmed, "{") && !strings.Contains(trimmed, "}") {
+				inStruct = true
+				depth = braceDelta(trimmed)
+			}
+			continue
+		}
+		if inStruct {
+			if depth == 1 && !strings.HasPrefix(trimmed, "}") {
+				field := leadingIdent(trimmed)
+				if field != "" {
+					members = append(members, repoMemberDecl{name: field, rel: rel, lineNo: lineNo, sig: trimmed})
+				}
+			}
+			depth += braceDelta(trimmed)
+			if depth <= 0 {
+				inStruct = false
+			}
+			continue
+		}
+		if strings.HasPrefix(trimmed, "func (") || strings.HasPrefix(trimmed, "func(") {
+			collapsed, endIdx := collapseMemberLineWindow(lines, i)
+			if method := parseGoReceiverMethod(collapsed, typeName); method != "" {
+				members = append(members, repoMemberDecl{name: method, rel: rel, lineNo: lineNo, sig: cleanMemberSig(collapsed)})
+			}
+			if endIdx > i {
+				i = endIdx
+			}
+		}
+	}
+	return defRel, defLine, members
+}
+
+func parseGoReceiverMethod(trimmed, typeName string) string {
+	if !strings.HasPrefix(trimmed, "func (") && !strings.HasPrefix(trimmed, "func(") {
+		return ""
+	}
+	_, afterOpen, ok := strings.Cut(trimmed, "(")
+	if !ok {
+		return ""
+	}
+	recv, afterClose, ok := strings.Cut(afterOpen, ")")
+	if !ok {
+		return ""
+	}
+	fields := strings.Fields(recv)
+	if len(fields) == 0 {
+		return ""
+	}
+	recvType := strings.TrimLeft(fields[len(fields)-1], "*")
+	if idx := strings.IndexByte(recvType, '['); idx > 0 {
+		recvType = recvType[:idx]
+	}
+	if recvType != typeName {
+		return ""
+	}
+	return leadingIdent(strings.TrimSpace(afterClose))
+}
+
+func parseTSTypeMembers(rel, typeName, content string) (defRel string, defLine int, members []repoMemberDecl) {
+	inBlock := false
+	depth := 0
+	lines := strings.Split(content, "\n")
+	for i := 0; i < len(lines); i++ {
+		lineNo := i + 1
+		trimmed := strings.TrimSpace(lines[i])
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*") {
+			continue
+		}
+		if !inBlock {
+			clean := trimmed
+			clean = strings.TrimPrefix(clean, "export ")
+			clean = strings.TrimPrefix(clean, "default ")
+			clean = strings.TrimPrefix(clean, "abstract ")
+			clean = strings.TrimPrefix(clean, "declare ")
+			if matchDeclKeywordTarget(clean, "class", typeName) || matchDeclKeywordTarget(clean, "interface", typeName) || matchDeclKeywordTarget(clean, "type", typeName) {
+				defRel = rel
+				defLine = lineNo
+				if strings.Contains(trimmed, "{") {
+					d := braceDelta(trimmed)
+					if d > 0 {
+						inBlock = true
+						depth = d
+					}
+				}
+			}
+			continue
+		}
+		endIdx := i
+		if depth == 1 && !strings.HasPrefix(trimmed, "}") {
+			var collapsed string
+			collapsed, endIdx = collapseMemberLineWindow(lines, i)
+			if member := parseTSMemberName(collapsed); member != "" {
+				members = append(members, repoMemberDecl{name: member, rel: rel, lineNo: lineNo, sig: cleanMemberSig(collapsed)})
+			}
+		}
+		for k := i; k <= endIdx; k++ {
+			depth += braceDelta(lines[k])
+		}
+		i = endIdx
+		if depth <= 0 {
+			inBlock = false
+		}
+	}
+	return defRel, defLine, members
+}
+
+func parseTSMemberName(trimmed string) string {
+	s := trimmed
+	for {
+		moved := false
+		for _, mod := range []string{"public ", "private ", "protected ", "readonly ", "static ", "async ", "override ", "get ", "set "} {
+			if strings.HasPrefix(s, mod) {
+				s = strings.TrimSpace(s[len(mod):])
+				moved = true
+			}
+		}
+		if !moved {
+			break
+		}
+	}
+	id := leadingIdent(s)
+	switch id {
+	case "", "constructor", "if", "for", "while", "switch", "return", "throw", "try", "catch":
+		return ""
+	}
+	rest := strings.TrimSpace(s[len(id):])
+	if strings.HasPrefix(rest, "(") || strings.HasPrefix(rest, "<") || strings.HasPrefix(rest, ": ") || strings.HasPrefix(rest, ":") || strings.HasPrefix(rest, "?:") || strings.HasPrefix(rest, "?(") || strings.HasPrefix(rest, "?<") || strings.HasPrefix(rest, "!") || strings.HasPrefix(rest, "=") {
+		return id
+	}
+	return ""
+}
+
+func parseRustTypeMembers(rel, typeName, content string) (defRel string, defLine int, members []repoMemberDecl) {
+	inBlock := false
+	isImpl := false
+	depth := 0
+	lines := strings.Split(content, "\n")
+	for i := 0; i < len(lines); i++ {
+		lineNo := i + 1
+		trimmed := strings.TrimSpace(lines[i])
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#[") {
+			continue
+		}
+		if !inBlock {
+			clean := strings.TrimPrefix(trimmed, "pub ")
+			clean = strings.TrimSpace(strings.TrimPrefix(clean, "pub(crate) "))
+			matched := false
+			if matchDeclKeywordTarget(clean, "struct", typeName) || matchDeclKeywordTarget(clean, "enum", typeName) {
+				matched = true
+				isImpl = false
+				if defRel == "" {
+					defRel = rel
+					defLine = lineNo
+				}
+			} else if matchRustImplTarget(clean, typeName) {
+				matched = true
+				isImpl = true
+				if defRel == "" {
+					defRel = rel
+					defLine = lineNo
+				}
+			}
+			if matched && strings.Contains(trimmed, "{") {
+				d := braceDelta(trimmed)
+				if d > 0 {
+					inBlock = true
+					depth = d
+				}
+			}
+			continue
+		}
+		endIdx := i
+		if depth == 1 && !strings.HasPrefix(trimmed, "}") {
+			var collapsed string
+			collapsed, endIdx = collapseMemberLineWindow(lines, i)
+			if isImpl {
+				if name, sig := parseDeclarationLine(collapsed); name != "" {
+					members = append(members, repoMemberDecl{name: name, rel: rel, lineNo: lineNo, sig: cleanMemberSig(sig)})
+				}
+			} else {
+				cleanField := strings.TrimPrefix(collapsed, "pub ")
+				cleanField = strings.TrimSpace(strings.TrimPrefix(cleanField, "pub(crate) "))
+				if field := leadingIdent(cleanField); field != "" && strings.Contains(cleanField, ":") {
+					members = append(members, repoMemberDecl{name: field, rel: rel, lineNo: lineNo, sig: cleanMemberSig(collapsed)})
+				}
+			}
+		}
+		for k := i; k <= endIdx; k++ {
+			depth += braceDelta(lines[k])
+		}
+		i = endIdx
+		if depth <= 0 {
+			inBlock = false
+		}
+	}
+	return defRel, defLine, members
+}
+
+func matchRustImplTarget(trimmed, typeName string) bool {
+	if !strings.HasPrefix(trimmed, "impl") {
+		return false
+	}
+	rest := trimmed[len("impl"):]
+	if rest == "" || (rest[0] != ' ' && rest[0] != '\t' && rest[0] != '<') {
+		return false
+	}
+	rest = strings.TrimSpace(rest)
+	if strings.HasPrefix(rest, "<") {
+		if _, after, ok := strings.Cut(rest, ">"); ok {
+			rest = strings.TrimSpace(after)
+		}
+	}
+	if before, _, ok := strings.Cut(rest, "{"); ok {
+		rest = before
+	}
+	if before, _, ok := strings.Cut(rest, " where "); ok {
+		rest = before
+	}
+	rest = strings.TrimSpace(rest)
+	if _, after, ok := strings.Cut(rest, " for "); ok {
+		rest = strings.TrimSpace(after)
+	}
+	if sep := strings.LastIndex(rest, "::"); sep >= 0 && sep+2 < len(rest) {
+		rest = rest[sep+2:]
+	}
+	if idx := strings.IndexByte(rest, '<'); idx > 0 {
+		rest = rest[:idx]
+	}
+	return leadingIdent(rest) == typeName
+}
+
+func matchDeclKeywordTarget(trimmed, kw, typeName string) bool {
+	if !strings.HasPrefix(trimmed, kw) {
+		return false
+	}
+	rest := trimmed[len(kw):]
+	if rest == "" || (rest[0] != ' ' && rest[0] != '\t') {
+		return false
+	}
+	rest = strings.TrimSpace(rest)
+	if typeName == "*" {
+		return leadingIdent(rest) != ""
+	}
+	if !strings.HasPrefix(rest, typeName) {
+		return false
+	}
+	tail := rest[len(typeName):]
+	if tail == "" {
+		return true
+	}
+	switch tail[0] {
+	case ' ', '\t', '(', ':', '<', '{', '[', '=':
+		return true
+	default:
+		return false
+	}
+}
+
+func leadingWhitespaceCount(line string) int {
+	n := 0
+	for i := range len(line) {
+		if line[i] != ' ' && line[i] != '\t' {
+			break
+		}
+		n++
+	}
+	return n
+}
+
+func braceDelta(s string) int {
+	d := 0
+	for i := range len(s) {
+		switch s[i] {
+		case '{':
+			d++
+		case '}':
+			d--
+		}
+	}
+	return d
+}
+
+func nearMissSymbolSignatureLine(cwd, missingSym, modHint string) string {
+	scanRoot := safeScanRoot(cwd)
+	if scanRoot == "" || len(missingSym) < 4 {
+		return ""
+	}
+	var paths []string
+	_ = filepath.WalkDir(scanRoot, func(p string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return nil //nolint:nilerr // skip unreadable paths during near-miss lookup
+		}
+		if d.IsDir() {
+			name := d.Name()
+			if p != scanRoot && (strings.HasPrefix(name, ".") || isSkippedScanDir(name) || name == "__pycache__" || name == ".venv" || name == "target") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if len(paths) >= 300 {
+			return filepath.SkipAll
+		}
+		if !isCodeExtForSymbolScan(strings.ToLower(filepath.Ext(d.Name()))) {
+			return nil
+		}
+		rel, rErr := filepath.Rel(scanRoot, p)
+		if rErr != nil || strings.HasPrefix(rel, "..") {
+			return nil //nolint:nilerr // ignore paths outside scanRoot
+		}
+		rel = filepath.ToSlash(rel)
+		if isTestFilePath(rel) {
+			return nil
+		}
+		paths = append(paths, rel)
+		return nil
+	})
+	var best repoMemberDecl
+	bestScore := 1 << 20
+	for _, rel := range paths {
+		raw, rErr := os.ReadFile(filepath.Join(scanRoot, filepath.FromSlash(rel)))
+		if rErr != nil || len(raw) > 256<<10 {
+			continue
+		}
+		modBonus := 0
+		if modHint != "" && strings.Contains(strings.TrimSuffix(rel, filepath.Ext(rel)), modHint) {
+			modBonus = 2
+		}
+		lines := strings.Split(string(raw), "\n")
+		for i := 0; i < len(lines); i++ {
+			startLine := i + 1
+			trimmed := strings.TrimSpace(lines[i])
+			if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "#") {
+				continue
+			}
+			collapsed, endIdx := collapseDeclarationWindow(lines, i)
+			name, sig := parseDeclarationLine(collapsed)
+			if endIdx > i {
+				i = endIdx
+			}
+			if len(name) < 4 || sig == "" {
+				continue
+			}
+			score, ok := nearMissScore(missingSym, name)
+			if !ok {
+				continue
+			}
+			rank := score - modBonus
+			if rank < bestScore {
+				bestScore = rank
+				best = repoMemberDecl{name: name, rel: rel, lineNo: startLine, sig: clipDeclSignature(sig)}
+			}
+		}
+	}
+	if best.name == "" {
+		return ""
+	}
+	return fmt.Sprintf("symbol near-match in repo — %s:%d: %s",
+		search.SafePath(best.rel), best.lineNo, clipDecision(search.SafeText(best.sig), 160))
+}
+
+func nearMissScore(missing, cand string) (int, bool) {
+	lowM := strings.ToLower(missing)
+	lowC := strings.ToLower(cand)
+	if lowM == lowC {
+		return 0, true
+	}
+	dist := levenshteinDistance(lowM, lowC)
+	pref := commonPrefixLength(lowM, lowC)
+	suf := commonSuffixLength(lowM, lowC)
+	maxLen := max(len(lowM), len(lowC))
+	minLen := min(len(lowM), len(lowC))
+	ok := dist <= 2 ||
+		(maxLen >= 6 && dist <= 3 && (pref >= 3 || suf >= 4)) ||
+		(minLen >= 5 && float64(minLen)/float64(maxLen) >= 0.6 && (strings.Contains(lowC, lowM) || strings.Contains(lowM, lowC))) ||
+		(hasSharedIdentifierWord(missing, cand) && dist <= maxLen/2)
+	if !ok {
+		return 0, false
+	}
+	score := dist*4 - pref*2 - suf
+	if hasSharedIdentifierWord(missing, cand) {
+		score -= 2
+	}
+	return score, true
+}
+
+func hasSharedIdentifierWord(a, b string) bool {
+	wordsA := splitIdentifierWords(a)
+	wordsB := splitIdentifierWords(b)
+	for _, wa := range wordsA {
+		if len(wa) < 3 {
+			continue
+		}
+		if slices.Contains(wordsB, wa) {
+			return true
+		}
+	}
+	return false
 }
 
 // repoMemoryLineForFailedOutput inspects a failed command and its output for

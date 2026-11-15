@@ -74,7 +74,7 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 		var cold string
 		if repoDec != "" {
 			cold = name + repoDecisionLabel + repoDec
-		} else if !isTestFilePath(path) {
+		} else if !isTestFilePath(path) && planIndexReady(dir) {
 			if rev, _ := fileReversalLineForWithTime(dir, cwd, path, editSymbols, fileSymbols, inScope, projects, pol, self); rev != "" {
 				cold = name + revertedLabel + rev
 			}
@@ -1119,6 +1119,7 @@ func hasReversalRationale(line string) bool {
 		"corrupt", "worse", "regress", "contract", "cycle", "cyclic", "slower",
 		"latency", "timeout", "race", "panic", "leak", "shadow", "cut ", "cuts ",
 		"instead", "rather than", "fail", "wrong", "noise", "bloat", "duplicate",
+		"torn read", "data loss",
 		"потому что", "так как", "из-за", "поскольку", "лома", "слома",
 		"хуже", "падает", "уронил", "просел", "не изменился", "не помогло",
 		"замолкает", "не отдаются", "цикл", "привязало", "не срабатыва",
@@ -1357,32 +1358,337 @@ func fileHookSymbols(cwd, path, editText string) ([]string, []string) {
 	return editSyms, fileSyms
 }
 
+var declKeywords = []string{
+	"func ", "type ", "async def ", "def ", "class ",
+	"export default function ", "export async function ", "export function ",
+	"export class ", "export interface ", "export type ",
+	"async function ", "function ", "interface ",
+	"pub async fn ", "pub fn ", "async fn ", "fn ",
+	"pub struct ", "struct ", "pub enum ", "enum ", "pub trait ", "trait ",
+}
+
+func startsWithDeclKeyword(s string) bool {
+	for _, kw := range declKeywords {
+		if strings.HasPrefix(s, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+func isDiffMetaLine(s string) bool {
+	return strings.HasPrefix(s, "+++") || strings.HasPrefix(s, "---") || strings.HasPrefix(s, "@@")
+}
+
+func stripSingleDiffPrefix(line string) string {
+	if isDiffMetaLine(line) {
+		return ""
+	}
+	if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "++") {
+		return line[1:]
+	}
+	if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "--") {
+		return line[1:]
+	}
+	return line
+}
+
+func stripInlineDeclComment(s string) string {
+	var quote byte
+	escaped := false
+	for i := range len(s) {
+		c := s[i]
+		if quote != 0 {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if c == '\\' && quote != '`' {
+				escaped = true
+				continue
+			}
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		if c == '"' || c == '\'' || c == '`' {
+			quote = c
+			continue
+		}
+		if c == '/' && i+1 < len(s) && s[i+1] == '/' {
+			return strings.TrimSpace(s[:i])
+		}
+		if c == '#' && (i == 0 || s[i-1] == ' ' || s[i-1] == '\t') {
+			return strings.TrimSpace(s[:i])
+		}
+	}
+	return strings.TrimSpace(s)
+}
+
+func parenDelta(s string) int {
+	delta := 0
+	var quote byte
+	escaped := false
+	for i := range len(s) {
+		c := s[i]
+		if quote != 0 {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if c == '\\' && quote != '`' {
+				escaped = true
+				continue
+			}
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		if c == '"' || c == '\'' || c == '`' {
+			quote = c
+			continue
+		}
+		if c == '/' && i+1 < len(s) && s[i+1] == '/' {
+			break
+		}
+		if c == '#' && (i == 0 || s[i-1] == ' ' || s[i-1] == '\t') {
+			break
+		}
+		switch c {
+		case '(':
+			delta++
+		case ')':
+			delta--
+		}
+	}
+	return delta
+}
+
+func declHeaderTerminated(s string) bool {
+	return strings.HasSuffix(s, "{") ||
+		strings.HasSuffix(s, ":") ||
+		strings.HasSuffix(s, ";") ||
+		strings.HasSuffix(s, "=>")
+}
+
+func declReturnStarts(s string) bool {
+	return strings.HasPrefix(s, "->") ||
+		strings.HasPrefix(s, ":") ||
+		strings.HasPrefix(s, "where ") ||
+		strings.HasPrefix(s, "{") ||
+		strings.HasPrefix(s, "=>")
+}
+
+func normalizeCollapsedDecl(s string) string {
+	joined := strings.Join(strings.Fields(s), " ")
+	joined = strings.ReplaceAll(joined, "( ", "(")
+	joined = strings.ReplaceAll(joined, " )", ")")
+	joined = strings.ReplaceAll(joined, ",)", ")")
+	return joined
+}
+
+func collapseDeclarationWindow(lines []string, startIdx int) (string, int) {
+	return collapseParenWindow(lines, startIdx, true, true)
+}
+
+func collapseMemberLineWindow(lines []string, startIdx int) (string, int) {
+	return collapseParenWindow(lines, startIdx, false, false)
+}
+
+func collapseParenWindow(lines []string, startIdx int, requireKeyword, stripDiff bool) (string, int) {
+	if startIdx < 0 || startIdx >= len(lines) {
+		return "", startIdx
+	}
+	rawFirst := lines[startIdx]
+	if stripDiff && isDiffMetaLine(rawFirst) {
+		return "", startIdx
+	}
+	if stripDiff {
+		rawFirst = stripSingleDiffPrefix(rawFirst)
+	}
+	first := stripInlineDeclComment(strings.TrimSpace(rawFirst))
+	if first == "" {
+		return "", startIdx
+	}
+	balance := parenDelta(first)
+	if (requireKeyword && !startsWithDeclKeyword(first)) || balance <= 0 {
+		return first, startIdx
+	}
+	var b strings.Builder
+	b.WriteString(first)
+	endIdx := startIdx
+	limit := min(len(lines)-1, startIdx+8)
+	for j := startIdx + 1; j <= limit; j++ {
+		rawLine := lines[j]
+		if stripDiff && isDiffMetaLine(rawLine) {
+			break
+		}
+		if stripDiff {
+			rawLine = stripSingleDiffPrefix(rawLine)
+		}
+		trimmed := strings.TrimSpace(rawLine)
+		if trimmed == "" {
+			break
+		}
+		cleaned := stripInlineDeclComment(trimmed)
+		if cleaned == "" {
+			endIdx = j
+			continue
+		}
+		if balance <= 0 {
+			if declHeaderTerminated(strings.TrimSpace(b.String())) || !declReturnStarts(cleaned) {
+				break
+			}
+		}
+		b.WriteByte(' ')
+		b.WriteString(cleaned)
+		balance += parenDelta(cleaned)
+		endIdx = j
+		if balance <= 0 && declHeaderTerminated(strings.TrimSpace(b.String())) {
+			break
+		}
+	}
+	return normalizeCollapsedDecl(b.String()), endIdx
+}
+
+func cleanMemberSig(sig string) string {
+	if idx := declBodyBraceIndex(sig); idx > 0 {
+		sig = strings.TrimSpace(sig[:idx])
+	}
+	return clipDeclSignature(normalizeCollapsedDecl(sig))
+}
+
+const maxDeclSigRunes = 180
+
+func clipDeclSignature(sig string) string {
+	if len(sig) <= maxDeclSigRunes {
+		return sig
+	}
+	runes := []rune(sig)
+	if len(runes) <= maxDeclSigRunes {
+		return sig
+	}
+	return string(runes[:maxDeclSigRunes-3]) + "..."
+}
+
+func collectDeclaredSigs(text string) ([]string, map[string]string, map[string]string) {
+	if text == "" {
+		return nil, nil, nil
+	}
+	var order []string
+	firstSigs := map[string]string{}
+	lastSigs := map[string]string{}
+	lines := strings.Split(text, "\n")
+	for i := 0; i < len(lines); i++ {
+		collapsed, endIdx := collapseDeclarationWindow(lines, i)
+		if id, sig := parseDeclarationLine(collapsed); id != "" && sig != "" {
+			if _, exists := lastSigs[id]; !exists {
+				order = append(order, id)
+				firstSigs[id] = sig
+			}
+			lastSigs[id] = sig
+			i = endIdx
+		}
+	}
+	return order, firstSigs, lastSigs
+}
+
+func splitDiffViews(text string) (string, string, bool) {
+	lines := strings.Split(text, "\n")
+	hasDiff := false
+	beforeLines := make([]string, 0, len(lines))
+	afterLines := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if isDiffMetaLine(line) {
+			hasDiff = true
+			continue
+		}
+		if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "++") {
+			hasDiff = true
+			afterLines = append(afterLines, line[1:])
+			continue
+		}
+		if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "--") {
+			hasDiff = true
+			beforeLines = append(beforeLines, line[1:])
+			continue
+		}
+		beforeLines = append(beforeLines, line)
+		afterLines = append(afterLines, line)
+	}
+	if !hasDiff {
+		return text, text, false
+	}
+	return strings.Join(beforeLines, "\n"), strings.Join(afterLines, "\n"), true
+}
+
 func declaredSymbolsInText(text string) []string {
 	if text == "" {
 		return nil
 	}
 	var out []string
-	for line := range strings.SplitSeq(text, "\n") {
-		if id, _ := parseDeclarationLine(line); id != "" {
+	lines := strings.Split(text, "\n")
+	for i := 0; i < len(lines); i++ {
+		collapsed, endIdx := collapseDeclarationWindow(lines, i)
+		if id, _ := parseDeclarationLine(collapsed); id != "" {
 			out = append(out, id)
+			i = endIdx
 		}
 	}
 	return out
 }
 
+func declBodyBraceIndex(sig string) int {
+	parenDepth := 0
+	var quote byte
+	escaped := false
+	for i := range len(sig) {
+		c := sig[i]
+		if quote != 0 {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if c == '\\' && quote != '`' {
+				escaped = true
+				continue
+			}
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		if c == '"' || c == '\'' || c == '`' {
+			quote = c
+			continue
+		}
+		switch c {
+		case '(':
+			parenDepth++
+		case ')':
+			if parenDepth > 0 {
+				parenDepth--
+			}
+		case '{':
+			if parenDepth == 0 {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
 func parseDeclarationLine(line string) (string, string) {
-	s := strings.TrimSpace(strings.TrimLeft(line, "+- "))
+	if isDiffMetaLine(line) {
+		return "", ""
+	}
+	s := strings.TrimSpace(stripSingleDiffPrefix(line))
 	if s == "" || strings.HasPrefix(s, "//") || strings.HasPrefix(s, "#") || strings.HasPrefix(s, "/*") || strings.HasPrefix(s, "*") {
 		return "", ""
 	}
-	for _, kw := range []string{
-		"func ", "type ", "async def ", "def ", "class ",
-		"export default function ", "export async function ", "export function ",
-		"export class ", "export interface ", "export type ",
-		"async function ", "function ", "interface ",
-		"pub async fn ", "pub fn ", "async fn ", "fn ",
-		"pub struct ", "struct ", "pub enum ", "enum ", "pub trait ", "trait ",
-	} {
+	for _, kw := range declKeywords {
 		if strings.HasPrefix(s, kw) {
 			rest := strings.TrimSpace(s[len(kw):])
 			if kw == "func " && strings.HasPrefix(rest, "(") {
@@ -1394,10 +1700,10 @@ func parseDeclarationLine(line string) (string, string) {
 			}
 			if id := leadingIdent(rest); len(id) >= 4 {
 				sig := s
-				if idx := strings.IndexByte(sig, '{'); idx >= 0 {
+				if idx := declBodyBraceIndex(sig); idx >= 0 {
 					sig = strings.TrimSpace(sig[:idx])
 				}
-				return id, strings.Join(strings.Fields(sig), " ")
+				return id, normalizeCollapsedDecl(sig)
 			}
 			break
 		}
@@ -1412,19 +1718,10 @@ func changedDeclarationSymbols(cwd, path, editText string) []string {
 	if path == "" || editText == "" {
 		return nil
 	}
-	firstSigs := map[string]string{}
-	editSigs := map[string]string{}
-	var editOrder []string
-	for line := range strings.SplitSeq(editText, "\n") {
-		if id, sig := parseDeclarationLine(line); id != "" && sig != "" {
-			if _, exists := editSigs[id]; !exists {
-				editOrder = append(editOrder, id)
-				firstSigs[id] = sig
-			}
-			editSigs[id] = sig
-		}
-	}
-	if len(editOrder) == 0 {
+	beforeView, afterView, hasDiff := splitDiffViews(editText)
+	afterOrder, firstSigs, editSigs := collectDeclaredSigs(afterView)
+	_, _, beforeSigs := collectDeclaredSigs(beforeView)
+	if len(afterOrder) == 0 {
 		return nil
 	}
 	diskSigs := map[string]string{}
@@ -1433,17 +1730,19 @@ func changedDeclarationSymbols(cwd, path, editText string) []string {
 		diskPath = filepath.Join(cwd, diskPath)
 	}
 	if raw, err := os.ReadFile(diskPath); err == nil && len(raw) <= 2<<20 {
-		for line := range strings.SplitSeq(string(raw), "\n") {
-			if id, sig := parseDeclarationLine(line); id != "" && sig != "" {
-				diskSigs[id] = sig
-			}
-		}
+		_, _, diskSigs = collectDeclaredSigs(string(raw))
 	}
 	var changed []string
-	for _, id := range editOrder {
+	for _, id := range afterOrder {
 		if firstSigs[id] != editSigs[id] {
 			changed = append(changed, id)
 			continue
+		}
+		if hasDiff {
+			if beforeSig, ok := beforeSigs[id]; ok && beforeSig != editSigs[id] {
+				changed = append(changed, id)
+				continue
+			}
 		}
 		if diskSig, ok := diskSigs[id]; ok && diskSig != editSigs[id] {
 			changed = append(changed, id)
@@ -1599,6 +1898,25 @@ func findSymbolDeclarationInRepo(cwd, sym string) (string, int, string) {
 	if cwd == "" || len(lowSym) < 4 {
 		return "", 0, ""
 	}
+	if idx := loadRepoSymbolMap(cwd); idx.numFiles > 0 {
+		if loc, ok := idx.firstDecl[lowSym]; ok {
+			return loc.rel, loc.line, loc.sig
+		}
+		if !idx.at.IsZero() && time.Since(idx.at) > 5*time.Millisecond {
+			if scanRoot := safeScanRoot(cwd); scanRoot != "" {
+				repoSymbolMapCache.Delete(scanRoot)
+				if fresh := loadRepoSymbolMap(cwd); fresh.numFiles > 0 {
+					if loc, ok := fresh.firstDecl[lowSym]; ok {
+						return loc.rel, loc.line, loc.sig
+					}
+					idx = fresh
+				}
+			}
+		}
+		if idx.numFiles < 2000 {
+			return "", 0, ""
+		}
+	}
 	scanRoot := safeScanRoot(cwd)
 	if scanRoot == "" {
 		return "", 0, ""
@@ -1637,15 +1955,18 @@ func findSymbolDeclarationInRepo(cwd, sym string) (string, int, string) {
 		if !strings.Contains(strings.ToLower(content), lowSym) {
 			continue
 		}
-		lineNo := 0
-		for line := range strings.SplitSeq(content, "\n") {
-			lineNo++
-			if id, sig := parseDeclarationLine(line); strings.EqualFold(id, sym) && sig != "" {
+		lines := strings.Split(content, "\n")
+		for i := 0; i < len(lines); i++ {
+			collapsed, endIdx := collapseDeclarationWindow(lines, i)
+			if id, sig := parseDeclarationLine(collapsed); strings.EqualFold(id, sym) && sig != "" {
 				rel := filepath.Base(cand)
 				if r, err := filepath.Rel(scanRoot, cand); err == nil && !strings.HasPrefix(r, "..") {
 					rel = filepath.ToSlash(r)
 				}
-				return rel, lineNo, sig
+				return rel, i + 1, clipDeclSignature(sig)
+			}
+			if endIdx > i {
+				i = endIdx
 			}
 		}
 	}
@@ -2253,7 +2574,10 @@ type pkgDecl struct {
 	sigLine string
 }
 
-func hallucinatedPkgSymbolLine(cwd, _, oldStr, newStr string) string {
+func hallucinatedPkgSymbolLine(cwd, path, oldStr, newStr string) string {
+	if line := hallucinatedLocalImportLine(cwd, path, oldStr, newStr); line != "" {
+		return line
+	}
 	if newStr == "" || cwd == "" {
 		return ""
 	}
@@ -2331,10 +2655,14 @@ func scanPkgDeclarations(pkgDir, root, cwd, sym string) ([]pkgDecl, bool) {
 			relFile = filepath.ToSlash(rel)
 		}
 		lines := strings.Split(string(content), "\n")
-		for lineIdx, line := range lines {
-			trimmed := strings.TrimSpace(line)
-			if strings.HasPrefix(trimmed, "//") {
+		for lineIdx := 0; lineIdx < len(lines); lineIdx++ {
+			trimmed := strings.TrimSpace(lines[lineIdx])
+			if trimmed == "" || strings.HasPrefix(trimmed, "//") {
 				continue
+			}
+			collapsed, endIdx := collapseDeclarationWindow(lines, lineIdx)
+			if collapsed != "" {
+				trimmed = collapsed
 			}
 			if strings.HasPrefix(trimmed, "func "+sym+"(") ||
 				strings.HasPrefix(trimmed, "type "+sym+" ") ||
@@ -2352,15 +2680,23 @@ func scanPkgDeclarations(pkgDir, root, cwd, sym string) ([]pkgDecl, bool) {
 				if paren := strings.Index(rest, "("); paren > 0 {
 					fnName := strings.TrimSpace(rest[:paren])
 					if len(fnName) > 0 && unicode.IsUpper(rune(fnName[0])) {
-						sig := strings.TrimRight(trimmed, " {")
+						sig := trimmed
+						if bodyBrace := declBodyBraceIndex(sig); bodyBrace >= 0 {
+							sig = strings.TrimSpace(sig[:bodyBrace])
+						} else {
+							sig = strings.TrimRight(sig, " {")
+						}
 						decls = append(decls, pkgDecl{
 							name:    fnName,
 							relFile: relFile,
 							lineNo:  lineIdx + 1,
-							sigLine: sig,
+							sigLine: clipDeclSignature(sig),
 						})
 					}
 				}
+			}
+			if endIdx > lineIdx {
+				lineIdx = endIdx
 			}
 		}
 	}
@@ -2510,6 +2846,432 @@ func missingFileHintLine(cwd, path, toolName string) string {
 		return missingFileSiblingLabel + strings.Join(siblings, ", ")
 	}
 	return ""
+}
+
+// hallucinatedLocalImportLine checks newly edited Python or JS/TS relative/local
+// imports against the resolved repository file's declared top-level exports.
+func hallucinatedLocalImportLine(cwd, path, oldStr, newStr string) string {
+	if cwd == "" || path == "" || newStr == "" {
+		return ""
+	}
+	ext := strings.ToLower(filepath.Ext(path))
+	isPy := ext == ".py"
+	isTS := isTSOrJSExt(ext)
+	if !isPy && !isTS {
+		return ""
+	}
+	scanRoot := safeScanRoot(cwd)
+	if scanRoot == "" {
+		return ""
+	}
+	oldSpecs := parseLocalImportSpecs(oldStr, isPy)
+	oldSet := make(map[string]bool, len(oldSpecs))
+	for _, s := range oldSpecs {
+		oldSet[s.mod+"\x00"+s.sym] = true
+	}
+	fileDir := filepath.Dir(path)
+	if !filepath.IsAbs(fileDir) {
+		fileDir = filepath.Join(cwd, fileDir)
+	}
+	for _, imp := range parseLocalImportSpecs(newStr, isPy) {
+		if oldSet[imp.mod+"\x00"+imp.sym] || len(imp.sym) < 2 {
+			continue
+		}
+		targetDisk, relTarget := resolveLocalImportTarget(scanRoot, fileDir, imp.mod, isPy)
+		if targetDisk == "" {
+			continue
+		}
+		raw, err := os.ReadFile(targetDisk)
+		if err != nil || len(raw) > 256<<10 {
+			continue
+		}
+		exports, dynamic := parseLocalModuleExports(string(raw), isPy)
+		if dynamic || len(exports) == 0 {
+			continue
+		}
+		found := false
+		for _, ex := range exports {
+			if ex.name == imp.sym {
+				found = true
+				break
+			}
+		}
+		if found {
+			continue
+		}
+		if hint := formatMissingLocalImportHint(relTarget, imp.sym, exports); hint != "" {
+			return hint
+		}
+	}
+	return ""
+}
+
+type localImportSpec struct {
+	mod string
+	sym string
+}
+
+type localExportDecl struct {
+	name   string
+	lineNo int
+}
+
+func isTSOrJSExt(ext string) bool {
+	switch ext {
+	case ".ts", ".tsx", ".js", ".jsx", ".mjs", ".mts", ".cjs":
+		return true
+	default:
+		return false
+	}
+}
+
+func parseLocalImportSpecs(src string, isPy bool) []localImportSpec {
+	var specs []localImportSpec
+	lines := strings.Split(src, "\n")
+	for i := 0; i < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[i])
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "//") {
+			continue
+		}
+		stmt := trimmed
+		if strings.Contains(stmt, "(") && !strings.Contains(stmt, ")") || strings.Contains(stmt, "{") && !strings.Contains(stmt, "}") {
+			var sb strings.Builder
+			sb.WriteString(trimmed)
+			for j := i + 1; j < len(lines) && j <= i+20; j++ {
+				sb.WriteByte(' ')
+				sb.WriteString(strings.TrimSpace(lines[j]))
+				if (isPy && strings.Contains(lines[j], ")")) || (!isPy && strings.Contains(lines[j], "}")) {
+					i = j
+					break
+				}
+			}
+			stmt = sb.String()
+		}
+		if isPy {
+			if mod, rest, ok := parsePythonFromImportStmt(stmt); ok {
+				for _, sym := range splitImportList(rest) {
+					specs = append(specs, localImportSpec{mod: mod, sym: sym})
+				}
+			}
+			continue
+		}
+		if mod, rest, ok := parseTSNamedImportStmt(stmt); ok {
+			for _, sym := range splitImportList(rest) {
+				specs = append(specs, localImportSpec{mod: mod, sym: sym})
+			}
+		}
+	}
+	return specs
+}
+
+func parsePythonFromImportStmt(stmt string) (mod, names string, ok bool) {
+	if !strings.HasPrefix(stmt, "from ") {
+		return "", "", false
+	}
+	rest := strings.TrimSpace(stmt[len("from "):])
+	modPart, afterImport, found := strings.Cut(rest, " import ")
+	if !found {
+		return "", "", false
+	}
+	modPart = strings.TrimSpace(modPart)
+	if modPart == "" || modPart == "__future__" {
+		return "", "", false
+	}
+	afterImport = strings.TrimSpace(afterImport)
+	if afterImport == "" || strings.HasPrefix(afterImport, "*") {
+		return "", "", false
+	}
+	afterImport = strings.TrimPrefix(afterImport, "(")
+	if before, _, hasClose := strings.Cut(afterImport, ")"); hasClose {
+		afterImport = before
+	}
+	return modPart, afterImport, true
+}
+
+func parseTSNamedImportStmt(stmt string) (mod, names string, ok bool) {
+	if !strings.HasPrefix(stmt, "import ") {
+		return "", "", false
+	}
+	openBrace := strings.IndexByte(stmt, '{')
+	closeBrace := strings.IndexByte(stmt, '}')
+	if openBrace < 0 || closeBrace <= openBrace {
+		return "", "", false
+	}
+	afterBrace := strings.TrimSpace(stmt[closeBrace+1:])
+	if !strings.HasPrefix(afterBrace, "from ") {
+		return "", "", false
+	}
+	quoted := strings.TrimSpace(afterBrace[len("from "):])
+	if len(quoted) < 3 {
+		return "", "", false
+	}
+	q := quoted[0]
+	if q != '\'' && q != '"' {
+		return "", "", false
+	}
+	end := strings.IndexByte(quoted[1:], q)
+	if end < 0 {
+		return "", "", false
+	}
+	mod = quoted[1 : 1+end]
+	if !strings.HasPrefix(mod, "./") && !strings.HasPrefix(mod, "../") && !strings.HasPrefix(mod, "@/") {
+		return "", "", false
+	}
+	return mod, stmt[openBrace+1 : closeBrace], true
+}
+
+func splitImportList(raw string) []string {
+	var out []string
+	for part := range strings.SplitSeq(raw, ",") {
+		part = strings.TrimSpace(part)
+		part = strings.TrimPrefix(part, "type ")
+		part = strings.TrimSpace(part)
+		if part == "" || part == "*" {
+			continue
+		}
+		if beforeAs, _, hasAs := strings.Cut(part, " as "); hasAs {
+			part = strings.TrimSpace(beforeAs)
+		}
+		if id := leadingIdent(part); id != "" && id == part {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+func resolveLocalImportTarget(scanRoot, fileDir, mod string, isPy bool) (diskPath, relPath string) {
+	var candidates []string
+	if isPy {
+		dots := 0
+		for dots < len(mod) && mod[dots] == '.' {
+			dots++
+		}
+		if dots > 0 {
+			baseDir := fileDir
+			for range dots - 1 {
+				baseDir = filepath.Dir(baseDir)
+			}
+			sub := strings.ReplaceAll(mod[dots:], ".", "/")
+			if sub == "" {
+				candidates = append(candidates, filepath.Join(baseDir, "__init__.py"))
+			} else {
+				candidates = append(candidates,
+					filepath.Join(baseDir, sub+".py"),
+					filepath.Join(baseDir, sub, "__init__.py"),
+				)
+			}
+		} else {
+			sub := strings.ReplaceAll(mod, ".", "/")
+			candidates = append(candidates,
+				filepath.Join(scanRoot, sub+".py"),
+				filepath.Join(scanRoot, sub, "__init__.py"),
+				filepath.Join(scanRoot, "src", sub+".py"),
+				filepath.Join(scanRoot, "src", sub, "__init__.py"),
+			)
+		}
+	} else {
+		var base string
+		if after, ok := strings.CutPrefix(mod, "@/"); ok {
+			base = filepath.Join(scanRoot, filepath.FromSlash(after))
+		} else {
+			base = filepath.Join(fileDir, filepath.FromSlash(mod))
+		}
+		noExt := base
+		for _, ext := range []string{".js", ".jsx", ".mjs", ".ts", ".tsx"} {
+			if trimmedBase, ok := strings.CutSuffix(base, ext); ok {
+				noExt = trimmedBase
+				break
+			}
+		}
+		candidates = append(candidates,
+			base,
+			noExt+".ts",
+			noExt+".tsx",
+			noExt+".js",
+			noExt+".jsx",
+			noExt+".mjs",
+			filepath.Join(noExt, "index.ts"),
+			filepath.Join(noExt, "index.tsx"),
+			filepath.Join(noExt, "index.js"),
+		)
+	}
+	for _, cand := range candidates {
+		info, err := os.Stat(cand)
+		if err != nil || info.IsDir() {
+			continue
+		}
+		rel, rErr := filepath.Rel(scanRoot, cand)
+		if rErr != nil || strings.HasPrefix(rel, "..") {
+			continue
+		}
+		return cand, filepath.ToSlash(rel)
+	}
+	return "", ""
+}
+
+func parseLocalModuleExports(content string, isPy bool) (decls []localExportDecl, dynamic bool) {
+	seen := map[string]bool{}
+	add := func(name string, lineNo int) {
+		if name == "" || seen[name] {
+			return
+		}
+		seen[name] = true
+		decls = append(decls, localExportDecl{name: name, lineNo: lineNo})
+	}
+	if isPy {
+		dynamic = parsePythonModuleExports(content, add)
+		return decls, dynamic
+	}
+	dynamic = parseTSModuleExports(content, add)
+	return decls, dynamic
+}
+
+func parsePythonModuleExports(content string, add func(string, int)) bool {
+	lineNo := 0
+	for line := range strings.SplitSeq(content, "\n") {
+		lineNo++
+		if strings.Contains(line, "import *") || strings.HasPrefix(strings.TrimSpace(line), "def __getattr__") {
+			return true
+		}
+		if line == "" || line[0] == ' ' || line[0] == '\t' || strings.HasPrefix(line, "#") {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if name, _ := parseDeclarationLine(trimmed); name != "" {
+			add(name, lineNo)
+			continue
+		}
+		if strings.HasPrefix(trimmed, "from ") {
+			addPythonReexports(trimmed, lineNo, add)
+			continue
+		}
+		addPythonTopLevelBinding(trimmed, lineNo, add)
+	}
+	return false
+}
+
+func addPythonReexports(trimmed string, lineNo int, add func(string, int)) {
+	_, names, ok := parsePythonFromImportStmt(trimmed)
+	if !ok {
+		return
+	}
+	for part := range strings.SplitSeq(names, ",") {
+		part = strings.TrimSpace(part)
+		if _, alias, hasAs := strings.Cut(part, " as "); hasAs {
+			add(leadingIdent(strings.TrimSpace(alias)), lineNo)
+			continue
+		}
+		add(leadingIdent(part), lineNo)
+	}
+}
+
+func addPythonTopLevelBinding(trimmed string, lineNo int, add func(string, int)) {
+	for _, sep := range []string{":", "="} {
+		left, right, ok := strings.Cut(trimmed, sep)
+		if !ok {
+			continue
+		}
+		cand := strings.TrimSpace(left)
+		if sep == "=" && strings.HasPrefix(right, "=") {
+			return
+		}
+		if id := leadingIdent(cand); id != "" && id == cand {
+			add(id, lineNo)
+		}
+		return
+	}
+}
+
+func parseTSModuleExports(content string, add func(string, int)) bool {
+	lineNo := 0
+	for line := range strings.SplitSeq(content, "\n") {
+		lineNo++
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "export *") {
+			return true
+		}
+		if !strings.HasPrefix(trimmed, "export ") {
+			continue
+		}
+		rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "export "))
+		rest = strings.TrimSpace(strings.TrimPrefix(rest, "default "))
+		if strings.HasPrefix(rest, "{") {
+			addTSBracedExports(rest[1:], lineNo, add)
+			continue
+		}
+		rest = strings.TrimSpace(strings.TrimPrefix(rest, "declare "))
+		if name, _ := parseDeclarationLine(rest); name != "" {
+			add(name, lineNo)
+			continue
+		}
+		for _, kw := range []string{"const ", "let ", "var ", "type ", "interface ", "enum ", "class ", "function ", "async function "} {
+			if after, ok := strings.CutPrefix(rest, kw); ok {
+				add(leadingIdent(strings.TrimSpace(after)), lineNo)
+				break
+			}
+		}
+	}
+	return false
+}
+
+func addTSBracedExports(afterOpen string, lineNo int, add func(string, int)) {
+	inner, _, ok := strings.Cut(afterOpen, "}")
+	if !ok {
+		return
+	}
+	for part := range strings.SplitSeq(inner, ",") {
+		part = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(part), "type "))
+		if _, alias, hasAs := strings.Cut(part, " as "); hasAs {
+			add(leadingIdent(strings.TrimSpace(alias)), lineNo)
+			continue
+		}
+		add(leadingIdent(part), lineNo)
+	}
+}
+
+func formatMissingLocalImportHint(relTarget, sym string, exports []localExportDecl) string {
+	bestName := ""
+	bestLine := 0
+	bestScore := 1 << 20
+	for _, ex := range exports {
+		lowImp := strings.ToLower(sym)
+		lowEx := strings.ToLower(ex.name)
+		dist := levenshteinDistance(lowImp, lowEx)
+		pref := commonPrefixLength(lowImp, lowEx)
+		suf := commonSuffixLength(lowImp, lowEx)
+		maxLen := max(len(lowImp), len(lowEx))
+		if dist <= 2 || (maxLen >= 6 && dist <= 3 && (pref >= 3 || suf >= 4)) {
+			score := dist*4 - pref*2 - suf
+			if score < bestScore {
+				bestScore = score
+				bestName = ex.name
+				bestLine = ex.lineNo
+			}
+		}
+	}
+	if bestName != "" {
+		return fmt.Sprintf(" — check import from %s — %q not declared; did you mean %q (%s:%d)?",
+			search.SafePath(relTarget), search.SafeLine(sym), search.SafeLine(bestName),
+			search.SafePath(relTarget), bestLine)
+	}
+	var names []string
+	for _, ex := range exports {
+		if strings.HasPrefix(ex.name, "_") {
+			continue
+		}
+		names = append(names, search.SafeLine(ex.name))
+		if len(names) >= 5 {
+			break
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	return fmt.Sprintf(" — check import from %s — %q not declared; exported: %s",
+		search.SafePath(relTarget), search.SafeLine(sym), strings.Join(names, ", "))
 }
 
 func isFileCreationTool(name string) bool {

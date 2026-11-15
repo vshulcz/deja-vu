@@ -63,3 +63,25 @@ func TestNoteSessionLiftLeavesEverythingElseAlone(t *testing.T) {
 
 	LiftNoteSessionsAboveTheirSource(nil)
 }
+
+func TestLiftNoteSessionsAlignedKeepsParallelMetadataSynced(t *testing.T) {
+	ss := []model.Session{
+		{ID: "other", Harness: "claude"},
+		{ID: "sess1", Harness: "claude"},
+		{ID: "unrelated", Harness: "claude"},
+		{ID: "deja-note-claude-sess1", Harness: "deja"},
+	}
+	matched := []int{10, 20, 30, 40}
+	strong := []int{1, 2, 3, 4}
+	naming := []int{0, 0, 0, 1}
+	LiftNoteSessionsAligned(ss, matched, strong, naming)
+	wantIDs := []string{"other", "deja-note-claude-sess1", "sess1", "unrelated"}
+	wantMatched := []int{10, 40, 20, 30}
+	wantStrong := []int{1, 4, 2, 3}
+	wantNaming := []int{0, 1, 0, 0}
+	for i := range ss {
+		if ss[i].ID != wantIDs[i] || matched[i] != wantMatched[i] || strong[i] != wantStrong[i] || naming[i] != wantNaming[i] {
+			t.Fatalf("misaligned at %d: id=%q m=%d s=%d n=%v", i, ss[i].ID, matched[i], strong[i], naming[i])
+		}
+	}
+}

@@ -1,12 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
 )
 
 func TestBenchLiveEvaluatesRepoReadOnlyWithoutMutatingHookSeenOrInjections(t *testing.T) {
@@ -149,5 +154,109 @@ func TestBenchLiveClassificationAndAuditHelpers(t *testing.T) {
 	audit := auditLiveInjections(idxDir)
 	if audit.Total != 3 || audit.Tool != 1 || audit.DejaVu != 1 || audit.Context != 1 || audit.ToolNoise != 1 || audit.MedianBytes != 240 {
 		t.Fatalf("unexpected injection audit: %+v", audit)
+	}
+}
+
+func TestBenchLiveHelpersAndFormatting(t *testing.T) {
+	t.Parallel()
+
+	short := "fix backoff jitter"
+	if got := clipLiveOpeningPrompt(short); got != short {
+		t.Errorf("clipLiveOpeningPrompt(short) = %q, want %q", got, short)
+	}
+	long := strings.Repeat("a", 1700) + strings.Repeat("b", 900)
+	clipped := clipLiveOpeningPrompt(long)
+	if len([]rune(clipped)) != 2401 || !strings.HasPrefix(clipped, "aaaa") || !strings.HasSuffix(clipped, "bbbb") {
+		t.Errorf("unexpected clipped length=%d", len([]rune(clipped)))
+	}
+
+	root := t.TempDir()
+	idxDir := filepath.Join(t.TempDir(), "index.db")
+	fallback := liveOpeningPrompt(idxDir, index.SessionMeta{Harness: "claude", ID: "missing", Title: "fallback title"})
+	if fallback != "fallback title" {
+		t.Errorf("liveOpeningPrompt fallback = %q", fallback)
+	}
+	if emptyLoc := measureLiveLocalization(idxDir, root, []string{"work/app"}, policy.Policy{}); emptyLoc.Tasks != 0 {
+		t.Errorf("expected empty localization audit, got %+v", emptyLoc)
+	}
+	if emptyInj := auditLiveInjections(idxDir); emptyInj.Total != 0 {
+		t.Errorf("expected empty injection audit, got %+v", emptyInj)
+	}
+
+	srcDir := filepath.Join(root, "pkg")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mainSrc := filepath.Join(srcDir, "worker.go")
+	if err := os.WriteFile(mainSrc, []byte("package pkg\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "worker_test.go"), []byte("package pkg\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "worker.pb.go"), []byte("package pkg\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	targets := liveExistingEditedTargets(root, []string{
+		mainSrc,
+		filepath.Join(srcDir, "worker.go"),
+		filepath.Join(srcDir, "worker_test.go"),
+		filepath.Join(srcDir, "worker.pb.go"),
+		filepath.Join(srcDir, "missing.go"),
+		"/outside/other.go",
+	})
+	if len(targets) != 1 || targets[0] != "pkg/worker.go" {
+		t.Errorf("liveExistingEditedTargets = %v, want [pkg/worker.go]", targets)
+	}
+	if !livePromptNamesAnyTarget("please inspect Worker.go logic", targets) || livePromptNamesAnyTarget("unrelated prompt", targets) {
+		t.Errorf("unexpected livePromptNamesAnyTarget behavior")
+	}
+
+	if got := roundMS(1234 * time.Microsecond); got != 1.23 {
+		t.Errorf("roundMS = %v, want 1.23", got)
+	}
+	if got := percentileMS([]float64{1.2, 4.5, 9.8}, 0.95); got != 9.8 {
+		t.Errorf("percentileMS = %v, want 9.8", got)
+	}
+
+	var buf bytes.Buffer
+	printLiveBenchReport(&buf, liveBenchReport{
+		Repo:        "work/app",
+		SourceFiles: 10,
+		WorkedFiles: 4,
+		Localization: liveLocalizationAudit{
+			Tasks: 2, Localized: 1, LocalizedRate: 0.5,
+			ImplicitTasks: 1, ImplicitLocalized: 1, ImplicitRate: 1.0,
+			WithGuardrail: 1, WithTestCmd: 1, MedianBytes: 180, P50MS: 2.5,
+		},
+		Injections: liveInjectionAudit{
+			Total: 5, Tool: 2, DejaVu: 2, Context: 1, MedianBytes: 210, ToolNoise: 1,
+		},
+	})
+	out := buf.String()
+	if !strings.Contains(out, "turn-0 localization:") || !strings.Contains(out, "injections log:") {
+		t.Errorf("printLiveBenchReport missing optional sections:\n%s", out)
+	}
+}
+
+func TestBenchLiveOpeningPromptFromIndex(t *testing.T) {
+	tmp := hermeticEnv(t)
+	idxDir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", idxDir)
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	proj := filepath.Join(tmp, "work", "payments")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeClaudeFixture(t, filepath.Join(claudeRoot, "payments", "s1.jsonl"), "s1", []string{
+		fmt.Sprintf(`{"type":"user","sessionId":"s1","cwd":%q,"timestamp":"2026-03-01T10:00:00Z","message":{"role":"user","content":"hi"}}`, proj),
+		fmt.Sprintf(`{"type":"user","sessionId":"s1","cwd":%q,"timestamp":"2026-03-01T10:00:05Z","message":{"role":"user","content":"investigate connection pool starvation under burst traffic"}}`, proj),
+	})
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	got := liveOpeningPrompt(idxDir, index.SessionMeta{Harness: "claude", ID: "s1", Title: "ignored"})
+	if !strings.Contains(got, "connection pool starvation") {
+		t.Errorf("liveOpeningPrompt from index = %q", got)
 	}
 }
