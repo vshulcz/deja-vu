@@ -119,6 +119,7 @@ func collectAudit(dir string, now time.Time) auditReport {
 		{"grok", grokReadFiles},
 		{"trae", sources.TraeFiles},
 		{"codebuddy", sources.CodeBuddySessionFiles},
+		{"codearts", sources.CodeArtsFiles},
 		{"cherrystudio", sources.CherryStudioSessionFiles},
 		{"junie", sources.JunieSessionFiles},
 		{"jetbrains", sources.JetBrainsSessionFiles},

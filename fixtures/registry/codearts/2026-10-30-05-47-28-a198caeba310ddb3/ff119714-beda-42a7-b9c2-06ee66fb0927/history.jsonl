@@ -1,0 +1,4 @@
+{"id": "m1", "role": "User", "content": {"SinglePart": {"Text": {"text": "把 onetab 拉到本地"}}}, "timestamp": "2026-10-29T21:47:28.572955600Z"}
+{"id": "m2", "role": "Assistant", "content": {"SinglePart": {"Text": {"text": "好的，开始拉取"}}}, "reasoning_content": "先确认路径", "timestamp": "2026-10-29T21:47:31Z"}
+{"id": "m3", "role": "Tool", "content": {"MultiPart": [{"ToolResult": {"tool_call_id": "c1", "result": {"tool_output": "done"}}}]}, "timestamp": "2026-10-29T21:47:32Z"}
+{"id": "m4", "role": "Assistant", "content": {"MultiPart": [{"Text": {"text": "拉取完成"}}, {"ToolCall": {"id": "c2", "name": "bash"}}]}, "timestamp": "2026-10-29T21:47:40Z"}

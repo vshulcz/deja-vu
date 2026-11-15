@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-<p align="center"><b>Mémoire locale partagée, relais entre agents et récupération de code pour 47 agents de code.</b></p>
+<p align="center"><b>Mémoire locale partagée, relais entre agents et récupération de code pour 48 agents de code.</b></p>
 
 <p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes et 40 autres agents enregistrent déjà chaque session sur le disque.<br>
 deja indexe tout localement pour que vos agents gardent le contexte après <code>/compact</code>, se passent le relais via <code>deja handoff</code> et récupèrent du code écrasé via <code>deja restore</code> — sans LLM, un seul binaire Go.</p>
@@ -242,6 +242,7 @@ Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) 
 Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
+CodeArts Desktop ·
 TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed.
 
 Ce que chacun prend en charge — rappel MCP, rappel automatique, skills, commandes, resume, handoff — se trouve

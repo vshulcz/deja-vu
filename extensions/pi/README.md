@@ -6,7 +6,7 @@ English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/pi/do
 
 Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S · **13.6 s** to index 19,195 sessions · **half the tokens** of agentmemory) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/) · **[★ Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)**
 
-pi remembers its own sessions. When you switch between coding tools or return to a project weeks later, this extension answers the other question: what was done in the forty-six other coding agents on this machine — Claude Code, Codex, Cursor, Gemini, OpenClaw and Hermes among them — including the months before pi was installed.
+pi remembers its own sessions. When you switch between coding tools or return to a project weeks later, this extension answers the other question: what was done in the forty-seven other coding agents on this machine — Claude Code, Codex, Cursor, Gemini, OpenClaw and Hermes among them — including the months before pi was installed.
 
 It runs [deja](https://github.com/vshulcz/deja-vu), a single local Go binary with a local BM25 index over transcripts already on disk: no LLM, no embeddings required, and no network path besides a daily release check that `DEJA_OFFLINE=1` turns off.
 
@@ -54,6 +54,6 @@ the copy bundled through `@vshulcz/deja-vu`.
 
 ## Privacy
 
-`deja` reads session files where the agents wrote them and builds a local BM25 index under `~/.cache/deja/index.db` (or `DEJA_INDEX_DIR`). Secrets and tokens (`sk-*`, `ghp_*`, `AKIA*`, `Bearer`, private keys, URL credentials) are stripped as the index is built, and without optional semantic search (`deja embed`) indexing and search make no network calls. Pair with `deja install --auto` to wire all 47 coding agents on this machine with native MCP (`recall`, `fix`, `blame`, `handoff`).
+`deja` reads session files where the agents wrote them and builds a local BM25 index under `~/.cache/deja/index.db` (or `DEJA_INDEX_DIR`). Secrets and tokens (`sk-*`, `ghp_*`, `AKIA*`, `Bearer`, private keys, URL credentials) are stripped as the index is built, and without optional semantic search (`deja embed`) indexing and search make no network calls. Pair with `deja install --auto` to wire all 48 coding agents on this machine with native MCP (`recall`, `fix`, `blame`, `handoff`).
 
 Part of [deja-vu](https://github.com/vshulcz/deja-vu). MIT. Found it useful? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).

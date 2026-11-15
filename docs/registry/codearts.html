@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where CodeArts Desktop stores its history — session format</title>
+<meta name="description" content="Where CodeArts Desktop writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/codearts.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where CodeArts Desktop stores its history — session format">
+<meta property="og:description" content="Where CodeArts Desktop writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/codearts.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where CodeArts Desktop stores its history — session format">
+<meta name="twitter:description" content="Where CodeArts Desktop writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where CodeArts Desktop writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"CodeArts Desktop","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/codearts.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/codearts.html","name":"CodeArts Desktop","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="nav-cta" href="https://github.com/vshulcz/deja-vu"><span class="star-ic" aria-hidden="true">★</span>GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="amp.html">Amp</a><a href="antigravity.html">Antigravity</a><a href="cherrystudio.html">Cherry Studio</a><a href="claude-code.html">Claude Code</a><a href="clawcode.html">Claw Code</a><a href="cline.html">Cline</a><a href="codearts.html" aria-current="page">CodeArts Desktop</a><a href="codebuddy.html">CodeBuddy Code</a><a href="codewhale.html">CodeWhale</a><a href="codex.html">Codex CLI</a><a href="commandcode.html">Command Code</a><a href="continue.html">Continue</a><a href="copilot.html">Copilot CLI</a><a href="crush.html">Crush</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="devin.html">Devin CLI</a><a href="gjc.html">gajae-code</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="jetbrains.html">JetBrains AI Assistant</a><a href="junie.html">Junie</a><a href="kilocode.html">Kilo Code</a><a href="kimchi.html">Kimchi Coding</a><a href="kimi.html">Kimi Code</a><a href="kiro.html">Kiro</a><a href="mimo.html">MiMo-Code</a><a href="mcode.html">MiniMax Code</a><a href="muse.html">Muse Code</a><a href="omnigent.html">Omnigent</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="orca.html">Orca</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qwen.html">Qwen Code</a><a href="reasonix.html">Reasonix</a><a href="roo.html">Roo Code</a><a href="senpi.html">Senpi</a><a href="trae.html">TRAE CLI</a><a href="copilot-chat.html">VS Code Copilot Chat</a><a href="windsurf.html">Windsurf / Devin Desktop</a><a href="zcode.html">ZCode</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>CodeArts Desktop</h1>
+<ul>
+<li><strong>ID</strong>: <code>codearts</code></li>
+<li><strong>Store</strong>: <code>~/.codearts/kernel/sessions/&lt;launch-bucket&gt;/&lt;session-uuid&gt;/</code> — <code>meta.json</code> + <code>history.jsonl</code></li>
+<li><strong>Read overrides</strong>: <code>DEJA_CODEARTS_ROOT</code> replaces the sessions root; absolute <code>CODEARTS_HOME</code> places it under <code>&lt;CODEARTS_HOME&gt;/kernel/sessions</code></li>
+<li><strong>Format</strong>: JSONL, one message per line, with Rust serde content variants</li>
+<li><strong>Needs</strong>: nothing extra</li>
+</ul>
+<p>CodeArts Desktop (Huawei Cloud CodeArts) writes one session per <strong>inner</strong> directory of a two-level tree: the outer <code>sessions/&lt;timestamp&gt;-&lt;hash&gt;/</code> is a launch bucket, not a session. Each session directory holds:</p>
+<ul>
+<li><code>meta.json</code> — <code>session_id</code>, <code>title</code>, <code>working_directory</code>, <code>created_at</code>, <code>updated_at</code> (RFC3339 with nanoseconds), plus token counters and the model id, which deja does not index.</li>
+<li><code>history.jsonl</code> — one message per line: <code>id</code>, <code>role</code> (<code>User</code> / <code>Assistant</code> / <code>Tool</code>), <code>timestamp</code> (RFC3339Nano), <code>content</code>, <code>reasoning_content</code>, <code>model_ref</code>, <code>token_usage</code>.</li>
+<li><code>messages.index.jsonl</code> — a byte-range index over <code>history.jsonl</code>; <strong>not</strong> a session, never listed.</li>
+</ul>
+<p><code>content</code> is a serde variant: <code>{&#34;SinglePart&#34;:{&#34;Text&#34;:{&#34;text&#34;:&#34;...&#34;}}}</code> or <code>{&#34;MultiPart&#34;:[{&#34;Text&#34;:{...}},{&#34;ToolCall&#34;:{...}},{&#34;ToolResult&#34;:{...}}]}</code>. deja indexes the <code>Text</code> blocks of user/assistant messages as speech. <code>ToolCall</code> and <code>ToolResult</code> bodies are renderer/tool output, not what the person said, so they are left out — as is <code>reasoning_content</code>, matching the deepseek and qwen readers. A malformed line is skipped, not fatal.</p>
+<p>The store shape was attested by Nwflower/dsh-chat-import PR #103 (<code>lib/sources/codearts.mjs</code>, <code>lib/convert/codearts.mjs</code>) and checked against a real 0.2.8 store; the synthetic fixture in <code>fixtures/registry/codearts/</code> keeps the reader honest.</p>
+<p><strong>Last verified:</strong> 2026-11-15</p>
+
+<hr>
+<p>deja reads this format and forty-seven others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
