@@ -561,6 +561,18 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			}},
 		},
 		{
+			// Claw Code writes JSONL transcripts and legacy JSON session
+			// snapshots under CLAW_CONFIG_HOME or ~/.claw/sessions.
+			Name: "clawcode", Load: LoadClawCode, Files: ClawCodeSessionFiles,
+			Kinds: []FileKind{{
+				Name:      "clawcode",
+				Match:     ClawCodeUnderRoot,
+				Parse:     fullParse(ParseClawCodeFile),
+				ParseFrom: offsetParse(ParseClawCodeFileFromOffset),
+				Resumes:   clawCodeResumes,
+			}},
+		},
+		{
 			// Command Code and ZCode both write a flat role/content transcript
 			// under a Claude-shaped project directory (#3647).
 			Name: "commandcode", Load: LoadCommandCode, Files: CommandCodeSessionFiles,

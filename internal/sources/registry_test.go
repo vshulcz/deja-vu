@@ -55,6 +55,7 @@ func TestFormatRegistryConformance(t *testing.T) {
 		"DEJA_MIMO_DB", "DEJA_MIMO_CONFIG_DIR", "MIMOCODE_HOME", "MIMOCODE_CONFIG_DIR", "MIMOCODE_DB",
 		"DEJA_OMNIGENT_ROOT", "DEJA_OMNIGENT_DB", "OMNIGENT_DATA_DIR",
 		"DEJA_ORCA_ROOT", "DEJA_ORCA_DB",
+		"DEJA_CLAWCODE_ROOT", "DEJA_CLAWCODE_ROOTS", "CLAW_CONFIG_HOME",
 	} {
 		t.Setenv(key, "")
 	}
@@ -205,6 +206,8 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 			t.Skip("zstd not installed")
 		}
 		sessions, err = ParseReasonixFile(path)
+	case "clawcode":
+		sessions, err = ParseClawCodeFile(path)
 	case "commandcode":
 		sessions, err = ParseCommandCodeFile(path)
 	case "zcode":
@@ -468,7 +471,7 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 
 // registryFixturesWithCalls are the registry fixtures whose tool calls are
 // read into work records.
-var registryFixturesWithCalls = map[string]bool{"deepseek": true, "continue": true, "trae": true, "muse": true, "codebuddy": true, "devin": true, "junie": true, "jetbrains": true, "kimi": true, "mcode": true, "gemini": true, "omnigent": true, "orca": true}
+var registryFixturesWithCalls = map[string]bool{"clawcode": true, "deepseek": true, "continue": true, "trae": true, "muse": true, "codebuddy": true, "devin": true, "junie": true, "jetbrains": true, "kimi": true, "mcode": true, "gemini": true, "omnigent": true, "orca": true}
 
 func validateRegistrySessions(t *testing.T, id string, sessions []model.Session) {
 	t.Helper()

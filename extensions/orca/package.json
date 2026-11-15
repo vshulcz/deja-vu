@@ -1,0 +1,10 @@
+{
+  "name": "@vshulcz/orca-deja",
+  "version": "0.24.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "license": "MIT"
+}

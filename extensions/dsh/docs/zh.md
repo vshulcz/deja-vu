@@ -8,7 +8,7 @@
 
 DeepSeek Harness（以及内置 `dsh` 运行时与 Web 界面的 DSH Desktop，`anywhere-labs/dsh-desktop`）自带的 `session-query` 已经可以检索它自己的会话。这个插件回答的是另一个问题：你在这台机器上**其他**智能体里做过什么。
 
-deja 索引 Claude Code、Codex、Cursor、opencode、Antigravity、Grok Build、Kimi、Cline、Zed 等其他四十五个智能体本来就写在磁盘上的会话文件。不需要提前录制：历史已经在那里，包括安装 deja 之前的那些月份。如果你上周才转到 dsh，上周之前做过的事仍然可以在 dsh 里查到。
+deja 索引 Claude Code、Codex、Cursor、opencode、Antigravity、Grok Build、Kimi、Cline、Zed 等其他四十六个智能体本来就写在磁盘上的会话文件。不需要提前录制：历史已经在那里，包括安装 deja 之前的那些月份。如果你上周才转到 dsh，上周之前做过的事仍然可以在 dsh 里查到。
 
 ## 安装
 
@@ -144,6 +144,6 @@ DSH 目前没有侧栏搜索 provider API。浏览器适配器限定在
 
 ## 不做什么
 
-不用大模型，不用向量嵌入。索引是本地 BM25，建立在本来就存在的文件之上，一次查询约一毫秒，除非你主动要求，否则不走网络。密钥在建立索引时被脱敏。
+不用大模型，不用向量嵌入。索引建立在 `~/.cache/deja/index.db`（可用 `DEJA_INDEX_DIR` 覆盖）下的本地 BM25 存储上，只读取机器上本就存在的历史对话文件；一次查询约一毫秒，除非你主动开启语义索引（`deja embed`），否则不走任何网络。常见密钥与令牌在建立索引时即被脱敏，不会把明文密钥带入 `dsh`。
 
 属于 [deja-vu](https://github.com/vshulcz/deja-vu) 项目。MIT 许可。觉得有用的话，欢迎在 [GitHub](https://github.com/vshulcz/deja-vu) 上给 deja-vu 点个 Star。

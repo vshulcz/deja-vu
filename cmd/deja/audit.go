@@ -126,6 +126,7 @@ func collectAudit(dir string, now time.Time) auditReport {
 		{"senpi", sources.SenpiSessionFiles},
 		{"kimchi", sources.KimchiSessionFiles},
 		{"commandcode", sources.CommandCodeSessionFiles},
+		{"clawcode", sources.ClawCodeSessionFiles},
 		{"zcode", sources.ZCodeSessionFiles},
 		{"gjc", sources.GjcSessionFiles},
 		{"prime", sources.PrimeSessionFiles},

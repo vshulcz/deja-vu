@@ -122,13 +122,15 @@
 <a href="delete-omnigent-session-history.html">Omnigent</a>
 <a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold"><summary>Per-agent guides <span class="n">46</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">50</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
 <a href="memory-for-cherrystudio.html">Cherry Studio</a>
 <a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-claw-code.html">Claw Code</a>
 <a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-cmux.html">cmux</a>
 <a href="memory-for-codebuddy.html">CodeBuddy Code</a>
 <a href="memory-for-codewhale.html">CodeWhale</a>
 <a href="memory-for-codex.html">Codex</a>
@@ -143,6 +145,7 @@
 <a href="memory-for-gemini.html">Gemini CLI</a>
 <a href="memory-for-goose.html">Goose</a>
 <a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-herdr.html">herdr</a>
 <a href="memory-for-hermes.html">Hermes</a>
 <a href="memory-for-jetbrains.html">JetBrains AI Assistant</a>
 <a href="memory-for-junie.html">Junie</a>
@@ -153,6 +156,7 @@
 <a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
+<a href="memory-for-oh-my-claudecode.html">oh-my-claudecode</a>
 <a href="memory-for-omp.html">omp</a>
 <a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
@@ -190,7 +194,7 @@
 <p>You solved something in March. In August the same agent, in the same repository, proposes the approach you already tried and backed out of. Nothing is broken — the session that held the answer ended, and its context window went with it.</p>
 
 <h2>What actually happens at the end of a session</h2>
-<p>An agent's memory during a session is its context window. When the session ends the window is discarded. What survives is a transcript file, written by the harness itself: Claude Code keeps JSONL under <code>~/.claude/projects</code>, Codex under <code>~/.codex</code>, opencode in a local database, Cursor, Gemini CLI, Zed and forty more agents each in their own format. The <a href="../registry/README.html">session format registry</a> documents where each one writes and what its records look like.</p>
+<p>An agent's memory during a session is its context window. When the session ends the window is discarded. What survives is a transcript file, written by the harness itself: Claude Code keeps JSONL under <code>~/.claude/projects</code>, Codex under <code>~/.codex</code>, opencode in a local database, Cursor, Gemini CLI, Zed and forty-one more agents each in their own format. The <a href="../registry/README.html">session format registry</a> documents where each one writes and what its records look like.</p>
 <p>So the work is not lost. It is unread. Nothing in the default setup opens yesterday's transcript when you ask today's question.</p>
 
 <h2>Compaction is not memory</h2>

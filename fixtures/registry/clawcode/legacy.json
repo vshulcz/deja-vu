@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "session_id": "reg-clawcode-legacy-001",
+  "created_at_ms": 1790000100000,
+  "updated_at_ms": 1790000120000,
+  "workspace_root": "/workspace/claw-demo",
+  "model": "claude-sonnet-4-6",
+  "prompt_history": [
+    {
+      "timestamp_ms": 1790000101000,
+      "text": "check retry jitter bounds on empty pool"
+    }
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "blocks": [
+        {
+          "type": "text",
+          "text": "check retry jitter bounds on empty pool"
+        }
+      ]
+    },
+    {
+      "role": "assistant",
+      "blocks": [
+        {
+          "type": "tool_use",
+          "id": "legacy_1",
+          "name": "read_file",
+          "input": "{\"path\":\"/workspace/claw-demo/retry/dial.go\"}"
+        },
+        {
+          "type": "text",
+          "text": "Guarded empty hosts before taking modulo length."
+        }
+      ]
+    }
+  ]
+}

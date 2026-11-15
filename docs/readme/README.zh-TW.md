@@ -5,9 +5,9 @@
   </picture>
 </p>
 
-<p align="center"><b>跨 43 個編碼代理的本地共享記憶、跨代理交接與程式碼復原。</b></p>
+<p align="center"><b>跨 47 個編碼代理的本地共享記憶、跨代理交接與程式碼復原。</b></p>
 
-<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 36 個代理本來就把每次會話寫在磁碟上。<br>
+<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 40 個代理本來就把每次會話寫在磁碟上。<br>
 deja 在本地索引全部歷史，讓代理跨 <code>/compact</code> 保住上下文、用 <code>deja handoff</code> 中途換代理接著做、用 <code>deja restore</code> 找回被覆寫的程式碼——無需 LLM，單個 Go 二進位檔。</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | 繁體中文 | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -130,7 +130,7 @@ skill 呼叫的是上面裝好的 `deja` 執行檔，自己不帶。
 
 ## 能得到什麼
 
-**在 Codex 裡解決，Claude 記得。** 四十三個編碼代理把每一次對話都寫進本機檔案，
+**在 Codex 裡解決，Claude 記得。** 四十七個編碼代理把每一次對話都寫進本機檔案，
 deja 把這些檔案變成一層它們都能讀的記憶。
 
 | | |
@@ -215,7 +215,7 @@ deja 自己在把結構縮成一個帶模式的工具之前，也是 828。
 `deja stats` 統計壓縮之後到第一次編輯之間的工具呼叫次數，這個功能就是拿它來衡量的。
 細節見[壓縮後自動復原](../../docs/compaction.md)。
 
-Claude Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
+Claude Code · Claw Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
 Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
 Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·

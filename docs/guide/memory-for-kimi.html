@@ -122,13 +122,15 @@
 <a href="delete-omnigent-session-history.html">Omnigent</a>
 <a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold" open><summary>Per-agent guides <span class="n">46</span></summary>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">50</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
 <a href="memory-for-cherrystudio.html">Cherry Studio</a>
 <a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-claw-code.html">Claw Code</a>
 <a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-cmux.html">cmux</a>
 <a href="memory-for-codebuddy.html">CodeBuddy Code</a>
 <a href="memory-for-codewhale.html">CodeWhale</a>
 <a href="memory-for-codex.html">Codex</a>
@@ -143,6 +145,7 @@
 <a href="memory-for-gemini.html">Gemini CLI</a>
 <a href="memory-for-goose.html">Goose</a>
 <a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-herdr.html">herdr</a>
 <a href="memory-for-hermes.html">Hermes</a>
 <a href="memory-for-jetbrains.html">JetBrains AI Assistant</a>
 <a href="memory-for-junie.html">Junie</a>
@@ -153,6 +156,7 @@
 <a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
+<a href="memory-for-oh-my-claudecode.html">oh-my-claudecode</a>
 <a href="memory-for-omp.html">omp</a>
 <a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
@@ -211,7 +215,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 <p>Measured on Kimi Code 0.28.1 by reading the requests it sent: <code>UserPromptSubmit</code> is the only event whose output reaches the model. A <code>SessionStart</code> hook runs and its output goes nowhere, which is why the digest rides the first prompt instead; <code>PreToolUse</code> can block a tool but not add anything to it; <code>PostToolUse</code> and <code>PostToolUseFailure</code> are fire-and-forget, so <code>deja install kimi-auto</code> wires them on <code>Bash</code> with <code>--defer</code>: the repair that follows a failed command is held and handed over once, on this session's next prompt. <code>PreToolUse</code> on <code>Edit</code> and <code>Write</code> works the same way, so the line about the edited file arrives with the next prompt.</p>
 
 <h2>The part that is not about this harness</h2>
-<p>The index covers every agent's transcripts on the machine — forty-six of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in one tool answers a question asked in another, including sessions from before any of this was installed. That is the reason to index rather than to capture.</p>
+<p>The index covers every agent's transcripts on the machine — forty-seven of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in one tool answers a question asked in another, including sessions from before any of this was installed. That is the reason to index rather than to capture.</p>
 <p>Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>). An injection is capped at 1,536 bytes per prompt and about 4 KB per tool call — <a href="token-cost.html">what memory costs</a> has the measured comparison.</p>
 
 <p><a href="getting-started.html">Getting started</a> · <a href="repeated-mistakes.html">When the same wall comes back</a> · <a href="../registry/kimi.html">The Kimi Code session format</a> · <a href="https://github.com/vshulcz/deja-vu/tree/main/extensions/kimi">The plugin source</a></p>

@@ -152,6 +152,12 @@ func TestRecordedCwdLabelsTheProjectLikeClaude(t *testing.T) {
 			t.Setenv("DEJA_CODEWHALE_ROOT", r)
 			return write(t, filepath.Join(r, "00000001.json"), `{"schema_version":3,"metadata":{"id":"00000001","title":"retry","created_at":"2026-09-19T08:00:00Z","workspace":`+js(cwd)+`},"messages":[{"role":"user","content":[{"type":"text","text":"`+user+`"}]}]}`)
 		}},
+		{"clawcode", "clawcode", myApp, "w/my-app", func(t *testing.T, home, cwd string) string {
+			t.Helper()
+			r := filepath.Join(home, ".claw", "sessions")
+			t.Setenv("DEJA_CLAWCODE_ROOT", r)
+			return write(t, filepath.Join(r, "sess-1.jsonl"), `{"type":"session_meta","session_id":"sess-1","workspace_root":`+js(cwd)+`,"created_at_ms":1759305600000}`+"\n"+`{"type":"message","message":{"role":"user","blocks":[{"type":"text","text":"`+user+`"}]}}`+"\n")
+		}},
 		{"kiro cli", "kiro-cli", myApp, "w/my-app", func(t *testing.T, home, cwd string) string {
 			t.Helper()
 			r := filepath.Join(home, ".kiro", "sessions")

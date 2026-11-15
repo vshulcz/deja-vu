@@ -111,13 +111,15 @@
 <a href="delete-omnigent-session-history.html">Omnigent</a>
 <a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold"><summary>Per-agent guides <span class="n">46</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">50</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
 <a href="memory-for-cherrystudio.html">Cherry Studio</a>
 <a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-claw-code.html">Claw Code</a>
 <a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-cmux.html">cmux</a>
 <a href="memory-for-codebuddy.html">CodeBuddy Code</a>
 <a href="memory-for-codewhale.html">CodeWhale</a>
 <a href="memory-for-codex.html">Codex</a>
@@ -132,6 +134,7 @@
 <a href="memory-for-gemini.html">Gemini CLI</a>
 <a href="memory-for-goose.html">Goose</a>
 <a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-herdr.html">herdr</a>
 <a href="memory-for-hermes.html">Hermes</a>
 <a href="memory-for-jetbrains.html">JetBrains AI Assistant</a>
 <a href="memory-for-junie.html">Junie</a>
@@ -142,6 +145,7 @@
 <a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
+<a href="memory-for-oh-my-claudecode.html">oh-my-claudecode</a>
 <a href="memory-for-omp.html">omp</a>
 <a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
@@ -199,7 +203,7 @@ deja delete &lt;id&gt;</pre>
 <p>The JSONL transcript holds the complete record of the session: the conversation messages, model switches, thinking adjustments, and tool calls (file reads, writes, edits, and shell commands) along with their results. Once removed, <code>pi --session &lt;id&gt;</code> cannot reopen the session, and pi cannot recover deleted transcripts without a separate backup.</p>
 
 <h2>Keeping it searchable instead</h2>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads pi transcripts, along with sessions from forty-five other coding agents on your machine, into a single searchable local index:</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads pi transcripts, along with sessions from forty-six other coding agents on your machine, into a single searchable local index:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "pi session about the parser fix"</pre>
 <p>Indexing and search stay entirely on your disk, credentials are automatically stripped, and <code>deja forget</code> removes a session from the index when you want it forgotten without deleting the source file. deja honors <code>PI_CODING_AGENT_DIR</code> and <code>PI_CODING_AGENT_SESSION_DIR</code>; you can also set <code>DEJA_PI_ROOT</code> to point deja at an archived copy or backup of your transcripts.</p>

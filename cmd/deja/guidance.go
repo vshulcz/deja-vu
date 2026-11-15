@@ -744,6 +744,8 @@ func ownGuidanceFile(harness string) string {
 		return kimchiSkillPath()
 	case "commandcode":
 		return commandCodeSkillPath()
+	case "clawcode":
+		return clawCodeSkillPath()
 	case "cherrystudio":
 		// It has no directory of its own; it reads the skill directories of
 		// whichever agent CLIs the machine has, the shared one among them.

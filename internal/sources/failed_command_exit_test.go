@@ -256,6 +256,10 @@ func TestAFailedResultForAStoredCallIsReadWithItsCall(t *testing.T) {
 		{"goose-jsonl", gooseCall, gooseOut(false), false},
 		{"goose-jsonl", gooseCall, `{"role":"user","created":1790874402,"content":[{"type":"toolResponse","id":"c1","toolResult":{"status":"success","value":{"content":[{"type":"text","text":"FAIL"}],"structuredContent":{"exit_code":2}}}}]}` + "\n", false},
 		{"goose-jsonl", "", gooseCall + gooseOut(true), true},
+		{"clawcode", clawCodeCall, clawCodeResult(`{"stdout":"FAIL","stderr":"","interrupted":false,"returnCodeInterpretation":"exit_code:1"}`, true), false},
+		{"clawcode", clawCodeCall, clawCodeResult(`{"stdout":"ok","stderr":"","interrupted":false}`, false), false},
+		{"clawcode", clawCodeCall, clawCodeResult(`{"stdout":"partial","stderr":"","interrupted":true}`, false), true},
+		{"clawcode", "", clawCodeCall + clawCodeResult(`{"stdout":"FAIL","stderr":"","interrupted":false,"returnCodeInterpretation":"exit_code:1"}`, true), true},
 		// Command Code's failure is the "Exit code: N" line, with no is_error
 		// (#4539).
 		{"commandcode", commandCodeCall, commandCodeResult("Exit code: 1\nFAIL"), false},

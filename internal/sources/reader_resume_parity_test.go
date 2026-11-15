@@ -117,6 +117,7 @@ func TestWholeFileJSONReadersSkipAByteOrderMark(t *testing.T) {
 		{"kilocode", "kilocode/tasks/registry-kilocode/api_conversation_history.json", ParseKiloTask},
 		{"continue", "continue/sessions/8f1c2a3e-0000-4000-8000-000000000000.json", ParseContinueFile},
 		{"codewhale", "codewhale/sessions/registry-codewhale.json", ParseCodeWhaleFile},
+		{"clawcode", "clawcode/legacy.json", ParseClawCodeFile},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

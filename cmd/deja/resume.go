@@ -752,6 +752,13 @@ func resumeHarnessCommand(s model.Session) (string, string, error) {
 			return "", "", err
 		}
 		return dir, "kimi --session " + s.ID, nil
+	case "clawcode":
+		// claw --resume requires session.workspace_root == cwd (session_control.rs).
+		dir, err := recordedResumeDir(s, sources.ClawCodeSessionDir(s.Path), "claw --resume")
+		if err != nil {
+			return "", "", err
+		}
+		return dir, "claw --resume " + s.ID, nil
 	case "goose":
 		return "", "goose session --resume --session-id " + s.ID, nil
 	case "crush":
@@ -864,6 +871,8 @@ func resumeRecordedDir(s model.Session) string {
 		return sources.JunieSessionProject(s.Path)
 	case "commandcode":
 		return sources.CommandCodeSessionDir(s.Path)
+	case "clawcode":
+		return sources.ClawCodeSessionDir(s.Path)
 	case "reasonix":
 		if sources.ReasonixStore(s.Path) == "jsonl" {
 			return sources.ReasonixWorkspace(s.Path)

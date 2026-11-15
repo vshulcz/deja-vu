@@ -36,7 +36,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Getting started", "description": "Install deja and index your coding-agent history in one command, then search it and wire it into your agents over MCP.", "url": "https://vshulcz.github.io/deja-vu/guide/getting-started.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/getting-started.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-07-19", "dateModified": "2026-11-11"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Getting started", "description": "Install deja and index your coding-agent history in one command, then search it and wire it into your agents over MCP.", "url": "https://vshulcz.github.io/deja-vu/guide/getting-started.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/getting-started.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-07-19", "dateModified": "2026-11-14"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Getting started","item":"https://vshulcz.github.io/deja-vu/guide/getting-started.html"}]}</script>
 </head>
 <body>
@@ -122,13 +122,15 @@
 <a href="delete-omnigent-session-history.html">Omnigent</a>
 <a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold"><summary>Per-agent guides <span class="n">46</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">50</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
 <a href="memory-for-cherrystudio.html">Cherry Studio</a>
 <a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-claw-code.html">Claw Code</a>
 <a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-cmux.html">cmux</a>
 <a href="memory-for-codebuddy.html">CodeBuddy Code</a>
 <a href="memory-for-codewhale.html">CodeWhale</a>
 <a href="memory-for-codex.html">Codex</a>
@@ -143,6 +145,7 @@
 <a href="memory-for-gemini.html">Gemini CLI</a>
 <a href="memory-for-goose.html">Goose</a>
 <a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-herdr.html">herdr</a>
 <a href="memory-for-hermes.html">Hermes</a>
 <a href="memory-for-jetbrains.html">JetBrains AI Assistant</a>
 <a href="memory-for-junie.html">Junie</a>
@@ -153,6 +156,7 @@
 <a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
+<a href="memory-for-oh-my-claudecode.html">oh-my-claudecode</a>
 <a href="memory-for-omp.html">omp</a>
 <a href="memory-for-omnigent.html">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
@@ -230,6 +234,8 @@ openclaw plugins install clawhub:@vshulcz/openclaw-deja &amp;&amp; openclaw conf
 pi install npm:@vshulcz/pi-deja
 hermes plugins install vshulcz/deja-vu/extensions/hermes
 magpie plugin add @vshulcz/magpie-deja
+/plugin install extensions/codewhale   # inside CodeWhale (plus deja install codewhale for hooks)
+# Orca → Plugins → extensions/orca   (plus deja install orca for MCP and hooks)
 code --install-extension vshulcz.deja-status
 idea installPlugins com.github.vshulcz.deja-vu   # JetBrains IDEs (or goland / pycharm / webstorm / rustrover)
 { "vshulcz/deja-vu", opts = {} }   # Neovim (lazy.nvim &amp; codecompanion.nvim)

@@ -31,7 +31,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Omnigent", "description": "How to give Omnigent recall over every coding agent's sessions on the machine — the MCP server, the skill, the /deja command, and lifecycle hooks.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-omnigent.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-omnigent.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-12", "dateModified": "2026-11-12"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Omnigent", "description": "How to give Omnigent recall over every coding agent's sessions on the machine — the MCP server, the skill, the /deja command, and lifecycle hooks.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-omnigent.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-omnigent.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-12", "dateModified": "2026-11-14"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Memory for Omnigent","item":"https://vshulcz.github.io/deja-vu/guide/memory-for-omnigent.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Where does Omnigent store its conversations?","acceptedAnswer":{"@type":"Answer","text":"In ~/.omnigent/chat.db (or under OMNIGENT_DATA_DIR when set) across the conversations, omnigent_conversation_metadata, projects, and conversation_items tables."}},{"@type":"Question","name":"How do I add persistent memory to Omnigent?","acceptedAnswer":{"@type":"Answer","text":"Run deja install omnigent-auto. It writes the deja MCP server into ~/.omnigent/mcp.json, the deja-history skill, the /deja command, and lifecycle hooks into ~/.omnigent/settings.json."}}]}</script>
 </head>
@@ -118,13 +118,15 @@
 <a href="delete-omnigent-session-history.html">Omnigent</a>
 <a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold" open><summary>Per-agent guides <span class="n">46</span></summary>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">50</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
 <a href="memory-for-cherrystudio.html">Cherry Studio</a>
 <a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-claw-code.html">Claw Code</a>
 <a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-cmux.html">cmux</a>
 <a href="memory-for-codebuddy.html">CodeBuddy Code</a>
 <a href="memory-for-codewhale.html">CodeWhale</a>
 <a href="memory-for-codex.html">Codex</a>
@@ -139,6 +141,7 @@
 <a href="memory-for-gemini.html">Gemini CLI</a>
 <a href="memory-for-goose.html">Goose</a>
 <a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-herdr.html">herdr</a>
 <a href="memory-for-hermes.html">Hermes</a>
 <a href="memory-for-jetbrains.html">JetBrains AI Assistant</a>
 <a href="memory-for-junie.html">Junie</a>
@@ -149,6 +152,7 @@
 <a href="memory-for-mimo.html">MiMo-Code</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
+<a href="memory-for-oh-my-claudecode.html">oh-my-claudecode</a>
 <a href="memory-for-omp.html">omp</a>
 <a href="memory-for-omnigent.html" aria-current="page">Omnigent</a>
 <a href="memory-for-openclaw.html">OpenClaw</a>
@@ -199,7 +203,7 @@
 <p>Everything above, plus lifecycle hooks (<code>SessionStart</code>, <code>UserPromptSubmit</code>, <code>PreToolUse</code>, <code>PostToolUse</code>, <code>PreCompact</code>, <code>SessionEnd</code>) and <code>statusLine</code> in <code>~/.omnigent/settings.json</code>.</p>
 
 <h2>The part that is not about this harness</h2>
-<p>The index covers every agent's transcripts on the machine — forty-six of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Omnigent answers a question asked in Claude Code, Codex or opencode, and the reverse. <a href="privacy.html">Indexing and search stay local</a>, and credentials are stripped as the index is built.</p>
+<p>The index covers every agent's transcripts on the machine — forty-seven of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Omnigent answers a question asked in Claude Code, Codex or opencode, and the reverse. <a href="privacy.html">Indexing and search stay local</a>, and credentials are stripped as the index is built.</p>
 
 <p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/omnigent.html">The Omnigent session format</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>

@@ -204,3 +204,8 @@ https://vshulcz.github.io/deja-vu/guide/delete-orca-session-history.html
 https://vshulcz.github.io/deja-vu/registry/mimo.html
 https://vshulcz.github.io/deja-vu/registry/omnigent.html
 https://vshulcz.github.io/deja-vu/registry/orca.html
+https://vshulcz.github.io/deja-vu/registry/clawcode.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-claw-code.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-oh-my-claudecode.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-herdr.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-cmux.html

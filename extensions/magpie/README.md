@@ -6,9 +6,9 @@ English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions
 
 Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S · **13.6 s** to index 19,195 sessions · **half the tokens** of agentmemory) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/) · **[★ Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)**
 
-> Local cross-agent session memory for Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes, and 37+ more agents.
+> Cross-agent session memory for Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes, and forty-six other coding agents in total — injected at the Magpie gateway with zero LLM dependencies.
 
-Recalls relevant coding session history from your local `deja` index into [Magpie](https://github.com/yetone/magpie) gateway requests across OpenAI (`chat`, `responses`), Anthropic (`anthropic`), and Gemini (`gemini`) protocols.
+When you route multiple coding agents through a gateway, each client tracks only its own thread and loses context whenever you switch tools or start a fresh session. `@vshulcz/magpie-deja` recalls relevant prior sessions from your local `deja` BM25 index during [Magpie](https://github.com/yetone/magpie) gateway requests across OpenAI (`chat`, `responses`), Anthropic (`anthropic`), and Gemini (`gemini`) protocols.
 
 ## Install
 
@@ -16,16 +16,18 @@ Recalls relevant coding session history from your local `deja` index into [Magpi
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-`@vshulcz/magpie-deja` depends on `@vshulcz/deja-vu`, so installing the plugin brings the `deja` binary with it if you do not already have `deja` on `PATH` (via `brew install deja-vu` or `install.sh`). Run `deja index` once to index existing transcripts on disk, or install the CLI and wire all 43 agents on this machine:
+`@vshulcz/magpie-deja` depends on `@vshulcz/deja-vu`, so installing the plugin brings the `deja` binary if you do not already have `deja` on `PATH` (via `brew install deja-vu` or `install.sh`). Run `deja index` once to index existing transcripts on disk, or run `deja install --auto` to also wire native MCP tools (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) and lifecycle hooks across all 47 supported coding agents on this machine:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja install --auto
 ```
 
+If a client already injects `<deja-memory>` or `<deja-recall>` through native hooks wired by `deja install`, the gateway hook detects those markers and skips duplicate injection.
+
 ## How It Works & Data Boundary
 
-1. **Local index lookup (`deja hook-prompt --plain`):** On `onRequest`, the hook queries the local `~/.deja` index asynchronously via `deja hook-prompt --plain` (default timeout `800ms`). When a relevant session is found, the recalled excerpt is wrapped in `<deja-memory>` and appended to the current user turn — which means **recalled excerpts are sent with the outbound request to your configured upstream model provider**.
+1. **Local index lookup (`deja hook-prompt --plain`):** On `onRequest`, the hook queries the local BM25 index under `~/.cache/deja/index.db` (`DEJA_INDEX_DIR` overrides) asynchronously via `deja hook-prompt --plain` (default timeout `800ms`). When a relevant session is found, the recalled excerpt is wrapped in `<deja-memory>` and appended to the current user turn — which means **recalled excerpts are sent with the outbound request to your configured upstream model provider**.
 2. **Strict project scoping (`ctx.cwd`):** By default (`allowUnscoped: false`), the hook requires a non-empty client working directory (`ctx.cwd`) and never falls back to `process.cwd()` (the Magpie gateway process's own directory). `deja hook-prompt` filters the index strictly to sessions recorded in that project so unrelated repositories' history is not mixed in.
 3. **Origin gate (`recallRemote: false`):** Only local requests (`ctx.origin === "local"`) and authenticated owner requests (`ctx.origin === "magpie-key"`) trigger recall unless `recallRemote: true` is explicitly enabled.
 4. **Two-layer secret scrubbing:** `deja` redacts common secret and token formats (`sk-*`, `ghp_*`, `github_pat_*`, `AKIA*`, `Bearer`, `PRIVATE KEY`, URL credentials, `api_key=...`) at index time, and `deja.hooks.mjs` runs a second regex pass (`maskSecrets`) before attaching `<deja-memory>` to the request.

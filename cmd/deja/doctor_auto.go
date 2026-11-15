@@ -136,6 +136,7 @@ func autoWirings() []autoWiring {
 		// Command Code keeps its hooks in the same settings.json as its
 		// permissions, and its timeout unit is seconds.
 		{"commandcode", commandCodeSettings, "hook-context", ""},
+		{"clawcode", clawCodeSettings, "hook-tool", ""},
 		// Reasonix hands the model nothing from a hook but SessionStart, so
 		// recall there is the code extension in deja's plugin package.
 		{"reasonix", reasonixInstalledManifest, "reasonix-ext", ""},
@@ -161,7 +162,7 @@ func autoWirings() []autoWiring {
 // rather than one deja writes whole. Those exist whether deja ever wrote to
 // them or not, so the file being there says nothing about deja (#4275).
 var autoInClientConfig = map[string]bool{
-	"cursor": true, "qwen": true, "codebuddy": true, "workbuddy": true, "trae": true, "trae-ide": true, "muse": true, "kimi": true, "crush": true, "zcode": true, "commandcode": true, "junie": true,
+	"cursor": true, "qwen": true, "codebuddy": true, "workbuddy": true, "trae": true, "trae-ide": true, "muse": true, "kimi": true, "crush": true, "zcode": true, "commandcode": true, "clawcode": true, "junie": true,
 	"copilot": true, "devin": true, "omnigent": true, "orca": true,
 	// CodeWhale's config.toml is the reader's own, and the plain MCP targets
 	// of both write the file the row reads, so it is there with no hook of

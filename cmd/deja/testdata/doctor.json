@@ -280,6 +280,15 @@
       "indexed_sessions": 0
     },
     {
+      "name": "clawcode",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.claw/sessions"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "zcode",
       "state": "missing",
       "paths": [
@@ -655,6 +664,11 @@
       "path": "<tmp>/home/.commandcode/mcp.json"
     },
     {
+      "name": "clawcode",
+      "state": "config-missing",
+      "path": "<tmp>/home/.claw/settings.json"
+    },
+    {
       "name": "cherrystudio",
       "state": "config-missing",
       "path": "<tmp>/home/.config/deja/cherrystudio-mcp.json"
@@ -867,6 +881,11 @@
       "path": "<tmp>/home/.commandcode/settings.json"
     },
     {
+      "name": "clawcode",
+      "state": "missing",
+      "path": "<tmp>/home/.claw/settings.json"
+    },
+    {
       "name": "reasonix",
       "state": "missing",
       "path": "<tmp>/home/.reasonix/plugins/deja/reasonix-plugin.json"
@@ -952,6 +971,11 @@
       "name": "commandcode",
       "state": "missing",
       "path": "<tmp>/home/.commandcode/commands/deja.md"
+    },
+    {
+      "name": "clawcode",
+      "state": "missing",
+      "path": "<tmp>/home/.claw/commands/deja.md"
     },
     {
       "name": "codebuddy",

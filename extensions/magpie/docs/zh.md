@@ -6,9 +6,9 @@
 
 属于 **[deja-vu](https://github.com/vshulcz/deja-vu)** 项目（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · Token 用量仅为 agentmemory 的**一半**）· [官网与在线搜索](https://vshulcz.github.io/deja-vu/) · [浏览器在线演示](https://vshulcz.github.io/deja-vu/view/) · **[★ 在 GitHub 上给 deja-vu 点 Star](https://github.com/vshulcz/deja-vu)**
 
-> 面向 Claude Code、Codex、Cursor、Gemini CLI、OpenClaw、Hermes 等本地编程智能体的跨工具会话记忆索引（零大模型依赖、单 Go 二进制）。
+> 面向 Claude Code、Codex、Cursor、Gemini CLI、OpenClaw、Hermes 及其他四十六个智能体的本机跨工具会话记忆索引（零大模型依赖、单 Go 二进制）。
 
-在 [Magpie](https://github.com/yetone/magpie) 本地 API 网关的 `onRequest` 阶段从本机 `deja` 索引召回当前项目的历史会话决定，支持 OpenAI（`chat`、`responses`）、Anthropic（`anthropic`）与 Gemini（`gemini`）协议。
+多工具切换或重开会话时，单个客户端只能看到自己的对话记录。[Magpie](https://github.com/yetone/magpie) 在 `onRequest` 阶段通过本插件查询本机 `deja` 索引，将当前项目的历史决议注入 OpenAI（`chat`、`responses`）、Anthropic（`anthropic`）与 Gemini（`gemini`）网关请求。
 
 ## 安装
 
@@ -16,7 +16,7 @@
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-`@vshulcz/magpie-deja` 依赖 `@vshulcz/deja-vu`，若本机 `PATH` 中尚未安装 `deja`，安装插件时会自动拉取对应平台的二进制。首次使用前可执行一次 `deja index` 建立本地会话索引，或直接安装 CLI 并一键接入本机全部 43 款智能体：
+`@vshulcz/magpie-deja` 依赖 `@vshulcz/deja-vu`，若本机 `PATH` 中尚未安装 `deja`，安装插件时会自动拉取对应平台的二进制。首次使用前可执行一次 `deja index` 建立本地会话索引，或运行 `deja install --auto` 为本机四十七个编程工具配置原生 MCP 工具（`recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff`）与生命周期钩子；当客户端自身已通过 `deja install` 注入记忆时，网关钩子会自动让步，不会重复注入。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -25,7 +25,7 @@ deja install --auto
 
 ## 工作原理与数据边界
 
-1. **本地索引检索与上游发送边界（`deja hook-prompt --plain`）：** 索引存储在本地 `~/.deja`；当 `onRequest` 命中与当前问题相关的历史记录时，钩子会将召回片段包裹在 `<deja-memory>` 标签中追加到当前用户消息末尾，**随请求一并发送给您配置的上游模型服务商**。
+1. **本地索引检索与上游发送边界（`deja hook-prompt --plain`）：** BM25 索引保存在本地 `~/.cache/deja/index.db`（可通过 `DEJA_INDEX_DIR` 覆盖）；当 `onRequest` 命中与当前问题相关的历史记录时，钩子会将召回片段包裹在 `<deja-memory>` 标签中追加到当前用户消息末尾，**随请求一并发送给您配置的上游模型服务商**。
 2. **严格按项目隔离（`ctx.cwd`）：** 默认配置（`allowUnscoped: false`）要求客户端请求提供非空的 `ctx.cwd`，绝不回退到网关自身的 `process.cwd()`。`deja hook-prompt` 仅在当前项目所属的历史会话中检索，防止其他仓库的上下文串入请求。
 3. **请求来源门控（`recallRemote: false`）：** 默认仅对本机请求（`ctx.origin === "local"`）或 `magpie-key` 请求生效；除非显式开启 `recallRemote: true`，否则忽略远端共享密钥请求。
 4. **双层敏感信息脱敏：** `deja` 在建立索引时已过滤常见密钥与凭证（`sk-*`、`ghp_*`、`github_pat_*`、`AKIA*`、`Bearer`、`PRIVATE KEY`、URL 凭证及 `api_key=...`），`deja.hooks.mjs` 在拼接 `<deja-memory>` 前还会执行第二道正则脱敏（`maskSecrets`）。

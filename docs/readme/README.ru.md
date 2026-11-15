@@ -5,9 +5,9 @@
   </picture>
 </p>
 
-<p align="center"><b>Общая локальная память, передача задач между агентами и восстановление кода для 43 кодинг-агентов.</b></p>
+<p align="center"><b>Общая локальная память, передача задач между агентами и восстановление кода для 47 кодинг-агентов.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes и ещё 36 агентов уже сохраняют каждую сессию на диск.<br>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes и ещё 40 агентов уже сохраняют каждую сессию на диск.<br>
 deja индексирует всю историю локально, чтобы агенты сохраняли контекст после <code>/compact</code>, передавали задачу на полпути через <code>deja handoff</code> и восстанавливали перезаписанный код через <code>deja restore</code> — без LLM, один Go-бинарник.</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | Русский | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -232,7 +232,7 @@ deja было 828, пока схему не свели к одному инст�
 инструментов между компактацией и первой правкой — этим и меряли.
 Подробности во [восстановлении после компактации](../../docs/compaction.md).
 
-Claude Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
+Claude Code · Claw Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
 Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
 Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·

@@ -2,16 +2,13 @@
 
 English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/opencode/docs/zh.md)
 
-Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** · [Documentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Live demo](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 
-opencode remembers its own sessions. This plugin answers the other question:
-what you did in the forty-five other coding agents on this machine — Claude Code,
-Codex, Cursor, Gemini and Zed among them — including the months before you
-installed anything.
+Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S · **13.6 s** to index 19,195 sessions · **half the tokens** of agentmemory) · [Documentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Live demo](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-It runs [deja](https://github.com/vshulcz/deja-vu), a local Go binary that
-indexes the transcripts those agents already wrote to disk. No LLM, no
-embeddings, no network path besides a daily release check, which DEJA_OFFLINE=1 turns off.
+opencode remembers its own sessions. When you switch between coding tools or reopen a repo months later, this plugin answers the other question: what you did in the forty-six other coding agents on this machine — Claude Code, Codex, Cursor, Gemini, Hermes, and Zed among them — including transcripts recorded before `deja` was installed.
+
+It runs [deja](https://github.com/vshulcz/deja-vu), a single local Go binary with a local BM25 index: no LLM, no embeddings required, and no network path besides an optional daily release check that `DEJA_OFFLINE=1` turns off.
 
 ## Install
 
@@ -100,6 +97,12 @@ only then the copy npm installed with this package. Your own `deja update` or
 
 Without deja anywhere, the tools say so instead of reporting an empty history,
 and the hooks stay quiet.
+
+For full MCP tools (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) across all 47 coding tools when switching agents on one project, run `deja install --auto` (see [Switch Agents Without Losing Context](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)).
+
+## Privacy
+
+`deja` reads transcript files already on disk and maintains a local BM25 index under `~/.cache/deja/index.db` (`DEJA_INDEX_DIR` overrides). Secrets and tokens (`sk-*`, `ghp_*`, `AKIA*`, `Bearer`, private keys, URL credentials) are redacted at index time before any snippet reaches opencode, and indexing/search make no network calls unless you run optional `deja embed`.
 
 ## License
 

@@ -1,0 +1,56 @@
+{
+  "manifestVersion": 2,
+  "execution": "trusted-worker",
+  "id": "deja",
+  "name": "deja-vu",
+  "version": "0.24.2",
+  "description": "Cross-agent session memory across forty-seven AI coding tools, injected into Orca prompts and command actions.",
+  "author": {
+    "name": "Vladislav Shulcz",
+    "url": "https://github.com/vshulcz"
+  },
+  "repository": "https://github.com/vshulcz/deja-vu",
+  "homepage": "https://vshulcz.github.io/deja-vu/guide/memory-for-orca.html",
+  "license": "MIT",
+  "engines": {
+    "orca": ">=1.4.248"
+  },
+  "pluginApi": 1,
+  "main": "worker.mjs",
+  "capabilities": [
+    {
+      "kind": "workspace:read"
+    },
+    {
+      "kind": "notifications:show"
+    }
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "id": "deja.orient",
+        "title": "deja: Orient on workspace",
+        "when": "workspace"
+      },
+      {
+        "id": "deja.recall",
+        "title": "deja: Recall past sessions",
+        "when": "workspace"
+      }
+    ],
+    "hooks": [
+      {
+        "event": "agent.prompt.before",
+        "onError": "pass"
+      },
+      {
+        "event": "agent.tool.before",
+        "onError": "pass"
+      },
+      {
+        "event": "agent.tool.after",
+        "onError": "pass"
+      }
+    ]
+  }
+}

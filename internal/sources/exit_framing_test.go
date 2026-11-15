@@ -274,6 +274,16 @@ func commandCodeExitStore(result string) func(*testing.T, string) string {
 	}
 }
 
+// Claw Code mirrors Claude Code's bash tool_result shapes, including
+// returnCodeInterpretation strings inside JSON payloads.
+func TestClawCodeFailedCommandKeepsItsExitCode(t *testing.T) {
+	runExitRows(t, []exitRow{
+		{"failed", "clawcode", clawCodeExitStore(`{"stdout":"--- FAIL: TestRetry (0.00s)\nFAIL","stderr":"","interrupted":false,"returnCodeInterpretation":"exit_code:1"}`, true), "$ go test ./...  → exit 1"},
+		{"clean", "clawcode", clawCodeExitStore(`{"stdout":"ok  \tproj\t0.01s","stderr":"","interrupted":false}`, false), "$ go test ./..."},
+		{"quoting", "clawcode", clawCodeExitStore(`{"stdout":"ok\nExit code: 1","stderr":"","interrupted":false}`, false), "$ go test ./..."},
+	})
+}
+
 // Command Code opens a failed command's result with "Exit code: N", or "Exit
 // code: N (<what it means>)" for a code it knows (formatShellCommandResult),
 // and sets no is_error; the reader never joined a result to its call (#4539).

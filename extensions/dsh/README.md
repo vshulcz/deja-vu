@@ -10,7 +10,7 @@ DeepSeek Harness (and DSH Desktop, `anywhere-labs/dsh-desktop`, which bundles th
 `session-query` subsystem does. This plugin answers the other question: what you
 did in the *other* agents on this machine.
 
-deja indexes the session files that forty-five other coding agents — Claude Code,
+deja indexes the session files that forty-six other coding agents — Claude Code,
 Codex, Cursor, opencode, Antigravity, Grok Build, Kimi, Cline and Zed among
 them — already write to disk. Nothing has to have been recorded ahead of time: the history is already
 there, including the months before deja was installed. If you moved to dsh last
@@ -218,8 +218,6 @@ errors, empty queries, disabling the feature and cleanup.
 
 ## What it does not do
 
-No LLM, no embeddings. The index is a local BM25 store over files
-that already exist, so a query answers in about a millisecond, with no network
-path unless you ask for one. Secrets are redacted at index time.
+No LLM, no embeddings. The index is a local BM25 store under `~/.cache/deja/index.db` (`DEJA_INDEX_DIR` overrides) built over transcript files that already exist, so a query answers in about a millisecond with no network path unless you explicitly run semantic search (`deja embed`). Common secrets and tokens (`sk-*`, `ghp_*`, `AKIA*`, `Bearer`, private keys, URL credentials) are redacted at index time before any snippet reaches `dsh`.
 
 Part of [deja-vu](https://github.com/vshulcz/deja-vu). MIT. Found it useful? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).

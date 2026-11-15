@@ -397,6 +397,43 @@ jobs:
             }
           '
 
+  orca:
+    name: orca-deja
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: extensions/orca
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+
+      - name: Check JS syntax
+        run: node --check lib.mjs && node --check worker.mjs
+
+      - name: Run unit tests
+        run: node --test test/*.test.mjs
+
+  codewhale:
+    name: codewhale-deja
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: extensions/codewhale
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+
+      - name: Run bundle tests
+        run: node --test test/*.test.mjs
+
   metadata:
     name: packages point at this repository
     runs-on: ubuntu-latest
@@ -462,6 +499,12 @@ jobs:
             if (!fs.existsSync("extensions/jetbrains/LICENSE")) {
               console.error("extensions/jetbrains: no LICENSE in the published directory");
               bad++;
+            }
+            for (const dir of ["extensions/orca", "extensions/codewhale"]) {
+              if (!fs.existsSync(dir + "/LICENSE")) {
+                console.error(dir + ": no LICENSE in the extension directory");
+                bad++;
+              }
             }
             const pluginXml = fs.readFileSync("extensions/jetbrains/src/main/resources/META-INF/plugin.xml", "utf8");
             if (!pluginXml.includes("vshulcz/deja-vu")) {

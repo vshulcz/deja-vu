@@ -6,7 +6,7 @@
 
 **别再让编程智能体重新调试你已经修好的问题。**
 
-[deja-vu](https://github.com/vshulcz/deja-vu) 会在本地索引 Claude Code、Cursor、Codex、Windsurf、Copilot Chat、OpenCode、Cline、Roo Code 等四十三款编程智能体保存在磁盘上的会话记录——单个 Go 二进制文件运行，无需调用大语言模型，无需 API 密钥，也没有常驻后台守护进程。
+[deja-vu](https://github.com/vshulcz/deja-vu) 会在本地索引 Claude Code、Cursor、Codex、Windsurf、Copilot Chat、OpenCode、Cline、Roo Code 等四十七款编程智能体保存在磁盘上的会话记录——单个 Go 二进制文件运行，无需调用大语言模型，无需 API 密钥，也没有常驻后台守护进程。
 
 ## 功能说明
 
