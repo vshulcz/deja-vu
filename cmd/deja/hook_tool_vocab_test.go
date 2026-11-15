@@ -110,6 +110,8 @@ func TestHookToolAfterReadsPostToolUseFailureToolError(t *testing.T) {
 		`{"hook_event_name":"PostToolUseFailure","session_id":"claw-1","cwd":"/work/app","tool_name":"bash","tool_input":{"command":"make"},"tool_input_json":"{\"command\":\"make\"}","tool_error":"exit 1\npanic: sql: database is closed\n","tool_result_is_error":true}`,
 		// Truncated mid-string (>1 MiB build output) triggers salvageFromPayload("tool_error").
 		`{"hook_event_name":"PostToolUseFailure","session_id":"claw-2","cwd":"/work/app","tool_name":"bash","tool_input":{"command":"make"},"tool_error":"exit 1\npanic: sql: database is closed\n` + strings.Repeat("x", 1024),
+		// Truncated tool_response object carrying tool_error triggers salvageToolOutput("tool_error").
+		`{"hook_event_name":"PostToolUseFailure","session_id":"claw-3","cwd":"/work/app","tool_name":"bash","tool_input":{"command":"make"},"tool_response":{"tool_error":"exit 1\npanic: sql: database is closed\n` + strings.Repeat("x", 1024),
 	} {
 		var out bytes.Buffer
 		if err := runHookToolAfter(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(payload), &out); err != nil {

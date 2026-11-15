@@ -121,11 +121,36 @@ func TestParseClawCodeLegacyJSON(t *testing.T) {
 	if got := ClawCodeSessionDir(path); got != "/workspace/claw-legacy" {
 		t.Fatalf("ClawCodeSessionDir legacy = %q, want /workspace/claw-legacy", got)
 	}
+
+	nativePath := filepath.Join(dir, "native.json")
+	nativeBody, err := json.Marshal(map[string]any{
+		"version":        1,
+		"workspace_root": dir,
+		"messages":       []any{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(nativePath, nativeBody, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := ClawCodeSessionDir(nativePath); got != filepath.Clean(dir) {
+		t.Fatalf("ClawCodeSessionDir native = %q, want %q", got, filepath.Clean(dir))
+	}
+
+	relPath := filepath.Join(dir, "rel.json")
+	if err := os.WriteFile(relPath, []byte(`{"version":1,"workspace_root":"relative/dir","messages":[]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := ClawCodeSessionDir(relPath); got != "" {
+		t.Fatalf("ClawCodeSessionDir relative = %q, want empty string", got)
+	}
 }
 
 func TestClawCodeDiscoveryAndFilters(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	t.Setenv("DEJA_CLAWCODE_ROOT", "")
 	t.Setenv("DEJA_CLAWCODE_ROOTS", "")
 	t.Setenv("CLAW_CONFIG_HOME", "")

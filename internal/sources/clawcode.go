@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"maps"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -103,28 +104,42 @@ func ClawCodeUnderRoot(p string) bool {
 	return false
 }
 
+func cleanClawCodeWorkspace(ws string) string {
+	ws = strings.TrimSpace(ws)
+	if ws == "" {
+		return ""
+	}
+	if filepath.IsAbs(ws) {
+		return filepath.Clean(ws)
+	}
+	if strings.HasPrefix(ws, "/") {
+		return path.Clean(ws)
+	}
+	return ""
+}
+
 // ClawCodeSessionDir returns the workspace_root recorded in a Claw Code session file.
-func ClawCodeSessionDir(path string) string {
-	if strings.HasSuffix(path, ".json") {
-		b, err := readJSONFile(path)
+func ClawCodeSessionDir(p string) string {
+	if strings.HasSuffix(p, ".json") {
+		b, err := readJSONFile(p)
 		if err != nil {
 			return ""
 		}
 		var doc struct {
 			WorkspaceRoot string `json:"workspace_root"`
 		}
-		if json.Unmarshal(b, &doc) == nil && filepath.IsAbs(doc.WorkspaceRoot) {
-			return filepath.Clean(doc.WorkspaceRoot)
+		if json.Unmarshal(b, &doc) == nil {
+			return cleanClawCodeWorkspace(doc.WorkspaceRoot)
 		}
 		return ""
 	}
 	var dir string
-	_ = scanJSONLFromOffset(path, 0, func(m map[string]any) {
+	_ = scanJSONLFromOffset(p, 0, func(m map[string]any) {
 		if dir != "" {
 			return
 		}
-		if ws, _ := m["workspace_root"].(string); filepath.IsAbs(ws) {
-			dir = filepath.Clean(ws)
+		if ws, _ := m["workspace_root"].(string); ws != "" {
+			dir = cleanClawCodeWorkspace(ws)
 		}
 	})
 	return dir

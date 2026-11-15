@@ -106,6 +106,13 @@ func TestResumeRecordedDirectoryPresentAndGone(t *testing.T) {
 		{"crush", refuse, func(_ *testing.T, _, dir string) model.Session {
 			return model.Session{Harness: "crush", ID: "942cbc1e-78c7-41cb-aa8a-78c3baab018c", Path: filepath.Join(dir, ".crush", "crush.db")}
 		}, nil},
+		{"clawcode", refuse, func(t *testing.T, name, dir string) model.Session {
+			t.Helper()
+			id := "claw-rec-" + name
+			p := filepath.Join(tmp, "clawcode", name, id+".jsonl")
+			writeResumeFile(t, p, `{"type":"session_meta","session_id":`+jsonStr(id)+`,"workspace_root":`+jsonStr(dir)+`}`+"\n")
+			return model.Session{Harness: "clawcode", ID: id, Path: p}
+		}, nil},
 	}
 	for _, c := range cases {
 		t.Run(c.harness, func(t *testing.T) {

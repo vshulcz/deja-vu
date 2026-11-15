@@ -12,6 +12,7 @@ import (
 func TestInstallClawCodeInstallIdempotentAndUninstall(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	t.Setenv("CLAW_CONFIG_HOME", "")
 
 	settingsPath := filepath.Join(home, ".claw", "settings.json")
@@ -99,6 +100,7 @@ func TestInstallClawCodeAutoRespectsEnvAndPreservesHooks(t *testing.T) {
 	home := t.TempDir()
 	cfgDir := filepath.Join(t.TempDir(), "custom-claw")
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	t.Setenv("CLAW_CONFIG_HOME", cfgDir)
 
 	settingsPath := filepath.Join(cfgDir, "settings.json")
@@ -163,5 +165,50 @@ func TestInstallClawCodeAutoRespectsEnvAndPreservesHooks(t *testing.T) {
 		if strings.Contains(afterText, unwanted) {
 			t.Fatalf("expected %q removed after uninstall, got:\n%s", unwanted, afterText)
 		}
+	}
+}
+
+func TestInstallClawCodeErrorBranches(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	badCfg := filepath.Join(t.TempDir(), "bad-json")
+	if err := os.MkdirAll(badCfg, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(badCfg, "settings.json"), []byte("{invalid"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAW_CONFIG_HOME", badCfg)
+	if _, err := installClawCode("/usr/local/bin/deja", false); err == nil {
+		t.Fatal("expected error from installClawCode with invalid settings.json")
+	}
+	if _, err := installClawCodeAuto("/usr/local/bin/deja", false); err == nil {
+		t.Fatal("expected error from installClawCodeAuto with invalid settings.json")
+	}
+
+	blockSkill := filepath.Join(t.TempDir(), "block-skill")
+	if err := os.MkdirAll(blockSkill, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(blockSkill, "skills"), []byte("block"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAW_CONFIG_HOME", blockSkill)
+	if _, err := installClawCode("/usr/local/bin/deja", false); err == nil {
+		t.Fatal("expected error when skills path is a file")
+	}
+
+	blockCmd := filepath.Join(t.TempDir(), "block-cmd")
+	if err := os.MkdirAll(blockCmd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(blockCmd, "commands"), []byte("block"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAW_CONFIG_HOME", blockCmd)
+	if _, err := installClawCode("/usr/local/bin/deja", false); err == nil {
+		t.Fatal("expected error when commands path is a file")
 	}
 }
