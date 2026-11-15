@@ -1744,7 +1744,7 @@ func parsePythonClassMembers(rel, typeName, content string) (defRel string, defL
 			i = endIdx
 			continue
 		}
-		if left, _, ok := cutClassFieldAssign(collapsed); ok {
+		if left, ok := cutClassFieldAssign(collapsed); ok {
 			members = append(members, repoMemberDecl{name: left, rel: rel, lineNo: lineNo, sig: cleanMemberSig(collapsed)})
 		}
 		if endIdx > i {
@@ -1754,20 +1754,20 @@ func parsePythonClassMembers(rel, typeName, content string) (defRel string, defL
 	return defRel, defLine, members
 }
 
-func cutClassFieldAssign(trimmed string) (string, string, bool) {
+func cutClassFieldAssign(trimmed string) (string, bool) {
 	if strings.HasPrefix(trimmed, "def ") || strings.HasPrefix(trimmed, "async ") || strings.HasPrefix(trimmed, "@") {
-		return "", "", false
+		return "", false
 	}
 	for _, sep := range []string{":", "="} {
-		if left, right, ok := strings.Cut(trimmed, sep); ok {
+		if left, _, ok := strings.Cut(trimmed, sep); ok {
 			cand := strings.TrimSpace(left)
 			id := leadingIdent(cand)
 			if id != "" && id == cand {
-				return id, strings.TrimSpace(right), true
+				return id, true
 			}
 		}
 	}
-	return "", "", false
+	return "", false
 }
 
 func parseGoTypeMembers(rel, typeName, content string) (defRel string, defLine int, members []repoMemberDecl) {

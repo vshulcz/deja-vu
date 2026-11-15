@@ -163,14 +163,18 @@ class Worker(Base):
 		t.Fatalf("expected Missing class line 0, got %d", missLine)
 	}
 
-	if _, _, ok := cutClassFieldAssign(""); ok {
+	if _, ok := cutClassFieldAssign(""); ok {
 		t.Fatal("expected empty cutClassFieldAssign false")
 	}
-	if _, _, ok := cutClassFieldAssign("if x == 1:"); ok {
+	if _, ok := cutClassFieldAssign("if x == 1:"); ok {
 		t.Fatal("expected comparison cutClassFieldAssign false")
 	}
-	_, _, _ = cutClassFieldAssign(`kind: str = "bg"`)
-	_, _, _ = cutClassFieldAssign("retries = 3")
+	if got, ok := cutClassFieldAssign(`kind: str = "bg"`); !ok || got != "kind" {
+		t.Fatalf("unexpected cutClassFieldAssign annotated result: (%q, %v)", got, ok)
+	}
+	if got, ok := cutClassFieldAssign("retries = 3"); !ok || got != "retries" {
+		t.Fatalf("unexpected cutClassFieldAssign simple result: (%q, %v)", got, ok)
+	}
 
 	pyExports, pyDyn := parseLocalModuleExports(pySrc, true)
 	if len(pyExports) == 0 || !pyDyn {
@@ -194,8 +198,8 @@ export * from './more';
 	if hint := formatMissingLocalImportHint("work/app/mod.py", "WrongName", nil); hint != "" {
 		t.Logf("empty exports hint = %q", hint)
 	}
-	var many []localExportDecl
-	for i := 0; i < 12; i++ {
+	many := make([]localExportDecl, 0, 12)
+	for i := range 12 {
 		many = append(many, localExportDecl{name: "Sym" + string(rune('A'+i)), lineNo: i + 1})
 	}
 	if hint := formatMissingLocalImportHint("work/app/mod.ts", "Missing", many); hint == "" {
