@@ -92,6 +92,9 @@ func TestCodeArtsParse(t *testing.T) {
 	if IsCodeArtsHistory(filepath.Join(dir, "messages.index.jsonl")) {
 		t.Fatal("IsCodeArtsHistory(messages.index.jsonl) = true")
 	}
+	if IsCodeArtsHistory(filepath.Join(root+"-kernel", "b", "s", "history.jsonl")) {
+		t.Fatal("IsCodeArtsHistory(sibling root) = true")
+	}
 }
 
 func TestCodeArtsParseFromOffset(t *testing.T) {

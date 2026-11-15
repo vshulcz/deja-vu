@@ -222,12 +222,10 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 		{
 			Name: "codearts", Load: LoadCodeArts, Files: CodeArtsFiles,
 			Kinds: []FileKind{{
-				Name:  "codearts",
-				Match: IsCodeArtsHistory,
-				Parse: fullParse(ParseCodeArtsFile),
-				ParseFrom: offsetParse(func(p string, offset int64) ([]model.Session, error) {
-					return parseCodeArtsFileFromOffset(p, offset)
-				}),
+				Name:      "codearts",
+				Match:     IsCodeArtsHistory,
+				Parse:     fullParse(ParseCodeArtsFile),
+				ParseFrom: offsetParse(parseCodeArtsFileFromOffset),
 			}},
 		},
 		{

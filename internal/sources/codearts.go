@@ -55,7 +55,11 @@ func CodeArtsFiles() []string {
 
 // IsCodeArtsHistory reports whether p is a CodeArts transcript.
 func IsCodeArtsHistory(p string) bool {
-	return strings.HasPrefix(p, CodeArtsRoot()) && filepath.Base(p) == codeartsHistoryFile
+	if filepath.Base(p) != codeartsHistoryFile {
+		return false
+	}
+	rel, err := filepath.Rel(filepath.Clean(CodeArtsRoot()), filepath.Clean(p))
+	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != ""
 }
 
 type codeartsMeta struct {
