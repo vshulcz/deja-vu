@@ -1,149 +1,92 @@
 # dsh-deja
 
-[English](../README.md) | 中文
-
 [![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 
-属于 **[deja-vu](https://github.com/vshulcz/deja-vu)** 项目（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · Token 用量仅为 agentmemory 的**一半**）· [完整中文文档](../../../docs/readme/README.zh.md) · [官网与在线搜索](https://vshulcz.github.io/deja-vu/) · [浏览器在线演示](https://vshulcz.github.io/deja-vu/view/) · **[★ 在 GitHub 上给 deja-vu 点 Star](https://github.com/vshulcz/deja-vu)**
+[English](../README.md) | 简体中文 | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-DeepSeek Harness（以及内置 `dsh` 运行时与 Web 界面的 DSH Desktop，`anywhere-labs/dsh-desktop`）自带的 `session-query` 已经可以检索它自己的会话。这个插件回答的是另一个问题：你在这台机器上**其他**智能体里做过什么。
+**[deja-vu](https://github.com/vshulcz/deja-vu)** 扩展（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · token 用量为 agentmemory 的**一半**）· [文档](https://vshulcz.github.io/deja-vu/zh/) · [在线演示](https://vshulcz.github.io/deja-vu/view/) · [评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) · **[★ GitHub 点赞](https://github.com/vshulcz/deja-vu)**
 
-deja 索引 Claude Code、Codex、Cursor、opencode、Antigravity、Grok Build、Kimi、Cline、Zed 等其他四十七个智能体本来就写在磁盘上的会话文件。不需要提前录制：历史已经在那里，包括安装 deja 之前的那些月份。如果你上周才转到 dsh，上周之前做过的事仍然可以在 dsh 里查到。
+面向 DeepSeek Harness（`dsh`）与 DSH Desktop（`anywhere-labs/dsh-desktop`）的 `session-query` 插件。除了 DSH 自身的对话历史，deja 还索引 Claude Code、Codex、Cursor、opencode、Antigravity、Grok Build、Kimi、Cline、Zed 等其他四十七个智能体本来就写在磁盘上的会话文件。不需要提前录制：历史已经在那里，包括安装 deja 之前的那些月份。如果你上周才转到 dsh，上周之前做过的事仍然可以在 dsh 里查到（全部由本地单文件 Go 二进制 `deja` 与 BM25 索引完成，无 LLM，可用 `DEJA_OFFLINE=1` 关闭每日检查）。
+
+![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
 ## 安装
 
+通过 npm 或 GitHub 源码直接安装到 `web` profile（必须携带 `--profile`）：
+
 ```sh
 dsh plugin --profile web add dsh-deja
-```
-
-也可以不走 npm，直接从仓库安装——根目录的 manifest 会重新导出这个目录，两种写法都行：
-
-```sh
+# 或直接从仓库路径安装开发版：
 dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 ```
 
-插件调用 `deja` 可执行文件。它作为依赖随插件一起安装；如果 `PATH` 上已有 `deja` 就直接使用，`DEJA_BIN` 可覆盖两者。
-
-如果直接安装 CLI，`deja install --auto` 会一步把 **dsh 以及本机其他所有编程智能体**（Claude Code、Codex、Cursor、opencode、Kimi、Cline、Zed 等）全部接好——写入 deja 的 MCP 服务端和 `/deja` 命令——那条路更短：
+若系统未预先安装 `deja`，请配置 `DEJA_BIN`，或使用安装脚本 / Homebrew 一并完成全机 48 款智能体与 `$DSH_HOME/plugins/deja/` 的配置：
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-deja install --auto
+brew install deja-vu && deja install --auto
+npx @vshulcz/deja-vu sources
 ```
 
-或者用 Homebrew：`brew install deja-vu && deja install --auto` · 国内 npm 镜像：`npm i -g @vshulcz/deja-vu --registry=https://registry.npmmirror.com && deja install --auto` · 免安装只读检查本机会话：`npx @vshulcz/deja-vu sources`。
-两边都装也没问题：插件会检查 `$DSH_HOME/plugins/deja/` 下安装器写了什么，只补缺的部分，工具和命令不会注册两次。
+## 插件内容
 
-## 提供的能力
+### 六个智能体工具
 
-六个模型可调用的工具：
-
-| 工具 | 回答什么 |
+| 工具 | 作用 |
 |---|---|
-| `deja_recall` | 匹配报错文本、函数名、文件路径或命令行参数的历史会话。 |
-| `deja_session` | 单个历史会话的完整摘要，用于需要当时的判断依据时。 |
-| `deja_blame` | 在修改或删除某个文件之前，讨论过这个文件的历史会话。 |
-| `deja_fix` | 这台机器上同样的报错之后跑过什么。 |
-| `deja_how` | 构建、测试或部署在这台机器上真实的执行命令。 |
-| `deja_remember` | 把一条已确定的决定存下来，供以后召回。 |
+| `deja_recall` | 按错误信息、主题或标志词搜索跨智能体会话历史 |
+| `deja_session` | 拉取命中片段前后的完整对话轮次 |
+| `deja_blame` | 查找修改过指定文件或 `path:line` 的历史会话 |
+| `deja_fix` | 查找上次修通同类错误所使用的命令 |
+| `deja_how` | 查看此项目里实际运行过的构建与测试参数 |
+| `deja_remember` | 记录不再反复推导的项目约定 |
 
-一个命令：`/deja <要查什么>`。
+- **`/deja <...>` 命令**：在聊天输入框中直接带过滤条件检索历史。
+- **独立挂载与界面**：运行 `deja install dsh-auto` 或安装后，`dsh web`（以及 `tui`、`headless`、`sdk` 模式）会加载侧边栏与查询接口；若要关闭自动注入可在 YAML 配置设 `autoRecall: false`。
 
-以及默认开启的自动召回：每个会话一次，插件把这个项目里以前的会话定下来的事加进来；每一步之前，插件会问 deja 这台机器的历史能否回答当前提问，并把结果加入运行时上下文。多数情况下它保持沉默，只有确实有内容时才开口。
+## 搜索快捷键与面板控制
 
-同一套召回也接上了 `deja install dsh-auto` 接的那些：读、改、写一个文件之后，模型会拿到以前的会话对这个文件说过什么；命令失败之后，会拿到这台机器上次遇到同样错误后跑过的命令；压缩时保留会话正在做的事；会话结束时撤掉它的在线标记。
+在 `Settings → Deja` 中可查看或自定义全部交互控制：
 
-在 `dsh web` 里，你也能看到 deja 在 Claude Code 里给人看的那几行：某个提问由历史回答时的回执（写明来自哪个智能体、多久以前），以及会话开始时召回了什么、首次建索引的说明和每周小结。它们显示在输入框上方的小面板里，直到下一次提问或你手动关闭。模型收到的内容与之前完全相同，这几行不会进入模型上下文。tui、headless 和 sdk 配置没有页面，因此没有变化：这些说明仍然随 `/deja` 的回复一起显示。等待页面超过十分钟的行会被丢弃。`deja install dsh-auto` 用同一份文件写出同一个面板；两者都装时也只有一个面板。
+- **Mod+F**（或 **Mod+Alt+F** / macOS 上的 **Cmd+Option+F**）：打开当前对话工作区的检索框；生成注入指令时可写 `/deja --session <bare session UUID> -- <your draft>` 将范围限定到单次会话。
+- **Mod+Shift+K**（macOS **Cmd+Shift+K**）：打开全工作区跨智能体快速检索。
+- **Mod+K**：唤醒面板并在开启 **DSH conversations only** 开关后只查 DSH 会话（单次最多返回 20 条命中）。
+- **Linux 浏览器快捷键冲突规避**：部分 Linux 桌面浏览器占用上述组合时，可使用备用快捷键 **`Mod+/`**、**`Mod+Shift+,`**、**`Mod+Shift+.`**（对应配置键 `shortcuts.open`）。
 
-```yaml
-- insert:
-    - id: deja
-      name: dsh-deja
-      config:
-        autoRecall: false   # 保留工具、/deja 和手动搜索
+## 自定义快捷键
+
+在 `Settings → Deja` 里点击 **`session.search`** 旁的 **Change shortcut** 即可录制新按键，**Restore default** 恢复默认值，**Remove** 解绑该快捷键。底层面板由 **dsh-deja package host plugin** 提供路由 `/api/deja-search`；请求 `/api/deja-search?probe=1` 返回 `{"ok": true, "plugin": "dsh-deja"}` 即表示与本地 `deja search` 后端打通。
+
+## 实现接入细节
+
+- **对话上下文钩子**：通过 `ctx.systemPrompt.context` 与 `agent/pre-step`（支持 `dsh 0.1.1-rc.2` 及以上）写入 `additionalContext` / `systemMessage`。
+- **HTTP 与 CLI 接口**：插件暴露 `/api/deja-notes`（底层调用 `--plain`）供 `client.js` 读取；`GET /api/deja-search` 转调 `deja search --harness deepseek --json --limit 20 -- <query>`，设置 20 秒超时、2 MiB 输出上限与 500 字符查询上限。
+- **侧边栏挂载槽位**：基于 `data-slot="sidebar.workspaces"`、`aria-expanded` 与 `_listArea` 实现可折叠侧边栏卡片（针对 DSH `0.2.1-rc.5` 优化兼容）。
+
+## 测试搜索控件
+
+```sh
+node --test extensions/dsh/test/*.test.js
 ```
 
-## 搜索控制
+无构建环境下的浏览器交互测试页面位于 `extensions/dsh/test/search-browser.html`（通过 React 18 CDN 直接打开运行）。
 
-打开 **设置 → Deja**，下面分两组，共三个默认开启的开关。本文档用 **Mod** 表示
-逻辑主修饰键：`Mod` = `Ctrl`（Windows/Linux）/ `Cmd`（macOS）。源码里的
-默认值统一写成官方注册表的 `primary` 形式，由框架按平台自动展开。
+## 基准评测
 
-**会话内搜索**
+| 召回率 | Token 用量 | 索引与检索耗时 |
+|---|---|---|
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1；MemPalace 公布 96.6%，agentmemory 为 95.2%） | **token 减少 58%**（同一仓储重复任务上 token 用量只有 agentmemory 的**一半**） | **13.6 秒**索引 19,195 个历史会话 / 跨越 48 个编程智能体的检索仅 **0.7 ms**（7 款对比工具中第二名 72 秒） |
 
-- **Mod+F in conversations（会话内快捷搜索）**：把真正的 `/deja` 命令写进
-  消息输入框——`/deja --session <不带 session- 前缀的会话 UUID> -- <当前草稿>`，
-  并聚焦输入框。发送后由 deja 只搜这一段会话，而不是变成一条普通消息；草稿里的
-  引用块会保留并随前缀整体后移。不会自动发送。若草稿本身已以别的命令开头，
-  则原样不动。桌面端默认 **Mod+F**；浏览器默认 **Mod+Alt+F**（macOS 为
-  **Cmd+Option+F**），因为 DSH 为浏览器原生查找保留了普通的 Find 快捷键。
+## 仓库记忆与跨智能体接力
 
-**Deja 全文搜索**（两个开关）
+通过 git 在 `.deja/memory.jsonl` 中共享经过筛选的项目决策与踩坑记录（`deja repo candidates`、`deja repo add <id>`）。条目在写入前自动脱敏，按内容哈希排序并附带 `merge=union`，并发分支可干净合并；克隆仓库的协作者都会自动加载（在信任策略中配置 `{"activations":{"auto":{"repo":false}}}` 可关闭 hook 注入）。[了解更多](https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html)。
 
-- **Mod+Shift+K 唤起 Deja 全文搜索**：这是直达跨会话搜索的快捷键。按下后打开
-  DSH 侧栏搜索，并直接进入 Deja 全文模式，而不是原来的标题搜索；点放大镜可对
-  当次打开恢复原生搜索。DSH 自带的 **Mod+K 保持不变**——快捷键注册表不允许
-  第二个相同默认绑定，所以 Deja 桌面端与浏览器统一用 **Mod+Shift+K**
-  （macOS 为 **Cmd+Shift+K**）。关闭此开关即完全恢复官方行为。
-- **Deja search in the sidebar（侧栏 Deja 搜索）**：控制侧栏放大镜那一路。先打开
-  侧栏搜索，再点一次放大镜，切换到 Deja 全文搜索。输入关键词后，只检索本地索引中的
-  **DSH 会话**，最多显示 20 条结果及匹配片段；点击结果可打开对应会话。
-  再点放大镜可恢复普通侧栏结果。若还有更多匹配，请缩小查询范围。
-  Deja 不可用、搜索失败或无法打开会话时，界面会显示错误信息。
+开发到一半需要切换工具？运行 `deja handoff --to <agent>`（或通过 MCP 调用 `handoff`），即可将当前会话的目标、已定决策、修改过的文件、通过的检查与待办工作直接交给另一个编程智能体。
 
-**Linux 浏览器**：两个快捷键都没有默认键位。浏览器快捷键服务在那里只允许
-`Mod+/`、`Mod+Shift+,`、`Mod+Shift+.` 三个组合；`Mod+/` 已归官方
-`shortcuts.open`（打开键盘设置），所以除了另外两个（`Mod+Shift+,`、
-`Mod+Shift+.`）之外的其他组合都会被拒绝。请在下方设置里从这两个中自行录制。
+## 不会做什么
 
-两个偏好分别保存在当前浏览器／配置的本地存储中，互不影响，也不会同步到其他
-浏览器或设备。即使设置了 `autoRecall: false`，手动搜索仍然可用。
+索引严格留在 `~/.cache/deja/index.db`（可通过 `DEJA_INDEX_DIR` 移动），除非你显式运行 `deja embed`，否则不会发送任何数据给外部嵌入模型或云服务。`sk-*`、`ghp_*`、`AKIA*` 与 `Bearer` 密钥会在建立索引时自动清除，且从不改写原始会话文件。
 
-### 自定义快捷键
+## 许可证
 
-打开 **设置 → Deja → Customize shortcuts**，可直接修改实际按键组合。三行分别显示
-「Search this conversation」「Deja cross-session search」和「Open sidebar search」的当前
-键位。点击 **Change shortcut** 后按下所需组合键，松开即保存；**Restore default** 恢复该
-命令的默认键位，**Remove** 清除绑定。Esc 或移开焦点取消录制。冲突和保存失败
-会显示提示，并保留原键位。要使用已占用的组合，请先修改或移除占用者的绑定。
-
-这里使用 DSH 原生快捷键服务，与 **设置 → 通用 → 快捷键** 同步。修改按平台
-持久保存，插件升级不会覆盖。浏览器或系统保留组合由 DSH 校验；不支持编辑服务
-的旧版 DSH 会提示升级。功能开关控制是否生效，键位设置控制具体按哪组键。
-
-侧栏全文搜索需要安装 **dsh-deja 包的宿主插件**，由它注册搜索接口。CLI 的
-`deja install dsh-auto` 会复制浏览器面板但不带该接口，因此面板启动时探测一次：
-
-- **设置 → Deja → Search endpoint** 始终说明探测结果：已安装的包及版本，或缺少
-  `/api/deja-search`。缺少时侧栏模式、对应开关、跨会话快捷键及其键位编辑行整体
-  不启用，DSH 侧栏保持原样，页面提供可复制的安装命令
-  （`dsh plugin --profile web add dsh-deja`，把 web 换成你的配置名），
-  而不是留一个点了没用的开关。
-- 探测走接口自己的 `?probe=1`：只有返回 `ok: true` 且
-  `plugin: "dsh-deja"` 的 JSON 才算接口可用，500、代理错误或返回 HTML 一律视为
-  缺失。探测同时返回版本号，不会启动 `deja search`；显式声明的状态（测试用）
-  优先于迟到的探测结果。
-
-请按上面的步骤安装包以启用侧栏搜索。原有的 CLI 工具、命令可以与包同时使用。
-
-## 接入方式
-
-召回通过 `ctx.systemPrompt.context` 注入，该回调在每次 assembly 时求值。另一种看起来可行的做法——在 `agent/pre-step` 中间件里往这一步的消息列表里插入一条消息——插件能加载、回合也能正常结束，但内容到不了模型：该 waterfall 中后续的监听器会基于 payload 重建返回值，插入的消息被丢弃且没有任何报错。这一点是通过读取 dsh 0.1.1-rc.2 实际发出的请求确认的。
-
-手动侧栏搜索使用 DSH 同一套登录保护下的 `GET /api/deja-search` 接口，
-通过异步、无 shell 的调用执行
-`deja search --harness deepseek --json --limit 20 -- <query>`，
-超时为 20 秒，输出上限为 2 MiB。空查询不会启动进程；超过 500 个字符的查询会被拒绝。
-接口只返回精简的会话元数据和匹配片段，不返回完整对话。
-
-DSH 目前没有侧栏搜索 provider API。浏览器适配器限定在
-`data-slot="sidebar.workspaces"` 锚点内，通过带 `aria-expanded` 的语义化
-搜索按钮和 `_listArea` CSS 类后缀定位原界面。已检查的界面版本为
-**DSH 0.2.1-rc.5**。如果旧版或变更后的布局缺少这些元素，适配器会保持普通
-侧栏不变。这些内部标记依赖可能需要随 DSH 后续版本调整。
-
-## 不做什么
-
-不用大模型，不用向量嵌入。索引建立在 `~/.cache/deja/index.db`（可用 `DEJA_INDEX_DIR` 覆盖）下的本地 BM25 存储上，只读取机器上本就存在的历史对话文件；一次查询约一毫秒，除非你主动开启语义索引（`deja embed`），否则不走任何网络。常见密钥与令牌在建立索引时即被脱敏，不会把明文密钥带入 `dsh`。
-
-属于 [deja-vu](https://github.com/vshulcz/deja-vu) 项目。MIT 许可。觉得有用的话，欢迎在 [GitHub](https://github.com/vshulcz/deja-vu) 上给 deja-vu 点个 Star。
+[deja-vu](https://github.com/vshulcz/deja-vu) 生态组件。MIT 协议。觉得有用？[去 GitHub 为 deja-vu 点颗星](https://github.com/vshulcz/deja-vu)。

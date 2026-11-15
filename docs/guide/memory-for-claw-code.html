@@ -188,6 +188,7 @@
 <p class="pagelede">append-only JSONL logs under ~/.claw/sessions and recall across all forty-eight agents<span class="mins" data-mins></span></p>
 
 <p>Claw Code (<code>claw</code>) writes append-only session logs and legacy snapshots on disk and can resume a specific run, but a fresh session reads none of your earlier runs — and nothing recorded in Claude Code, Codex, Cursor, or opencode. This page covers wiring <code>deja</code> into Claw Code.</p>
+<div class="term-shot"><img src="../assets/demo.gif" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier" loading="lazy"><p class="cap">same prompt before and after deja — local BM25 recall across past sessions on disk, zero LLM calls</p></div>
 
 <h2>What Claw Code already has</h2>
 <p>Transcripts live in <code>${CLAW_CONFIG_HOME:-~/.claw}/sessions/*.jsonl</code> alongside legacy <code>*.json</code> files (<code>DEJA_CLAWCODE_ROOT</code> and <code>DEJA_CLAWCODE_ROOTS</code> override the paths). <code>deja</code> parses <code>session_meta</code> headers, <code>prompt_history</code> entries, and <code>message</code> turns including <code>tool_use</code> and <code>tool_result</code> blocks (<code>read_file</code>, <code>write_file</code>, <code>edit_file</code>, <code>bash</code>), while skipping <code>.meta.json</code> and <code>.deleted.json</code> sidecars. To reopen a specific transcript directly, run <code>claw --resume &lt;id&gt;</code> from its recorded <code>workspace_root</code>.</p>
@@ -212,6 +213,10 @@
 
 <h2>The part that is not about Claw Code</h2>
 <p>The local BM25 index (<code>~/.cache/deja/index.db</code>) covers every agent's transcripts on the machine — forty-eight of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so fixes recorded in Claude Code, Codex, or opencode answer questions inside Claw Code, and vice versa. <a href="privacy.html">Indexing and search stay local</a>, with API keys and tokens scrubbed as the index is built.</p>
+
+<h2>Repository memory &amp; handoff</h2>
+<p>Share vetted project decisions and dead ends through git in <code>.deja/memory.jsonl</code> (<code>deja repo candidates</code>, <code>deja repo add &lt;id&gt;</code>). Entries are redacted on write, stored sorted with <code>merge=union</code> so parallel branches merge cleanly, and loaded for any teammate who clones the repository (<code>{"activations":{"auto":{"repo":false}}}</code> in the trust policy keeps them out of hooks). See <a href="repo-memory.html">repo memory</a>.</p>
+<p>Switching tools mid-task? Run <code>deja handoff --to &lt;agent&gt;</code> (or use <code>handoff</code> via MCP) to transfer the active session's goal, decisions, touched files, passed checks, and open work into another coding agent.</p>
 
 <p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/clawcode.html">The Claw Code session format</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>

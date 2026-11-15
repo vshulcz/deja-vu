@@ -1,6 +1,6 @@
 # `@vshulcz/magpie-deja` — Magpie Gateway Hook for deja-vu
 
-English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/zh.md)
+English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/zh.md) | [繁體中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/zh-TW.md) | [日本語](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/ja.md) | [한국어](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/ko.md) | [Español](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/es.md) | [Português](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/pt.md) | [Français](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/fr.md) | [Deutsch](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/de.md) | [Русский](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/ru.md) | [Türkçe](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/tr.md) | [हिन्दी](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/hi.md)
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat-square&logo=github&label=deja-vu)](https://github.com/vshulcz/deja-vu)
 
@@ -10,13 +10,15 @@ Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on Long
 
 When you route multiple coding agents through a gateway, each client tracks only its own thread and loses context whenever you switch tools or start a fresh session. `@vshulcz/magpie-deja` recalls relevant prior sessions from your local `deja` BM25 index during [Magpie](https://github.com/yetone/magpie) gateway requests across OpenAI (`chat`, `responses`), Anthropic (`anthropic`), and Gemini (`gemini`) protocols.
 
+![deja-vu demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
+
 ## Install
 
 ```bash
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-`@vshulcz/magpie-deja` depends on `@vshulcz/deja-vu`, so installing the plugin brings the `deja` binary if you do not already have `deja` on `PATH` (via `brew install deja-vu` or `install.sh`). Run `deja index` once to index existing transcripts on disk, or run `deja install --auto` to also wire native MCP tools (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) and lifecycle hooks across all 47 supported coding agents on this machine:
+`@vshulcz/magpie-deja` depends on `@vshulcz/deja-vu`, so installing the plugin brings the `deja` binary if you do not already have `deja` on `PATH` (via `brew install deja-vu` or `install.sh`). Run `deja index` once to index existing transcripts on disk, or run `deja install --auto` to also wire native MCP tools (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) and lifecycle hooks across all 48 supported coding agents on this machine:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -46,5 +48,17 @@ Configure in Magpie's plugin options for `@vshulcz/magpie-deja`:
 | `cwd` | `""` | Explicit fallback project directory when `ctx.cwd` is absent. |
 | `skipAgents` | `[]` | Agent names (`ctx.agent`) to skip (for example `["claude-code"]` if native hooks are already active). |
 | `bin` | `""` | Explicit path to the `deja` binary. |
+
+## Benchmarks
+
+| Recall | Tokens | Index & lookup |
+|---|---|---|
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 48 coding agents (next of 7 tools: 72 s) |
+
+## Repository memory & handoff
+
+Share vetted project decisions and dead ends through git in `.deja/memory.jsonl` (`deja repo candidates`, `deja repo add <id>`). Entries are redacted on write, stored sorted with `merge=union` so parallel branches merge cleanly, and loaded for any teammate who clones the repository (`{"activations":{"auto":{"repo":false}}}` in the trust policy disables hook injection). [More](https://vshulcz.github.io/deja-vu/guide/repo-memory.html).
+
+Switching tools mid-task? Run `deja handoff --to <agent>` (or use `handoff` via MCP) to transfer the active session's goal, decisions, touched files, passed checks, and open work into another coding agent.
 
 Part of [deja-vu](https://github.com/vshulcz/deja-vu). MIT. Found it useful? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).

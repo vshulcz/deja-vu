@@ -1,31 +1,33 @@
-# Zed 上的 deja
+# deja for Zed
 
-[English](../README.md) | 中文
+[English](../README.md) | 简体中文 | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
 [![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 
-属于 **[deja-vu](https://github.com/vshulcz/deja-vu)** 项目（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · Token 用量仅为 agentmemory 的**一半**）· [官网与在线搜索](https://vshulcz.github.io/deja-vu/) · [浏览器在线演示](https://vshulcz.github.io/deja-vu/view/) · **[★ 在 GitHub 上给 deja-vu 点 Star](https://github.com/vshulcz/deja-vu)**
+**[deja-vu](https://github.com/vshulcz/deja-vu)** 扩展（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · token 用量为 agentmemory 的**一半**）· [文档](https://vshulcz.github.io/deja-vu/zh/) · [在线演示](https://vshulcz.github.io/deja-vu/view/) · [评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) · **[★ GitHub 点赞](https://github.com/vshulcz/deja-vu)**
 
 [deja](https://github.com/vshulcz/deja-vu) 索引编程智能体本来就写在磁盘上的会话文件——Claude Code、Codex、Cursor、opencode 等其他四十七个智能体——并据此回答问题。这个扩展把那个索引作为 context server 接到 Zed 的 agent 面板上，于是一个对话可以检索你先前做过什么，包括装 deja 之前的那些工作。
 
-## 智能体拿到什么
+![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-一个工具 `deja`，用 `mode` 指定要做什么：
+## 智能体可调用的工具
 
-| 模式 | 回答什么 |
+提供一个工具 `deja`，按 `mode` 参数切换能力：
+
+| Mode | 回答内容 |
 |---|---|
-| `recall` | 匹配报错文本、函数名、文件路径或命令行参数的历史会话。 |
-| `context` | 单个历史会话的完整摘要，用于需要当时的判断依据时。 |
-| `blame` | 在修改或删除某个文件之前，讨论过这个文件的历史会话。 |
-| `fix` | 这台机器上同样的报错之后跑过什么。 |
-| `how` | 构建、测试或部署在这台机器上真实的执行命令。 |
-| `orient` | 先前会话在这个项目里跑过的命令，以及它们改过的文件。 |
-| `remember` | 把一条长期有效的决定存下来，供以后召回。 |
-| `handoff` | 另一个会话的状态，从它停下的地方接着做。 |
+| `recall` | 匹配报错字符串、函数名、文件路径或 CLI 参数的历史会话。 |
+| `context` | 当推理过程重要时，返回单次过往会话的完整摘要。 |
+| `blame` | 在编辑或删除文件前，列出讨论过该文件的相关会话。 |
+| `fix` | 这台机器上次遇到同类报错后执行的修复操作。 |
+| `how` | 基于本机实际运行记录提取构建、测试或部署的真实命令。 |
+| `orient` | 过往会话在此项目中运行过的命令与操作过的文件。 |
+| `remember` | 写入一条可长期保留的工程决策，供后续召回。 |
+| `handoff` | 读取另一会话的断点状态，从中断处继续工作。 |
 
 ## 安装
 
-在 Zed 的扩展列表里安装这个扩展。首次使用时它会请 Zed 运行 `deja --version`，能运行就直接用 Zed 的 PATH 上的 `deja`；否则把 `deja` 的发布版可执行文件下载到自己的目录里。扩展在沙箱里运行，自己看不到常见的安装路径，所以不在 Zed 启动时的 PATH 上的 deja 需要指名：
+从 Zed 扩展列表中安装即可。首次使用时，扩展会让 Zed 执行 `deja --version`；若执行成功，就直接使用 Zed `PATH` 中的 `deja`。否则扩展会在自身目录下下载发布版二进制文件。由于 Zed 扩展在沙盒中运行、无法自行扫描常见安装目录，若 `deja` 不在启动 Zed 时的 `PATH` 中，请显式指定路径：
 
 ```json
 {
@@ -39,8 +41,22 @@
 }
 ```
 
-装了 CLI 的话，`deja install --auto` 同样能接上 Zed，并直接把服务端写进 `settings.json`——那条路更短。两边用的是同一个 id `deja-context-server`，而 Zed 按 id 索引服务端，所以无论先装哪一个，最后都只会有一个：安装器发现这个扩展的条目时不会去动它，之后再装扩展也会落在同一个键上，而不是并排多出一个。`deja uninstall zed` 会移除 CLI 写下的内容。
+`deja install --auto` 同样支持接入 Zed，会直接将服务写入 `settings.json`——如果你已安装 CLI，这是最省事的方式。两者使用同一个服务 ID `deja-context-server`，而 Zed 按 ID 索引服务，因此无论先装哪边都只会保留一条配置：CLI 安装器看到扩展的配置会保持原样，后装的扩展也会命中同一个键而不是并存重复项。运行 `deja uninstall zed` 可移除 CLI 写入的配置。
 
-索引和检索都在本地：不发起网络请求，建立索引时凭据会被脱敏。
+索引与搜索在本地运行：未配置语义嵌入端点时不发起网络请求，并在建索引时对凭证和密钥自动脱敏。
 
-MIT 许可，与 deja 一致。觉得有用的话，欢迎在 [GitHub](https://github.com/vshulcz/deja-vu) 上给 deja-vu 点个 Star。
+## 基准评测
+
+| 召回率 | Token 用量 | 索引与检索耗时 |
+|---|---|---|
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1；MemPalace 公布 96.6%，agentmemory 为 95.2%） | **token 减少 58%**（同一仓储重复任务上 token 用量只有 agentmemory 的**一半**） | **13.6 秒**索引 19,195 个历史会话 / 跨越 48 个编程智能体的检索仅 **0.7 ms**（7 款对比工具中第二名 72 秒） |
+
+## 仓库记忆与跨智能体接力
+
+通过 git 在 `.deja/memory.jsonl` 中共享经过筛选的项目决策与踩坑记录（`deja repo candidates`、`deja repo add <id>`）。条目在写入前自动脱敏，按内容哈希排序并附带 `merge=union`，并发分支可干净合并；克隆仓库的协作者都会自动加载（在信任策略中配置 `{"activations":{"auto":{"repo":false}}}` 可关闭 hook 注入）。[了解更多](https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html)。
+
+开发到一半需要切换工具？运行 `deja handoff --to <agent>`（或通过 MCP 调用 `handoff`），即可将当前会话的目标、已定决策、修改过的文件、通过的检查与待办工作直接交给另一个编程智能体。
+
+MIT 协议，与 deja 一致。
+
+[deja-vu](https://github.com/vshulcz/deja-vu) 生态组件。MIT 协议。觉得有用？[去 GitHub 为 deja-vu 点颗星](https://github.com/vshulcz/deja-vu)。

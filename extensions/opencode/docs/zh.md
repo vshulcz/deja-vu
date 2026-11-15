@@ -1,57 +1,48 @@
 # opencode-deja
 
-[English](../README.md) | 中文
+[English](../README.md) | 简体中文 | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
 [![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 
-属于 **[deja-vu](https://github.com/vshulcz/deja-vu)** 项目（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · Token 用量仅为 agentmemory 的**一半**）· [官网与在线搜索](https://vshulcz.github.io/deja-vu/) · [浏览器在线演示](https://vshulcz.github.io/deja-vu/view/) · **[★ 在 GitHub 上给 deja-vu 点 Star](https://github.com/vshulcz/deja-vu)**
+**[deja-vu](https://github.com/vshulcz/deja-vu)** 扩展（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · token 用量为 agentmemory 的**一半**）· [文档](https://vshulcz.github.io/deja-vu/zh/) · [在线演示](https://vshulcz.github.io/deja-vu/view/) · [评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) · **[★ GitHub 点赞](https://github.com/vshulcz/deja-vu)**
 
-opencode 记得自己的会话。这个插件回答的是另一个问题：你在这台机器上 Claude Code、Codex、Cursor、Gemini、Zed 等其他四十七个编程智能体里做过什么，包括你安装任何东西之前的那几个月。
+opencode 记得自己的会话。这个插件回答的是另一个问题：你在这台机器上 Claude Code、Codex、Cursor、Gemini、Zed 等其他四十七个编程智能体里做过什么，包括你安装任何东西之前的那几个月。基于单文件 Go 二进制 `deja` 与本地 BM25 索引，无大模型、无云端嵌入；可用 `DEJA_OFFLINE=1` 关闭每日版本检查。
 
-插件运行 [deja](https://github.com/vshulcz/deja-vu)，一个本地 Go 可执行文件，索引这些智能体本来就写在磁盘上的会话记录。不用大模型，不用向量嵌入，除了每天一次的版本检查之外不走网络，`DEJA_OFFLINE=1` 可以关掉它。
+![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
 ## 安装
 
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-deja"]
-}
-```
-
-这是 opencode 1.x 的写法。2.x 用 `plugins`：
+添加到你的 `opencode.ai/config.json`：
 
 ```json
-{
-  "plugins": ["opencode-deja"]
-}
+{ "plugin": ["opencode-deja"] }
 ```
 
-opencode 启动时会安装这个包。deja 可执行文件随包一起提供，但你自己装的 deja 永远优先——见[用哪个可执行文件](#用哪个可执行文件)。
-
-装了 CLI 的话，`deja install --auto` 也会把 opencode 接好，那条路更短：它写入 deja 的 MCP 服务端，并自己写一个插件。两边都装也没问题：这个包会读取安装器留下的东西——`opencode.json` 里的 MCP 条目、`plugins/deja.js` 里的插件文件——只补缺的部分，所以不会注册两次，也不会召回两次。
+（opencode 2.x 使用复数键 `"plugins": ["opencode-deja"]`，也可直接运行 `opencode plugin add opencode-deja`。）或者运行 `deja install --auto`，将工具、规则与 `plugins/deja.js` 直接写入 `opencode.json`。
 
 ## 提供的能力
 
-六个模型可调用的工具：
+### 六个智能体按需工具
 
-| 工具 | 回答什么 |
+| 工具 | 作用 |
 |---|---|
-| `deja_recall` | 匹配报错文本、函数名、文件路径或命令行参数的历史会话。 |
-| `deja_session` | 单个历史会话的完整摘要——当时试过什么、定下了什么。 |
-| `deja_blame` | 在修改某个文件之前，讨论过这个文件的历史会话。 |
-| `deja_fix` | 这台机器上同样的报错之后跑过什么，而且那次修好了。 |
-| `deja_how` | 构建、测试或部署真实的执行命令，带上实际用过的参数。 |
-| `deja_remember` | 存下一条长期有效的决定。 |
+| `deja_recall` | 按错误信息、符号或主题检索过往会话历史 |
+| `deja_session` | 读取某条命中会话附近的前后完整对话记录 |
+| `deja_blame` | 查看某文件或 `path:line` 最初出自哪一次会话 |
+| `deja_fix` | 查询以前解决同类报错时跑通的命令 |
+| `deja_how` | 召回过去在这个项目里实际使用的命令行参数与构建标志 |
+| `deja_remember` | 记录一条不再重新推导的已定结论 |
 
-以及不需要谁开口的召回：
+### 四项自动记忆注入
 
-- 每个会话一次，把这个项目最近的会话推到系统提示里，并弹一次提示让你知道记忆已经到位（仅 1.x：2.x 的服务端插件没有通往 TUI 的通道）；
-- 你输入的每条提问都单独做一次相关性判断，没有匹配时保持沉默；匹配很强时弹出提示，写明来自哪个智能体、多久以前（`deja-vu — from Codex CLI, 4 months ago: "…"`，仅 1.x，二十分钟最多一次）。task 子智能体的回合不再重复检索：写下这些回合的父智能体已经拿到了召回；
-- 工具调用之后，失败的命令会带上这台机器在同样报错之后跑过的命令，文件操作会带上这个文件之前的决定，都附在工具输出后面；
-- 压缩之前把当前的会话记录索引一遍，于是上下文窗口塌缩后这次会话依然留得下来。
+- **新会话启动提示**：opencode 1.x 会弹出简短提示条告知检索到的条数，opencode 2.x 会在后台直接写入系统提示；形如 `deja-vu — from Codex CLI, 4 months ago: "…"`。
+- **按项目防抖冷却**：同一工作区约 20 分钟内不重复刷入同类提示；**自动跳过子智能体（sub-agent）**，只向主会话注入，节省上下文预算。
+- **失败命令与关键文件决策**：命令执行后针对报错附带往期修法，或在修改过的文件旁带上历史结论。
+- **压缩保留（Precompact）**：在上下文被压缩前整理当前任务目标、决定与未完成命令。
 
-## 选项
+## 配置选项
+
+在 1.x 配置里写成：
 
 ```json
 {
@@ -59,26 +50,36 @@ opencode 启动时会安装这个包。deja 可执行文件随包一起提供，
 }
 ```
 
-2.x 上：
+2.x 使用 `"plugins"` 键，选项说明如下：
 
-```json
-{
-  "plugins": [{ "package": "opencode-deja", "options": { "autoRecall": false, "tools": true } }]
-}
-```
+- `autoRecall`：控制是否自动注入上下文，默认 `true`。
+- `tools`：控制是否暴露六个 `deja_*` 工具，默认 `true`。
+- `bin`：指定 `deja` 可执行文件的自定义路径。
 
-- `autoRecall`（默认 `true`）——上面这些钩子。关掉就只剩工具。
-- `tools`（默认 `true`）——那六个工具。当 `deja install` 已经接好 MCP 服务端时它们会自行跳过；如果你通过别的方式用上 deja，把这一项设为 `false` 即可去掉。
-- `bin` —— 指定某个 deja 可执行文件的路径。
+如果需要给全机 48 款编程工具统一配置包含 `recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff` 在内的完整 MCP 与无缝切工具交接，请运行 `deja install --auto`（参见[切换智能体不丢上下文](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)）。
 
-## 用哪个可执行文件
+## 使用哪份二进制
 
-顺序是：选项里的 `bin`、`DEJA_BIN`、`PATH` 上的 `deja`、常见安装位置（`~/.local/bin`、`/usr/local/bin`、`/opt/homebrew/bin`），最后才是 npm 随这个包装下的那份。你自己的 `deja update` 或 `brew upgrade deja-vu` 会盖过这个包发布时冻结的版本。
+查找顺序：`bin` 配置项 -> `DEJA_BIN` -> `PATH` 中的 `deja` -> `~/.local/bin`、`/usr/local/bin`、`/opt/homebrew/bin` -> 随 npm 包附带的副本。
 
-哪里都没有 deja 时，工具会直接说明情况，而不是报告一段空历史；钩子则保持沉默。
+## 隐私
 
-## 许可
+索引存放在 `~/.cache/deja/index.db`（可用 `DEJA_INDEX_DIR` 修改），在构建索引阶段自动清除 `sk-*`、`ghp_*`、`AKIA*` 与 `Bearer` 等凭据。默认完全离线，仅在主动使用 `deja embed` 并指定向量服务时才发生请求。
+
+## 基准评测
+
+| 召回率 | Token 用量 | 索引与检索耗时 |
+|---|---|---|
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1；MemPalace 公布 96.6%，agentmemory 为 95.2%） | **token 减少 58%**（同一仓储重复任务上 token 用量只有 agentmemory 的**一半**） | **13.6 秒**索引 19,195 个历史会话 / 跨越 48 个编程智能体的检索仅 **0.7 ms**（7 款对比工具中第二名 72 秒） |
+
+## 仓库记忆与跨智能体接力
+
+通过 git 在 `.deja/memory.jsonl` 中共享经过筛选的项目决策与踩坑记录（`deja repo candidates`、`deja repo add <id>`）。条目在写入前自动脱敏，按内容哈希排序并附带 `merge=union`，并发分支可干净合并；克隆仓库的协作者都会自动加载（在信任策略中配置 `{"activations":{"auto":{"repo":false}}}` 可关闭 hook 注入）。[了解更多](https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html)。
+
+开发到一半需要切换工具？运行 `deja handoff --to <agent>`（或通过 MCP 调用 `handoff`），即可将当前会话的目标、已定决策、修改过的文件、通过的检查与待办工作直接交给另一个编程智能体。
+
+## ## 许可证
 
 MIT
 
-属于 [deja-vu](https://github.com/vshulcz/deja-vu) 项目。觉得有用的话，欢迎在 [GitHub](https://github.com/vshulcz/deja-vu) 上给 deja-vu 点个 Star。
+觉得有用？[去 GitHub 为 deja-vu 点颗星](https://github.com/vshulcz/deja-vu)。

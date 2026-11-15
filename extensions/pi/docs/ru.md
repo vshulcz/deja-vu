@@ -1,0 +1,64 @@
+# @vshulcz/pi-deja
+
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+
+[English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | Русский | [Türkçe](tr.md) | [हिन्दी](hi.md)
+
+Часть **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** на LongMemEval-S · **13.6 с** на индекс 19,195 сессий · **вдвое меньше токенов**, чем у agentmemory) · [Документация](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Живое демо](https://vshulcz.github.io/deja-vu/view/) · [Бенчмарки](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) · **[★ Звезда на GitHub](https://github.com/vshulcz/deja-vu)**
+
+![Демонстрация deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
+
+Локальная память для [pi](https://github.com/badlogic/pi-mono) на основе истории сессий 47 других кодинг-агентов (Claude Code, Codex, Cursor, Gemini, OpenClaw, Hermes и других). Работает через единый Go-бинарник `deja` с локальным BM25-индексом без LLM и эмбеддингов; сеть используется только в явных командах обновления и синхронизации и при ежедневной проверке релизов (отключается через `DEJA_OFFLINE=1`).
+
+## Установка
+
+```sh
+pi install npm:@vshulcz/pi-deja
+```
+
+Если `deja` ещё не установлен в системе, расширение использует встроенную копию согласно разделу [Какой бинарник используется](#какой-бинарник-используется). Системный пакет можно поставить заранее:
+
+```sh
+brew install deja-vu
+```
+
+Если на машине уже выполнена привязка через `deja install pi-auto` или `deja install --auto`, npm-пакет уступает ей место и не дублирует хуки и инструменты. Поддержка `pi.extensions` и `before_agent_start` обеспечивает аналогичную работу и в `omp`.
+
+## Что делает расширение
+
+- **Старт сессии (строка состояния внизу)**: показывает число проиндексированных сессий и совпадений для проекта.
+- **Каждый промпт (`before_agent_start`)**: находит прошлые решения по задаче и подставляет их в контекст до ответа модели.
+- **После ошибки команды (`tool_result` для `bash` / `powershell`)**: подсказывает команду, которая исправляла эту ошибку раньше.
+- **При чтении и правке (`tool_result` для read/edit/write)**: напоминает предыдущие договорённости по затрагиваемому файлу.
+- **После компакции (`session_compact`)**: возвращает текущую задачу, выводы и незавершённые команды после сжатия истории.
+- **Завершение сессии (`session_shutdown`)**: обновляет локальный индекс новой сессией.
+- **`/deja <query>`**: быстрый поиск по истории всех индексированных агентов прямо из чата.
+
+## Какой бинарник используется
+
+Путь к `deja` определяется в следующем порядке:
+
+1. Переменная окружения `DEJA_BIN`
+2. Исполняемый файл `deja` в `PATH`
+3. Стандартные каталоги установки (`~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin` и др.)
+4. Встроенная копия из пакета `@vshulcz/deja-vu`
+
+## Бенчмарки
+
+| Полнота (Recall) | Расход токенов | Индексация и поиск |
+|---|---|---|
+| **97.2% R@5** на LongMemEval-S (88.9% hit@1 на 470 вопросах; у MemPalace заявлено 96.6%, у agentmemory — 95.2%) | **на 58% меньше токенов** (**вдвое меньше токенов**, чем у agentmemory на повторных задачах) | **13.6 с** на индекс 19,195 сессий / **0.7 мс** на поиск по 48 кодинг-агентам (следующий из 7 инструментов: 72 с) |
+
+## Память в репозитории и передача сессии (`handoff`)
+
+Делитесь проверенными решениями и тупиковыми ветками через git в `.deja/memory.jsonl` (`deja repo candidates`, `deja repo add <id>`). Записи очищаются от секретов при записи, хранятся отсортированными с `merge=union` для беспроблемного слияния веток и подгружаются у каждого, кто клонирует репозиторий (`{"activations":{"auto":{"repo":false}}}` в политике доверия отключает подстановку через хуки). [Подробнее](https://vshulcz.github.io/deja-vu/guide/repo-memory.html).
+
+Переключаетесь между инструментами посреди задачи? Выполните `deja handoff --to <agent>` (или вызовите `handoff` через MCP), чтобы передать цель сессии, принятые решения, затронутые файлы, пройденные проверки и оставшуюся работу другому агенту.
+
+## Приватность
+
+Индекс хранится в `~/.cache/deja/index.db` (каталог задаётся через `DEJA_INDEX_DIR`), а токены `sk-*`, `ghp_*`, `AKIA*` и `Bearer` маскируются на этапе индексации. По умолчанию всё остаётся на диске; внешние запросы возможны только при явном запуске `deja embed`. Для настройки `recall`, `fix`, `blame` и `handoff` сразу во всех 48 агентах выполните `deja install --auto`.
+
+## Лицензия
+
+Часть [deja-vu](https://github.com/vshulcz/deja-vu). Лицензия MIT. Пригодилось? [Поставьте deja-vu звезду на GitHub](https://github.com/vshulcz/deja-vu).

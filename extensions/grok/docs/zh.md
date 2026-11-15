@@ -1,77 +1,70 @@
-# Grok Build 上的 deja
+# Grok Build 中的 deja
 
-[English](../README.md) | 中文
+[English](../README.md) | 简体中文 | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
 [![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 
-属于 **[deja-vu](https://github.com/vshulcz/deja-vu)** 项目（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · Token 用量仅为 agentmemory 的**一半**）· [官网与在线搜索](https://vshulcz.github.io/deja-vu/) · [浏览器在线演示](https://vshulcz.github.io/deja-vu/view/) · **[★ 在 GitHub 上给 deja-vu 点 Star](https://github.com/vshulcz/deja-vu)**
+**[deja-vu](https://github.com/vshulcz/deja-vu)** 扩展（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · token 用量为 agentmemory 的**一半**）· [文档](https://vshulcz.github.io/deja-vu/zh/) · [在线演示](https://vshulcz.github.io/deja-vu/view/) · [评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) · **[★ GitHub 点赞](https://github.com/vshulcz/deja-vu)**
 
-Grok 记得自己的会话。这个插件回答的是另一个问题：你在这台机器上的 Claude Code、Codex、Cursor、opencode、Zed 等其他四十七个智能体里做过什么——包括你安装任何东西之前的那几个月。
+Grok 记得自己的会话。这个插件回答的是另一个问题：你在这台机器上的 Claude Code、Codex、Cursor、opencode、Zed 等其他四十七个智能体里做过什么——包括你安装任何东西之前的那几个月。记忆与检索由单文件 Go 二进制 `deja` 在本地完成，无 LLM、无云端嵌入（可设 `DEJA_OFFLINE=1` 关闭每日检查）。
 
-插件运行 [deja](https://github.com/vshulcz/deja-vu)，一个本地 Go 可执行文件，索引这些智能体本来就写在磁盘上的会话记录。不用大模型，不用向量嵌入，除了每天一次的版本检查之外不走网络，`DEJA_OFFLINE=1` 可以关掉它。
+![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
 ## 安装
+
+先安装 `deja` 二进制本身（插件包只附带扩展声明，不含原生可执行文件）：
+
+```sh
+brew install deja-vu
+# 或：
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+```
+
+接着从当前仓库目录的 Marketplace 安装插件（官方收录提案：[xai-org/plugin-marketplace#332](https://github.com/xai-org/plugin-marketplace/pull/332)）：
 
 ```sh
 grok plugin marketplace add vshulcz/deja-vu
 grok plugin install deja
 ```
 
-官方 xAI 插件市场的条目还在审核中（[xai-org/plugin-marketplace#332](https://github.com/xai-org/plugin-marketplace/pull/332)），在它合并之前，这个仓库本身就是插件市场。
-
-先装可执行文件——插件分发的是文件，不是运行时，也不是原生二进制：
+或者直接用安装器自动向 `~/.grok/config.toml`（写入 `[mcp_servers.deja]`）和 `~/.grok/hooks/deja.json` 写入全部配置：
 
 ```sh
-brew install deja-vu
+deja install --auto
 ```
 
-或者
+## 安装后包含的能力
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-```
+- **`deja` MCP 工具**（8 种模式：`recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff`）
+- **`deja-history` 技能（skill）**与斜杠命令 **`/deja:recall <query>`**
+- **5 个生命周期钩子（`hooks/recall.mjs`）**：`SessionStart`、`UserPromptSubmit`、`PreToolUse`（通过 `updatedInput` 补充上下文）、`PostToolUse`（在 Grok 1.0.41 上于 `Bash` 后返回排障记忆）、`PreCompact` 与 `SessionEnd`
 
-装了 CLI 的话，`deja install --auto` 同样能接上 Grok，那条路更短：它把 `[mcp_servers.deja]` 写进 `~/.grok/config.toml`，把它的钩子写进 `~/.grok/hooks/deja.json`。两条路各自都够用：插件跑的是同样的钩子。
+## 同时安装了两组配置也不会冲突
 
-## 提供的能力
+如果 `~/.grok/config.toml` 里已经写了 `[mcp_servers.deja]`，或者 `~/.grok/hooks/deja.json` 里已经挂载了 deja 钩子，Marketplace 插件会自动让路，避免同一条上下文注入两次。若只保留插件安装，可运行 `deja uninstall grok` 移出全局写入。
 
-MCP 服务端，带着 deja 在各处提供的那一个工具：`deja`，模式可以是 `recall`、`context`、`blame`、`fix`、`how`、`orient`、`remember` 或 `handoff`。
+## 使用哪份二进制
 
-`deja-history` 技能，让智能体在够不着工具时仍然知道 CLI 的用法。
+插件按顺序查找 `deja`：`DEJA_BIN` -> `~/.local/bin`、`/usr/local/bin`、`/opt/homebrew/bin`、`/usr/bin` -> `PATH`。
 
-`/deja:recall <要查什么>`，用于你想直接问的时候。
+## 在未找到二进制时安静退让而不报错
 
-`deja install grok-auto` 写入的那些钩子，经由 `hooks/recall.mjs` 运行：
+插件依赖 `${GROK_PLUGIN_ROOT}` 与 `.mcp.json` 启动。从 Grok Build 1.0.5 起，如果系统里还没有装 `deja`，`grok mcp doctor` 或 `grok inspect` 会报告 `handshake failed: connection closed`，装上 `deja` 后重连即可恢复。
 
-- `Bash` 上的 `PostToolUse`：失败的命令旁边会附上这台机器上次遇到同样错误后跑过的修复（Grok 1.0.41 会把这个钩子的上下文交给模型）。
-- 会改动东西的工具上的 `PreToolUse`：派生出来的智能体通过 `updatedInput` 在提示里拿到这个项目的记忆。
-- `PreCompact`：忘掉这个会话已经看过的内容，压缩之后召回可以再次发送。
-- `SessionEnd`：撤掉会话的在线标记，下一个会话的召回就能用上它。
-- `SessionStart` 和 `UserPromptSubmit`：Grok 会丢掉它们打印的内容，所以它们只用来预热索引、标记会话在线，什么都不输出。提问要通过 MCP 工具到达历史。
+## 基准评测
 
-## 两边都装也没问题
+| 召回率 | Token 用量 | 索引与检索耗时 |
+|---|---|---|
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1；MemPalace 公布 96.6%，agentmemory 为 95.2%） | **token 减少 58%**（同一仓储重复任务上 token 用量只有 agentmemory 的**一半**） | **13.6 秒**索引 19,195 个历史会话 / 跨越 48 个编程智能体的检索仅 **0.7 ms**（7 款对比工具中第二名 72 秒） |
 
-`deja install grok` 和这个插件接的是同样的两样东西，而 Grok 会把两份都跑起来——每个工具列两遍，每条提问把同样的召回读两遍。所以两边各自在发现安装器的副本时主动让位：
+## 仓库记忆与跨智能体接力
 
-- 当 `~/.grok/config.toml` 里有 `[mcp_servers.deja]` 时，MCP 服务端回应握手，但不列出任何工具；
-- 当 `~/.grok/hooks/deja.json` 里有 deja 的钩子时，钩子直接返回、不输出任何内容。
+通过 git 在 `.deja/memory.jsonl` 中共享经过筛选的项目决策与踩坑记录（`deja repo candidates`、`deja repo add <id>`）。条目在写入前自动脱敏，按内容哈希排序并附带 `merge=union`，并发分支可干净合并；克隆仓库的协作者都会自动加载（在信任策略中配置 `{"activations":{"auto":{"repo":false}}}` 可关闭 hook 注入）。[了解更多](https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html)。
 
-`deja install` 写下的那份优先，因为那是它负责保持更新的副本。`deja uninstall grok` 把所有权交回插件。
+开发到一半需要切换工具？运行 `deja handoff --to <agent>`（或通过 MCP 调用 `handoff`），即可将当前会话的目标、已定决策、修改过的文件、通过的检查与待办工作直接交给另一个编程智能体。
 
-## 用哪个可执行文件
-
-顺序是：`DEJA_BIN`，然后是你自己装的 deja（`~/.local/bin`、`/usr/local/bin`、`/opt/homebrew/bin`、`/usr/bin`），最后是裸名字，于是 `PATH` 仍然说得上话。你自己的 `deja update` 或 `brew upgrade` 会盖过插件发布时冻结的任何版本。
-
-哪里都没有 deja 时，钩子保持沉默，MCP 服务端会说明缺了什么，而不是假装历史是空的。
-
-## 让位而不显得坏掉
-
-`${GROK_PLUGIN_ROOT}` 在 `.mcp.json` 里和在钩子命令里一样会展开——这是在 Grok Build 1.0.5 上实测的：启动一个把自己收到的参数写回文件的插件服务端，因为 `grok mcp doctor` 和 `grok inspect` 都不报告插件的 MCP 服务端。
-
-当 `deja install grok` 已经接好了 CLI 那一份时，这一份会回应握手但不列出任何工具。直接退出会被报成 `handshake failed: connection closed`，在插件界面里留下一个坏掉的服务端，那比留下一个闲着的更糟。
-
-## 许可
+## ## 许可证
 
 MIT
 
-属于 [deja-vu](https://github.com/vshulcz/deja-vu) 项目。觉得有用的话，欢迎在 [GitHub](https://github.com/vshulcz/deja-vu) 上给 deja-vu 点个 Star。
+觉得有用？[去 GitHub 为 deja-vu 点颗星](https://github.com/vshulcz/deja-vu)。

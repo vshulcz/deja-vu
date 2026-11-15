@@ -35,9 +35,9 @@
 <meta property="og:site_name" content="deja-vu">
 <link rel="apple-touch-icon" href="../../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Быстрый старт deja: память для кодинг-агентов", "description": "Установка deja за 10 секунд, локальный индекс истории сессий Claude Code, Codex и Cursor без LLM и облака, поиск в терминале и подключение через MCP и хуки.", "url": "https://vshulcz.github.io/deja-vu/ru/guide/getting-started.html", "inLanguage": "ru", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/ru/guide/getting-started.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-01", "dateModified": "2026-11-01"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Быстрый старт deja: память для кодинг-агентов", "description": "Установка deja за 10 секунд, локальный индекс истории сессий Claude Code, Codex и Cursor без LLM и облака, поиск в терминале и подключение через MCP и хуки.", "url": "https://vshulcz.github.io/deja-vu/ru/guide/getting-started.html", "inLanguage": "ru", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/ru/guide/getting-started.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-01", "dateModified": "2026-11-15"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Быстрый старт", "item": "https://vshulcz.github.io/deja-vu/ru/guide/getting-started.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Как установить deja-vu?", "acceptedAnswer": {"@type": "Answer", "text": "Выполните curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh и затем deja install --auto. Также доступна установка через brew install vshulcz/tap/deja-vu, npm i -g @vshulcz/deja-vu и winget install vshulcz.deja-vu на Windows."}}, {"@type": "Question", "name": "Нужен ли API-ключ или подключение к облаку?", "acceptedAnswer": {"@type": "Answer", "text": "Нет. Индексация и поиск работают полностью локально в одном Go-бинарнике без LLM, фоновых демонов и отправки данных в сеть. Секреты и токены вырезаются при построении индекса."}}, {"@type": "Question", "name": "Найдёт ли deja сессии, которые были до её установки?", "acceptedAnswer": {"@type": "Answer", "text": "Да. deja читает транскрипты, которые Claude Code, Codex, Cursor и ещё 40 агентов уже сохранили на диск, поэтому поиск работает по всей прошлой истории сразу после первой индексации."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Как установить deja-vu?", "acceptedAnswer": {"@type": "Answer", "text": "Выполните curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh и затем deja install --auto. Также доступна установка через brew install vshulcz/tap/deja-vu, npm i -g @vshulcz/deja-vu и winget install vshulcz.deja-vu на Windows."}}, {"@type": "Question", "name": "Нужен ли API-ключ или подключение к облаку?", "acceptedAnswer": {"@type": "Answer", "text": "Нет. Индексация и поиск работают полностью локально в одном Go-бинарнике без LLM, фоновых демонов и отправки данных в сеть. Секреты и токены вырезаются при построении индекса."}}, {"@type": "Question", "name": "Найдёт ли deja сессии, которые были до её установки?", "acceptedAnswer": {"@type": "Answer", "text": "Да. deja читает транскрипты, которые Claude Code, Codex, Cursor и ещё 45 агентов уже сохранили на диск, поэтому поиск работает по всей прошлой истории сразу после первой индексации."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -65,7 +65,8 @@
 <h1>Быстрый старт</h1>
 <p class="pagelede">десять секунд на установку, десять на индекс — и агенты помнят всё, что вы уже чинили<span class="mins" data-mins></span></p>
 
-<p><a href="https://github.com/vshulcz/deja-vu">deja-vu</a> (<code>github.com/vshulcz/deja-vu</code>, CLI <code>deja</code>) — локальный инструмент памяти и поиска по истории сессий для кодинг-агентов. Он индексирует транскрипты, которые Claude Code, Codex, Cursor, Qwen Code, Gemini CLI, opencode, Crush и ещё 36 агентов уже пишут на диск, и возвращает нужный контекст через MCP и хуки. Один Go-бинарник, без LLM и без облака.</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja-vu</a> (<code>github.com/vshulcz/deja-vu</code>, CLI <code>deja</code>) — локальный инструмент памяти и поиска по истории сессий для кодинг-агентов. Он индексирует транскрипты, которые Claude Code, Codex, Cursor, Qwen Code, Gemini CLI, opencode, Crush и ещё 41 агент уже пишут на диск, и возвращает нужный контекст через MCP и хуки. Один Go-бинарник, без LLM и без облака.</p>
+<div class="term-shot"><img src="../../assets/demo.gif" alt="Один и тот же вопрос дважды: без памяти агент не помнит решение, с deja находит его в сессии восьмимесячной давности" loading="lazy"><p class="cap">один и тот же запрос до и после deja — локальный BM25-поиск по сессиям на диске, без вызовов LLM</p></div>
 
 <h2>Установка</h2>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -76,7 +77,7 @@ deja install --auto</pre>
 <h2>Проверка найденных агентов</h2>
 <pre>deja sources
 deja stats</pre>
-<p><code>deja sources</code> показывает пути и число сессий каждого найденного агента; <code>deja stats</code> выводит общую сводку по проектам и активности. Полный список путей для всех 43 агентов — в <a href="../../guide/harnesses.html">таблице поддержки</a>.</p>
+<p><code>deja sources</code> показывает пути и число сессий каждого найденного агента; <code>deja stats</code> выводит общую сводку по проектам и активности. Полный список путей для всех 48 агентов — в <a href="../../guide/harnesses.html">таблице поддержки</a>.</p>
 
 <h2>Поиск в терминале</h2>
 <p>Запустите <code>deja</code> без аргументов — откроется интерактивный полноэкранный поиск по истории всех агентов. Вверху списка — сессии, связанные с текущими незакоммиченными изменениями, ниже — недавние сессии этого проекта.</p>
@@ -101,6 +102,10 @@ deja stats</pre>
 <pre>deja uninstall --all
 rm -rf ~/.cache/deja</pre>
 <p>Исходные файлы сессий ваших агентов deja никогда не изменяет.</p>
+
+<h2>Память в репозитории и передача сессий</h2>
+<p>Проверенные решения команды и тупиковые ветки можно хранить в Git в файле <code>.deja/memory.jsonl</code> (<code>deja repo candidates</code>, <code>deja repo add &lt;id&gt;</code>). Записи очищаются от секретов при добавлении, сортируются и объединяются через <code>merge=union</code> без конфликтов между ветками; политика доверия <code>{"activations":{"auto":{"repo":false}}}</code> отключает автоподстановку в хуках. <a href="../../guide/repo-memory.html">Подробнее</a>.</p>
+<p>При смене инструмента посреди задачи выполните <code>deja handoff --to &lt;agent&gt;</code> (или вызовите <code>handoff</code> через MCP), чтобы передать цель, принятые решения, изменённые файлы, пройденные проверки и оставшиеся шаги другому агенту.</p>
 
 <p><a href="does-my-agent-remember.html">Помнит ли агент прошлые сессии?</a> · <a href="session-files-on-disk.html">Как удалить сессии Claude Code</a> · <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.ru.md">README на русском</a></p>
 <p class="star-cta">Пригодилось? <a href="https://github.com/vshulcz/deja-vu">Поставьте deja-vu звезду на GitHub</a>.</p>

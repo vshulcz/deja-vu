@@ -1,6 +1,6 @@
 # deja for Zed
 
-English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/zed/docs/zh.md)
+English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/zed/docs/zh.md) | [繁體中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/zed/docs/zh-TW.md) | [日本語](https://github.com/vshulcz/deja-vu/blob/main/extensions/zed/docs/ja.md) | [한국어](https://github.com/vshulcz/deja-vu/blob/main/extensions/zed/docs/ko.md) | [Español](https://github.com/vshulcz/deja-vu/blob/main/extensions/zed/docs/es.md) | [Português](https://github.com/vshulcz/deja-vu/blob/main/extensions/zed/docs/pt.md) | [Français](https://github.com/vshulcz/deja-vu/blob/main/extensions/zed/docs/fr.md) | [Deutsch](https://github.com/vshulcz/deja-vu/blob/main/extensions/zed/docs/de.md) | [Русский](https://github.com/vshulcz/deja-vu/blob/main/extensions/zed/docs/ru.md) | [Türkçe](https://github.com/vshulcz/deja-vu/blob/main/extensions/zed/docs/tr.md) | [हिन्दी](https://github.com/vshulcz/deja-vu/blob/main/extensions/zed/docs/hi.md)
 
 [![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 
@@ -11,6 +11,8 @@ coding agents already write to disk — Claude Code, Codex, Cursor, opencode and
 forty-four more — and answers from them. This extension serves that index to Zed's
 agent panel as a context server, so a thread can search what you did before,
 including work from before deja was installed.
+
+![deja-vu demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
 ## What the agent gets
 
@@ -57,6 +59,18 @@ rather than beside it. `deja uninstall zed` removes what the CLI wrote.
 
 Indexing and search are local: no network calls, and credentials are redacted
 as the index is built.
+
+## Benchmarks
+
+| Recall | Tokens | Index & lookup |
+|---|---|---|
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 48 coding agents (next of 7 tools: 72 s) |
+
+## Repository memory & handoff
+
+Share vetted project decisions and dead ends through git in `.deja/memory.jsonl` (`deja repo candidates`, `deja repo add <id>`). Entries are redacted on write, stored sorted with `merge=union` so parallel branches merge cleanly, and loaded for any teammate who clones the repository (`{"activations":{"auto":{"repo":false}}}` in the trust policy disables hook injection). [More](https://vshulcz.github.io/deja-vu/guide/repo-memory.html).
+
+Switching tools mid-task? Run `deja handoff --to <agent>` (or use `handoff` via MCP) to transfer the active session's goal, decisions, touched files, passed checks, and open work into another coding agent.
 
 MIT, same as deja.
 

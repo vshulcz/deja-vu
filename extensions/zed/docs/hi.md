@@ -1,0 +1,62 @@
+# deja for Zed
+
+[English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | हिन्दी
+
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+
+**[deja-vu](https://github.com/vshulcz/deja-vu)** का हिस्सा (LongMemEval-S पर **97.2% R@5** · 19,195 सेशन इंडेक्स करने में **13.6 s** · agentmemory के **आधे टोकन**) · [दस्तावेज़](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [लाइव डेमो](https://vshulcz.github.io/deja-vu/view/) · [बेंचमार्क](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) · **[★ GitHub पर स्टार करें](https://github.com/vshulcz/deja-vu)**
+
+[deja](https://github.com/vshulcz/deja-vu) उन सेशन फ़ाइलों को इंडेक्स करता है जिन्हें कोडिंग एजेंट्स पहले ही डिस्क पर लिखते हैं — Claude Code, Codex, Cursor, opencode और 44 अन्य — और उनसे उत्तर देता है। यह एक्सटेंशन उस इंडेक्स को Zed के एजेंट पैनल को context server के रूप में उपलब्ध कराता है, ताकि चैट पिछले काम खोज सके, जिसमें deja इंस्टॉल होने से पहले का काम भी शामिल है।
+
+![deja-vu डेमो](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
+
+## एजेंट को क्या मिलता है
+
+एक ही टूल, `deja`, जिसे `mode` के साथ कॉल किया जाता है:
+
+| Mode | क्या बताता है |
+|---|---|
+| `recall` | एरर स्ट्रिंग, फ़ंक्शन नाम, फ़ाइल पाथ या फ़्लैग से मेल खाने वाले सेशन। |
+| `context` | जब पीछे का तर्क महत्वपूर्ण हो, तो किसी एक पुराने सेशन का पूरा सारांश। |
+| `blame` | किसी फ़ाइल को संपादित या हटाने से पहले, उस पर चर्चा करने वाले सेशन। |
+| `fix` | इसी एरर के बाद इस मशीन पर पहले क्या चलाया गया था। |
+| `how` | यहाँ वास्तव में चले बिल्ड, टेस्ट या डिप्लॉय का सटीक कमांड। |
+| `orient` | इस प्रोजेक्ट में पुराने सेशन द्वारा चलाए गए कमांड और बदली फ़ाइलें। |
+| `remember` | बाद में वापस पाने के लिए एक स्थायी निर्णय सहेजता है। |
+| `handoff` | दूसरे सेशन की स्थिति, ताकि जहाँ रुका था वहीं से काम जारी रहे। |
+
+## इंस्टॉल करें
+
+Zed की एक्सटेंशन सूची से एक्सटेंशन इंस्टॉल करें। पहली बार उपयोग करने पर यह Zed से `deja --version` चलाने को कहता है, और चलने पर Zed के `PATH` में मौजूद `deja` का उपयोग करता है। अन्यथा यह अपने डायरेक्टरी में रिलीज़ बाइनरी डाउनलोड करता है। सैंडबॉक्स में चलने के कारण एक्सटेंशन सामान्य इंस्टॉल पाथ नहीं ढूँढ सकता, इसलिए Zed शुरू करते समय जो `deja` `PATH` में न हो उसे बताना पड़ता है:
+
+```json
+{
+  "context_servers": {
+    "deja-context-server": {
+      "settings": {
+        "binary": "/opt/homebrew/bin/deja"
+      }
+    }
+  }
+}
+```
+
+`deja install --auto` भी Zed तक पहुँचता है और सर्वर को सीधे `settings.json` में लिख देता है — CLI होने पर यह छोटा रास्ता है। दोनों एक ही ID `deja-context-server` का उपयोग करते हैं और Zed सर्वरों को ID से सहेजता है, इसलिए किसी भी क्रम में केवल एक ही सर्वर प्रविष्टि रहती है। CLI द्वारा जोड़ा गया विन्यास `deja uninstall zed` से हटता है।
+
+इंडेक्सिंग और खोज लोकल हैं: कोई नेटवर्क कॉल नहीं होता, और इंडेक्स बनते समय क्रेडेंशियल हटा दिए जाते हैं।
+
+## बेंचमार्क
+
+| रिकॉल (Recall) | टोकन | इंडेक्सिंग और खोज |
+|---|---|---|
+| LongMemEval-S पर **97.2% R@5** (470 प्रश्नों पर 88.9% hit@1; MemPalace 96.6% और agentmemory 95.2% प्रकाशित करते हैं) | **58% कम टोकन** (दोहराए गए कार्य पर agentmemory के **आधे टोकन**) | 19,195 सेशन इंडेक्स करने में **13.6 s** / 48 कोडिंग एजेंट्स में **0.7 ms** खोज समय (7 में अगला: 72 s) |
+
+## रेपो मेमोरी और एजेंट हैंडऑफ़
+
+जाँचे गए प्रोजेक्ट निर्णय और गलत रास्ते git के ज़रिए `.deja/memory.jsonl` में साझा करें (`deja repo candidates`, `deja repo add <id>`)। एंट्री लिखते समय सीक्रेट्स हटा दिए जाते हैं, `merge=union` के साथ सामग्री हैश के क्रम में सहेजी जाती हैं ताकि समानांतर ब्रांच बिना टकराव के मर्ज हों, और रेपो क्लोन करने वाले हर साथी के लिए लोड होती हैं (ट्रस्ट पॉलिसी में `{"activations":{"auto":{"repo":false}}}` हुक इंजेक्शन बंद करता है)। [और जानें](https://vshulcz.github.io/deja-vu/guide/repo-memory.html)।
+
+काम के बीच में टूल बदल रहे हैं? `deja handoff --to <agent>` चलाएँ (या MCP के ज़रिए `handoff` कॉल करें) ताकि सक्रिय सेशन का लक्ष्य, निर्णय, बदली गई फ़ाइलें, पास हुए चेक और बाकी काम दूसरे कोडिंग एजेंट को मिल सके।
+
+MIT लाइसेंस, deja के समान।
+
+[deja-vu](https://github.com/vshulcz/deja-vu) का हिस्सा। MIT लाइसेंस। उपयोगी लगा? [GitHub पर deja-vu को स्टार दें](https://github.com/vshulcz/deja-vu)।

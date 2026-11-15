@@ -1,6 +1,6 @@
 # deja-vu for Spec Kit
 
-English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/spec-kit/docs/zh.md)
+English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/spec-kit/docs/zh.md) | [繁體中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/spec-kit/docs/zh-TW.md) | [日本語](https://github.com/vshulcz/deja-vu/blob/main/extensions/spec-kit/docs/ja.md) | [한국어](https://github.com/vshulcz/deja-vu/blob/main/extensions/spec-kit/docs/ko.md) | [Español](https://github.com/vshulcz/deja-vu/blob/main/extensions/spec-kit/docs/es.md) | [Português](https://github.com/vshulcz/deja-vu/blob/main/extensions/spec-kit/docs/pt.md) | [Français](https://github.com/vshulcz/deja-vu/blob/main/extensions/spec-kit/docs/fr.md) | [Deutsch](https://github.com/vshulcz/deja-vu/blob/main/extensions/spec-kit/docs/de.md) | [Русский](https://github.com/vshulcz/deja-vu/blob/main/extensions/spec-kit/docs/ru.md) | [Türkçe](https://github.com/vshulcz/deja-vu/blob/main/extensions/spec-kit/docs/tr.md) | [हिन्दी](https://github.com/vshulcz/deja-vu/blob/main/extensions/spec-kit/docs/hi.md)
 
 [![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 
@@ -14,6 +14,8 @@ session id behind each point.
 The sessions come from [deja](https://github.com/vshulcz/deja-vu), which
 indexes the transcripts Claude Code, Codex, Cursor, Copilot, Gemini and other
 agents already write to disk. Everything stays on your machine.
+
+![deja-vu demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
 ## Install
 
@@ -73,6 +75,18 @@ unless you say yes. To turn it off, set `enabled: false` on the entry in
   a large history. After that it answers in well under a second.
 - Recalled session text is treated as reference data; the command tells the
   agent never to follow instructions found in it.
+
+## Benchmarks
+
+| Recall | Tokens | Index & lookup |
+|---|---|---|
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 48 coding agents (next of 7 tools: 72 s) |
+
+## Repository memory & handoff
+
+Share vetted project decisions and dead ends through git in `.deja/memory.jsonl` (`deja repo candidates`, `deja repo add <id>`). Entries are redacted on write, stored sorted with `merge=union` so parallel branches merge cleanly, and loaded for any teammate who clones the repository (`{"activations":{"auto":{"repo":false}}}` in the trust policy disables hook injection). [More](https://vshulcz.github.io/deja-vu/guide/repo-memory.html).
+
+Switching tools mid-task? Run `deja handoff --to <agent>` (or use `handoff` via MCP) to transfer the active session's goal, decisions, touched files, passed checks, and open work into another coding agent.
 
 ## License
 

@@ -7,6 +7,8 @@
 
 <p align="center"><strong>Shared local memory, session history search, cross-agent handoff, and code recovery across 48 coding agents.</strong></p>
 
+<p align="center"><a href="https://github.com/vshulcz/deja-vu#readme">English</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.zh.md">简体中文</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.zh-TW.md">繁體中文</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.ja.md">日本語</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.ko.md">한국어</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.es.md">Español</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.pt.md">Português</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.fr.md">Français</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.de.md">Deutsch</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.ru.md">Русский</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.tr.md">Türkçe</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.hi.md">हिन्दी</a></p>
+
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="deja-vu cross-agent coding session memory"></p>
 
 Forty-eight coding agents — including Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, opencode, Cline, Copilot CLI, Roo Code, Kilo Code, aider, Goose, Qwen Code, Kimi Code, Antigravity, Grok Build, pi, omp, DeepSeek Harness, Hermes, Kiro, Reasonix and Zed — already write every session to local files. **deja starts full**: it indexes months of history from before you installed it so your agents keep context across `/compact`, hand off mid-task via `deja handoff`, and recover overwritten code via `deja restore` and `deja blame` — with no model and no capture step.
@@ -39,6 +41,18 @@ Or wire the stdio MCP server directly in any MCP client (`mcp.json` / `claude_de
   }
 }
 ```
+
+## Benchmarks
+
+| Recall | Tokens | Index & lookup |
+|---|---|---|
+| **97.2% R@5** on LongMemEval-S (**88.9% hit@1** on the 470-question cleaned set; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 47 coding agents (next of 7 tools: 72 s) |
+
+## Repository memory & handoff
+
+Share vetted project decisions and dead ends through git in `.deja/memory.jsonl` (`deja repo candidates`, `deja repo add <id>`). Entries are redacted on write, stored sorted with `merge=union` so parallel branches merge cleanly, and loaded for any teammate who clones the repository (`{"activations":{"auto":{"repo":false}}}` in the trust policy keeps them out of hooks). [More](https://vshulcz.github.io/deja-vu/guide/repo-memory.html).
+
+Switching tools mid-task? Run `deja handoff --to <agent>` (or use `handoff` via MCP) to transfer the active session's goal, decisions, touched files, passed checks, and open work into another coding agent.
 
 Full documentation, the harness matrix and the benchmarks:
 [github.com/vshulcz/deja-vu](https://github.com/vshulcz/deja-vu) ·

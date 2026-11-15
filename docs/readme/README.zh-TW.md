@@ -5,9 +5,9 @@
   </picture>
 </p>
 
-<p align="center"><b>跨 47 個編碼代理的本地共享記憶、跨代理交接與程式碼復原。</b></p>
+<p align="center"><b>跨 48 個編碼代理的本地共享記憶、跨代理交接與程式碼復原。</b></p>
 
-<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 40 個代理本來就把每次會話寫在磁碟上。<br>
+<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 41 個代理本來就把每次會話寫在磁碟上。<br>
 deja 在本地索引全部歷史，讓代理跨 <code>/compact</code> 保住上下文、用 <code>deja handoff</code> 中途換代理接著做、用 <code>deja restore</code> 找回被覆寫的程式碼——無需 LLM，單個 Go 二進位檔。</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | 繁體中文 | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -31,11 +31,12 @@ deja 在本地索引全部歷史，讓代理跨 <code>/compact</code> 保住上�
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同一個問題問同一個代理兩次：沒有記憶時它毫無印象，有 deja 時它用八個月前的結論作答"></p>
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-deja install --auto
+npx @vshulcz/deja-vu install --auto                # 單步驟跨平台安裝並接上已安裝的代理
+# 或透過 shell / Homebrew：
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
 ```
 
-<p align="center"><sub>或用 Homebrew：<code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code 外掛：<code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills：<code>npx skills add vshulcz/deja-vu</code><br><a href="#安裝">Windows（Scoop / winget）、Codex、OpenCode、OpenClaw 等</a> &middot; 免安裝唯讀檢查本機會話：<code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">瀏覽器線上展示 →</a></sub></p>
+<p align="center"><sub>Homebrew：<code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code 外掛：<code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills：<code>npx skills add vshulcz/deja-vu</code><br><a href="#安裝">Windows（Scoop / winget）、Codex、OpenCode、OpenClaw 等</a> &middot; 免安裝試用：<code>npx @vshulcz/deja-vu stats --no-index --card</code> 或 <code>npx @vshulcz/deja-vu audit</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">瀏覽器線上展示 →</a></sub></p>
 
 <table align="center">
 <tr>
@@ -130,7 +131,7 @@ skill 呼叫的是上面裝好的 `deja` 執行檔，自己不帶。
 
 ## 能得到什麼
 
-**在 Codex 裡解決，Claude 記得。** 四十七個編碼代理把每一次對話都寫進本機檔案，
+**在 Codex 裡解決，Claude 記得。** 四十八個編碼代理把每一次對話都寫進本機檔案，
 deja 把這些檔案變成一層它們都能讀的記憶。
 
 | | |
@@ -154,6 +155,28 @@ deja 把這些檔案變成一層它們都能讀的記憶。
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/docs/assets/stats-card-demo.svg" width="760" alt="deja 統計卡片：一年的會話熱力圖、它們來自哪些代理、以及最長的一次"></p>
 
 完整的功能參考在[文件站](https://vshulcz.github.io/deja-vu/)。
+
+## 儲存庫中的記憶
+
+Sync 負責在你自己的機器之間移動歷史。想把代理好不容易踩坑學到的少數要點交給協作者，
+可以放進儲存庫：
+
+```text
+$ deja repo candidates
+4cd7e7bb9c rejected Reverted the retry with jitter: it broke idempotency because the sender re-signs each attempt with a new delivery id.  (session s1, claude 2026-08-03)
+$ deja repo add 4cd7e7bb9c
+added 1 entry to .deja/memory.jsonl
+nothing is committed: review with `git diff .deja/` and commit it like code
+```
+
+候選項來自每個代理在這個專案裡的歷史：標記保留與記下的筆記、會話中回報的回退，以及
+各次會話敲定的結論。在你挑選之前不會寫入任何內容；寫入時每筆條目都會先做機密遮罩，
+仍命中任何密鑰規則的條目會被拒絕。`.deja/memory.jsonl` 是按內容雜湊排序的 JSON 行檔案，
+旁邊配了 `merge=union` 屬性，平行新增會自動合併；刪掉一行就是移除該條目。Clone 下來之後，
+這些條目會在任何已接上 deja 的代理開新會話與召回時重新出現，並標明來自儲存庫、與其他記憶
+一樣套上不可信邊界。在信任策略裡設定 `{"activations":{"auto":{"repo":false}}}` 即可讓它們
+不進入 hooks 注入。
+[更多說明](https://vshulcz.github.io/deja-vu/guide/repo-memory.html)。
 
 ## 隱私
 
@@ -238,17 +261,35 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | 外掛 `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
+| Gemini CLI | 擴充功能 `@vshulcz/deja`，位於 [Gemini CLI Extensions Gallery](https://geminicli.com/extensions/) | `gemini extensions install https://github.com/vshulcz/deja-vu` |
+| Antigravity | 外掛 `deja-vu`（[`antigravity-plugin/`](../../antigravity-plugin/)） | `agy plugin install deja-vu` |
 | Codex CLI | 外掛 `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu`，然後 `codex plugin add deja-vu@deja-vu` |
 | Grok Build | 外掛 `deja` | `grok plugin marketplace add vshulcz/deja-vu`，然後 `grok plugin install deja` |
 | OpenClaw | ClawHub 與 npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi（以及 omp） | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 | Hermes | 記憶提供者 `deja-memory`，在 Hermes 外掛目錄裡 | `hermes plugins install deja-memory`，或從 GitHub：`hermes plugins install vshulcz/deja-vu/extensions/hermes` |
+| Magpie | npm `@vshulcz/magpie-deja` | `magpie plugin add @vshulcz/magpie-deja` |
+| Orca | v2 `trusted-worker` 外掛 `deja` | `Orca → Plugins → extensions/orca`（並執行 `deja install orca` 啟用原生 MCP 與 hooks） |
+| CodeWhale | Claude 相容套件包 `deja-vu` | `/plugin install extensions/codewhale`（並執行 `deja install codewhale` 啟用原生 hooks） |
+| VS Code / Cursor / Windsurf | 狀態列擴充功能 `vshulcz.deja-status` | `code --install-extension vshulcz.deja-status` |
+| JetBrains 全家桶 | IntelliJ、GoLand、PyCharm、WebStorm 與 RustRover 外掛（[`extensions/jetbrains/`](../../extensions/jetbrains/docs/zh-TW.md)） | `idea installPlugins com.github.vshulcz.deja-vu` |
+| Neovim | `lazy.nvim` 與 CodeCompanion 外掛（[`extensions/nvim/`](../../extensions/nvim/docs/zh-TW.md)） | `{ "vshulcz/deja-vu", opts = {} }` |
+| tmux | [TPM](https://github.com/tmux-plugins/tpm) 彈窗（`prefix + D`）與狀態列 `#{deja_status}`（`deja.tmux`） | `set -g @plugin 'vshulcz/deja-vu'` |
+| Raycast | Raycast 擴充功能 `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
+| CC Switch | 一鍵匯入 MCP 與 Skill 倉庫（`ccswitch://`） | [匯入 MCP 到 CC Switch](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [跨代理切換指南](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 兩條路各自都夠用，兩條都走也不會出問題：每個套件都會先讀 `deja install` 寫下的設定。
 opencode、dsh 和 OpenClaw 只補上缺的那部分；Kimi、Grok、Codex 和 pi 在安裝器已經接好時
 直接讓位；在 Zed 裡兩邊用的是同一個 server id。所以無論先裝哪個都不會重複。
 
 它們用的都是你已經裝好的 deja，套件裡自帶的那份只是備援。
+
+在 [Spec Kit](https://github.com/github/spec-kit) 專案裡，有一個擴充會提供 `/speckit.deja-vu.recall`，
+在實作功能之前先搜尋過去的會話：
+
+```sh
+specify extension add deja-vu --from https://github.com/vshulcz/deja-vu/releases/latest/download/deja-spec-kit.zip
+```
 
 ## 可選的語意召回
 
@@ -297,6 +338,20 @@ deja bench read       # 讀取一個資料庫儲存的代價，以及一個超�
 | 索引大小 | 200 MB，約為語料的 10% |
 
 索引是增量的。會話檔案變長時，只重新讀那一個檔案。
+
+### 比較
+
+| 能力 | `deja-vu` | `claude-mem` | `MemPalace` |
+| --- | --- | --- | --- |
+| 安裝前的歷史記錄（[第一天](https://vshulcz.github.io/deja-vu/guide/day-zero.html)） | 是 — 索引既有的轉錄檔（`36/100` hit@1） | 否 — 從安裝起才開始記錄（`0/100`） | Claude Code、Codex、Cursor（`16/100`） |
+| 共用代理數 | 48 款工具 | 9 款（hooks） | 3 款（CLI） |
+| LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
+| 執行時期與相依套件 | 1 個 Go 二進位檔 | Bun worker + SQLite + Chroma | Python + 300 MB 嵌入模型 |
+| LLM 呼叫 / 帳號要求 | 無 | 觀察者 LLM 呼叫 | 無 |
+| 未提交檔案復原 | `deja restore <path>` | 否 | 否 |
+| 現有 `claude-mem.db` | 直接讀取 `~/.claude-mem/claude-mem.db` | 原生 | 否 |
+
+逐項比較：[15 套工具完整對比](https://vshulcz.github.io/deja-vu/guide/compare.html) · [claude-mem 替代方案](https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html) · [Mem0 替代方案](https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html) · [SpecStory 替代方案](https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html) · [Basic Memory 替代方案](https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html)。
 
 ## 運作方式
 
@@ -378,6 +433,13 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 `make build test lint`，然後看 [CONTRIBUTING.md](../../CONTRIBUTING.md)。
 新增一個工具從[解析器註冊表](../../docs/ARCHITECTURE.md#source-parsers)開始。
 優先順序與非目標見 [ROADMAP.md](../../ROADMAP.md)。
+
+## 支援
+
+錯誤與問題請提交到 [issues](https://github.com/vshulcz/deja-vu/issues)。
+若認為可能構成安全漏洞，請改走 [SECURITY.md](../../SECURITY.md) 裡的私密通報連結。
+deja 會讀取什麼、絕不向外傳送什麼，以及如何排除專案或遺忘特定會話，都寫在
+[隱私](#隱私)。覺得有幫助？[Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)。
 
 ## 授權
 

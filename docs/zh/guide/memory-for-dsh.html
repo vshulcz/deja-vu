@@ -85,6 +85,7 @@
 <p class="pagelede">dsh 自己的会话由 session-query 回答；这一页讲剩下的那部分<span class="mins" data-mins></span></p>
 
 <p>dsh 本来就能回答关于它自己对话的问题——内置的 <code>session-query</code> 子系统就是干这个的。这一页讲的是另一个问题：在同一台机器上，你在 Claude Code、Codex、Cursor、opencode 或 Zed 里做过什么，包括 dsh 还没装上来之前。</p>
+<div class="term-shot"><img src="../../assets/demo.gif" alt="同一问题问两次：没有记忆时智能体一无所知，接入 deja 后直接引用 8 个月前敲定的方案" loading="lazy"><p class="cap">接入 deja 前后同一提示词的对比 —— 本地 BM25 跨会话召回，不调用任何模型</p></div>
 
 <h2>dsh 已经有的部分</h2>
 <p>会话放在 <code>$DSH_HOME</code>（默认 <code>~/.dsh</code>）下，格式是 zstd 分帧的 JSONL，一个会话一个文件，<code>session-query</code> 搜的就是它们。两个限制：只有 dsh 自己的历史，而且新会话不会主动去查，除非你开口。</p>
@@ -104,6 +105,10 @@
 <h2>和这个 harness 无关的那一半</h2>
 <p>索引覆盖这台机器上每个智能体的转录——今天是四十八个，<a href="../../guide/where-sessions-are-stored.html">各有各的格式</a>——所以在一个工具里找到的修法，能回答在另一个工具里提的问题，包括这一切装上来之前的会话。这就是选择索引、而不是选择边用边记的原因。</p>
 <p>这里没有任何东西在写记忆，所以也就没有什么能凭空编进你的历史里；建索引和检索都在本地，凭据在建索引时就被脱敏（<a href="privacy.html">隐私说明</a>）。每次提问注入上限 1536 字节，每次工具调用约 4 KB——<a href="../../guide/token-cost.html">记忆要花多少 token</a> 里有实测对比。</p>
+
+<h2>仓库共享记忆与跨智能体交接</h2>
+<p>把团队校验过的工程决策、否决方案和避坑经验通过 Git 放进 <code>.deja/memory.jsonl</code>（<code>deja repo candidates</code>、<code>deja repo add &lt;id&gt;</code>）。条目写入时自动脱敏，按内容哈希排序并搭配 <code>merge=union</code> 合并属性，并行分支可无冲突合并；队友克隆仓库后即刻生效，也可在信任策略中配置 <code>{"activations":{"auto":{"repo":false}}}</code> 关闭自动钩子注入。见<a href="repo-memory.html">仓库共享记忆</a>。</p>
+<p>中途切换工具时，运行 <code>deja handoff --to &lt;agent&gt;</code>（或通过 MCP 调用 <code>handoff</code>）即可把当前目标、已定决策、改动文件、已通过检查和待办事项直接交给另一个智能体。</p>
 
 <p><a href="getting-started.html">快速开始</a> · <a href="../../guide/switching-agents.html">换一个智能体</a> · <a href="https://github.com/vshulcz/deja-vu/tree/main/extensions/dsh">插件源码</a></p>
 <p class="star-cta">觉得有用？欢迎在 <a href="https://github.com/vshulcz/deja-vu">GitHub 上给 deja-vu 点颗 Star</a>。</p>
