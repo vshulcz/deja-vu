@@ -208,3 +208,56 @@ func TestContextPasteDoesNotPolluteSingleSubjectAsk(t *testing.T) {
 		}
 	}
 }
+
+func TestCommandTermsAndPasteHelpers(t *testing.T) {
+	cmd := "export FOOBAR=1\ncd /Users/alex/repo && go test ./pkg/quokka -run TestZebraquux"
+	got := CommandTerms(cmd)
+	if !has(got, "pkg/quokka") || !has(got, "testzebraquux") {
+		t.Errorf("CommandTerms(%q) = %q, want pkg/quokka and testzebraquux", cmd, got)
+	}
+	ask, rest := splitAskLine("first setup line\nwhy did `git commit -m \"fix: x. y\"` fail on zebraquux?")
+	if !strings.Contains(ask, "zebraquux") || !strings.Contains(rest, "first setup line") {
+		t.Errorf("splitAskLine = (%q, %q)", ask, rest)
+	}
+	if emptyAsk, emptyRest := splitAskLine(""); emptyAsk != "" || emptyRest != "" {
+		t.Errorf("splitAskLine empty = (%q, %q)", emptyAsk, emptyRest)
+	}
+
+	if !isTraceFrame("\tat pkg.Runner.Run(Runner.go:12)") {
+		t.Errorf("expected tab trace frame")
+	}
+	if !isTraceFrame("  at Object.handler (/Users/alex/app.js:3:4)") {
+		t.Errorf("expected js trace frame")
+	}
+	if !isTraceFrame(`  File "/Users/alex/app.py", line 14, in run`) {
+		t.Errorf("expected python trace frame")
+	}
+	if isTraceFrame("regular log line without frame") {
+		t.Errorf("unexpected trace frame match")
+	}
+
+	if !isPastePathToken("Makefile") || !isPastePathToken("src/app.go") || isPastePathToken("") || isPastePathToken("plainword") {
+		t.Errorf("unexpected isPastePathToken behavior")
+	}
+	tracePaste := "Exception in thread main\n\tat one\n  at two\nwhy did zebraquux panic?"
+	if !isContextPaste("why did zebraquux panic?", "Exception in thread main\n\tat one\n  at two", 2) {
+		t.Errorf("expected trace paste to count as context paste")
+	}
+	if isContextPaste("\tat frame", "goroutine 1 [running]:", 1) {
+		t.Errorf("expected bare trace frame ask not to trigger context paste skip")
+	}
+	if !has(Terms(tracePaste), "zebraquux") {
+		t.Errorf("expected zebraquux term from trace paste")
+	}
+
+	cyr := Terms("почему ломается авторизация и токены при обновлении сессии?")
+	if len(cyr) == 0 {
+		t.Errorf("expected non-empty Cyrillic prompt terms")
+	}
+	if single := Terms("zebraquux quokkabloom?"); len(single) < 2 {
+		t.Errorf("expected ask terms without filling past ask, got %q", single)
+	}
+	if filled := Terms("zebraquux\nquokkabloom"); !has(filled, "zebraquux") || !has(filled, "quokkabloom") {
+		t.Errorf("expected Terms to combine ask + rest, got %q", filled)
+	}
+}
