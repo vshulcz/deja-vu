@@ -1229,3 +1229,70 @@ func TestHookPrecisionAndGuardrails(t *testing.T) {
 		t.Fatal("leadTermsMeet should accept session carrying top-2 highest-IDF named lead terms (blame + ranking)")
 	}
 }
+
+func TestMultiLineChangedDeclarationSymbols(t *testing.T) {
+	dir := t.TempDir()
+	ledgerFile := filepath.Join(dir, "billing", "ledger.go")
+	if err := os.MkdirAll(filepath.Dir(ledgerFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	diskSrc := `package billing
+
+func ReconcileBatch(
+	accountID string,
+	limit int,
+	dryRun bool,
+) error {
+	return nil
+}
+`
+	if err := os.WriteFile(ledgerFile, []byte(diskSrc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	oldSig := `func ReconcileBatch(
+	accountID string,
+	limit int,
+	dryRun bool,
+) error {`
+	newSig := `func ReconcileBatch(
+	accountID string,
+	limit int,
+	dryRun bool,
+	idempotencyKey string,
+) error {`
+	if got := changedDeclarationSymbols(dir, "billing/ledger.go", oldSig+"\n"+newSig); len(got) != 1 || got[0] != "ReconcileBatch" {
+		t.Fatalf("old+new multiline signature edit: got %v, want [ReconcileBatch]", got)
+	}
+
+	diffHunk := `@@ -3,5 +3,6 @@ package billing
+ func ReconcileBatch(
+ 	accountID string,
+ 	limit int,
+-	dryRun bool,
++	dryRun bool,
++	idempotencyKey string,
+ ) error {`
+	if got := changedDeclarationSymbols(dir, "billing/ledger.go", diffHunk); len(got) != 1 || got[0] != "ReconcileBatch" {
+		t.Fatalf("unified diff multiline signature edit: got %v, want [ReconcileBatch]", got)
+	}
+
+	sameSigBodyEdit := `func ReconcileBatch(
+	accountID string,
+	limit int,
+	dryRun bool,
+) error {
+	return nil
+}
+func ReconcileBatch(
+	accountID string,
+	limit int,
+	dryRun bool,
+) error {
+	_ = dryRun
+	return nil
+}`
+	if got := changedDeclarationSymbols(dir, "billing/ledger.go", sameSigBodyEdit); len(got) != 0 {
+		t.Fatalf("unchanged multiline signature negative control: got %v, want empty", got)
+	}
+}

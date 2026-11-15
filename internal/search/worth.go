@@ -82,6 +82,9 @@ const identifierKnownFrom = 3
 // is 396 — and buys nothing: 91.
 const identifierIDFFloor = 4.0
 
+// IdentifierIDFFloor is identifierIDFFloor for sibling packages.
+const IdentifierIDFFloor = identifierIDFFloor
+
 // HasIdentifierTermKnown is HasIdentifierTerm over the words the corpus
 // actually holds.
 //
@@ -239,6 +242,7 @@ var soleWorkingWord = map[string]bool{
 	// started firing the moment they could reach the store.
 	"line": true, "file": true, "code": true, "read": true, "open": true,
 	"task": true, "step": true, "note": true, "logs": true, "docs": true,
+	"time": true, "times": true,
 	"failures": true, "failure": true, "prepared": true, "statement": true, "statements": true,
 	// Chinese ordinary working/question bigrams: CJK terms are two runes each,
 	// so the same ordinary vocabulary ("文件"=file, "代码"=code, "测试"=test,

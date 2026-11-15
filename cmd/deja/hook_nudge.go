@@ -100,16 +100,28 @@ func promptDirectContextIn(dir, cwd, sessionID, asked string, readOnly bool, ski
 			namedSourceFile = true
 		}
 	}
-	if !namedSourceFile {
+	if len(lines) < 4 {
 		sbLine, sbTok := promptSymbolBriefLine(cwd, asked, seen)
-		if sbLine != "" {
+		joined := strings.Join(lines, "\n")
+		if sbLine != "" && (!namedSourceFile || lineAddsNewTargetPath(joined, sbLine)) {
+			if nudgeHasLocalizedGuidance(joined) && textHasLiveTestRecipe(joined) {
+				sbLine = dropLiveTestRecipeSuffix(sbLine)
+			}
 			lines = append(lines, sbLine)
 			tokens = append(tokens, sbTok)
 		}
+	}
+	if len(lines) < 5 {
 		if locLine, locToks := promptTaskTargetsLine(dir, cwd, asked, seen, skip); locLine != "" {
-			if sbLine == "" || !symbolBriefAlreadyCoversTarget(sbLine, locLine) {
-				lines = append(lines, locLine)
-				tokens = append(tokens, locToks...)
+			joined := strings.Join(lines, "\n")
+			if !symbolBriefAlreadyCoversTarget(joined, locLine) && lineAddsNewTargetPath(joined, locLine) {
+				if nudgeHasLocalizedGuidance(joined) {
+					locLine = compactTargetSupplementLineWithPrefix(joined, locLine, "likely target: ", 3)
+				}
+				if locLine != "" {
+					lines = append(lines, locLine)
+					tokens = append(tokens, locToks...)
+				}
 			}
 		}
 	}
@@ -117,6 +129,21 @@ func promptDirectContextIn(dir, cwd, sessionID, asked string, readOnly bool, ski
 		rememberInjectedIDs(dir, sessionID, tokens...)
 	}
 	return strings.Join(lines, "\n")
+}
+
+func dropLiveTestRecipeSuffix(s string) string {
+	parts := strings.Split(s, " — ")
+	if len(parts) <= 1 {
+		return s
+	}
+	kept := []string{parts[0]}
+	for _, seg := range parts[1:] {
+		if textHasLiveTestRecipe(" — " + seg) {
+			continue
+		}
+		kept = append(kept, seg)
+	}
+	return strings.Join(kept, " — ")
 }
 
 // promptSymbolBriefLine locates a symbol declared in the repository when a
@@ -128,25 +155,63 @@ func promptSymbolBriefLine(cwd, asked string, seen map[string]bool) (string, str
 		return "", ""
 	}
 	pol := policy.Load()
+	idx := loadRepoSymbolMap(cwd)
+	type symbolCand struct {
+		tok   string
+		df    int
+		order int
+		rel   string
+		line  int
+		sig   string
+	}
 	checked := map[string]bool{}
-	for _, tok := range identifierTokens(asked) {
+	var cands []symbolCand
+	toks := identifierTokens(asked)
+	useIdx := idx.numFiles > 0 && idx.numFiles < 2000
+	for i, tok := range toks {
 		low := strings.ToLower(tok)
 		if len(low) < 6 || checked[low] || !isSymbolLikeCaseOrUnderscore(tok) || isCommonKeyword(low) {
 			continue
 		}
 		checked[low] = true
-		rel, lineNo, sig := findSymbolDeclarationInRepo(cwd, tok)
-		if rel == "" || sig == "" {
+		if useIdx {
+			df := idx.declDF[low]
+			if df == 0 || df > 3 {
+				continue
+			}
+			loc, ok := idx.firstDecl[low]
+			if !ok || loc.rel == "" || loc.sig == "" {
+				continue
+			}
+			cands = append(cands, symbolCand{tok: tok, df: df, order: i, rel: loc.rel, line: loc.line, sig: loc.sig})
 			continue
 		}
-		line := fmt.Sprintf("defined in %s:%d: %s", search.SafePath(rel), lineNo, clipDecision(search.SafeText(sig), 140))
-		if repoDec := repoMemoryDecisionForFile(cwd, rel, []string{tok}, pol); repoDec != "" {
+		rel, lineNo, sig := findSymbolDeclarationInRepo(cwd, tok)
+		if rel != "" && sig != "" {
+			cands = append(cands, symbolCand{tok: tok, df: 1, order: i, rel: rel, line: lineNo, sig: sig})
+		}
+	}
+	sort.SliceStable(cands, func(i, j int) bool {
+		if cands[i].df != cands[j].df {
+			return cands[i].df < cands[j].df
+		}
+		return cands[i].order < cands[j].order
+	})
+	for _, cand := range cands {
+		line := fmt.Sprintf("defined in %s:%d: %s", search.SafePath(cand.rel), cand.line, clipDecision(search.SafeText(cand.sig), 140))
+		if repoDec := repoMemoryDecisionForFile(cwd, cand.rel, []string{cand.tok}, pol); repoDec != "" {
 			line += repoDecisionLabel + repoDec
 		}
-		if callers := crossFileCallersLine(cwd, rel, []string{tok}); callers != "" {
-			line += callers
+		if idx.numFiles <= 250 {
+			if callers := crossFileCallersLine(cwd, cand.rel, []string{cand.tok}); callers != "" {
+				line += callers
+			}
+		} else if idx.numFiles <= 1500 {
+			if callers := crossFileCallersFromIndexLine(cwd, &idx, cand.rel, cand.tok, cand.sig); callers != "" {
+				line += callers
+			}
 		}
-		if ran := siblingTestLineFor(cwd, rel, []string{tok}); ran != "" && !strings.Contains(line, ran) {
+		if ran := siblingTestLineFor(cwd, cand.rel, []string{cand.tok}); ran != "" && !strings.Contains(line, ran) {
 			line += ran
 		}
 		pTok := "prompt:sb:" + shortHash(line)
@@ -156,6 +221,75 @@ func promptSymbolBriefLine(cwd, asked string, seen map[string]bool) (string, str
 		return line, pTok
 	}
 	return "", ""
+}
+
+func crossFileCallersFromIndexLine(cwd string, idx *repoSymbolMap, defRel, sym, sig string) string {
+	lowSym := strings.ToLower(strings.TrimSpace(sym))
+	if cwd == "" || idx == nil || len(lowSym) < 4 {
+		return ""
+	}
+	defSlash := filepath.ToSlash(defRel)
+	defDir := filepath.Dir(defSlash)
+	ext := strings.ToLower(filepath.Ext(defSlash))
+	pkgBase := strings.ToLower(filepath.Base(defDir))
+	isMethod := strings.HasPrefix(strings.TrimSpace(sig), "func (")
+
+	type candFile struct {
+		rel     string
+		sameDir bool
+		hits    int
+	}
+	var cands []candFile
+	for _, f := range idx.files {
+		if f.rel == defSlash || f.bodyWords[lowSym] == 0 || isTestFilePath(f.rel) {
+			continue
+		}
+		cands = append(cands, candFile{
+			rel:     f.rel,
+			sameDir: filepath.Dir(f.rel) == defDir,
+			hits:    f.bodyWords[lowSym],
+		})
+	}
+	sort.SliceStable(cands, func(i, j int) bool {
+		if cands[i].sameDir != cands[j].sameDir {
+			return cands[i].sameDir
+		}
+		if cands[i].hits != cands[j].hits {
+			return cands[i].hits > cands[j].hits
+		}
+		return len(cands[i].rel) < len(cands[j].rel)
+	})
+	var callers []string
+	checked := 0
+	for _, cf := range cands {
+		if checked >= 8 {
+			break
+		}
+		checked++
+		candPath := filepath.Join(cwd, filepath.FromSlash(cf.rel))
+		needle := lowSym
+		if !cf.sameDir && ext == ".go" && pkgBase != "" && pkgBase != "." && !isMethod {
+			needle = pkgBase + "." + lowSym
+		}
+		lineNo := firstCallLineInFile(candPath, sym, needle)
+		if lineNo <= 0 {
+			continue
+		}
+		callers = append(callers, fmt.Sprintf("%s:%d", search.SafePath(cf.rel), lineNo))
+		if len(callers) >= 3 {
+			break
+		}
+	}
+	if len(callers) == 0 && defSlash != "" {
+		defPath := filepath.Join(cwd, filepath.FromSlash(defSlash))
+		if lineNo := firstCallLineInFile(defPath, sym, lowSym); lineNo > 0 {
+			callers = append(callers, fmt.Sprintf("%s:%d", search.SafePath(defSlash), lineNo))
+		}
+	}
+	if len(callers) == 0 {
+		return ""
+	}
+	return " — callers of " + search.SafeText(sym) + ": " + strings.Join(callers, ", ")
 }
 
 // promptFileBriefLine checks whether the user's prompt explicitly names a file
@@ -170,7 +304,7 @@ func promptFileBriefLineIn(dir, cwd, asked string, seen, skip map[string]bool) (
 		return "", nil
 	}
 	tree := orientRepoTree(cwd)
-	projects := sync.OnceValue(func() []string { return digest.ProjectNameCandidates(cwd) })
+	projects := sync.OnceValue(func() []string { return cachedProjectNameCandidates(cwd) })
 	pol := policy.Load()
 	seenFiles := map[string]bool{}
 	var docFallbackLine string

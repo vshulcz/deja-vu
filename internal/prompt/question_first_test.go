@@ -199,6 +199,8 @@ func TestContextPasteDoesNotPolluteSingleSubjectAsk(t *testing.T) {
 		"Do not open the editor, answer from memory only. what did we decide about telemetry?",
 		"Before touching staging — what did we decide about telemetry?",
 		"Не вызывай инструменты, отвечай только по памяти: напомни, что мы решали про mcode?",
+		"src/app.py tests/test_app.ts Cargo.toml README.md\nwhat did we decide about telemetry?",
+		"Before running database migration — what did we decide about telemetry?",
 	} {
 		got := Terms(p)
 		if len(got) != 2 || (!has(got, "telemetry") && !has(got, "mcode")) {

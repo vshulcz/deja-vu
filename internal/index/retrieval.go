@@ -832,8 +832,8 @@ func projectRelevantIn(dir string, projects, terms []string, n int, skip map[str
 		return projectRelevantRead{}, rerr
 	}
 	metas, matched, strong, naming, idf, offsets := rank.metas, rank.informative, rank.strong, rank.naming, rank.idf, rank.offsets
-	if bm, bmatched, bstrong, bidf, boffsets, ok := bridgedRetry(dir, m, projects, terms, n, skip, strong, idf); ok {
-		metas, matched, strong, idf, offsets, naming = bm, bmatched, bstrong, bidf, boffsets, nil
+	if bm, bmatched, bstrong, _, bidf, boffsets, ok := bridgedRetry(dir, m, projects, terms, n, skip, strong, idf); ok {
+		metas, matched, strong, naming, idf, offsets = bm, bmatched, bstrong, nil, bidf, boffsets
 	}
 	if len(metas) == 0 {
 		return projectRelevantRead{}, nil
@@ -906,15 +906,6 @@ func countsFor(out []model.Session, metas []SessionMeta, matched, strong []int) 
 		}
 	}
 	return m, st
-}
-
-func relevantMetasMatched(dir string, m Manifest, projects, terms []string, n int, skip map[string]bool) ([]SessionMeta, []int, []int, map[string]float64, map[uint32][]int64, error) {
-	var keep func(SessionMeta) bool
-	if len(skip) > 0 {
-		keep = func(meta SessionMeta) bool { return !skip[meta.ID] }
-	}
-	rank, err := relevantMetasCounts(dir, m, projects, terms, n, keep)
-	return rank.metas, rank.informative, rank.strong, rank.idf, rank.offsets, err
 }
 
 // relevanceRanking is what one ranking pass produced. It was seven return

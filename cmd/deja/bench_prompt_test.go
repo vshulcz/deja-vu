@@ -69,8 +69,8 @@ func TestPromptBenchScoresAndReports(t *testing.T) {
 	}
 	// The numbers this run reports are the ones the PR quoted; a drop below
 	// them means recall got worse without anyone saying so.
-	if report.Real.Fired < 8 {
-		t.Fatalf("real questions answered dropped to %d/%d", report.Real.Fired, report.Real.Cases)
+	if report.Real.Correct < report.Real.Cases {
+		t.Fatalf("real questions answered dropped to %d/%d", report.Real.Correct, report.Real.Cases)
 	}
 	// Back to zero (#1534). The five this recorded were the fixture answering
 	// its own controls: every content chain's filler quoted three of them word
@@ -102,8 +102,14 @@ func TestPromptBenchScoresAndReports(t *testing.T) {
 		t.Fatalf("haystack %d/%d: a long session that mentions everything won again",
 			report.Haystack.Correct, report.Haystack.Cases)
 	}
-	if report.Russian.Correct < 3 {
+	if report.Russian.Correct < report.Russian.Cases {
 		t.Fatalf("russian_questions %d/%d", report.Russian.Correct, report.Russian.Cases)
+	}
+	if report.Paraphrase.Correct < 15 {
+		t.Fatalf("paraphrase %d/%d, want >= 15", report.Paraphrase.Correct, report.Paraphrase.Cases)
+	}
+	if report.Tied.Correct < report.Tied.Cases {
+		t.Fatalf("paraphrase_tied %d/%d, want 100%%", report.Tied.Correct, report.Tied.Cases)
 	}
 	if report.Marathon.Fired < 1 || report.Fresh.Fired < 1 {
 		t.Fatalf("marathon %d/%d, fresh %d/%d: a shape the gates turn away",
@@ -116,13 +122,20 @@ func TestPromptBenchScoresAndReports(t *testing.T) {
 		arm  promptArmReport
 		max  int
 	}{
-		{"absent_subject", report.AbsentSubject, 3},
-		{"off_topic", report.OffTopic, 3},
+		{"absent_subject", report.AbsentSubject, 0},
+		{"off_topic", report.OffTopic, 0},
+		{"cross_paired", report.CrossPaired, 0},
 		{"bucket_scope", report.Bucket, 1},
 	} {
 		if k.arm.FalseFires > k.max {
 			t.Fatalf("%s false fires rose to %d of %d, was %d", k.name, k.arm.FalseFires, k.arm.Cases, k.max)
 		}
+	}
+	if report.Pasted.Correct < report.Pasted.Cases {
+		t.Fatalf("pasted_preamble %d/%d, want 100%%", report.Pasted.Correct, report.Pasted.Cases)
+	}
+	if report.LeadIn.Correct < report.LeadIn.Cases {
+		t.Fatalf("inline_lead_in %d/%d, want 100%%", report.LeadIn.Correct, report.LeadIn.Cases)
 	}
 }
 

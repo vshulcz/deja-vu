@@ -44,6 +44,8 @@ type relevanceAcc struct {
 	queryBest       float64
 	queryBestUnseen int
 	queryBestSeen   int
+	unseenASCIIBest float64
+	queryTerms      int
 	// msgs is every record of the sessions being ranked that a term matched or
 	// that is a tool record, and msgAt finds one by its offset.
 	msgs  []messageCredit
@@ -191,6 +193,16 @@ type termHits struct {
 	minSess int
 }
 
+func hasASCIILetterOrDigit(s string) bool {
+	for i := range len(s) {
+		c := s[i]
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') {
+			return true
+		}
+	}
+	return false
+}
+
 // noteQuerySubject raises that mark for a word that names something. df is
 // counted over the whole store, before the project scope drops the term, so
 // a subject that lives somewhere else still counts as the subject — which
@@ -204,8 +216,8 @@ func (a *relevanceAcc) noteQuerySubject(term string, sessions int, inProject boo
 		return
 	}
 	r := rankIDF(len(a.m.Sessions), sessions)
-	if r >= dejaVuStrongIDFFloor {
-		a.idfOf[term] = math.Max(a.idfOf[term], r)
+	if !inProject && hasASCIILetterOrDigit(term) && r > a.unseenASCIIBest {
+		a.unseenASCIIBest = r
 	}
 	if r > a.queryBest {
 		a.queryBest = r
@@ -229,6 +241,7 @@ func (a *relevanceAcc) addTerm(term string) {
 	if len(keys) == 0 {
 		return
 	}
+	a.queryTerms++
 	orKeys := a.stemKeys(term, keys)
 	// A dotted or slashed term ("203.0.113.51", "pkg/index") tokenizes
 	// into several index keys. Matching only the first key made an IP
@@ -767,9 +780,10 @@ func (a *relevanceAcc) scoreSession(p int32, long bool, sumWords, nWords float64
 		}
 		sc *= 1 + marathonShare*share
 	}
-	if mult := a.zoneFieldMultiplier(meta); mult != 1.0 {
-		sc *= mult
-		s.focus *= mult
+	zoneMult := a.zoneFieldMultiplier(meta)
+	if zoneMult != 1.0 {
+		sc *= zoneMult
+		s.focus *= zoneMult
 	}
 	// Did this session match what the question is about, rather than the
 	// working word beside it. The subject is the question's rarest naming
@@ -782,7 +796,9 @@ func (a *relevanceAcc) scoreSession(p int32, long bool, sumWords, nWords float64
 	if a.queryBest <= 0 || s.bestMatched >= a.queryBest*subjectShare {
 		named = 1
 	}
-	if a.queryBest >= dejaVuIDFFloor && a.queryBestUnseen > 0 && a.queryBestSeen == 0 && s.matched < 3 {
+	if (a.queryBest >= dejaVuIDFFloor && a.queryBestUnseen > 0 && a.queryBestSeen == 0 && s.matched < 3) ||
+		(a.unseenASCIIBest >= search.IdentifierIDFFloor && a.unseenASCIIBest >= s.bestMatched*0.75 && s.matched < 2 &&
+			(a.queryTerms <= 3 || s.bestMatched < dejaVuStrongIDFFloor || (a.unseenASCIIBest > s.bestMatched && zoneMult <= 1.0))) {
 		named = 0
 	}
 	if long && sumWords > 0 {

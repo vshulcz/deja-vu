@@ -204,6 +204,50 @@ func LiftNoteSessionsAboveTheirSource(ss []model.Session) {
 	liftNotesBy(ss, func(s model.Session) model.Session { return s })
 }
 
+// LiftNoteSessionsAligned applies LiftNoteSessionsAboveTheirSource while
+// keeping parallel per-session metadata slices aligned with ss.
+func LiftNoteSessionsAligned(ss []model.Session, matched, strong, naming []int) {
+	if len(ss) <= 1 {
+		return
+	}
+	type alignedItem struct {
+		s       model.Session
+		matched int
+		strong  int
+		naming  int
+	}
+	hasMatched := len(matched) == len(ss)
+	hasStrong := len(strong) == len(ss)
+	hasNaming := len(naming) == len(ss)
+	items := make([]alignedItem, len(ss))
+	for i, s := range ss {
+		it := alignedItem{s: s}
+		if hasMatched {
+			it.matched = matched[i]
+		}
+		if hasStrong {
+			it.strong = strong[i]
+		}
+		if hasNaming {
+			it.naming = naming[i]
+		}
+		items[i] = it
+	}
+	liftNotesBy(items, func(it alignedItem) model.Session { return it.s })
+	for i, it := range items {
+		ss[i] = it.s
+		if hasMatched {
+			matched[i] = it.matched
+		}
+		if hasStrong {
+			strong[i] = it.strong
+		}
+		if hasNaming {
+			naming[i] = it.naming
+		}
+	}
+}
+
 // sortHits orders a ranked result set.
 func sortHits(hits []Hit) {
 	sort.Slice(hits, func(i, j int) bool {

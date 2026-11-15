@@ -46,28 +46,64 @@ func termsAsked(ask, rest string) []string {
 			return out
 		}
 	}
-	if len(out) > 0 && isContextPaste(rest) {
+	if len(out) > 0 && isContextPaste(ask, rest, len(out)) {
 		return out
 	}
 	termsFrom(rest, seen, add)
 	return out
 }
 
-func isContextPaste(rest string) bool {
-	low := strings.ToLower(rest)
-	if strings.Contains(low, "goroutine ") || strings.Contains(low, "without calling") ||
-		strings.Contains(low, "answer from memory") || strings.Contains(low, "before touching") ||
-		strings.Contains(low, "отвечай только по памяти") {
+func isTraceFrame(line string) bool {
+	if strings.HasPrefix(line, "\t") {
 		return true
+	}
+	low := strings.ToLower(strings.TrimSpace(line))
+	return strings.HasPrefix(low, "at ") || strings.HasPrefix(low, "file \"")
+}
+
+func isContextPaste(ask, rest string, askTerms int) bool {
+	if !strings.HasSuffix(strings.TrimRight(ask, " \t"), "?") && isTraceFrame(ask) {
+		return false
+	}
+	low := strings.ToLower(rest)
+	if strings.Contains(low, "goroutine ") || strings.Contains(low, "traceback (most recent") ||
+		strings.Contains(rest, "\n\tat ") || strings.Contains(low, "panic: ") {
+		return true
+	}
+	trimmed := strings.TrimSpace(low)
+	if askTerms >= 1 {
+		for _, pfx := range []string{"without ", "do not ", "don't ", "never ", "before ", "не ", "без "} {
+			if strings.HasPrefix(trimmed, pfx) {
+				return true
+			}
+		}
 	}
 	paths := 0
 	for w := range strings.FieldsSeq(rest) {
 		w = strings.Trim(w, ",;:()")
-		if strings.HasPrefix(w, "@") || strings.HasSuffix(w, ".go") || strings.HasSuffix(w, ".mod") || w == "Makefile" {
+		if isPastePathToken(w) {
 			paths++
 		}
 	}
 	return paths >= 3
+}
+
+func isPastePathToken(w string) bool {
+	if w == "" {
+		return false
+	}
+	if strings.HasPrefix(w, "@") || w == "Makefile" || w == "Dockerfile" {
+		return true
+	}
+	if strings.Contains(w, "/") && !strings.Contains(w, "://") {
+		return true
+	}
+	for _, ext := range []string{".go", ".py", ".ts", ".tsx", ".js", ".jsx", ".rs", ".mod", ".sum", ".json", ".yaml", ".yml", ".toml", ".md"} {
+		if strings.HasSuffix(w, ext) {
+			return true
+		}
+	}
+	return false
 }
 
 // termsFrom runs the three passes — identifiers, CJK bigrams, Cyrillic words —

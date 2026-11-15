@@ -657,7 +657,7 @@ func measurePromptCrossed(report *promptReport, indexDir string, chains []bench.
 	for _, chain := range chains {
 		if chain.Negative || chain.Question == "" || chain.Kind == "background" ||
 			chain.Kind == "bucket" || chain.Kind == "haystack-noise" ||
-			chain.Kind == "concluded-noise" {
+			chain.Kind == "concluded-noise" || chain.Kind == "tool-only" {
 			continue
 		}
 		crossed = append(crossed, PromptChainRef{chain.Question, chain.Project, chain.ID})
@@ -680,6 +680,9 @@ func measurePromptCrossed(report *promptReport, indexDir string, chains []bench.
 	// anything below that rate is the term budget going to someone else's
 	// file names.
 	for i, c := range crossed {
+		if bare, _ := promptBenchProbe(indexDir, c.Project, c.ID, prompt.Terms(c.Question)); !bare {
+			continue
+		}
 		pre := pastedPreambles()[i%len(pastedPreambles())]
 		report.Pasted.Cases++
 		if fired, _ := promptBenchProbe(indexDir, c.Project, c.ID, prompt.Terms(pre+"\n"+c.Question)); fired {
@@ -689,6 +692,9 @@ func measurePromptCrossed(report *promptReport, indexDir string, chains []bench.
 	}
 	finishPromptArm(&report.Pasted, nil)
 	for i, c := range crossed {
+		if bare, _ := promptBenchProbe(indexDir, c.Project, c.ID, prompt.Terms(c.Question)); !bare {
+			continue
+		}
 		lead := leadIns()[i%len(leadIns())]
 		report.LeadIn.Cases++
 		if fired, _ := promptBenchProbe(indexDir, c.Project, c.ID, prompt.Terms(lead+c.Question)); fired {

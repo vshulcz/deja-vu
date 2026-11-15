@@ -1358,32 +1358,337 @@ func fileHookSymbols(cwd, path, editText string) ([]string, []string) {
 	return editSyms, fileSyms
 }
 
+var declKeywords = []string{
+	"func ", "type ", "async def ", "def ", "class ",
+	"export default function ", "export async function ", "export function ",
+	"export class ", "export interface ", "export type ",
+	"async function ", "function ", "interface ",
+	"pub async fn ", "pub fn ", "async fn ", "fn ",
+	"pub struct ", "struct ", "pub enum ", "enum ", "pub trait ", "trait ",
+}
+
+func startsWithDeclKeyword(s string) bool {
+	for _, kw := range declKeywords {
+		if strings.HasPrefix(s, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+func isDiffMetaLine(s string) bool {
+	return strings.HasPrefix(s, "+++") || strings.HasPrefix(s, "---") || strings.HasPrefix(s, "@@")
+}
+
+func stripSingleDiffPrefix(line string) string {
+	if isDiffMetaLine(line) {
+		return ""
+	}
+	if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "++") {
+		return line[1:]
+	}
+	if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "--") {
+		return line[1:]
+	}
+	return line
+}
+
+func stripInlineDeclComment(s string) string {
+	var quote byte
+	escaped := false
+	for i := range len(s) {
+		c := s[i]
+		if quote != 0 {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if c == '\\' && quote != '`' {
+				escaped = true
+				continue
+			}
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		if c == '"' || c == '\'' || c == '`' {
+			quote = c
+			continue
+		}
+		if c == '/' && i+1 < len(s) && s[i+1] == '/' {
+			return strings.TrimSpace(s[:i])
+		}
+		if c == '#' && (i == 0 || s[i-1] == ' ' || s[i-1] == '\t') {
+			return strings.TrimSpace(s[:i])
+		}
+	}
+	return strings.TrimSpace(s)
+}
+
+func parenDelta(s string) int {
+	delta := 0
+	var quote byte
+	escaped := false
+	for i := range len(s) {
+		c := s[i]
+		if quote != 0 {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if c == '\\' && quote != '`' {
+				escaped = true
+				continue
+			}
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		if c == '"' || c == '\'' || c == '`' {
+			quote = c
+			continue
+		}
+		if c == '/' && i+1 < len(s) && s[i+1] == '/' {
+			break
+		}
+		if c == '#' && (i == 0 || s[i-1] == ' ' || s[i-1] == '\t') {
+			break
+		}
+		switch c {
+		case '(':
+			delta++
+		case ')':
+			delta--
+		}
+	}
+	return delta
+}
+
+func declHeaderTerminated(s string) bool {
+	return strings.HasSuffix(s, "{") ||
+		strings.HasSuffix(s, ":") ||
+		strings.HasSuffix(s, ";") ||
+		strings.HasSuffix(s, "=>")
+}
+
+func declReturnStarts(s string) bool {
+	return strings.HasPrefix(s, "->") ||
+		strings.HasPrefix(s, ":") ||
+		strings.HasPrefix(s, "where ") ||
+		strings.HasPrefix(s, "{") ||
+		strings.HasPrefix(s, "=>")
+}
+
+func normalizeCollapsedDecl(s string) string {
+	joined := strings.Join(strings.Fields(s), " ")
+	joined = strings.ReplaceAll(joined, "( ", "(")
+	joined = strings.ReplaceAll(joined, " )", ")")
+	joined = strings.ReplaceAll(joined, ",)", ")")
+	return joined
+}
+
+func collapseDeclarationWindow(lines []string, startIdx int) (string, int) {
+	return collapseParenWindow(lines, startIdx, true, true)
+}
+
+func collapseMemberLineWindow(lines []string, startIdx int) (string, int) {
+	return collapseParenWindow(lines, startIdx, false, false)
+}
+
+func collapseParenWindow(lines []string, startIdx int, requireKeyword, stripDiff bool) (string, int) {
+	if startIdx < 0 || startIdx >= len(lines) {
+		return "", startIdx
+	}
+	rawFirst := lines[startIdx]
+	if stripDiff && isDiffMetaLine(rawFirst) {
+		return "", startIdx
+	}
+	if stripDiff {
+		rawFirst = stripSingleDiffPrefix(rawFirst)
+	}
+	first := stripInlineDeclComment(strings.TrimSpace(rawFirst))
+	if first == "" {
+		return "", startIdx
+	}
+	balance := parenDelta(first)
+	if (requireKeyword && !startsWithDeclKeyword(first)) || balance <= 0 {
+		return first, startIdx
+	}
+	var b strings.Builder
+	b.WriteString(first)
+	endIdx := startIdx
+	limit := min(len(lines)-1, startIdx+8)
+	for j := startIdx + 1; j <= limit; j++ {
+		rawLine := lines[j]
+		if stripDiff && isDiffMetaLine(rawLine) {
+			break
+		}
+		if stripDiff {
+			rawLine = stripSingleDiffPrefix(rawLine)
+		}
+		trimmed := strings.TrimSpace(rawLine)
+		if trimmed == "" {
+			break
+		}
+		cleaned := stripInlineDeclComment(trimmed)
+		if cleaned == "" {
+			endIdx = j
+			continue
+		}
+		if balance <= 0 {
+			if declHeaderTerminated(strings.TrimSpace(b.String())) || !declReturnStarts(cleaned) {
+				break
+			}
+		}
+		b.WriteByte(' ')
+		b.WriteString(cleaned)
+		balance += parenDelta(cleaned)
+		endIdx = j
+		if balance <= 0 && declHeaderTerminated(strings.TrimSpace(b.String())) {
+			break
+		}
+	}
+	return normalizeCollapsedDecl(b.String()), endIdx
+}
+
+func cleanMemberSig(sig string) string {
+	if idx := declBodyBraceIndex(sig); idx > 0 {
+		sig = strings.TrimSpace(sig[:idx])
+	}
+	return clipDeclSignature(normalizeCollapsedDecl(sig))
+}
+
+const maxDeclSigRunes = 180
+
+func clipDeclSignature(sig string) string {
+	if len(sig) <= maxDeclSigRunes {
+		return sig
+	}
+	runes := []rune(sig)
+	if len(runes) <= maxDeclSigRunes {
+		return sig
+	}
+	return string(runes[:maxDeclSigRunes-3]) + "..."
+}
+
+func collectDeclaredSigs(text string) ([]string, map[string]string, map[string]string) {
+	if text == "" {
+		return nil, nil, nil
+	}
+	var order []string
+	firstSigs := map[string]string{}
+	lastSigs := map[string]string{}
+	lines := strings.Split(text, "\n")
+	for i := 0; i < len(lines); i++ {
+		collapsed, endIdx := collapseDeclarationWindow(lines, i)
+		if id, sig := parseDeclarationLine(collapsed); id != "" && sig != "" {
+			if _, exists := lastSigs[id]; !exists {
+				order = append(order, id)
+				firstSigs[id] = sig
+			}
+			lastSigs[id] = sig
+			i = endIdx
+		}
+	}
+	return order, firstSigs, lastSigs
+}
+
+func splitDiffViews(text string) (string, string, bool) {
+	lines := strings.Split(text, "\n")
+	hasDiff := false
+	beforeLines := make([]string, 0, len(lines))
+	afterLines := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if isDiffMetaLine(line) {
+			hasDiff = true
+			continue
+		}
+		if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "++") {
+			hasDiff = true
+			afterLines = append(afterLines, line[1:])
+			continue
+		}
+		if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "--") {
+			hasDiff = true
+			beforeLines = append(beforeLines, line[1:])
+			continue
+		}
+		beforeLines = append(beforeLines, line)
+		afterLines = append(afterLines, line)
+	}
+	if !hasDiff {
+		return text, text, false
+	}
+	return strings.Join(beforeLines, "\n"), strings.Join(afterLines, "\n"), true
+}
+
 func declaredSymbolsInText(text string) []string {
 	if text == "" {
 		return nil
 	}
 	var out []string
-	for line := range strings.SplitSeq(text, "\n") {
-		if id, _ := parseDeclarationLine(line); id != "" {
+	lines := strings.Split(text, "\n")
+	for i := 0; i < len(lines); i++ {
+		collapsed, endIdx := collapseDeclarationWindow(lines, i)
+		if id, _ := parseDeclarationLine(collapsed); id != "" {
 			out = append(out, id)
+			i = endIdx
 		}
 	}
 	return out
 }
 
+func declBodyBraceIndex(sig string) int {
+	parenDepth := 0
+	var quote byte
+	escaped := false
+	for i := range len(sig) {
+		c := sig[i]
+		if quote != 0 {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if c == '\\' && quote != '`' {
+				escaped = true
+				continue
+			}
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		if c == '"' || c == '\'' || c == '`' {
+			quote = c
+			continue
+		}
+		switch c {
+		case '(':
+			parenDepth++
+		case ')':
+			if parenDepth > 0 {
+				parenDepth--
+			}
+		case '{':
+			if parenDepth == 0 {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
 func parseDeclarationLine(line string) (string, string) {
-	s := strings.TrimSpace(strings.TrimLeft(line, "+- "))
+	if isDiffMetaLine(line) {
+		return "", ""
+	}
+	s := strings.TrimSpace(stripSingleDiffPrefix(line))
 	if s == "" || strings.HasPrefix(s, "//") || strings.HasPrefix(s, "#") || strings.HasPrefix(s, "/*") || strings.HasPrefix(s, "*") {
 		return "", ""
 	}
-	for _, kw := range []string{
-		"func ", "type ", "async def ", "def ", "class ",
-		"export default function ", "export async function ", "export function ",
-		"export class ", "export interface ", "export type ",
-		"async function ", "function ", "interface ",
-		"pub async fn ", "pub fn ", "async fn ", "fn ",
-		"pub struct ", "struct ", "pub enum ", "enum ", "pub trait ", "trait ",
-	} {
+	for _, kw := range declKeywords {
 		if strings.HasPrefix(s, kw) {
 			rest := strings.TrimSpace(s[len(kw):])
 			if kw == "func " && strings.HasPrefix(rest, "(") {
@@ -1395,10 +1700,10 @@ func parseDeclarationLine(line string) (string, string) {
 			}
 			if id := leadingIdent(rest); len(id) >= 4 {
 				sig := s
-				if idx := strings.IndexByte(sig, '{'); idx >= 0 {
+				if idx := declBodyBraceIndex(sig); idx >= 0 {
 					sig = strings.TrimSpace(sig[:idx])
 				}
-				return id, strings.Join(strings.Fields(sig), " ")
+				return id, normalizeCollapsedDecl(sig)
 			}
 			break
 		}
@@ -1413,19 +1718,10 @@ func changedDeclarationSymbols(cwd, path, editText string) []string {
 	if path == "" || editText == "" {
 		return nil
 	}
-	firstSigs := map[string]string{}
-	editSigs := map[string]string{}
-	var editOrder []string
-	for line := range strings.SplitSeq(editText, "\n") {
-		if id, sig := parseDeclarationLine(line); id != "" && sig != "" {
-			if _, exists := editSigs[id]; !exists {
-				editOrder = append(editOrder, id)
-				firstSigs[id] = sig
-			}
-			editSigs[id] = sig
-		}
-	}
-	if len(editOrder) == 0 {
+	beforeView, afterView, hasDiff := splitDiffViews(editText)
+	afterOrder, firstSigs, editSigs := collectDeclaredSigs(afterView)
+	_, _, beforeSigs := collectDeclaredSigs(beforeView)
+	if len(afterOrder) == 0 {
 		return nil
 	}
 	diskSigs := map[string]string{}
@@ -1434,17 +1730,19 @@ func changedDeclarationSymbols(cwd, path, editText string) []string {
 		diskPath = filepath.Join(cwd, diskPath)
 	}
 	if raw, err := os.ReadFile(diskPath); err == nil && len(raw) <= 2<<20 {
-		for line := range strings.SplitSeq(string(raw), "\n") {
-			if id, sig := parseDeclarationLine(line); id != "" && sig != "" {
-				diskSigs[id] = sig
-			}
-		}
+		_, _, diskSigs = collectDeclaredSigs(string(raw))
 	}
 	var changed []string
-	for _, id := range editOrder {
+	for _, id := range afterOrder {
 		if firstSigs[id] != editSigs[id] {
 			changed = append(changed, id)
 			continue
+		}
+		if hasDiff {
+			if beforeSig, ok := beforeSigs[id]; ok && beforeSig != editSigs[id] {
+				changed = append(changed, id)
+				continue
+			}
 		}
 		if diskSig, ok := diskSigs[id]; ok && diskSig != editSigs[id] {
 			changed = append(changed, id)
@@ -1600,6 +1898,25 @@ func findSymbolDeclarationInRepo(cwd, sym string) (string, int, string) {
 	if cwd == "" || len(lowSym) < 4 {
 		return "", 0, ""
 	}
+	if idx := loadRepoSymbolMap(cwd); idx.numFiles > 0 {
+		if loc, ok := idx.firstDecl[lowSym]; ok {
+			return loc.rel, loc.line, loc.sig
+		}
+		if !idx.at.IsZero() && time.Since(idx.at) > 5*time.Millisecond {
+			if scanRoot := safeScanRoot(cwd); scanRoot != "" {
+				repoSymbolMapCache.Delete(scanRoot)
+				if fresh := loadRepoSymbolMap(cwd); fresh.numFiles > 0 {
+					if loc, ok := fresh.firstDecl[lowSym]; ok {
+						return loc.rel, loc.line, loc.sig
+					}
+					idx = fresh
+				}
+			}
+		}
+		if idx.numFiles < 2000 {
+			return "", 0, ""
+		}
+	}
 	scanRoot := safeScanRoot(cwd)
 	if scanRoot == "" {
 		return "", 0, ""
@@ -1638,15 +1955,18 @@ func findSymbolDeclarationInRepo(cwd, sym string) (string, int, string) {
 		if !strings.Contains(strings.ToLower(content), lowSym) {
 			continue
 		}
-		lineNo := 0
-		for line := range strings.SplitSeq(content, "\n") {
-			lineNo++
-			if id, sig := parseDeclarationLine(line); strings.EqualFold(id, sym) && sig != "" {
+		lines := strings.Split(content, "\n")
+		for i := 0; i < len(lines); i++ {
+			collapsed, endIdx := collapseDeclarationWindow(lines, i)
+			if id, sig := parseDeclarationLine(collapsed); strings.EqualFold(id, sym) && sig != "" {
 				rel := filepath.Base(cand)
 				if r, err := filepath.Rel(scanRoot, cand); err == nil && !strings.HasPrefix(r, "..") {
 					rel = filepath.ToSlash(r)
 				}
-				return rel, lineNo, sig
+				return rel, i + 1, clipDeclSignature(sig)
+			}
+			if endIdx > i {
+				i = endIdx
 			}
 		}
 	}
@@ -2335,10 +2655,14 @@ func scanPkgDeclarations(pkgDir, root, cwd, sym string) ([]pkgDecl, bool) {
 			relFile = filepath.ToSlash(rel)
 		}
 		lines := strings.Split(string(content), "\n")
-		for lineIdx, line := range lines {
-			trimmed := strings.TrimSpace(line)
-			if strings.HasPrefix(trimmed, "//") {
+		for lineIdx := 0; lineIdx < len(lines); lineIdx++ {
+			trimmed := strings.TrimSpace(lines[lineIdx])
+			if trimmed == "" || strings.HasPrefix(trimmed, "//") {
 				continue
+			}
+			collapsed, endIdx := collapseDeclarationWindow(lines, lineIdx)
+			if collapsed != "" {
+				trimmed = collapsed
 			}
 			if strings.HasPrefix(trimmed, "func "+sym+"(") ||
 				strings.HasPrefix(trimmed, "type "+sym+" ") ||
@@ -2356,15 +2680,23 @@ func scanPkgDeclarations(pkgDir, root, cwd, sym string) ([]pkgDecl, bool) {
 				if paren := strings.Index(rest, "("); paren > 0 {
 					fnName := strings.TrimSpace(rest[:paren])
 					if len(fnName) > 0 && unicode.IsUpper(rune(fnName[0])) {
-						sig := strings.TrimRight(trimmed, " {")
+						sig := trimmed
+						if bodyBrace := declBodyBraceIndex(sig); bodyBrace >= 0 {
+							sig = strings.TrimSpace(sig[:bodyBrace])
+						} else {
+							sig = strings.TrimRight(sig, " {")
+						}
 						decls = append(decls, pkgDecl{
 							name:    fnName,
 							relFile: relFile,
 							lineNo:  lineIdx + 1,
-							sigLine: sig,
+							sigLine: clipDeclSignature(sig),
 						})
 					}
 				}
+			}
+			if endIdx > lineIdx {
+				lineIdx = endIdx
 			}
 		}
 	}
