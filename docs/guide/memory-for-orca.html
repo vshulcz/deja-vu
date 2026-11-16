@@ -188,6 +188,7 @@
 <p class="pagelede">Orca's session journal in agent-session-journal.db and full recall across hosted agents<span class="mins" data-mins></span></p>
 
 <p>Orca persists its unified session journal in <code>agent-session-journal.db</code> under its <code>userData</code> directory (<code>~/Library/Application Support/orca</code> on macOS, <code>~/.config/orca</code> on Linux, <code>%APPDATA%/orca</code> on Windows). Each session has metadata in <code>agent_session_records</code> and structured render items in <code>journal_rows</code>.</p>
+<div class="term-shot"><img src="../assets/demo.gif" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier" loading="lazy"><p class="cap">same prompt before and after deja — local BM25 recall across past sessions on disk, zero LLM calls</p></div>
 
 <h2>Option A: Orca v2 plugin (<code>extensions/orca</code>)</h2>
 <p>In Orca (<code>&gt;=1.4.248</code>), open <code>Orca → Plugins → extensions/orca</code>. The <code>orca-plugin.json</code> v2 <code>trusted-worker</code> plugin adds:</p>
@@ -213,6 +214,10 @@
 
 <h2>The part that is not about this harness</h2>
 <p>The local BM25 index (<code>~/.cache/deja/index.db</code>) covers every agent's transcripts on the machine — forty-eight of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so work recorded in Orca's journal is searchable from Claude Code, Codex, Cursor or opencode, and the reverse. <a href="privacy.html">Indexing and search stay local</a>, and credentials are stripped as the index is built.</p>
+
+<h2>Repository memory &amp; handoff</h2>
+<p>Share vetted project decisions and dead ends through git in <code>.deja/memory.jsonl</code> (<code>deja repo candidates</code>, <code>deja repo add &lt;id&gt;</code>). Entries are redacted on write, stored sorted with <code>merge=union</code> so parallel branches merge cleanly, and loaded for any teammate who clones the repository (<code>{"activations":{"auto":{"repo":false}}}</code> in the trust policy keeps them out of hooks). See <a href="repo-memory.html">repo memory</a>.</p>
+<p>Switching tools mid-task? Run <code>deja handoff --to &lt;agent&gt;</code> (or use <code>handoff</code> via MCP) to transfer the active session's goal, decisions, touched files, passed checks, and open work into another coding agent.</p>
 
 <p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/orca.html">The Orca session format</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>

@@ -1,41 +1,55 @@
-# Hermes 的 deja-memory
+# deja-memory for Hermes
 
-[English](../README.md) | 中文
+[English](../README.md) | 简体中文 | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
 [![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 
-属于 **[deja-vu](https://github.com/vshulcz/deja-vu)** 项目（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · Token 用量仅为 agentmemory 的**一半**）· [官网与在线搜索](https://vshulcz.github.io/deja-vu/) · [浏览器在线演示](https://vshulcz.github.io/deja-vu/view/) · **[★ 在 GitHub 上给 deja-vu 点 Star](https://github.com/vshulcz/deja-vu)**
+**[deja-vu](https://github.com/vshulcz/deja-vu)** 扩展（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · token 用量为 agentmemory 的**一半**）· [文档](https://vshulcz.github.io/deja-vu/zh/) · [在线演示](https://vshulcz.github.io/deja-vu/view/) · [评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) · **[★ GitHub 点赞](https://github.com/vshulcz/deja-vu)**
 
-一个 Hermes 记忆提供者（memory provider），答案来自这台机器上已经存在的编程会话：Claude Code、Codex、Cursor、Hermes 自己，以及 deja 能读的其他智能体，包括装任何东西之前的那几个月。不用大模型，不用 API key，不用服务器。历史记录由 [deja](https://github.com/vshulcz/deja-vu) 在本地建索引，它是一个单独的 Go 可执行文件。
+一个 Hermes 记忆后端（memory provider），直接基于本机已有的编程会话历史回答问题：包括 Claude Code、Codex、Cursor、Hermes 自身以及 deja 支持读取的其他智能体，涵盖安装任何工具之前数月积累的记录。无需额外模型、API 密钥或后台服务；所有历史由单文件 Go 二进制 [deja](https://github.com/vshulcz/deja-vu) 在本地建立索引。
+
+![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
 ## 安装
 
-先让 deja 出现在 PATH 里：
+需确保 `PATH` 中已可调用 `deja`：
 
 ```bash
-brew install deja-vu        # 或者：curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-deja install --auto         # 同时接入 Hermes 与这台机器上其他受支持的智能体
-hermes plugins install deja-memory   # 或直接从 GitHub：hermes plugins install vshulcz/deja-vu/extensions/hermes
+brew install deja-vu        # 或: curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto         # 一并接入 Hermes 与本机所有受支持的智能体
+hermes plugins install deja-memory   # 或从 GitHub 安装: hermes plugins install vshulcz/deja-vu/extensions/hermes
 hermes config set memory.provider deja-memory
 ```
 
-也可以在 `hermes memory setup` 里选 `deja-memory`，它会先检查 deja 在不在，再启用这个提供者。
+也可以在 `hermes memory setup` 中选择 `deja-memory`，它会在启用前检查 `deja` 可执行文件是否存在。
 
-## 它做什么
+## 工作机制
 
-- 每个会话的第一轮之前，它把 deja 的钩子平时交给 Claude Code 和 Codex 的那份摘要交给 Hermes：这个项目最近做了什么，哪些结论站住了。之后只有当刚问的问题和以前的某次工作对得上时才补充内容，大多数轮次它什么都不加。
-- 你能看到它带来了什么：deja 在 Claude Code 里显示给人看的那几行（写明记忆来自哪个智能体的回执、会话开始时召回了什么、建索引和每周的说明）会出现在 Hermes 的召回提示行 `🧠 deja · …` 上，只在交互式 CLI 和 `hermes chat -q` 里显示。交给模型的文本和以前一样。Hermes 0.17 没有召回提示行，`hermes -z` 和 `hermes chat -Q` 不打印它，TUI 只在状态栏里闪一下，网关聊天可能是别人也能看到的群聊，所以在这些地方 deja 把这些说明留给能显示它们的会话。
-- cron 任务的运行不会自动召回：Hermes 报告平台为 `cron` 时，提供者不主动添加内容；任务调用 deja 工具时仍会作答。
-- 三个工具：`deja_recall` 搜索过去的会话，`deja_fix` 告诉你上次遇到同一个报错之后运行了什么，`deja_blame` 列出改过某个文件的会话。
-- Hermes 往 MEMORY.md 或 USER.md 里加的条目，也会存成一条 deja 笔记，排序时排在周围那些会话前面。
-- 压缩时保留会话正在做的事，交给下一轮；会话结束时撤掉它的在线标记。
+- **首轮会话前注入上下文**：向 Hermes 传入 deja 钩子给 Claude Code / Codex 使用的同款项目摘要——包括本仓库近期工作与已确定的结论；此后仅在当前提问命中过往会话时才附加召回结果，大多数对话轮次不会增加额外内容。
+- **清晰可见的召回提示**：在交互式 CLI 与 `hermes chat -q` 中，deja 在 Claude Code 里展示的来源回执（记忆来自哪款智能体、会话启动召回内容、构建与周报说明）会挂载在 Hermes 的召回行 `🧠 deja · …` 上，模型的原始回复保持不变。Hermes 0.17 无召回行，`hermes -z` 与 `hermes chat -Q` 也不打印该行，TUI 仅在状态栏闪现，网关聊天可能是多人可见的群聊——这些场景下 deja 会保留提示，待支持显示的交互会话中再呈现。
+- **定时任务（`cron`）静默**：当 Hermes 报告平台为 `cron` 时，后端不会自动注入记忆；如果定时任务主动调用 deja 工具，工具仍正常应答。
+- **三个内置工具**：`deja_recall` 检索历史会话，`deja_fix` 查询同类报错后的修复记录，`deja_blame` 列出编辑过指定文件的会话。
+- **笔记提升权重**：Hermes 写入 `MEMORY.md` 或 `USER.md` 的条目也会保留为 deja 笔记，在检索排序中优先于周围普通会话。
+- **压缩保留断点**：上下文压缩（compaction）时会保留会话中止前正在处理的工作以便下一轮衔接；会话结束时自动移除活跃标记。
 
-有一件事记忆提供者做不到：在刚失败的命令旁边放上以前的修复。那要靠插件钩子 `transform_tool_result`，而 Hermes 交给记忆提供者的上下文里 `register_hook` 什么都不做（`plugins/memory/__init__.py`，0.17.0）。`deja install hermes-auto` 写入的钩子插件负责这一项。
+有一项能力记忆后端本身无法完成：把历史修复直接贴在刚刚失败的命令结果旁。这依赖插件钩子 `transform_tool_result`，而 Hermes 向记忆后端传入的上下文里 `register_hook` 为空实现（`plugins/memory/__init__.py`，0.17.0）。执行 `deja install hermes-auto` 可一并安装承载该能力的钩子插件。
 
-它从不把 Hermes 的对话写到别处：Hermes 自己已经存了，deja 下次刷新时会读那个存储。
+扩展从不额外转写 Hermes 对话轮次：Hermes 自身已经将记录落盘，deja 会在下次刷新时直接读取。
 
-## 和 `deja install` 是同一份代码
+## 基准评测
 
-`deja install hermes-auto` 会把这个提供者写到 `~/.hermes/plugins/deja-memory`，同时写入 MCP 服务器和一个 pre_llm_call 钩子插件。这里的文件由同一份源码生成（`cmd/deja/install_hermes_memory.go`），唯一的区别是：这一份从 PATH 里找 deja，而不是把路径写死。两份一旦不一致，`TestHermesExtensionIsTheProviderInstallWrites` 就会失败。
+| 召回率 | Token 用量 | 索引与检索耗时 |
+|---|---|---|
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1；MemPalace 公布 96.6%，agentmemory 为 95.2%） | **token 减少 58%**（同一仓储重复任务上 token 用量只有 agentmemory 的**一半**） | **13.6 秒**索引 19,195 个历史会话 / 跨越 48 个编程智能体的检索仅 **0.7 ms**（7 款对比工具中第二名 72 秒） |
 
-属于 [deja-vu](https://github.com/vshulcz/deja-vu) 项目。MIT 许可。觉得有用的话，欢迎在 [GitHub](https://github.com/vshulcz/deja-vu) 上给 deja-vu 点个 Star。
+## 仓库记忆与跨智能体接力
+
+通过 git 在 `.deja/memory.jsonl` 中共享经过筛选的项目决策与踩坑记录（`deja repo candidates`、`deja repo add <id>`）。条目在写入前自动脱敏，按内容哈希排序并附带 `merge=union`，并发分支可干净合并；克隆仓库的协作者都会自动加载（在信任策略中配置 `{"activations":{"auto":{"repo":false}}}` 可关闭 hook 注入）。[了解更多](https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html)。
+
+开发到一半需要切换工具？运行 `deja handoff --to <agent>`（或通过 MCP 调用 `handoff`），即可将当前会话的目标、已定决策、修改过的文件、通过的检查与待办工作直接交给另一个编程智能体。
+
+## 与 `deja install` 同源
+
+`deja install hermes-auto` 会将此后端写入 `~/.hermes/plugins/deja-memory`，并连同 MCP 服务与 `pre_llm_call` 钩子插件一并部署。此处扩展文件与安装器出自同一份源码（`cmd/deja/install_hermes_memory.go`）；唯一差异在于本扩展从 `PATH` 查找 `deja`，而安装器会把路径直接写入。一旦两者产生漂移，`TestHermesExtensionIsTheProviderInstallWrites` 测试就会报错。
+
+[deja-vu](https://github.com/vshulcz/deja-vu) 生态组件。MIT 协议。觉得有用？[去 GitHub 为 deja-vu 点颗星](https://github.com/vshulcz/deja-vu)。

@@ -206,6 +206,7 @@
 <tr><td><a href="../registry/claude-code.html">Claude Code</a></td><td><code>${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl</code></td><td>JSONL, one record per line</td></tr>
 <tr><td><a href="../registry/clawcode.html">Claw Code</a></td><td><code>${CLAW_CONFIG_HOME:-~/.claw}/sessions/*.jsonl</code> and legacy <code>*.json</code></td><td>JSONL transcripts, or JSON snapshots</td></tr>
 <tr><td><a href="../registry/cline.html">Cline</a></td><td><code>${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/*/*.messages.json</code></td><td>JSON files</td></tr>
+<tr><td><a href="../registry/codearts.html">CodeArts Desktop</a></td><td><code>~/.codearts/kernel/sessions/&lt;launch-bucket&gt;/&lt;session-uuid&gt;/history.jsonl</code></td><td>JSONL, one message per line</td></tr>
 <tr><td><a href="../registry/codebuddy.html">CodeBuddy Code</a></td><td><code>${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/*/*.jsonl</code>; WorkBuddy writes <code>~/.workbuddy/projects/*/*.jsonl</code></td><td>JSONL, one record per line</td></tr>
 <tr><td><a href="../registry/codewhale.html">CodeWhale</a></td><td><code>${CODEWHALE_HOME:-~/.codewhale}/sessions/&lt;id&gt;.json</code></td><td>JSON, one file per session</td></tr>
 <tr><td><a href="../registry/codex.html">Codex CLI</a></td><td><code>${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl</code></td><td>JSONL rollouts plus a history file</td></tr>
@@ -228,11 +229,14 @@
 <tr><td><a href="../registry/kimchi.html">Kimchi Coding</a></td><td><code>~/.config/kimchi/harness/sessions/--&lt;encoded-cwd&gt;--/*.jsonl</code></td><td>JSONL, one record per line</td></tr>
 <tr><td><a href="../registry/kimi.html">Kimi Code</a></td><td><code>${KIMI_CODE_HOME:-~/.kimi-code}/sessions/*/*/agents/main/wire.jsonl</code></td><td>JSONL, one record per line</td></tr>
 <tr><td><a href="../registry/kiro.html">Kiro</a></td><td><code>~/.kiro/sessions/cli/*.jsonl</code> and <code>~/.kiro/sessions/*/sess_*/messages.jsonl</code></td><td>JSONL, one record per line</td></tr>
+<tr><td><a href="../registry/mimo.html">MiMo-Code</a></td><td><code>${XDG_DATA_HOME:-~/.local/share}/mimocode/mimocode.db</code></td><td>SQLite (OpenCode schema)</td></tr>
 <tr><td><a href="../registry/mcode.html">MiniMax Code</a></td><td><code>${DEJA_MCODE_ROOT:-~/.minimax/v2/sessions}/YYYY/MM/DD/&lt;session&gt;/messages.jsonl</code></td><td>JSONL, one record per line</td></tr>
 <tr><td><a href="../registry/muse.html">Muse Code</a></td><td><code>${XDG_DATA_HOME:-~/.local/share}/muse/sessions/YYYY/MM/DD/*/session.jsonl</code></td><td>JSONL, one record per line</td></tr>
+<tr><td><a href="../registry/omnigent.html">Omnigent</a></td><td><code>~/.omnigent/chat.db</code></td><td>SQLite database</td></tr>
 <tr><td><a href="../registry/omp.html">omp (Oh My Pi)</a></td><td><code>~/.omp/agent/sessions/**/*.jsonl</code> and <code>~/.omp/profiles/*/agent/sessions/**/*.jsonl</code></td><td>JSONL, one record per line</td></tr>
 <tr><td><a href="../registry/openclaw.html">OpenClaw</a></td><td><code>${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/*/agent/openclaw-agent.sqlite</code> and <code>…/agents/*/sessions/*.jsonl</code></td><td>SQLite database, or JSONL in older builds</td></tr>
 <tr><td><a href="../registry/opencode.html">opencode</a></td><td><code>~/.local/share/opencode/opencode.db</code></td><td>SQLite database</td></tr>
+<tr><td><a href="../registry/orca.html">Orca</a></td><td><code>~/Library/Application Support/orca/agent-session-journal.db</code>, <code>~/.config/orca/agent-session-journal.db</code>, <code>%APPDATA%/orca/agent-session-journal.db</code></td><td>SQLite database</td></tr>
 <tr><td><a href="../registry/pi.html">pi</a></td><td><code>${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl</code></td><td>JSONL, one record per line</td></tr>
 <tr><td><a href="../registry/prime.html">prime-agent (PrimeIntellect)</a></td><td><code>${DEJA_PRIME_ROOT:-~/.prime/agent/sessions}/**/*.jsonl</code></td><td>JSONL, one record per line</td></tr>
 <tr><td><a href="../registry/qwen.html">Qwen Code</a></td><td><code>${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl</code></td><td>JSONL, one record per line</td></tr>

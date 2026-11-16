@@ -1,36 +1,53 @@
 # @vshulcz/openclaw-deja
 
-[English](../README.md) | 中文
+[English](../README.md) | 简体中文 | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
 [![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 
-属于 **[deja-vu](https://github.com/vshulcz/deja-vu)** 项目（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · Token 用量仅为 agentmemory 的**一半**）· [官网与在线搜索](https://vshulcz.github.io/deja-vu/) · [浏览器在线演示](https://vshulcz.github.io/deja-vu/view/) · **[★ 在 GitHub 上给 deja-vu 点 Star](https://github.com/vshulcz/deja-vu)**
+**[deja-vu](https://github.com/vshulcz/deja-vu)** 扩展（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · token 用量为 agentmemory 的**一半**）· [文档](https://vshulcz.github.io/deja-vu/zh/) · [在线演示](https://vshulcz.github.io/deja-vu/view/) · [评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) · **[★ GitHub 点赞](https://github.com/vshulcz/deja-vu)**
 
-OpenClaw 记得自己的会话。这个插件回答的是另一个问题：这台机器上 Claude Code、Codex、Cursor、Gemini、Zed 等其他四十七个编程智能体里做过什么，包括装 OpenClaw 之前的那几个月。
+OpenClaw 记得自己的会话。这个插件回答的是另一个问题：这台机器上 Claude Code、Codex、Cursor、Gemini、Zed 等其他四十七个编程智能体里做过什么，包括装 OpenClaw 之前的那几个月。完全依赖单文件 Go 二进制 `deja` 与本地 BM25 索引在本地运行，无需额外 LLM 或嵌入模型（设置 `DEJA_OFFLINE=1` 可关闭每日检查）。
 
-插件运行 [deja](https://github.com/vshulcz/deja-vu)，一个本地 Go 可执行文件，索引这些智能体本来就写在磁盘上的会话记录。不用大模型，不用向量嵌入，除了每天一次的版本检查之外不走网络，`DEJA_OFFLINE=1` 可以关掉它。
+![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
 ## 安装
 
-```bash
+```sh
 openclaw plugins install clawhub:@vshulcz/openclaw-deja
 ```
 
-deja 可执行文件随包一起提供；你自己装的 deja（`brew install deja-vu`）永远优先——见[用哪个可执行文件](#用哪个可执行文件)。
+如果系统里还没有装 `deja`，推荐一并安装：
 
-装了 CLI 的话，`deja install openclaw-auto`（或者 `deja install --auto` 一次性接好机器上所有支持的智能体）也会把 OpenClaw 接好，那条路更短：它写入 deja 的 MCP 服务端，并自己写一个插件。两边都装也没问题：这个包会读取安装器写下的内容，只补缺的部分。
+```sh
+brew install deja-vu
+```
 
-## 做什么
+若本机已通过 `deja install openclaw-auto` 或 `deja install --auto` 写入过原生集成包，扩展会自动避让，不重复挂载工具或注入两份记忆。
 
-- **会话开始时**（`agent:bootstrap`）：这个项目定下的事，每个会话一次，放在 Project Context 里。不需要 `allowConversationAccess`，`openclaw agent --local` 下也会运行。
-- **每回合之前**（`before_prompt_build`）：把提问拿去和索引比对，如果某次历史会话能回答它，那次会话就送到模型面前。多数情况下是沉默。OpenClaw 2026.8.1 及以后只有在插件条目上设了 `hooks.allowConversationAccess: true` 时才运行这个钩子（见配置）；没设时插件会在网关日志和 `/deja` 里说明。
-- **压缩之前**（`before_compaction`）：deja 从会话文件里读出要被总结的回合，下一回合就带上智能体正在做的事。
-- **会话结束时**（`session_end`）：撤掉会话的在线标记，下一个会话的召回就能用上它。
-- **工具调用之后**（tool result middleware）：读或改一个文件时，附上以前的会话对这个文件定下的事；命令失败时，附上这台机器上次遇到同样错误后跑过的命令，就放在模型读到的结果旁边。
-- **工具**：`deja_recall`（检索历史）、`deja_fix`（这个报错之后上次跑了什么）、`deja_blame`（哪些会话动过某个文件、当时得出了什么结论）。
-- **`/deja <要查什么>`**：同样的检索，结果给你看，而不是给模型。
+## 核心能力
 
-在频道上（Telegram、Slack、Discord 等）和你的一对一私聊里，如果回复用到了你的历史，下方会多一行斜体：`↺ from Codex CLI, 3 weeks ago: "…" · deja`。它经由 `reply_payload_sending` 在会话记录写入之后才加上，所以模型看不到，拿到的文本和以前完全一样。只有同时满足以下条件才会出现，任何一项缺失或无法判断都不显示：消息来自一对一私聊（OpenClaw 给出 `isGroup: false`，会话键不含 group、channel、thread 或 topic，给出的聊天类型是 `direct`）；发送者是你（`commands.ownerAllowFrom`，没有配置时指只列了一个 id 的频道 `allowFrom`）；该频道整条发送回复（关闭了流式，也没有开启分块流式，例如 `channels.telegram.streaming.mode: "off"`；Telegram 默认的预览流式分块发送，没有可以附带这一行的最终消息，所以那里根本不会向 deja 请求回执，回执也不会被消耗）；这条回复是同一次运行、同一会话的最终文字回复。媒体或语音回复、没有回复就结束的运行都不带这一行。其他 deja 提示从不发到频道里，仍然随 `/deja` 给你。插件配置里设 `"receipt": false` 可以关掉。
+- **`agent:bootstrap`（含 `openclaw agent --local`）**：会话启动时注入该目录过往已经确定的背景结论。
+- **`before_prompt_build`（配合 OpenClaw `2026.8.1` 与 `hooks.allowConversationAccess: true`）**：每轮提问前检索最相关的历史记录与排障经过。
+- **`before_compaction`**：上下文发生压缩前记录当前任务、定论与命令执行结果，避免在摘要阶段丢失关键参数。
+- **`session_end`**：更新索引并保留当前会话记录。
+- **工具结果中间件**：当命令失败或读取/修改关键文件时，随手附上过往相似报错的解法或该文件的早期决定。
+- **`deja_recall` / `deja_fix` / `deja_blame` 工具**：供智能体主动检索历史、查命令修法与文件归因。
+- **`/deja <query>` 命令**：在消息框中直接关键词检索全部已索引工具的历史会话。
+
+### 私聊回执（Direct-message receipt）
+
+在符合条件的私聊回复底部，扩展会经由 `reply_payload_sending` 附带一行斜体来源回执，例如：
+
+`_↺ from Codex CLI, 3 weeks ago: "how should the zorbit queue drain on deploy" · deja_`
+
+回执仅在同时满足以下全部条件时才会附加：
+
+1. 当前会话为非群组私聊（`isGroup: false` / `direct`）。
+2. 发送方符合所有权许可（`commands.ownerAllowFrom` / `allowFrom`）。
+3. 分块流式回写处于关闭状态（`streaming.block.enabled` / `blockStreaming` / `channels.telegram.streaming.mode: "off"`）。
+4. 该条输出为面向私聊用户的最终文本回复（`direct`）。
+
+不希望显示来源回执时，在配置中设 `"receipt": false` 即可关闭。
 
 ## 配置
 
@@ -40,28 +57,45 @@ deja 可执行文件随包一起提供；你自己装的 deja（`brew install de
     "entries": {
       "deja-vu": {
         "enabled": true,
-        "hooks": { "allowConversationAccess": true },
-        "config": { "autoRecall": true, "tools": true, "bin": "/opt/homebrew/bin/deja" }
+        "hooks": {
+          "allowConversationAccess": true
+        },
+        "config": {
+          "autoRecall": true,
+          "tools": true,
+          "receipt": true,
+          "bin": "/opt/homebrew/bin/deja"
+        }
       }
     }
   }
 }
 ```
 
-三项都是可选的。`autoRecall: false` 保留工具、去掉每回合的召回；`tools: false` 则相反。
-
-`hooks.allowConversationAccess` 是 OpenClaw 的授权，不是插件的配置：2026.8.1 及以后，非内置插件的 `before_prompt_build` 只有在它为 true 时才会运行，插件也无法在 manifest 里申请。一条命令即可设置：
+也可以直接通过 CLI 开启对话读取权限：
 
 ```sh
 openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 ```
 
-## 用哪个可执行文件
+## 使用哪份二进制
 
-顺序是：配置里的 `bin`、`DEJA_BIN`、`PATH` 上的 `deja`、常见安装位置，最后才是通过 `@vshulcz/deja-vu` 捆绑的那份。
+查找顺序：`bin` 配置项 -> `DEJA_BIN` -> `PATH` -> 常见安装路径 -> `@vshulcz/deja-vu` 包附带副本。
+
+## 基准评测
+
+| 召回率 | Token 用量 | 索引与检索耗时 |
+|---|---|---|
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1；MemPalace 公布 96.6%，agentmemory 为 95.2%） | **token 减少 58%**（同一仓储重复任务上 token 用量只有 agentmemory 的**一半**） | **13.6 秒**索引 19,195 个历史会话 / 跨越 48 个编程智能体的检索仅 **0.7 ms**（7 款对比工具中第二名 72 秒） |
+
+## 仓库记忆与跨智能体接力
+
+通过 git 在 `.deja/memory.jsonl` 中共享经过筛选的项目决策与踩坑记录（`deja repo candidates`、`deja repo add <id>`）。条目在写入前自动脱敏，按内容哈希排序并附带 `merge=union`，并发分支可干净合并；克隆仓库的协作者都会自动加载（在信任策略中配置 `{"activations":{"auto":{"repo":false}}}` 可关闭 hook 注入）。[了解更多](https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html)。
+
+开发到一半需要切换工具？运行 `deja handoff --to <agent>`（或通过 MCP 调用 `handoff`），即可将当前会话的目标、已定决策、修改过的文件、通过的检查与待办工作直接交给另一个编程智能体。
 
 ## 隐私
 
-deja 在智能体本来写入的位置读取会话文件，并在 `~/.cache/deja`（或 `DEJA_INDEX_DIR`）下建立本地索引。建立索引时密钥和令牌会被脱敏；没有启用语义检索（`deja embed`）时，索引和检索都不发起网络请求。
+索引保存在 `~/.cache/deja/index.db`（可用 `DEJA_INDEX_DIR` 修改），在建索引时自动清理 `sk-*`、`ghp_*`、`AKIA*` 与 `Bearer` 等凭据。只有明确运行 `deja embed` 并配置外部模型时才会出网。一键为本机 48 款编程智能体部署完整集成请运行 `deja install --auto`。
 
-属于 [deja-vu](https://github.com/vshulcz/deja-vu) 项目。MIT 许可。觉得有用的话，欢迎在 [GitHub](https://github.com/vshulcz/deja-vu) 上给 deja-vu 点个 Star。
+[deja-vu](https://github.com/vshulcz/deja-vu) 生态组件。MIT 协议。觉得有用？[去 GitHub 为 deja-vu 点颗星](https://github.com/vshulcz/deja-vu)。

@@ -72,3 +72,88 @@ func TestReadmeImagesNameFilesThatExist(t *testing.T) {
 		t.Fatal("no README image pointed at this repository, so this test proves nothing")
 	}
 }
+
+func TestPluginAndPackageReadmesParity(t *testing.T) {
+	const rawPrefix = "https://raw.githubusercontent.com/vshulcz/deja-vu/main/"
+	rawURLRe := regexp.MustCompile(`https://raw\.githubusercontent\.com/vshulcz/deja-vu/main/[^\s)"'>]+`)
+	locales := []string{"zh", "zh-TW", "ja", "ko", "es", "pt", "fr", "de", "ru", "tr", "hi"}
+	targets := []string{
+		"antigravity-plugin/README.md",
+		"claude-plugin/README.md",
+		"codebuddy-plugin/README.md",
+		"codex-plugin/README.md",
+		"cursor-plugin/README.md",
+		"devin-plugin/README.md",
+		"extensions/README.md",
+		"npm/README.md",
+	}
+
+	root := filepath.Join("..", "..")
+	for _, rel := range targets {
+		b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatalf("%s: %v", rel, err)
+		}
+		text := string(b)
+		for _, lang := range locales {
+			want := "docs/readme/README." + lang + ".md"
+			if !strings.Contains(text, want) {
+				t.Errorf("%s missing switcher link %s", rel, want)
+			}
+		}
+		for _, req := range []string{
+			rawPrefix + "assets/demo.gif",
+			"## Benchmarks",
+			".deja/memory.jsonl",
+			"merge=union",
+			"deja handoff",
+			"Star deja-vu on GitHub",
+		} {
+			if !strings.Contains(text, req) {
+				t.Errorf("%s missing %q", rel, req)
+			}
+		}
+		for _, url := range rawURLRe.FindAllString(text, -1) {
+			asset := strings.TrimPrefix(url, rawPrefix)
+			if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(asset))); err != nil {
+				t.Errorf("%s references missing asset %s", rel, asset)
+			}
+		}
+	}
+}
+
+func TestGuidePagesCarryDemoAndRepoMemory(t *testing.T) {
+	root := filepath.Join("..", "..")
+	enGuides, err := filepath.Glob(filepath.Join(root, "docs", "guide", "memory-for-*.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(enGuides) != 50 {
+		t.Fatalf("expected 50 EN memory-for-* guides, got %d", len(enGuides))
+	}
+	zhGuides, err := filepath.Glob(filepath.Join(root, "docs", "zh", "guide", "memory-for-*.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(zhGuides) != 6 {
+		t.Fatalf("expected 6 ZH memory-for-* guides, got %d", len(zhGuides))
+	}
+
+	pages := make([]string, 0, len(enGuides)+len(zhGuides)+1)
+	pages = append(pages, enGuides...)
+	pages = append(pages, zhGuides...)
+	pages = append(pages, filepath.Join(root, "docs", "ru", "guide", "getting-started.html"))
+
+	for _, p := range pages {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatalf("%s: %v", p, err)
+		}
+		text := string(b)
+		for _, req := range []string{"demo.gif", ".deja/memory.jsonl", "merge=union", "deja handoff"} {
+			if !strings.Contains(text, req) {
+				t.Errorf("%s missing %q", p, req)
+			}
+		}
+	}
+}

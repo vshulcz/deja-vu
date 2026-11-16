@@ -188,6 +188,7 @@
 <p class="pagelede">cross-agent memory across detachable panes for Claude Code, Codex, Cursor, opencode and Grok<span class="mins" data-mins></span></p>
 
 <p><code>herdr</code> multiplexes coding agents (<code>claude code</code>, <code>codex</code>, <code>cursor</code>, <code>opencode</code>, <code>grok</code>) inside persistent, detachable panes with live status tracking (<code>working</code>, <code>blocked</code>, <code>idle</code>), a socket API, and layout restore after detaching with <code>ctrl+b q</code>. What <code>herdr</code> does not unify is conversation memory: every pane still reads only its own agent's session log.</p>
+<div class="term-shot"><img src="../assets/demo.gif" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier" loading="lazy"><p class="cap">same prompt before and after deja — local BM25 recall across past sessions on disk, zero LLM calls</p></div>
 
 <h2>Wiring every harness herdr runs</h2>
 <pre>deja install --auto</pre>
@@ -195,13 +196,17 @@
 
 <h2>What panes share</h2>
 <ul>
-<li><b>Shared local index:</b> as soon as any harness writes a turn to disk, <code>deja</code> indexes it into <code>~/.cache/deja/index.db</code> (BM25 search with secret scrubbing) alongside all forty-seven supported agent formats.</li>
+<li><b>Shared local index:</b> as soon as any harness writes a turn to disk, <code>deja</code> indexes it into <code>~/.cache/deja/index.db</code> (BM25 search with secret scrubbing) alongside all forty-eight supported agent formats.</li>
 <li><b>Cross-harness handoffs:</b> when a Claude Code pane hits a wall or finishes a submodule and you open Codex in another pane, <code>deja handoff</code> and <code>SessionStart</code>/<code>UserPromptSubmit</code> hooks carry over settled decisions and recent commands (<a href="switch-agents-without-losing-context.html">session handoffs</a>).</li>
 <li><b>No duplicate mistakes across splits:</b> error resolutions recorded in one pane flow back via <code>fix</code> and per-file history in every other pane working on the same repo (<a href="parallel-sessions.html">parallel sessions</a>).</li>
 </ul>
 
 <h2>Format references for panes in herdr</h2>
 <p><code>herdr</code> reads the standard native stores of each tool it launches: <a href="../registry/claude-code.html">Claude Code</a>, <a href="../registry/codex.html">Codex CLI</a>, <a href="../registry/cursor.html">Cursor</a>, <a href="../registry/opencode.html">opencode</a>, and <a href="../registry/grok.html">Grok Build</a>. <a href="privacy.html">Indexing and search stay on your machine</a>, with tokens stripped during indexing.</p>
+
+<h2>Repository memory &amp; handoff</h2>
+<p>Share vetted project decisions and dead ends through git in <code>.deja/memory.jsonl</code> (<code>deja repo candidates</code>, <code>deja repo add &lt;id&gt;</code>). Entries are redacted on write, stored sorted with <code>merge=union</code> so parallel branches merge cleanly, and loaded for any teammate who clones the repository (<code>{"activations":{"auto":{"repo":false}}}</code> in the trust policy keeps them out of hooks). See <a href="repo-memory.html">repo memory</a>.</p>
+<p>Switching tools mid-task? Run <code>deja handoff --to &lt;agent&gt;</code> (or use <code>handoff</code> via MCP) to transfer the active session's goal, decisions, touched files, passed checks, and open work into another coding agent.</p>
 
 <p><a href="parallel-sessions.html">Parallel sessions</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="getting-started.html">Getting started</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>

@@ -31,11 +31,12 @@ deja はそれをローカルでインデックス化し、<code>/compact</code>
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同じエージェントに同じ質問を2回する：記憶がないと何の記録もないが、deja があると8か月前の決定をもとに答える"></p>
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-deja install --auto
+npx @vshulcz/deja-vu install --auto                # 1ステップでクロスプラットフォーム導入 + 導入済みエージェントを接続
+# またはシェル / Homebrew から:
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
 ```
 
-<p align="center"><sub>または Homebrew：<code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code プラグイン：<code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills：<code>npx skills add vshulcz/deja-vu</code><br><a href="#インストール">Windows（Scoop / winget）、Codex、OpenCode、OpenClaw など</a> &middot; インストール不要でセッションを確認：<code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">ブラウザデモ →</a></sub></p>
+<p align="center"><sub>Homebrew：<code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code プラグイン：<code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills：<code>npx skills add vshulcz/deja-vu</code><br><a href="#インストール">Windows（Scoop / winget）、Codex、OpenCode、OpenClaw など</a> &middot; インストールせずに試す：<code>npx @vshulcz/deja-vu stats --no-index --card</code> または <code>npx @vshulcz/deja-vu audit</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">ブラウザデモ →</a></sub></p>
 
 <table align="center">
 <tr>
@@ -175,6 +176,28 @@ aider の読み取り専用コンテキストファイル、Windows の `cmd /c 
 
 機能の完全なリファレンスは[ドキュメント](https://vshulcz.github.io/deja-vu/)にあります。
 
+## リポジトリ内のメモリ
+
+Sync は自分のマシン間で履歴を移動します。エージェントが苦労して学んだ数少ない要点をチームのメンバーに渡すには、
+リポジトリに置きます：
+
+```text
+$ deja repo candidates
+4cd7e7bb9c rejected Reverted the retry with jitter: it broke idempotency because the sender re-signs each attempt with a new delivery id.  (session s1, claude 2026-08-03)
+$ deja repo add 4cd7e7bb9c
+added 1 entry to .deja/memory.jsonl
+nothing is committed: review with `git diff .deja/` and commit it like code
+```
+
+候補は、あらゆるエージェントにおけるこのプロジェクトの履歴から集められます——昇格・記録されたメモ、
+セッション内で報告された差し戻し、そしてセッションで決着した事項です。あなたが選ぶまで何も書き込まれず、
+書き込み時にすべての項目からシークレットが伏せ字化され、依然としてシークレット規則に一致するものは拒否されます。
+`.deja/memory.jsonl` はコンテンツハッシュで並んだ JSON 行ファイルで、隣に `merge=union` 属性が置かれるため、
+並行した追加もそのままマージされます。行を消せば項目も消えます。クローン後は、deja を接続したどのエージェントでも
+セッション開始時とリコール時にこの項目が返り、リポジトリ由来と明記されたうえで他の記憶と同様に信頼境界内に
+収められます。信頼ポリシーの `{"activations":{"auto":{"repo":false}}}` を設定すると、フック注入から外せます。
+[詳細](https://vshulcz.github.io/deja-vu/guide/repo-memory.html)。
+
 ## プライバシー
 
 インデックス作成と検索はローカルで完結します。ネットワークを使うのは `deja update`、`deja sync ssh`、
@@ -309,7 +332,7 @@ $ deja "jwt refresh token"
 [自動コンパクション復旧](../../docs/compaction.md)を参照してください。
 
 <!-- matrix:start -->
-aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Claw Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; Devin CLI &middot; CodeWhale &middot; Junie &middot; JetBrains AI Assistant &middot; Windsurf / Devin Desktop &middot; CodeBuddy Code &middot; Reasonix &middot; TRAE CLI &middot; Muse Code &middot; MiniMax Code &middot; MiMo-Code &middot; Omnigent &middot; Orca.
+aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Claw Code &middot; Cline &middot; CodeArts Desktop &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; Devin CLI &middot; CodeWhale &middot; Junie &middot; JetBrains AI Assistant &middot; Windsurf / Devin Desktop &middot; CodeBuddy Code &middot; Reasonix &middot; TRAE CLI &middot; Muse Code &middot; MiniMax Code &middot; MiMo-Code &middot; Omnigent &middot; Orca.
 
 <details>
 <summary>各ハーネスの対応状況</summary>
@@ -321,6 +344,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Claw Code 
 | Antigravity | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Claude Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Cline | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| CodeArts Desktop | ⚠ | ⚠ | ⚠ | ⚠ | ✕ | 貼り付け | — |
 | Codex CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Copilot CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | VS Code Copilot Chat | ✅ | ✅ | ✅ | ✅ | ✕ | ✅ | — |
@@ -390,11 +414,22 @@ TRAE IDE は接続はしますが、読み取りはしません。チャット�
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | プラグイン `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
+| Gemini CLI | 拡張機能 `@vshulcz/deja`（[Gemini CLI Extensions Gallery](https://geminicli.com/extensions/) 内） | `gemini extensions install https://github.com/vshulcz/deja-vu` |
+| Antigravity | プラグイン `deja-vu`（[`antigravity-plugin/`](../../antigravity-plugin/)） | `agy plugin install deja-vu` |
 | Codex CLI | プラグイン `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu` の後に `codex plugin add deja-vu@deja-vu` |
 | Grok Build | プラグイン `deja` | `grok plugin marketplace add vshulcz/deja-vu` の後に `grok plugin install deja` |
 | OpenClaw | ClawHub と npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi（と omp） | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 | Hermes | メモリプロバイダー `deja-memory`（Hermes のプラグインカタログ内） | `hermes plugins install deja-memory`、または GitHub から：`hermes plugins install vshulcz/deja-vu/extensions/hermes` |
+| Magpie | npm `@vshulcz/magpie-deja` | `magpie plugin add @vshulcz/magpie-deja` |
+| Orca | v2 `trusted-worker` プラグイン `deja` | `Orca → Plugins → extensions/orca`（ネイティブ MCP とフックには `deja install orca`） |
+| CodeWhale | Claude 互換バンドル `deja-vu` | `/plugin install extensions/codewhale`（ネイティブフックには `deja install codewhale`） |
+| VS Code / Cursor / Windsurf | ステータスバー拡張機能 `vshulcz.deja-status` | `code --install-extension vshulcz.deja-status` |
+| JetBrains IDEs | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35998-deja-vu-cross-agent-ai-session-memory) (`com.github.vshulcz.deja-vu`)（[`extensions/jetbrains/`](../../extensions/jetbrains/docs/ja.md)） | `idea installPlugins com.github.vshulcz.deja-vu` |
+| Neovim | `lazy.nvim` ＆ CodeCompanion プラグイン（[`extensions/nvim/`](../../extensions/nvim/docs/ja.md)） | `{ "vshulcz/deja-vu", opts = {} }` |
+| tmux | [TPM](https://github.com/tmux-plugins/tpm) ポップアップ（`prefix + D`）＆ `#{deja_status}`（`deja.tmux`） | `set -g @plugin 'vshulcz/deja-vu'` |
+| Raycast | Raycast 拡張機能 `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
+| CC Switch | ワンクリック MCP ＆ Skill リポジトリ取り込み（`ccswitch://`） | [CC Switch に MCP を追加](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [エージェント切り替えガイド](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 どちらの方法も単独で十分で、両方を使っても問題ありません。どのパッケージもまず `deja install` が
 書き込んだ内容を読み取ります。opencode、dsh、OpenClaw は足りないものだけを追加し、Kimi、Grok、Codex、pi は
@@ -402,6 +437,13 @@ TRAE IDE は接続はしますが、読み取りはしません。チャット�
 そのため、どの順番でインストールしても重複は生じません。
 
 いずれもすでに入っている deja を使い、同梱のコピーはフォールバックにすぎません。
+
+[Spec Kit](https://github.com/github/spec-kit) プロジェクトでは、拡張機能が `/speckit.deja-vu.recall` を追加し、
+実装の前にその機能に関する過去のセッションを検索します：
+
+```sh
+specify extension add deja-vu --from https://github.com/vshulcz/deja-vu/releases/latest/download/deja-spec-kit.zip
+```
 
 同じ検索はスキルとしても提供されており、`SKILL.md` を読み込むあらゆるエージェントで使えます：
 
@@ -516,6 +558,20 @@ deja bench read       # what it costs to read a database-backed store, and what 
 
 インデックスはインクリメンタルです。セッションファイルが増えたときは、そのファイルだけを読み直します。
 
+### 比較
+
+| 機能 | `deja-vu` | `claude-mem` | `MemPalace` |
+| --- | --- | --- | --- |
+| 導入前の履歴（[day zero](https://vshulcz.github.io/deja-vu/guide/day-zero.html)） | 対応 — 既存の会話記録をインデックス化（`36/100` hit@1） | 非対応 — 導入後から記録（`0/100`） | Claude Code, Codex, Cursor（`16/100`） |
+| 共有対象エージェント | 48 ハーネス | 9（フック） | 3（CLI） |
+| LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
+| ランタイムと依存関係 | Go 単一バイナリ 1 個 | Bun ワーカー + SQLite + Chroma | Python + 300 MB 埋め込みモデル |
+| LLM 呼び出し / アカウント要否 | 不要 | Observer LLM 呼び出し | 不要 |
+| 未コミットファイルの復元 | `deja restore <path>` | 非対応 | 非対応 |
+| 既存の `claude-mem.db` | `~/.claude-mem/claude-mem.db` を直接参照 | ネイティブ | 非対応 |
+
+詳細比較：[全 15 ツールの比較](https://vshulcz.github.io/deja-vu/guide/compare.html) · [claude-mem 代替](https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html) · [Mem0 代替](https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html) · [SpecStory 代替](https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html) · [Basic Memory 代替](https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html)。
+
 ## 仕組み
 
 `~/.cache/deja` にあるローカルの転置インデックスです：JSONL と SQLite のストアを解析し、認証情報を
@@ -605,6 +661,7 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 悪用可能だと思われるものは、代わりに [SECURITY.md](../../SECURITY.md) にある非公開のアドバイザリリンクから
 報告してください。deja が何を読み、何をどこにも送らないか、そしてプロジェクトを除外したりセッションを
 忘れさせたりする方法は[プライバシー](#プライバシー)にまとめています。
+役に立ちましたか？[Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)。
 
 ## ライセンス
 

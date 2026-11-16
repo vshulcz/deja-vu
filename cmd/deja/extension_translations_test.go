@@ -77,3 +77,133 @@ func countCJK(s string) int {
 	}
 	return n
 }
+
+func countRuneRange(s string, lo, hi rune) int {
+	n := 0
+	for _, r := range s {
+		if r >= lo && r <= hi {
+			n++
+		}
+	}
+	return n
+}
+
+func countJapaneseChars(s string) int {
+	n := 0
+	for _, r := range s {
+		if (r >= 0x3040 && r <= 0x30FF) || (r >= 0x4E00 && r <= 0x9FFF) {
+			n++
+		}
+	}
+	return n
+}
+
+func countHangulChars(s string) int {
+	n := 0
+	for _, r := range s {
+		if (r >= 0xAC00 && r <= 0xD7AF) || (r >= 0x1100 && r <= 0x11FF) {
+			n++
+		}
+	}
+	return n
+}
+
+// Every extension under extensions/ must carry all 11 non-English docs linked
+// both ways, reference the demo asset, repo memory, and handoff, avoid SVG
+// assets on VS Code, keep `--profile` on dsh install commands, and hold real
+// translated text in each target script.
+func TestExtensionDocsCoverAllElevenLocales(t *testing.T) {
+	locales := []string{"zh", "zh-TW", "ja", "ko", "es", "pt", "fr", "de", "ru", "tr", "hi"}
+	root := filepath.Join("..", "..")
+	entries, err := os.ReadDir(filepath.Join(root, "extensions"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	packages := 0
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		readmeBytes, err := os.ReadFile(filepath.Join(root, "extensions", name, "README.md"))
+		if err != nil {
+			continue
+		}
+		packages++
+		readme := string(readmeBytes)
+
+		for _, lang := range locales {
+			wantURL := "https://github.com/vshulcz/deja-vu/blob/main/extensions/" + name + "/docs/" + lang + ".md"
+			if !strings.Contains(readme, wantURL) {
+				t.Errorf("extensions/%s/README.md missing switcher link %s", name, wantURL)
+			}
+
+			docBytes, err := os.ReadFile(filepath.Join(root, "extensions", name, "docs", lang+".md"))
+			if err != nil {
+				t.Errorf("extensions/%s/docs/%s.md missing: %v", name, lang, err)
+				continue
+			}
+			doc := string(docBytes)
+
+			if !strings.Contains(doc, "[English](../README.md)") {
+				t.Errorf("extensions/%s/docs/%s.md missing [English](../README.md)", name, lang)
+			}
+			for _, other := range locales {
+				if other == lang {
+					continue
+				}
+				if !strings.Contains(doc, "("+other+".md)") {
+					t.Errorf("extensions/%s/docs/%s.md missing sibling link (%s.md)", name, lang, other)
+				}
+			}
+			for _, req := range []string{
+				"assets/demo.gif",
+				".deja/memory.jsonl",
+				"deja handoff",
+				"https://github.com/vshulcz/deja-vu",
+			} {
+				if !strings.Contains(doc, req) {
+					t.Errorf("extensions/%s/docs/%s.md missing %q", name, lang, req)
+				}
+			}
+			if name == "vscode" && strings.Contains(strings.ToLower(doc), ".svg") {
+				t.Errorf("extensions/vscode/docs/%s.md contains disallowed .svg reference", lang)
+			}
+			if name == "dsh" {
+				for line := range strings.SplitSeq(doc, "\n") {
+					if strings.Contains(line, "dsh plugin") && strings.Contains(line, "add") && !strings.Contains(line, "--profile") {
+						t.Errorf("extensions/dsh/docs/%s.md: %q misses --profile", lang, strings.TrimSpace(line))
+					}
+				}
+			}
+
+			switch lang {
+			case "zh", "zh-TW":
+				if n := countCJK(doc); n < 200 {
+					t.Errorf("extensions/%s/docs/%s.md has %d CJK chars (< 200)", name, lang, n)
+				}
+			case "ja":
+				if n := countJapaneseChars(doc); n < 150 {
+					t.Errorf("extensions/%s/docs/%s.md has %d Japanese chars (< 150)", name, lang, n)
+				}
+			case "ko":
+				if n := countHangulChars(doc); n < 150 {
+					t.Errorf("extensions/%s/docs/%s.md has %d Hangul chars (< 150)", name, lang, n)
+				}
+			case "ru":
+				if n := countRuneRange(doc, 0x0400, 0x04FF); n < 200 {
+					t.Errorf("extensions/%s/docs/%s.md has %d Cyrillic chars (< 200)", name, lang, n)
+				}
+			case "hi":
+				if n := countRuneRange(doc, 0x0900, 0x097F); n < 150 {
+					t.Errorf("extensions/%s/docs/%s.md has %d Devanagari chars (< 150)", name, lang, n)
+				}
+			}
+		}
+	}
+
+	if packages != 16 {
+		t.Fatalf("expected 16 extension packages under extensions/, got %d", packages)
+	}
+}

@@ -34,7 +34,7 @@
 <meta property="og:site_name" content="deja-vu">
 <link rel="apple-touch-icon" href="../../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "给 Claude Code 加记忆", "description": "如何让 Claude Code 查到这台机器上每个编程智能体的会话：MCP 服务器、SessionStart 钩子和插件市场。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-claude-code.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-claude-code.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-15", "dateModified": "2026-11-05"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "给 Claude Code 加记忆", "description": "如何让 Claude Code 查到这台机器上每个编程智能体的会话：MCP 服务器、SessionStart 钩子和插件市场。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-claude-code.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-claude-code.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-15", "dateModified": "2026-11-15"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "给 Claude Code 加记忆", "item": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-claude-code.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "怎么给 Claude Code 加记忆？", "acceptedAnswer": {"@type": "Answer", "text": "运行 deja install claude-auto，它会写入 MCP 服务器、/deja 命令，以及从 SessionStart 开始的七个钩子；或者用 claude plugin marketplace add vshulcz/deja-vu 把这个仓库作为插件市场加入。"}}, {"@type": "Question", "name": "Claude Code 的会话存在哪里？", "acceptedAnswer": {"@type": "Answer", "text": "以 JSONL 格式存在 ${CLAUDE_CONFIG_DIR:-~/.claude}/projects/ 下，而且一个会话对应一个文件——deja 建索引读的就是它。"}}, {"@type": "Question", "name": "MCP 服务器和插件都装，会不会把工具重复一份？", "acceptedAnswer": {"@type": "Answer", "text": "不会。Claude 按名字索引 MCP 服务器，且交付的每份清单都把它叫作 deja，所以两边会合成同一个服务器。"}}]}</script>
 </head>
@@ -84,6 +84,7 @@
 <p class="pagelede">MCP 服务器、钩子，还有插件市场<span class="mins" data-mins></span></p>
 
 <p>Claude Code 会把每个会话都写到磁盘上，然后把下一个会话开成空的。你的那些工作还在，同一周里你在 Cursor、Codex，或任何当时开着的智能体里做的事，也都还在。</p>
+<div class="term-shot"><img src="../../assets/demo.gif" alt="同一问题问两次：没有记忆时智能体一无所知，接入 deja 后直接引用 8 个月前敲定的方案" loading="lazy"><p class="cap">接入 deja 前后同一提示词的对比 —— 本地 BM25 跨会话召回，不调用任何模型</p></div>
 
 <h2>在这里，人们说的「记忆」其实是两件事</h2>
 <p>Claude Code 自己只有一种记忆面。包括你自己写的文件。你仓库里的 <code>CLAUDE.md</code>、对整台机器生效的 <code>~/.claude/CLAUDE.md</code>、用来引入更多内容的 <code>@path</code> 导入、改它们用的 <code>/memory</code>，以及不用离开会话就能追加一行、以 <code>#</code> 开头的消息。它在每个会话开始时都会被整份读进去——这既让它适合放长期指令（构建命令、约定、不要动的目录），也正是它不适合放历史的原因。每一行都在每一轮里消耗上下文，而一条已经不成立的规则，和一条仍然成立的规则带着同样的权重抵达。<a href="../../guide/rules-files.html">CLAUDE.md 长起来之后</a>讲的正是这个权衡。</p>
@@ -110,6 +111,10 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 <h2>和这个 harness 无关的部分</h2>
 <p>索引覆盖这台机器上每个智能体的转录——今天是四十八个，<a href="where-sessions-are-stored.html">而且各有各的格式</a>——所以在一个工具里找到的修法，能回答在另一个工具里提的问题，包括这一切装上来之前的会话。这就是选择索引、而不是选择边用边记的原因。</p>
 <p>这里没有任何东西在写记忆，所以也就没有什么能凭空编进你的历史里；建立索引和检索都在本地，凭据在建索引时就被脱敏（<a href="../../guide/privacy.html">隐私说明</a>）。每次提问注入上限 1536 字节，每次工具调用约 4 KB——<a href="../../guide/token-cost.html">记忆要花多少 token</a> 里有实测对比。</p>
+
+<h2>仓库共享记忆与跨智能体交接</h2>
+<p>把团队校验过的工程决策、否决方案和避坑经验通过 Git 放进 <code>.deja/memory.jsonl</code>（<code>deja repo candidates</code>、<code>deja repo add &lt;id&gt;</code>）。条目写入时自动脱敏，按内容哈希排序并搭配 <code>merge=union</code> 合并属性，并行分支可无冲突合并；队友克隆仓库后即刻生效，也可在信任策略中配置 <code>{"activations":{"auto":{"repo":false}}}</code> 关闭自动钩子注入。见<a href="repo-memory.html">仓库共享记忆</a>。</p>
+<p>中途切换工具时，运行 <code>deja handoff --to &lt;agent&gt;</code>（或通过 MCP 调用 <code>handoff</code>）即可把当前目标、已定决策、改动文件、已通过检查和待办事项直接交给另一个智能体。</p>
 
 <p><a href="getting-started.html">快速开始</a> · <a href="../../registry/claude-code.html">Claude 的会话文件是怎么读的</a> · <a href="../../guide/rules-files.html">CLAUDE.md 长起来之后</a></p>
 <p class="star-cta">觉得有用？欢迎在 <a href="https://github.com/vshulcz/deja-vu">GitHub 上给 deja-vu 点颗 Star</a>。</p>

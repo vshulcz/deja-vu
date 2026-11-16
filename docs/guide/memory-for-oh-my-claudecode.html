@@ -188,6 +188,7 @@
 <p class="pagelede">cross-session and cross-agent recall for OMC orchestration inside Claude Code<span class="mins" data-mins></span></p>
 
 <p><code>oh-my-claudecode</code> (OMC, also run via the <code>omc</code> CLI) orchestrates multi-agent runs inside Claude Code. Because OMC runs on top of Claude Code, each subagent invocation starts fresh and sees neither yesterday's orchestrator run nor fixes already settled in Codex, Cursor, or opencode. Pairing OMC with <code>deja</code> gives every spawned session searchable access to prior work.</p>
+<div class="term-shot"><img src="../assets/demo.gif" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier" loading="lazy"><p class="cap">same prompt before and after deja — local BM25 recall across past sessions on disk, zero LLM calls</p></div>
 
 <h2>Where OMC transcripts already live</h2>
 <p>OMC sessions write standard Claude Code JSONL transcripts under <code>~/.claude/projects/</code>, while OMC keeps its own configuration in <code>~/.claude/.omc-config.json</code> and rules in <code>./.claude/CLAUDE.md</code> or <code>~/.claude/CLAUDE-omc.md</code>. <code>deja</code> indexes Claude Code's transcript tree directly — alongside the other forty-seven harnesses on the machine — without modifying your OMC setup or touching <code>CLAUDE.md</code> (<a href="rules-files.html">why rules files grow</a>).</p>
@@ -206,7 +207,11 @@
 </ul>
 
 <h2>Local and scrubbed</h2>
-<p>The local BM25 store at <code>~/.cache/deja/index.db</code> covers all forty-seven agent formats on the machine, including historical transcripts recorded before installing <code>deja</code>. <a href="privacy.html">Everything stays on disk</a>, and tokens and credentials are scrubbed as transcripts are indexed.</p>
+<p>The local BM25 store at <code>~/.cache/deja/index.db</code> covers all forty-eight agent formats on the machine, including historical transcripts recorded before installing <code>deja</code>. <a href="privacy.html">Everything stays on disk</a>, and tokens and credentials are scrubbed as transcripts are indexed.</p>
+
+<h2>Repository memory &amp; handoff</h2>
+<p>Share vetted project decisions and dead ends through git in <code>.deja/memory.jsonl</code> (<code>deja repo candidates</code>, <code>deja repo add &lt;id&gt;</code>). Entries are redacted on write, stored sorted with <code>merge=union</code> so parallel branches merge cleanly, and loaded for any teammate who clones the repository (<code>{"activations":{"auto":{"repo":false}}}</code> in the trust policy keeps them out of hooks). See <a href="repo-memory.html">repo memory</a>.</p>
+<p>Switching tools mid-task? Run <code>deja handoff --to &lt;agent&gt;</code> (or use <code>handoff</code> via MCP) to transfer the active session's goal, decisions, touched files, passed checks, and open work into another coding agent.</p>
 
 <p><a href="memory-for-claude-code.html">Claude Code setup</a> · <a href="parallel-sessions.html">Parallel sessions</a> · <a href="getting-started.html">Getting started</a> · <a href="../registry/claude-code.html">The Claude Code session format</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>

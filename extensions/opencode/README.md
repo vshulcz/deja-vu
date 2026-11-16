@@ -1,6 +1,6 @@
 # opencode-deja
 
-English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/opencode/docs/zh.md)
+English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/opencode/docs/zh.md) | [繁體中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/opencode/docs/zh-TW.md) | [日本語](https://github.com/vshulcz/deja-vu/blob/main/extensions/opencode/docs/ja.md) | [한국어](https://github.com/vshulcz/deja-vu/blob/main/extensions/opencode/docs/ko.md) | [Español](https://github.com/vshulcz/deja-vu/blob/main/extensions/opencode/docs/es.md) | [Português](https://github.com/vshulcz/deja-vu/blob/main/extensions/opencode/docs/pt.md) | [Français](https://github.com/vshulcz/deja-vu/blob/main/extensions/opencode/docs/fr.md) | [Deutsch](https://github.com/vshulcz/deja-vu/blob/main/extensions/opencode/docs/de.md) | [Русский](https://github.com/vshulcz/deja-vu/blob/main/extensions/opencode/docs/ru.md) | [Türkçe](https://github.com/vshulcz/deja-vu/blob/main/extensions/opencode/docs/tr.md) | [हिन्दी](https://github.com/vshulcz/deja-vu/blob/main/extensions/opencode/docs/hi.md)
 
 [![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 
@@ -9,6 +9,8 @@ Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on Long
 opencode remembers its own sessions. When you switch between coding tools or reopen a repo months later, this plugin answers the other question: what you did in the forty-seven other coding agents on this machine — Claude Code, Codex, Cursor, Gemini, Hermes, and Zed among them — including transcripts recorded before `deja` was installed.
 
 It runs [deja](https://github.com/vshulcz/deja-vu), a single local Go binary with a local BM25 index: no LLM, no embeddings required, and no network path besides an optional daily release check that `DEJA_OFFLINE=1` turns off.
+
+![deja-vu demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
 ## Install
 
@@ -98,11 +100,23 @@ only then the copy npm installed with this package. Your own `deja update` or
 Without deja anywhere, the tools say so instead of reporting an empty history,
 and the hooks stay quiet.
 
-For full MCP tools (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) across all 47 coding tools when switching agents on one project, run `deja install --auto` (see [Switch Agents Without Losing Context](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)).
+For full MCP tools (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) across all 48 coding tools when switching agents on one project, run `deja install --auto` (see [Switch Agents Without Losing Context](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)).
 
 ## Privacy
 
 `deja` reads transcript files already on disk and maintains a local BM25 index under `~/.cache/deja/index.db` (`DEJA_INDEX_DIR` overrides). Secrets and tokens (`sk-*`, `ghp_*`, `AKIA*`, `Bearer`, private keys, URL credentials) are redacted at index time before any snippet reaches opencode, and indexing/search make no network calls unless you run optional `deja embed`.
+
+## Benchmarks
+
+| Recall | Tokens | Index & lookup |
+|---|---|---|
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 48 coding agents (next of 7 tools: 72 s) |
+
+## Repository memory & handoff
+
+Share vetted project decisions and dead ends through git in `.deja/memory.jsonl` (`deja repo candidates`, `deja repo add <id>`). Entries are redacted on write, stored sorted with `merge=union` so parallel branches merge cleanly, and loaded for any teammate who clones the repository (`{"activations":{"auto":{"repo":false}}}` in the trust policy disables hook injection). [More](https://vshulcz.github.io/deja-vu/guide/repo-memory.html).
+
+Switching tools mid-task? Run `deja handoff --to <agent>` (or use `handoff` via MCP) to transfer the active session's goal, decisions, touched files, passed checks, and open work into another coding agent.
 
 ## License
 

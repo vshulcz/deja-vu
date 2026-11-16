@@ -7,7 +7,7 @@
 
 <p align="center"><b>Mémoire locale partagée, relais entre agents et récupération de code pour 48 agents de code.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes et 40 autres agents enregistrent déjà chaque session sur le disque.<br>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes et 41 autres agents enregistrent déjà chaque session sur le disque.<br>
 deja indexe tout localement pour que vos agents gardent le contexte après <code>/compact</code>, se passent le relais via <code>deja handoff</code> et récupèrent du code écrasé via <code>deja restore</code> — sans LLM, un seul binaire Go.</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | Français | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -31,11 +31,12 @@ deja indexe tout localement pour que vos agents gardent le contexte après <code
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="la même question au même agent deux fois : sans mémoire il ne se souvient de rien, avec deja il répond avec une conclusion vieille de huit mois"></p>
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-deja install --auto
+npx @vshulcz/deja-vu install --auto                # Installation multiplateforme en 1 étape + branchement des agents installés
+# ou via shell / Homebrew :
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
 ```
 
-<p align="center"><sub>Ou avec Homebrew : <code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Plugin Claude Code : <code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills : <code>npx skills add vshulcz/deja-vu</code><br><a href="#installation">Windows (Scoop / winget), Codex, OpenCode, OpenClaw et plus</a> &middot; Essayer sans installer : <code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Démo en direct →</a></sub></p>
+<p align="center"><sub>Homebrew : <code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Plugin Claude Code : <code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills : <code>npx skills add vshulcz/deja-vu</code><br><a href="#installation">Windows (Scoop / winget), Codex, OpenCode, OpenClaw et plus</a> &middot; Essayer sans installer : <code>npx @vshulcz/deja-vu stats --no-index --card</code> ou <code>npx @vshulcz/deja-vu audit</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Démo en direct →</a></sub></p>
 
 <table align="center">
 <tr>
@@ -163,6 +164,29 @@ navigateur.
 
 La référence complète est sur le [site de documentation](https://vshulcz.github.io/deja-vu/).
 
+## Mémoire dans le dépôt
+
+Sync déplace l'historique entre vos propres machines. Pour transmettre à vos collègues les quelques
+leçons que vos agents ont apprises à leurs dépens, mettez-les dans le dépôt :
+
+```text
+$ deja repo candidates
+4cd7e7bb9c rejected Reverted the retry with jitter: it broke idempotency because the sender re-signs each attempt with a new delivery id.  (session s1, claude 2026-08-03)
+$ deja repo add 4cd7e7bb9c
+added 1 entry to .deja/memory.jsonl
+nothing is committed: review with `git diff .deja/` and commit it like code
+```
+
+Les candidats proviennent de l'historique de ce projet dans chaque agent : notes promues et mémorisées,
+retours arrière signalés en session et points tranchés. Rien n'est écrit tant que vous ne choisissez pas ;
+chaque entrée est expurgée à l'écriture et toute entrée qui correspond encore à une règle de secret est refusée.
+Le fichier `.deja/memory.jsonl` est composé de lignes JSON triées par empreinte de contenu, avec l'attribut
+`merge=union` à côté pour que les ajouts parallèles fusionnent ; supprimer une ligne retire une entrée. Après
+un clone, les entrées reviennent au démarrage de session et lors du rappel dans tout agent relié à deja,
+marquées comme provenant du dépôt et encadrées comme non fiables comme le reste.
+`{"activations":{"auto":{"repo":false}}}` dans la politique de confiance les exclut des hooks.
+[En savoir plus](https://vshulcz.github.io/deja-vu/guide/repo-memory.html).
+
 ## Vie privée
 
 L'indexation et la recherche sont locales. Seuls `deja update`, `deja sync ssh`, la vérification de version
@@ -261,11 +285,22 @@ ailleurs un paquet dans son écosystème, pour qui installe ses extensions de ce
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
+| Gemini CLI | extension `@vshulcz/deja`, dans la [Gemini CLI Extensions Gallery](https://geminicli.com/extensions/) | `gemini extensions install https://github.com/vshulcz/deja-vu` |
+| Antigravity | plugin `deja-vu` ([`antigravity-plugin/`](../../antigravity-plugin/)) | `agy plugin install deja-vu` |
 | Codex CLI | plugin `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu`, puis `codex plugin add deja-vu@deja-vu` |
 | Grok Build | plugin `deja` | `grok plugin marketplace add vshulcz/deja-vu`, puis `grok plugin install deja` |
 | OpenClaw | ClawHub et npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi (et omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 | Hermes | fournisseur de mémoire `deja-memory`, dans le catalogue de plugins Hermes | `hermes plugins install deja-memory`, ou depuis GitHub : `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
+| Magpie | npm `@vshulcz/magpie-deja` | `magpie plugin add @vshulcz/magpie-deja` |
+| Orca | plugin v2 `trusted-worker` `deja` | `Orca → Plugins → extensions/orca` (et `deja install orca` pour MCP et hooks natifs) |
+| CodeWhale | bundle compatible Claude `deja-vu` | `/plugin install extensions/codewhale` (et `deja install codewhale` pour les hooks natifs) |
+| VS Code / Cursor / Windsurf | extension de barre d'état `vshulcz.deja-status` | `code --install-extension vshulcz.deja-status` |
+| JetBrains IDEs | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35998-deja-vu-cross-agent-ai-session-memory) (`com.github.vshulcz.deja-vu`) ([`extensions/jetbrains/`](../../extensions/jetbrains/docs/fr.md)) | `idea installPlugins com.github.vshulcz.deja-vu` |
+| Neovim | plugin `lazy.nvim` et CodeCompanion ([`extensions/nvim/`](../../extensions/nvim/docs/fr.md)) | `{ "vshulcz/deja-vu", opts = {} }` |
+| tmux | fenêtre [TPM](https://github.com/tmux-plugins/tpm) (`prefix + D`) et `#{deja_status}` (`deja.tmux`) | `set -g @plugin 'vshulcz/deja-vu'` |
+| Raycast | extension Raycast `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
+| CC Switch | import en 1 clic de MCP et dépôt de Skills (`ccswitch://`) | [Ajouter MCP à CC Switch](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [Guide de changement d'agent](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 L'un ou l'autre suffit et les deux ensemble ne cassent rien : chaque paquet lit d'abord ce que `deja install` a
 écrit. opencode, dsh et OpenClaw ne complètent que ce qui manque ; Kimi, Grok, Codex et pi s'effacent si
@@ -273,6 +308,14 @@ l'installeur a déjà branché ; dans Zed, les deux côtés utilisent le même i
 n'a donc pas d'importance.
 
 Tous utilisent le deja que vous avez déjà installé ; la copie embarquée dans le paquet n'est qu'un secours.
+
+Dans un projet [Spec Kit](https://github.com/github/spec-kit), une extension ajoute
+`/speckit.deja-vu.recall`, qui recherche dans les sessions passées le contexte de la fonctionnalité
+avant son implémentation :
+
+```sh
+specify extension add deja-vu --from https://github.com/vshulcz/deja-vu/releases/latest/download/deja-spec-kit.zip
+```
 
 ## Rappel sémantique, en option
 
@@ -324,6 +367,20 @@ Mesuré sur un vrai stockage : 2,419 sessions, 179k messages, 1.9 Go d'enregistr
 | Taille de l'index | 200 Mo, environ 10 % du corpus |
 
 L'index est incrémental. Quand un fichier de session s'allonge, seul ce fichier est relu.
+
+### Comment il se compare
+
+| Capacité | `deja-vu` | `claude-mem` | `MemPalace` |
+| --- | --- | --- | --- |
+| Historique avant installation ([jour zéro](https://vshulcz.github.io/deja-vu/guide/day-zero.html)) | Oui — indexe les transcriptions existantes (`36/100` hit@1) | Non — enregistre après installation (`0/100`) | Claude Code, Codex, Cursor (`16/100`) |
+| Agents partagés | 48 harnais | 9 (hooks) | 3 (CLI) |
+| LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
+| Runtime et dépendances | 1 binaire Go | Worker Bun + SQLite + Chroma | Python + modèle d'embedding de 300 Mo |
+| Appels LLM / compte requis | Aucun | Appels LLM d'observation | Aucun |
+| Récupération non commitée | `deja restore <path>` | Non | Non |
+| `claude-mem.db` existant | Lit `~/.claude-mem/claude-mem.db` directement | Natif | Non |
+
+Comparatifs détaillés : [les 15 outils comparés](https://vshulcz.github.io/deja-vu/guide/compare.html) · [alternative à claude-mem](https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html) · [alternative à Mem0](https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html) · [alternative à SpecStory](https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html) · [alternative à Basic Memory](https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html).
 
 ## Comment ça marche
 
@@ -415,6 +472,14 @@ Par outil : [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-openco
 `make build test lint`, puis [CONTRIBUTING.md](../../CONTRIBUTING.md).
 Un nouvel agent commence par le [registre des parseurs](../../docs/ARCHITECTURE.md#source-parsers).
 Les priorités et ce que nous ne ferons pas sont dans [ROADMAP.md](../../ROADMAP.md).
+
+## Support
+
+Les bogues et questions se signalent dans [issues](https://github.com/vshulcz/deja-vu/issues).
+Tout problème potentiellement exploitable passe plutôt par le lien d'alerte privée dans
+[SECURITY.md](../../SECURITY.md). Ce que deja lit, ce qu'il n'envoie jamais où que ce soit
+et comment exclure un projet ou oublier une session se trouvent sous
+[Vie privée](#vie-privée). Utile ? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).
 
 ## Licence
 

@@ -5,9 +5,9 @@
   </picture>
 </p>
 
-<p align="center"><b>47 kodlama ajanı arasında paylaşılan yerel bellek, ajanlar arası görev devri ve kod kurtarma.</b></p>
+<p align="center"><b>48 kodlama ajanı arasında paylaşılan yerel bellek, ajanlar arası görev devri ve kod kurtarma.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes ve 40 ajan daha her oturumu zaten diske kaydediyor.<br>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes ve 41 ajan daha her oturumu zaten diske kaydediyor.<br>
 deja tüm geçmişi yerel olarak indeksler; böylece ajanlarınız <code>/compact</code> sonrasında bağlamı korur, <code>deja handoff</code> ile görevi devreder ve <code>deja restore</code> ile üzerine yazılmış kodu kurtarır — LLM yok, tek bir Go ikilisi.</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | Türkçe | <a href="README.hi.md">हिन्दी</a></p>
@@ -31,11 +31,12 @@ deja tüm geçmişi yerel olarak indeksler; böylece ajanlarınız <code>/compac
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="aynı soru aynı ajana iki kez: bellek yokken hiçbir şey hatırlamıyor, deja varken sekiz ay önceki sonuçla yanıtlıyor"></p>
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-deja install --auto
+npx @vshulcz/deja-vu install --auto                # Tek adımda çapraz platform kurulum + kurulu ajanları bağlama
+# veya kabuk / Homebrew ile:
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
 ```
 
-<p align="center"><sub>Veya Homebrew ile: <code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code eklentisi: <code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills: <code>npx skills add vshulcz/deja-vu</code><br><a href="#kurulum">Windows (Scoop / winget), Codex, OpenCode, OpenClaw ve daha fazlası</a> &middot; Kurmadan deneyin: <code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Canlı demo →</a></sub></p>
+<p align="center"><sub>Homebrew: <code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code eklentisi: <code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills: <code>npx skills add vshulcz/deja-vu</code><br><a href="#kurulum">Windows (Scoop / winget), Codex, OpenCode, OpenClaw ve daha fazlası</a> &middot; Kurmadan deneyin: <code>npx @vshulcz/deja-vu stats --no-index --card</code> veya <code>npx @vshulcz/deja-vu audit</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">Canlı demo →</a></sub></p>
 
 <table align="center">
 <tr>
@@ -162,6 +163,29 @@ sizin tarayıcınızda yapar.
 
 Tam başvuru [belge sitesinde](https://vshulcz.github.io/deja-vu/).
 
+## Depoda bellek
+
+Sync geçmişi kendi makineleriniz arasında taşır. Birlikte çalıştığınız kişilere ajanlarınızın
+zor yoldan öğrendiği birkaç şeyi aktarmak için bunları depoya koyun:
+
+```text
+$ deja repo candidates
+4cd7e7bb9c rejected Reverted the retry with jitter: it broke idempotency because the sender re-signs each attempt with a new delivery id.  (session s1, claude 2026-08-03)
+$ deja repo add 4cd7e7bb9c
+added 1 entry to .deja/memory.jsonl
+nothing is committed: review with `git diff .deja/` and commit it like code
+```
+
+Adaylar her ajandaki bu proje geçmişinden gelir: öne çıkarılmış ve hatırlanan notlar, bir oturumda
+bildirilen geri almalar ve oturumlarda karara bağlananlar. Siz seçmeden hiçbir şey yazılmaz; içeri
+alınırken her kayıt gizlenir ve hâlâ bir gizli anahtar kuralına takılanlar reddedilir. `.deja/memory.jsonl`
+dosyası içerik özetine göre sıralanmış JSON satırlarından oluşur ve yanında `merge=union` özniteliği bulunur;
+böylece paralel eklemeler birleşir ve bir satırı silmek kaydı kaldırır. Klonlama sonrasında kayıtlar, deja'nın
+bağlı olduğu herhangi bir ajanda oturum başlangıcında ve geri çağırmada depodan geldiği işaretlenerek ve
+diğerleri gibi güvenilmeyen çerçeve içinde geri gelir. Güven politikasındaki `{"activations":{"auto":{"repo":false}}}`
+ayarı bunları kancaların dışında tutar.
+[Ayrıntılar](https://vshulcz.github.io/deja-vu/guide/repo-memory.html).
+
 ## Gizlilik
 
 İndeksleme ve arama yereldir. Ağı yalnızca `deja update`, `deja sync ssh`, `deja doctor` içindeki sürüm
@@ -257,17 +281,35 @@ kendi ekosisteminde bir paketi var; eklentilerini oradan kuranlar için:
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | eklenti `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
+| Gemini CLI | [Gemini CLI Extensions Gallery](https://geminicli.com/extensions/) içinde `@vshulcz/deja` uzantısı | `gemini extensions install https://github.com/vshulcz/deja-vu` |
+| Antigravity | `deja-vu` eklentisi ([`antigravity-plugin/`](../../antigravity-plugin/)) | `agy plugin install deja-vu` |
 | Codex CLI | eklenti `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu`, sonra `codex plugin add deja-vu@deja-vu` |
 | Grok Build | eklenti `deja` | `grok plugin marketplace add vshulcz/deja-vu`, sonra `grok plugin install deja` |
 | OpenClaw | ClawHub ve npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi (ve omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 | Hermes | Hermes eklenti kataloğunda `deja-memory` bellek sağlayıcısı | `hermes plugins install deja-memory` ya da GitHub'dan: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
+| Magpie | npm `@vshulcz/magpie-deja` | `magpie plugin add @vshulcz/magpie-deja` |
+| Orca | v2 `trusted-worker` eklentisi `deja` | `Orca → Plugins → extensions/orca` (yerel MCP ve kancalar için `deja install orca`) |
+| CodeWhale | Claude uyumlu paket `deja-vu` | `/plugin install extensions/codewhale` (yerel kancalar için `deja install codewhale`) |
+| VS Code / Cursor / Windsurf | durum çubuğu uzantısı `vshulcz.deja-status` | `code --install-extension vshulcz.deja-status` |
+| JetBrains IDEs | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35998-deja-vu-cross-agent-ai-session-memory) (`com.github.vshulcz.deja-vu`) ([`extensions/jetbrains/`](../../extensions/jetbrains/docs/tr.md)) | `idea installPlugins com.github.vshulcz.deja-vu` |
+| Neovim | `lazy.nvim` ve CodeCompanion eklentisi ([`extensions/nvim/`](../../extensions/nvim/docs/tr.md)) | `{ "vshulcz/deja-vu", opts = {} }` |
+| tmux | [TPM](https://github.com/tmux-plugins/tpm) açılır penceresi (`prefix + D`) ve `#{deja_status}` (`deja.tmux`) | `set -g @plugin 'vshulcz/deja-vu'` |
+| Raycast | Raycast uzantısı `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
+| CC Switch | tek tıkla MCP ve Skill deposu aktarımı (`ccswitch://`) | [CC Switch'e MCP ekle](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [Ajan geçiş kılavuzu](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 İki yoldan biri yeter, ikisi birden de bir şey bozmaz: her paket önce `deja install`'ın yazdığını okur.
 opencode, dsh ve OpenClaw yalnızca eksiği tamamlar; Kimi, Grok, Codex ve pi kurucu zaten bağladıysa geri
 çekilir; Zed'de iki taraf aynı sunucu kimliğini kullanır. Yani kurulum sırası önemli değil.
 
 Hepsi sizin kurduğunuz deja'yı kullanır; paketin içindeki kopya yalnızca yedektir.
+
+Bir [Spec Kit](https://github.com/github/spec-kit) projesinde bir uzantı `/speckit.deja-vu.recall`
+komutunu ekler; bu komut özelliği uygulamadan önce geçmiş oturumlarda arama yapar:
+
+```sh
+specify extension add deja-vu --from https://github.com/vshulcz/deja-vu/releases/latest/download/deja-spec-kit.zip
+```
 
 ## İsteğe bağlı anlamsal geri çağırma
 
@@ -319,6 +361,20 @@ Gerçek bir depoda ölçüldü: 2,419 oturum, 179k mesaj, 1.9 GB kayıt.
 | İndeks boyutu | 200 MB, külliyatın yaklaşık %10'u |
 
 İndeks artımlıdır. Bir oturum dosyası uzadığında yalnızca o dosya yeniden okunur.
+
+### Karşılaştırma
+
+| Özellik | `deja-vu` | `claude-mem` | `MemPalace` |
+| --- | --- | --- | --- |
+| Kurulum öncesi geçmiş ([sıfırıncı gün](https://vshulcz.github.io/deja-vu/guide/day-zero.html)) | Evet — mevcut transkriptleri indeksler (`36/100` hit@1) | Hayır — kurulumdan itibaren kaydeder (`0/100`) | Claude Code, Codex, Cursor (`16/100`) |
+| Paylaşılan ajanlar | 48 araç | 9 (kanca) | 3 (CLI) |
+| LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
+| Çalışma zamanı ve bağımlılıklar | 1 Go ikili dosyası | Bun çalışanı + SQLite + Chroma | Python + 300 MB gömme modeli |
+| LLM çağrısı / hesap gereksinimi | Yok | Gözlemci LLM çağrıları | Yok |
+| Commit edilmemiş dosya kurtarma | `deja restore <path>` | Hayır | Hayır |
+| Mevcut `claude-mem.db` | Doğrudan `~/.claude-mem/claude-mem.db` okur | Yerleşik | Hayır |
+
+Yan yana notlar: [15 aracın tamamı karşılaştırıldı](https://vshulcz.github.io/deja-vu/guide/compare.html) · [claude-mem alternatifi](https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html) · [Mem0 alternatifi](https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html) · [SpecStory alternatifi](https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html) · [Basic Memory alternatifi](https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html).
 
 ## Nasıl çalışır
 
@@ -410,6 +466,14 @@ Araca göre: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-openc
 `make build test lint`, ardından [CONTRIBUTING.md](../../CONTRIBUTING.md).
 Yeni bir araç [ayrıştırıcı kaydından](../../docs/ARCHITECTURE.md#source-parsers) başlar.
 Öncelikler ve yapmayacaklarımız [ROADMAP.md](../../ROADMAP.md) dosyasında.
+
+## Destek
+
+Hatalar ve sorular [issues](https://github.com/vshulcz/deja-vu/issues) sayfasına gider.
+İstismar edilebilir olduğunu düşündüğünüz her şey bunun yerine [SECURITY.md](../../SECURITY.md) içindeki
+özel bildirim bağlantısı üzerinden iletilir. deja'nın neyi okuduğu, hiçbir yere neyi göndermediği ve
+bir projeyi hariç tutma ya da oturum unutma adımları [Gizlilik](#gizlilik) bölümündedir.
+İşinize yaradı mı? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).
 
 ## Lisans
 

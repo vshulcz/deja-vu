@@ -189,6 +189,7 @@
 <p class="pagelede">every session is one JSON file, and nothing reads the old ones<span class="mins" data-mins></span></p>
 
 <p>CodeWhale writes one pretty-printed JSON file per session under <code>~/.codewhale/sessions/</code> and can resume one. The next session starts from nothing, and nothing in it knows about the Claude Code or Cursor session in the same repo last week. This page is about making that history reachable.</p>
+<div class="term-shot"><img src="../assets/demo.gif" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier" loading="lazy"><p class="cap">same prompt before and after deja — local BM25 recall across past sessions on disk, zero LLM calls</p></div>
 
 <h2>What CodeWhale already has</h2>
 <p>The session files, and a way back into one. <code>$CODEWHALE_HOME</code> moves the whole store, and a machine that has not finished the rebrand still keeps <code>~/.deepseek/sessions</code>, which CodeWhale itself migrates on first access — deja walks both roots. A session is <code>{schema_version, metadata, messages}</code>, and the message blocks are the Anthropic shape, so the tool calls, the files they touched and what they printed come apart with the same code the Cline and Claude readers use. Messages carry no timestamps of their own, so deja clocks them from the session's <code>created_at</code>, a millisecond per record, which is what keeps two identical turns in order.</p>
@@ -214,6 +215,10 @@
 
 <h2>The part that is not about CodeWhale</h2>
 <p>The index covers every agent's transcripts on the machine — forty-eight of them, each in its own format — so a fix found in Claude Code answers a question asked in CodeWhale, including sessions from before any of this was installed. A transcript a client later deletes stays searchable; only <code>deja forget</code> drops one on purpose. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+
+<h2>Repository memory &amp; handoff</h2>
+<p>Share vetted project decisions and dead ends through git in <code>.deja/memory.jsonl</code> (<code>deja repo candidates</code>, <code>deja repo add &lt;id&gt;</code>). Entries are redacted on write, stored sorted with <code>merge=union</code> so parallel branches merge cleanly, and loaded for any teammate who clones the repository (<code>{"activations":{"auto":{"repo":false}}}</code> in the trust policy keeps them out of hooks). See <a href="repo-memory.html">repo memory</a>.</p>
+<p>Switching tools mid-task? Run <code>deja handoff --to &lt;agent&gt;</code> (or use <code>handoff</code> via MCP) to transfer the active session's goal, decisions, touched files, passed checks, and open work into another coding agent.</p>
 
 <p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/codewhale.html">The CodeWhale session format</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>

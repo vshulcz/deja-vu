@@ -1,48 +1,65 @@
-# `@vshulcz/magpie-deja` — Magpie 网关钩子（deja-vu）
-
-[English](../README.md) | 简体中文
+# `@vshulcz/magpie-deja` — deja-vu 的 Magpie 网关钩子
 
 [![GitHub Repo stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat-square&logo=github&label=deja-vu)](https://github.com/vshulcz/deja-vu)
 
-属于 **[deja-vu](https://github.com/vshulcz/deja-vu)** 项目（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · Token 用量仅为 agentmemory 的**一半**）· [官网与在线搜索](https://vshulcz.github.io/deja-vu/) · [浏览器在线演示](https://vshulcz.github.io/deja-vu/view/) · **[★ 在 GitHub 上给 deja-vu 点 Star](https://github.com/vshulcz/deja-vu)**
+[English](../README.md) | 简体中文 | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
+
+**[deja-vu](https://github.com/vshulcz/deja-vu)** 扩展（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · token 用量为 agentmemory 的**一半**）· [文档](https://vshulcz.github.io/deja-vu/zh/) · [在线演示](https://vshulcz.github.io/deja-vu/view/) · [评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) · **[★ GitHub 点赞](https://github.com/vshulcz/deja-vu)**
 
 > 面向 Claude Code、Codex、Cursor、Gemini CLI、OpenClaw、Hermes 及其他四十七个智能体的本机跨工具会话记忆索引（零大模型依赖、单 Go 二进制）。
 
-多工具切换或重开会话时，单个客户端只能看到自己的对话记录。[Magpie](https://github.com/yetone/magpie) 在 `onRequest` 阶段通过本插件查询本机 `deja` 索引，将当前项目的历史决议注入 OpenAI（`chat`、`responses`）、Anthropic（`anthropic`）与 Gemini（`gemini`）网关请求。
+![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
+
+> 在所有通过 [Magpie](https://github.com/yetone/magpie) 发往上游模型的对话请求里，自动附带来自本地 47 款其他编程智能体（Claude Code、Codex、Cursor、Gemini CLI、OpenClaw、Hermes 等）的跨智能体历史记忆。
+
+基于单文件 Go 二进制 `deja` 与本地 BM25 全文索引运行，支持 OpenAI（`chat`、`responses`）、Anthropic（`anthropic`）和 Gemini（`gemini`）协议的 Magpie 请求路径，不启用任何额外大模型与云端向量库；除明确运行的命令以及可通过 `DEJA_OFFLINE=1` 关闭的每日版本检查外，扩展自身不产生外发连接。
 
 ## 安装
 
-```bash
+```sh
 magpie plugin add @vshulcz/magpie-deja
 ```
 
 `@vshulcz/magpie-deja` 依赖 `@vshulcz/deja-vu`，若本机 `PATH` 中尚未安装 `deja`，安装插件时会自动拉取对应平台的二进制。首次使用前可执行一次 `deja index` 建立本地会话索引，或运行 `deja install --auto` 为本机四十八个编程工具配置原生 MCP 工具（`recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff`）与生命周期钩子；当客户端自身已通过 `deja install` 注入记忆时，网关钩子会自动让步，不会重复注入。
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-deja install --auto
+```sh
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
 ```
 
-## 工作原理与数据边界
+若请求消息中已经包含 `<deja-memory>` 或 `<deja-recall>` 上下文，网关钩子会自动跳过，避免与终端智能体自身已注入的回忆叠写两次。
 
-1. **本地索引检索与上游发送边界（`deja hook-prompt --plain`）：** BM25 索引保存在本地 `~/.cache/deja/index.db`（可通过 `DEJA_INDEX_DIR` 覆盖）；当 `onRequest` 命中与当前问题相关的历史记录时，钩子会将召回片段包裹在 `<deja-memory>` 标签中追加到当前用户消息末尾，**随请求一并发送给您配置的上游模型服务商**。
-2. **严格按项目隔离（`ctx.cwd`）：** 默认配置（`allowUnscoped: false`）要求客户端请求提供非空的 `ctx.cwd`，绝不回退到网关自身的 `process.cwd()`。`deja hook-prompt` 仅在当前项目所属的历史会话中检索，防止其他仓库的上下文串入请求。
-3. **请求来源门控（`recallRemote: false`）：** 默认仅对本机请求（`ctx.origin === "local"`）或 `magpie-key` 请求生效；除非显式开启 `recallRemote: true`，否则忽略远端共享密钥请求。
-4. **双层敏感信息脱敏：** `deja` 在建立索引时已过滤常见密钥与凭证（`sk-*`、`ghp_*`、`github_pat_*`、`AKIA*`、`Bearer`、`PRIVATE KEY`、URL 凭证及 `api_key=...`），`deja.hooks.mjs` 在拼接 `<deja-memory>` 前还会执行第二道正则脱敏（`maskSecrets`）。
-5. **防重复注入与多轮前缀缓存保持：** 若请求中已带有客户端原生 `deja` 钩子注入的上下文（`<deja-memory`、`<deja-recall>`、`[deja —`），网关钩子会自动跳过；每个用户轮次注入的记忆块会在会话生命周期内保持固定，保证多轮对话和工具调用循环不会破坏上游模型的 Prompt Cache。
+## 工作机制与数据边界
+
+1. **`onRequest` 调用 `deja hook-prompt --plain`**：直接读取 `~/.cache/deja/index.db`（可通过 `DEJA_INDEX_DIR` 覆写），默认超过 `800ms` 超时直接放行，命中后在用户消息中插入 `<deja-memory>` 区块。**出站请求提示**：注入的历史片段会随这次网关请求发送给上游 LLM 提供方。
+2. **严格按项目目录隔离**：默认读取 `ctx.cwd` 作为项目作用域（`allowUnscoped: false`），绝不错误回落到网关进程自己的 `process.cwd()`，仅将该路径传给 `deja hook-prompt`。
+3. **默认仅限本机来源**：`recallRemote` 默认为 `false`，只在 `ctx.origin === "local"` 或 `ctx.origin === "magpie-key"` 时触发回忆。
+4. **双层密钥脱敏**：构建索引时清理一次，插件注入前还通过与 `deja.hooks.mjs` 同源的 `maskSecrets` 再过滤一遍 `sk-*`、`ghp_*`、`github_pat_*`、`AKIA*`、`Bearer`、`PRIVATE KEY`、URL 凭据与 `api_key=...`。
+5. **防环路与前缀缓存友好**：检测到 `<deja-memory`、`<deja-recall>` 或 `[deja —` 时不再嵌套注入，且修改放在用户请求消息末尾，不破坏系统提示词的前缀缓存（prompt prefix cache）。
 
 ## 配置项
 
-可在 Magpie 的 `@vshulcz/magpie-deja` 插件配置中调整以下参数：
-
-| 参数 | 默认值 | 说明 |
+| 选项 | 默认值 | 说明 |
 |---|---|---|
-| `requestTimeoutMs` | `800` | 调用 `deja hook-prompt` 的超时毫秒数（`50`–`5000`）。 |
-| `maxBytes` | `4000` | 单个 `<deja-memory>` 块的最大 UTF-8 字节预算（`256`–`32768`）。 |
-| `recallRemote` | `false` | 是否允许在 `remote` / `gateway-key` 请求上触发召回。 |
-| `allowUnscoped` | `false` | 当客户端未上报 `ctx.cwd` 时是否允许全机检索。 |
-| `cwd` | `""` | 当 `ctx.cwd` 缺失时使用的显式项目目录。 |
-| `skipAgents` | `[]` | 需要跳过的客户端标识列表（例如已启用原生钩子的 `["claude-code"]`）。 |
-| `bin` | `""` | 显式指定 `deja` 二进制文件路径。 |
+| `requestTimeoutMs` | `800` | 调用 `deja` 子进程的超时时间（允许范围 `50`–`5000` 毫秒） |
+| `maxBytes` | `4000` | 单次注入记忆的最大字节数（允许范围 `256`–`32768`） |
+| `recallRemote` | `false` | 是否对非本地来源的网关请求启用召回 |
+| `allowUnscoped` | `false` | 缺少 `ctx.cwd` 时是否仍允许跨全局索引查询 |
+| `cwd` | `""` | 显式覆盖当前请求的工作目录 |
+| `skipAgents` | `[]` | 跳过网关重复注入的来源列表（例如 `["claude-code"]`） |
+| `bin` | `""` | 指定 `deja` 可执行文件的绝对路径 |
 
-属于 [deja-vu](https://github.com/vshulcz/deja-vu) 项目。MIT 许可。觉得有用的话，欢迎在 [GitHub](https://github.com/vshulcz/deja-vu) 上给 deja-vu 点个 Star。
+## 基准评测
+
+| 召回率 | Token 用量 | 索引与检索耗时 |
+|---|---|---|
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1；MemPalace 公布 96.6%，agentmemory 为 95.2%） | **token 减少 58%**（同一仓储重复任务上 token 用量只有 agentmemory 的**一半**） | **13.6 秒**索引 19,195 个历史会话 / 跨越 48 个编程智能体的检索仅 **0.7 ms**（7 款对比工具中第二名 72 秒） |
+
+## 仓库记忆与跨智能体接力
+
+通过 git 在 `.deja/memory.jsonl` 中共享经过筛选的项目决策与踩坑记录（`deja repo candidates`、`deja repo add <id>`）。条目在写入前自动脱敏，按内容哈希排序并附带 `merge=union`，并发分支可干净合并；克隆仓库的协作者都会自动加载（在信任策略中配置 `{"activations":{"auto":{"repo":false}}}` 可关闭 hook 注入）。[了解更多](https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html)。
+
+开发到一半需要切换工具？运行 `deja handoff --to <agent>`（或通过 MCP 调用 `handoff`），即可将当前会话的目标、已定决策、修改过的文件、通过的检查与待办工作直接交给另一个编程智能体。
+
+## 许可证
+
+[deja-vu](https://github.com/vshulcz/deja-vu) 生态组件。MIT 协议。觉得有用？[去 GitHub 为 deja-vu 点颗星](https://github.com/vshulcz/deja-vu)。

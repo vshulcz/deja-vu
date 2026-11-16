@@ -5,9 +5,9 @@
   </picture>
 </p>
 
-<p align="center"><b>47 कोडिंग एजेंट्स के लिए साझा लोकल मेमोरी, एजेंट हैंडऑफ़ और कोड रिकवरी।</b></p>
+<p align="center"><b>48 कोडिंग एजेंट्स के लिए साझा लोकल मेमोरी, एजेंट हैंडऑफ़ और कोड रिकवरी।</b></p>
 
-<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes और 40 अन्य एजेंट्स हर सेशन पहले से डिस्क पर सेव करते हैं।<br>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes और 41 अन्य एजेंट्स हर सेशन पहले से डिस्क पर सेव करते हैं।<br>
 deja सब कुछ लोकल रूप से इंडेक्स करता है ताकि आपके एजेंट्स <code>/compact</code> के बाद भी कॉन्टेक्स्ट बनाए रखें, <code>deja handoff</code> से काम आगे बढ़ाएँ और <code>deja restore</code> से ओवरराइट हुआ कोड वापस पाएँ — बिना LLM, एक अकेली Go बाइनरी।</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | हिन्दी</p>
@@ -31,11 +31,12 @@ deja सब कुछ लोकल रूप से इंडेक्स कर
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="एक ही सवाल एक ही एजेंट से दो बार: मेमोरी के बिना उसे कुछ याद नहीं, deja के साथ वह आठ महीने पुराने नतीजे से जवाब देता है"></p>
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-deja install --auto
+npx @vshulcz/deja-vu install --auto                # 1-चरण क्रॉस-प्लेटफ़ॉर्म इंस्टॉल + इंस्टॉल किए गए एजेंट्स को जोड़ें
+# या शेल / Homebrew से:
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
 ```
 
-<p align="center"><sub>या Homebrew से: <code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code प्लगइन: <code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills: <code>npx skills add vshulcz/deja-vu</code><br><a href="#इंस्टॉल">Windows (Scoop / winget), Codex, OpenCode, OpenClaw और अन्य</a> &middot; बिना इंस्टॉल किए आज़माएँ: <code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">लाइव डेमो →</a></sub></p>
+<p align="center"><sub>Homebrew: <code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code प्लगइन: <code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills: <code>npx skills add vshulcz/deja-vu</code><br><a href="#इंस्टॉल">Windows (Scoop / winget), Codex, OpenCode, OpenClaw और अन्य</a> &middot; बिना इंस्टॉल किए आज़माएँ: <code>npx @vshulcz/deja-vu stats --no-index --card</code> या <code>npx @vshulcz/deja-vu audit</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">लाइव डेमो →</a></sub></p>
 
 <table align="center">
 <tr>
@@ -161,6 +162,29 @@ skill आपके इंस्टॉल किए हुए `deja` बाइन
 
 पूरा रेफ़रेंस [दस्तावेज़ साइट](https://vshulcz.github.io/deja-vu/) पर है।
 
+## रिपॉज़िटरी में मेमोरी
+
+Sync आपकी अपनी मशीनों के बीच इतिहास ले जाता है। जिन साथियों के साथ आप काम करते हैं, उन्हें वे चुनिंदा बातें
+सौंपने के लिए जो आपके एजेंट्स ने मुश्किल से सीखी हैं, उन्हें रिपॉज़िटरी में रखें:
+
+```text
+$ deja repo candidates
+4cd7e7bb9c rejected Reverted the retry with jitter: it broke idempotency because the sender re-signs each attempt with a new delivery id.  (session s1, claude 2026-08-03)
+$ deja repo add 4cd7e7bb9c
+added 1 entry to .deja/memory.jsonl
+nothing is committed: review with `git diff .deja/` and commit it like code
+```
+
+उम्मीदवार प्रविष्टियाँ हर एजेंट में मौजूद इस प्रोजेक्ट के इतिहास से आती हैं: प्रमोट और याद रखे गए नोट्स,
+सेशन में दर्ज किए गए रोलबैक, और जो बातें सेशन्स ने तय कीं। जब तक आप न चुनें तब तक कुछ नहीं लिखा जाता;
+अंदर लिखते समय हर प्रविष्टि से संवेदनशील हिस्से हटाए जाते हैं, और जो अभी भी किसी सीक्रेट नियम से मेल खाती
+है उसे अस्वीकार कर दिया जाता है। `.deja/memory.jsonl` फ़ाइल कंटेंट हैश से क्रमबद्ध JSON लाइनों में होती है
+और इसके बगल में `merge=union` एट्रिब्यूट रहता है, ताकि समानांतर जोड़ी गई लाइनें अपने-आप मर्ज हो जाएँ;
+किसी लाइन को हटाने से वह प्रविष्टि हट जाती है। क्लोन के बाद ये प्रविष्टियाँ सेशन की शुरुआत और रिकॉल में,
+deja से जुड़े हर एजेंट में वापस आती हैं—रिपॉज़िटरी से आई हुई चिह्नित और बाक़ी इतिहास की तरह अनट्रस्टेड
+फ़्रेम में। ट्रस्ट पॉलिसी में `{"activations":{"auto":{"repo":false}}}` इन्हें हुक्स से बाहर रखता है।
+[और जानें](https://vshulcz.github.io/deja-vu/guide/repo-memory.html).
+
 ## निजता
 
 इंडेक्सिंग और खोज लोकल हैं। नेटवर्क सिर्फ़ `deja update`, `deja sync ssh`, `deja doctor` के भीतर वर्शन जाँच,
@@ -254,11 +278,22 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | प्लगइन `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
+| Gemini CLI | एक्सटेंशन `@vshulcz/deja`, [Gemini CLI Extensions Gallery](https://geminicli.com/extensions/) में | `gemini extensions install https://github.com/vshulcz/deja-vu` |
+| Antigravity | प्लगइन `deja-vu` ([`antigravity-plugin/`](../../antigravity-plugin/)) | `agy plugin install deja-vu` |
 | Codex CLI | प्लगइन `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu`, फिर `codex plugin add deja-vu@deja-vu` |
 | Grok Build | प्लगइन `deja` | `grok plugin marketplace add vshulcz/deja-vu`, फिर `grok plugin install deja` |
 | OpenClaw | ClawHub और npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi (और omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 | Hermes | Hermes प्लगइन कैटलॉग में मेमोरी प्रोवाइडर `deja-memory` | `hermes plugins install deja-memory`, या GitHub से: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
+| Magpie | npm `@vshulcz/magpie-deja` | `magpie plugin add @vshulcz/magpie-deja` |
+| Orca | v2 `trusted-worker` प्लगइन `deja` | `Orca → Plugins → extensions/orca` (और नेटिव MCP व हुक्स के लिए `deja install orca`) |
+| CodeWhale | Claude-संगत बंडल `deja-vu` | `/plugin install extensions/codewhale` (और नेटिव हुक्स के लिए `deja install codewhale`) |
+| VS Code / Cursor / Windsurf | स्टेटस बार एक्सटेंशन `vshulcz.deja-status` | `code --install-extension vshulcz.deja-status` |
+| JetBrains IDEs | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35998-deja-vu-cross-agent-ai-session-memory) (`com.github.vshulcz.deja-vu`) ([`extensions/jetbrains/`](../../extensions/jetbrains/docs/hi.md)) | `idea installPlugins com.github.vshulcz.deja-vu` |
+| Neovim | `lazy.nvim` और CodeCompanion प्लगइन ([`extensions/nvim/`](../../extensions/nvim/docs/hi.md)) | `{ "vshulcz/deja-vu", opts = {} }` |
+| tmux | [TPM](https://github.com/tmux-plugins/tpm) पॉपअप (`prefix + D`) और `#{deja_status}` (`deja.tmux`) | `set -g @plugin 'vshulcz/deja-vu'` |
+| Raycast | Raycast एक्सटेंशन `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
+| CC Switch | 1-क्लिक MCP और Skill रेपो इम्पोर्ट (`ccswitch://`) | [CC Switch में MCP जोड़ें](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [एजेंट स्विचिंग गाइड](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 दोनों में से कोई एक रास्ता काफ़ी है और दोनों साथ में भी कुछ नहीं तोड़ते: हर पैकेज पहले वही पढ़ता है जो
 `deja install` ने लिखा। opencode, dsh और OpenClaw सिर्फ़ छूटा हुआ भरते हैं; Kimi, Grok, Codex और pi हट जाते हैं
@@ -266,6 +301,13 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 नहीं रखता।
 
 ये सब वही deja इस्तेमाल करते हैं जो आपने पहले से इंस्टॉल किया है; पैकेज के भीतर की प्रति सिर्फ़ बैकअप है।
+
+किसी [Spec Kit](https://github.com/github/spec-kit) प्रोजेक्ट में एक एक्सटेंशन `/speckit.deja-vu.recall`
+जोड़ता है, जो फ़ीचर को लागू करने से पहले पिछले सेशन्स में खोज करता है:
+
+```sh
+specify extension add deja-vu --from https://github.com/vshulcz/deja-vu/releases/latest/download/deja-spec-kit.zip
+```
 
 ## वैकल्पिक सिमैंटिक रिकॉल
 
@@ -316,6 +358,20 @@ deja bench read       # डेटाबेस वाले स्टोर क�
 | इंडेक्स का आकार | 200 MB, कॉर्पस का करीब 10% |
 
 इंडेक्स इन्क्रीमेंटल है। सेशन फ़ाइल लंबी होने पर सिर्फ़ वही एक फ़ाइल दोबारा पढ़ी जाती है।
+
+### तुलना
+
+| क्षमता | `deja-vu` | `claude-mem` | `MemPalace` |
+| --- | --- | --- | --- |
+| इंस्टॉल से पहले का इतिहास ([day zero](https://vshulcz.github.io/deja-vu/guide/day-zero.html)) | हाँ — मौजूदा ट्रांसक्रिप्ट इंडेक्स करता है (`36/100` hit@1) | नहीं — इंस्टॉल के बाद से रिकॉर्ड करता है (`0/100`) | Claude Code, Codex, Cursor (`16/100`) |
+| साझा एजेंट्स | 48 हार्नेस | 9 (हुक्स) | 3 (CLI) |
+| LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
+| रनटाइम और निर्भरताएँ | 1 Go बाइनरी | Bun वर्कर + SQLite + Chroma | Python + 300 MB एम्बेडिंग मॉडल |
+| LLM कॉल / खाता आवश्यक | कोई नहीं | ऑब्ज़र्वर LLM कॉल | कोई नहीं |
+| अनकमिटेड फ़ाइल रिकवरी | `deja restore <path>` | नहीं | नहीं |
+| मौजूदा `claude-mem.db` | सीधे `~/.claude-mem/claude-mem.db` पढ़ता है | नेटिव | नहीं |
+
+विस्तृत तुलना: [सभी 15 टूल्स की तुलना](https://vshulcz.github.io/deja-vu/guide/compare.html) · [claude-mem विकल्प](https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html) · [Mem0 विकल्प](https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html) · [SpecStory विकल्प](https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html) · [Basic Memory विकल्प](https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html).
 
 ## यह कैसे काम करता है
 
@@ -406,6 +462,14 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 `make build test lint`, फिर [CONTRIBUTING.md](../../CONTRIBUTING.md)।
 नया टूल [पार्सर रजिस्ट्री](../../docs/ARCHITECTURE.md#source-parsers) से शुरू होता है।
 प्राथमिकताएँ और जो हम नहीं करेंगे, वह [ROADMAP.md](../../ROADMAP.md) में है।
+
+## सहायता
+
+बग और सवाल [issues](https://github.com/vshulcz/deja-vu/issues) पर भेजें।
+जो भी चीज़ शोषण योग्य लगे, उसे इसके बजाय [SECURITY.md](../../SECURITY.md) में दिए
+निजी एडवाइज़री लिंक से रिपोर्ट करें। deja क्या पढ़ता है, क्या कभी कहीं नहीं भेजता,
+और किसी प्रोजेक्ट को बाहर करने या किसी सेशन को भुलाने का तरीक़ा [निजता](#निजता) में है।
+उपयोगी लगा? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).
 
 ## लाइसेंस
 

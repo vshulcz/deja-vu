@@ -1,6 +1,6 @@
 # dsh-deja
 
-English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/zh.md)
+English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/zh.md) | [繁體中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/zh-TW.md) | [日本語](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/ja.md) | [한국어](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/ko.md) | [Español](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/es.md) | [Português](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/pt.md) | [Français](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/fr.md) | [Deutsch](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/de.md) | [Русский](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/ru.md) | [Türkçe](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/tr.md) | [हिन्दी](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/hi.md)
 
 [![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 
@@ -15,6 +15,8 @@ Codex, Cursor, opencode, Antigravity, Grok Build, Kimi, Cline and Zed among
 them — already write to disk. Nothing has to have been recorded ahead of time: the history is already
 there, including the months before deja was installed. If you moved to dsh last
 week, everything you did before last week is still reachable from inside it.
+
+![deja-vu demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
 ## Install
 
@@ -215,6 +217,18 @@ adapter check, serve the repository with a static HTTP server and open
 18 from a CDN and uses synthetic history; it does not connect to DSH or read a
 local index. A passing report covers mode switching, session opening, host
 errors, empty queries, disabling the feature and cleanup.
+
+## Benchmarks
+
+| Recall | Tokens | Index & lookup |
+|---|---|---|
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 48 coding agents (next of 7 tools: 72 s) |
+
+## Repository memory & handoff
+
+Share vetted project decisions and dead ends through git in `.deja/memory.jsonl` (`deja repo candidates`, `deja repo add <id>`). Entries are redacted on write, stored sorted with `merge=union` so parallel branches merge cleanly, and loaded for any teammate who clones the repository (`{"activations":{"auto":{"repo":false}}}` in the trust policy disables hook injection). [More](https://vshulcz.github.io/deja-vu/guide/repo-memory.html).
+
+Switching tools mid-task? Run `deja handoff --to <agent>` (or use `handoff` via MCP) to transfer the active session's goal, decisions, touched files, passed checks, and open work into another coding agent.
 
 ## What it does not do
 

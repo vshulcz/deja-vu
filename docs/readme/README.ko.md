@@ -5,9 +5,9 @@
   </picture>
 </p>
 
-<p align="center"><b>47개 코딩 에이전트를 아우르는 로컬 공유 기억, 에이전트 간 작업 인계, 코드 복구.</b></p>
+<p align="center"><b>48개 코딩 에이전트를 아우르는 로컬 공유 기억, 에이전트 간 작업 인계, 코드 복구.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes 등 47개 에이전트는 이미 모든 세션을 디스크에 저장합니다.<br>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes 등 48개 에이전트는 이미 모든 세션을 디스크에 저장합니다.<br>
 deja는 그 기록을 로컬에서 색인해 <code>/compact</code> 이후에도 컨텍스트를 유지하고, <code>deja handoff</code>로 작업을 인계하며, <code>deja restore</code>로 덮어쓴 코드를 복구합니다 — LLM 없이 단일 Go 바이너리로.</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | 한국어 | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -31,11 +31,12 @@ deja는 그 기록을 로컬에서 색인해 <code>/compact</code> 이후에도 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="같은 에이전트에게 같은 질문을 두 번: 기억이 없을 때는 아무것도 모르고, deja가 있으면 8개월 전 결론으로 답한다"></p>
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-deja install --auto
+npx @vshulcz/deja-vu install --auto                # 1단계 크로스플랫폼 설치 + 설치된 에이전트 연결
+# 또는 셸 / Homebrew 사용:
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
 ```
 
-<p align="center"><sub>또는 Homebrew: <code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code 플러그인: <code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills: <code>npx skills add vshulcz/deja-vu</code><br><a href="#설치">Windows (Scoop / winget), Codex, OpenCode, OpenClaw 등</a> &middot; 설치 없이 세션 확인: <code>npx @vshulcz/deja-vu sources</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">라이브 데모 →</a></sub></p>
+<p align="center"><sub>Homebrew: <code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code 플러그인: <code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills: <code>npx skills add vshulcz/deja-vu</code><br><a href="#설치">Windows (Scoop / winget), Codex, OpenCode, OpenClaw 등</a> &middot; 설치 없이 실행: <code>npx @vshulcz/deja-vu stats --no-index --card</code> 또는 <code>npx @vshulcz/deja-vu audit</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">라이브 데모 →</a></sub></p>
 
 <table align="center">
 <tr>
@@ -132,7 +133,7 @@ skill은 이미 설치된 `deja` 바이너리를 호출하며, 자체 바이너�
 
 ## 무엇을 얻나
 
-**Codex에서 해결하면 Claude가 기억합니다.** 마흔세 개의 코딩 에이전트가 모든 대화를 로컬 파일에 쓰고,
+**Codex에서 해결하면 Claude가 기억합니다.** 마흔여덟 개의 코딩 에이전트가 모든 대화를 로컬 파일에 쓰고,
 deja는 그 파일들을 모두가 읽을 수 있는 하나의 기억 계층으로 바꿉니다.
 
 | | |
@@ -159,6 +160,28 @@ deja는 그 파일들을 모두가 읽을 수 있는 하나의 기억 계층으�
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/docs/assets/stats-card-demo.svg" width="760" alt="deja 통계 카드: 1년치 세션 히트맵, 어느 에이전트에서 왔는지, 가장 길었던 세션"></p>
 
 전체 기능 레퍼런스는 [문서 사이트](https://vshulcz.github.io/deja-vu/)에 있습니다.
+
+## 저장소 안의 메모리
+
+Sync는 내 기기들 사이에서 기록을 옮깁니다. 함께 일하는 사람들에게 에이전트가 시행착오 끝에 배운
+몇 가지 사실을 넘기려면 저장소에 넣어 두세요:
+
+```text
+$ deja repo candidates
+4cd7e7bb9c rejected Reverted the retry with jitter: it broke idempotency because the sender re-signs each attempt with a new delivery id.  (session s1, claude 2026-08-03)
+$ deja repo add 4cd7e7bb9c
+added 1 entry to .deja/memory.jsonl
+nothing is committed: review with `git diff .deja/` and commit it like code
+```
+
+후보는 모든 에이전트에 남은 이 프로젝트의 기록에서 모읍니다. 승격되거나 기억해 둔 메모, 세션에서
+보고된 되돌리기, 그리고 세션에서 결론 난 내용들입니다. 사용자가 고르기 전까지는 아무것도 쓰지
+않으며, 기록할 때 모든 항목을 마스킹하고 비밀 규칙에 여전히 걸리는 항목은 거부합니다.
+`.deja/memory.jsonl`은 콘텐츠 해시순으로 정렬된 JSON 라인 파일이고 옆에 `merge=union` 속성이 붙어
+병렬 추가가 충돌 없이 합쳐지며, 줄을 지우면 항목이 삭제됩니다. 클론한 뒤에는 deja가 연결된 모든
+에이전트에서 세션 시작과 회상 시 저장소 출처 표시 및 나머지 기록과 동일한 비신뢰 경계로 항목이
+돌아옵니다. 신뢰 정책에 `{"activations":{"auto":{"repo":false}}}`를 넣으면 훅에서 제외됩니다.
+[자세히 보기](https://vshulcz.github.io/deja-vu/guide/repo-memory.html).
 
 ## 프라이버시
 
@@ -251,17 +274,35 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 | DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | 플러그인 `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
+| Gemini CLI | [Gemini CLI Extensions Gallery](https://geminicli.com/extensions/)의 확장 `@vshulcz/deja` | `gemini extensions install https://github.com/vshulcz/deja-vu` |
+| Antigravity | 플러그인 `deja-vu` ([`antigravity-plugin/`](../../antigravity-plugin/)) | `agy plugin install deja-vu` |
 | Codex CLI | 플러그인 `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu` 다음 `codex plugin add deja-vu@deja-vu` |
 | Grok Build | 플러그인 `deja` | `grok plugin marketplace add vshulcz/deja-vu` 다음 `grok plugin install deja` |
 | OpenClaw | ClawHub와 npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi (그리고 omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 | Hermes | Hermes 플러그인 카탈로그의 메모리 공급자 `deja-memory` | `hermes plugins install deja-memory`, 또는 GitHub에서: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
+| Magpie | npm `@vshulcz/magpie-deja` | `magpie plugin add @vshulcz/magpie-deja` |
+| Orca | v2 `trusted-worker` 플러그인 `deja` | `Orca → Plugins → extensions/orca` (네이티브 MCP와 훅은 `deja install orca`) |
+| CodeWhale | Claude 호환 번들 `deja-vu` | `/plugin install extensions/codewhale` (네이티브 훅은 `deja install codewhale`) |
+| VS Code / Cursor / Windsurf | 상태 표시줄 확장 `vshulcz.deja-status` | `code --install-extension vshulcz.deja-status` |
+| JetBrains IDEs | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35998-deja-vu-cross-agent-ai-session-memory) (`com.github.vshulcz.deja-vu`) ([`extensions/jetbrains/`](../../extensions/jetbrains/docs/ko.md)) | `idea installPlugins com.github.vshulcz.deja-vu` |
+| Neovim | `lazy.nvim` &amp; CodeCompanion 플러그인 ([`extensions/nvim/`](../../extensions/nvim/docs/ko.md)) | `{ "vshulcz/deja-vu", opts = {} }` |
+| tmux | [TPM](https://github.com/tmux-plugins/tpm) 팝업 (`prefix + D`) &amp; `#{deja_status}` (`deja.tmux`) | `set -g @plugin 'vshulcz/deja-vu'` |
+| Raycast | Raycast 확장 `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
+| CC Switch | 원클릭 MCP &amp; Skill 저장소 가져오기 (`ccswitch://`) | [CC Switch에 MCP 추가](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [에이전트 전환 가이드](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 어느 쪽이든 하나면 충분하고 둘 다 해도 탈이 없습니다. 각 패키지는 먼저 `deja install`이 써 둔 설정을
 읽습니다. opencode, dsh, OpenClaw는 빠진 부분만 채우고, Kimi, Grok, Codex, pi는 설치기가 이미 연결했다면
 물러섭니다. Zed에서는 양쪽이 같은 server id를 씁니다. 그래서 설치 순서는 상관없습니다.
 
 모두 여러분이 이미 설치한 deja를 사용하며, 패키지 안에 든 것은 대비책일 뿐입니다.
+
+[Spec Kit](https://github.com/github/spec-kit) 프로젝트에서는 확장이 `/speckit.deja-vu.recall`을 추가해
+기능을 구현하기 전에 과거 세션에서 관련 내용을 검색합니다:
+
+```sh
+specify extension add deja-vu --from https://github.com/vshulcz/deja-vu/releases/latest/download/deja-spec-kit.zip
+```
 
 ## 선택적인 의미 기반 회상
 
@@ -311,6 +352,20 @@ deja bench read       # 데이터베이스 기반 저장소를 읽는 비용과,
 | 색인 크기 | 200 MB, 코퍼스의 약 10% |
 
 색인은 증분입니다. 세션 파일이 길어지면 그 파일 하나만 다시 읽습니다.
+
+### 비교
+
+| 기능 | `deja-vu` | `claude-mem` | `MemPalace` |
+| --- | --- | --- | --- |
+| 설치 이전 기록 ([day zero](https://vshulcz.github.io/deja-vu/guide/day-zero.html)) | 지원 — 기존 트랜스크립트 인덱싱 (`36/100` hit@1) | 미지원 — 설치 시점부터 기록 (`0/100`) | Claude Code, Codex, Cursor (`16/100`) |
+| 공유 에이전트 | 48개 하네스 | 9개 (훅) | 3개 (CLI) |
+| LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
+| 런타임과 의존성 | Go 단일 바이너리 1개 | Bun 워커 + SQLite + Chroma | Python + 300 MB 임베딩 모델 |
+| LLM 호출 / 계정 필요 | 없음 | Observer LLM 호출 | 없음 |
+| 미커밋 파일 복구 | `deja restore <path>` | 없음 | 없음 |
+| 기존 `claude-mem.db` | `~/.claude-mem/claude-mem.db` 직접 읽기 | 기본 내장 | 없음 |
+
+나란히 비교하기: [15개 도구 전체 비교](https://vshulcz.github.io/deja-vu/guide/compare.html) · [claude-mem 대안](https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html) · [Mem0 대안](https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html) · [SpecStory 대안](https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html) · [Basic Memory 대안](https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html).
 
 ## 작동 방식
 
@@ -400,6 +455,13 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 `make build test lint` 다음 [CONTRIBUTING.md](../../CONTRIBUTING.md)를 보세요.
 새 도구는 [파서 레지스트리](../../docs/ARCHITECTURE.md#source-parsers)에서 시작합니다.
 우선순위와 하지 않을 일은 [ROADMAP.md](../../ROADMAP.md)에 있습니다.
+
+## 지원
+
+버그와 질문은 [issues](https://github.com/vshulcz/deja-vu/issues)에 남겨 주세요.
+악용 가능성이 있다고 생각되는 문제는 대신 [SECURITY.md](../../SECURITY.md)의 비공개 보안 권고 링크로
+제보해 주세요. deja가 읽는 범위, 절대 외부로 보내지 않는 항목, 프로젝트 제외 및 세션 삭제 방법은
+[프라이버시](#프라이버시)에 있습니다. 도움이 되었나요? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).
 
 ## 라이선스
 
