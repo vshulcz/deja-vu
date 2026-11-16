@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // liveAndPriorStore is the shape both reports describe: a finished session that
@@ -226,5 +227,32 @@ func TestSharedGroupSidecarsAndUnreadableLivePreserved(t *testing.T) {
 		if _, ok := rows["live-user-a"]; !ok {
 			t.Errorf("unreadable .live file was overwritten and lost live-user-a: %v", rows)
 		}
+	}
+}
+
+func TestSharedGroupLiveRulesWritable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix permission bits")
+	}
+	tests := []struct {
+		name string
+		text string
+	}{
+		{"first rule", "always run gofmt"},
+		{"replacement rule", "prefer table-driven tests"},
+	}
+	target := filepath.Join(t.TempDir(), "index.db", "live_rules.jsonl")
+	t.Setenv("DEJA_SHARED_GROUP", "1")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			appendLiveRule(target, sources.RepoEntry{ID: tt.name, Kind: "rule", Text: tt.text}, nil)
+			fi, err := os.Stat(target)
+			if err != nil {
+				t.Fatalf("stat: %v", err)
+			}
+			if fi.Mode().Perm() != 0o660 {
+				t.Errorf("perm = %o, want 0660", fi.Mode().Perm())
+			}
+		})
 	}
 }
