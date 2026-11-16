@@ -6,10 +6,17 @@
   <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
   <link rel="self" type="application/atom+xml" href="https://vshulcz.github.io/deja-vu/feed.xml"></link>
   <link rel="hub" href="https://pubsubhubbub.appspot.com/"></link>
-  <updated>2026-11-15T00:00:00Z</updated>
+  <updated>2026-11-16T00:00:00Z</updated>
   <author>
     <name>vshulcz</name>
   </author>
+  <entry>
+    <title>CLAUDE.md, AGENTS.md, GEMINI.md: one rules file — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/one-rules-file.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/one-rules-file.html"></link>
+    <updated>2026-11-16T00:00:00Z</updated>
+    <summary>Claude Code reads CLAUDE.md, Codex AGENTS.md, Gemini GEMINI.md. Share one file in a repo, and keep your own rules in step across agents with deja rules sync.</summary>
+  </entry>
   <entry>
     <title>deja-vu: local memory, session search &amp; handoff across 48 coding agents</title>
     <id>https://vshulcz.github.io/deja-vu/</id>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-mcode.html"></link>
     <updated>2026-11-15T00:00:00Z</updated>
     <summary>How to give MiniMax Code recall over every coding agent&#39;s sessions on the machine — the MCP server in mcp.json, and a plugin with the skill and the hooks.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to MiMo-Code: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-mimo.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-mimo.html"></link>
-    <updated>2026-11-15T00:00:00Z</updated>
-    <summary>How to give MiMo-Code (mimo) recall over every coding agent&#39;s sessions on the machine — the MCP server, the skill, the /deja command, and auto-recall.</summary>
   </entry>
 </feed>
