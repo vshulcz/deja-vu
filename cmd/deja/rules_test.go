@@ -444,3 +444,71 @@ func TestRulesSyncWindsurfHonoursCap(t *testing.T) {
 		t.Fatal("windsurf global_rules.md modified past the cap")
 	}
 }
+
+// Hermes profiles are full homes with their own SOUL.md, and a profile reads
+// only its own, so a sync has to reach each of them.
+func TestRulesSyncHermesProfiles(t *testing.T) {
+	home := rulesHome(t, "hermes")
+	hh := filepath.Join(home, ".hermes")
+	root := filepath.Join(hh, "SOUL.md")
+	profile := filepath.Join(hh, "profiles", "hermus", "SOUL.md")
+	writeRulesTestFile(t, root, "root identity\n")
+	writeRulesTestFile(t, profile, "hermus identity\n")
+	writeRulesTestFile(t, rulesSourcePath(), "- a rule\n")
+
+	if _, err := rulesOut(t, "sync"); err != nil {
+		t.Fatal(err)
+	}
+	for name, p := range map[string]string{"default": root, "hermus": profile} {
+		if got := readRulesTestFile(t, p); !strings.Contains(got, rulesStart) {
+			t.Errorf("%s SOUL.md has no rules block: %q", name, got)
+		}
+	}
+	if got := readRulesTestFile(t, profile); !strings.HasPrefix(got, "hermus identity\n") {
+		t.Errorf("profile identity was disturbed: %q", got)
+	}
+}
+
+func TestHermesProfileRulesSkipsInvalid(t *testing.T) {
+	home := rulesHome(t, "hermes")
+	pr := filepath.Join(home, ".hermes", "profiles")
+	for _, n := range []string{"ok", "default", "Bad Name", "nosoul"} {
+		if n != "nosoul" {
+			writeRulesTestFile(t, filepath.Join(pr, n, "SOUL.md"), "x\n")
+		}
+	}
+	if err := os.MkdirAll(filepath.Join(pr, "nosoul"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got := hermesProfileRules()
+	if len(got) != 1 || got[0] != "hermes:ok" {
+		t.Errorf("hermesProfileRules() = %v, want [hermes:ok]", got)
+	}
+}
+
+func TestHermesProfileRulesStatusDoctorUninstall(t *testing.T) {
+	home := rulesHome(t, "hermes")
+	prof := filepath.Join(home, ".hermes", "profiles", "hermecules", "SOUL.md")
+	writeRulesTestFile(t, prof, "identity\n")
+	writeRulesTestFile(t, rulesSourcePath(), "- a rule\n")
+
+	out, err := rulesOut(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "hermes:hermecules missing") {
+		t.Errorf("status lacks an aligned profile row with drift:\n%s", out)
+	}
+	if note := rulesDoctorNote(); !strings.Contains(note, "hermes:hermecules") {
+		t.Errorf("doctor note = %q", note)
+	}
+	if _, err := rulesOut(t, "sync"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := dropRulesBlock("hermes"); err != nil {
+		t.Fatal(err)
+	}
+	if got := readRulesTestFile(t, prof); strings.Contains(got, rulesStart) {
+		t.Errorf("uninstall left the profile block: %q", got)
+	}
+}

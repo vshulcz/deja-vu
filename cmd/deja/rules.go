@@ -110,6 +110,10 @@ func ompGjcRules(harness string) rulesFile {
 }
 
 func rulesFileFor(harness string) rulesFile {
+	if name, ok := strings.CutPrefix(harness, "hermes:"); ok {
+		dir := filepath.Join(sources.HermesProfilesRoot(), name)
+		return rulesFile{path: filepath.Join(dir, "SOUL.md"), root: dir, existing: true}
+	}
 	switch harness {
 	case "claude-code":
 		return sharedRules(filepath.Join(sources.ClaudeConfigDir(), "CLAUDE.md"))
@@ -445,6 +449,11 @@ func rulesTargets() (known, unknown []string) {
 		if installed[h] && rulesFileFor(h).ready() {
 			known = append(known, h)
 		}
+		// Profiles are enumerated whether or not the default home has a
+		// SOUL.md: each profile reads only its own.
+		if installed[h] && h == "hermes" {
+			known = append(known, hermesProfileRules()...)
+		}
 		delete(installed, h)
 	}
 	for h := range installed {
@@ -452,6 +461,23 @@ func rulesTargets() (known, unknown []string) {
 	}
 	sort.Strings(unknown)
 	return known, unknown
+}
+
+// hermesProfileRules names a rules target, "hermes:<profile>", for each
+// profile home that Hermes accepts as a profile and that has its SOUL.md.
+func hermesProfileRules() []string {
+	entries, _ := os.ReadDir(sources.HermesProfilesRoot())
+	var out []string
+	for _, e := range entries {
+		n := e.Name()
+		if !hermesProfilePattern.MatchString(n) || hermesReservedProfiles[n] {
+			continue
+		}
+		if rulesFileFor("hermes:" + n).ready() {
+			out = append(out, "hermes:"+n)
+		}
+	}
+	return out
 }
 
 // rulesState compares a harness's file with the rules: "in sync", "stale" (a
@@ -522,6 +548,13 @@ func runRulesTo(w io.Writer, args []string) error {
 		fmt.Fprintf(w, "rules: %s, %d lines, %d bytes\n", shortHome(rulesSourcePath()), strings.Count(body, "\n")+1, len(body))
 	}
 	behind := false
+	labelW := 12
+	for _, h := range known {
+		labelW = max(labelW, len(h))
+	}
+	for _, h := range unknown {
+		labelW = max(labelW, len(h))
+	}
 	for _, h := range known {
 		path := rulesPath(h)
 		state, err := rulesState(path, body)
@@ -534,10 +567,10 @@ func runRulesTo(w io.Writer, args []string) error {
 		if state == "unbounded" {
 			state = "marker without its pair — fix by hand"
 		}
-		fmt.Fprintf(w, "  %-12s %-9s %s\n", h, state, shortHome(path))
+		fmt.Fprintf(w, "  %-*s %-9s %s\n", labelW, h, state, shortHome(path))
 	}
 	for _, h := range unknown {
-		fmt.Fprintf(w, "  %-12s no global rules file known\n", h)
+		fmt.Fprintf(w, "  %-*s no global rules file known\n", labelW, h)
 	}
 	if len(known) == 0 && len(unknown) == 0 {
 		fmt.Fprintln(w, "  no agents found — `deja install` first")
@@ -617,6 +650,23 @@ func writeRulesFile(f rulesFile, body string) (string, error) {
 // the rules goes with it, the same way its guidance does.
 func dropRulesBlock(target string) (path, action string, err error) {
 	h := guidanceHarness(target)
+	path, action, err = dropRulesBlockFor(h)
+	if h != "hermes" {
+		return path, action, err
+	}
+	// Each Hermes profile's SOUL.md got a block of its own from sync.
+	for _, p := range hermesProfileRules() {
+		pp, pa, perr := dropRulesBlockFor(p)
+		if perr != nil && err == nil {
+			path, action, err = pp, pa, perr
+		} else if err == nil && pa != "unchanged" && action == "unchanged" {
+			path, action = pp, pa
+		}
+	}
+	return path, action, err
+}
+
+func dropRulesBlockFor(h string) (path, action string, err error) {
 	f := rulesFileFor(h)
 	path = f.path
 	if path == "" {
