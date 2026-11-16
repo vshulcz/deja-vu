@@ -16,6 +16,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -804,10 +805,11 @@ func appendLiveRule(targetPath string, entry sources.RepoEntry, syms []string) {
 			b.WriteByte('\n')
 		}
 	}
-	tmp := fmt.Sprintf("%s.tmp-%d-%d", targetPath, os.Getpid(), time.Now().UnixNano())
-	if err := os.WriteFile(tmp, b.Bytes(), 0o644); err == nil {
-		_ = os.Rename(tmp, targetPath)
+	perm := os.FileMode(0o644)
+	if atomicfile.SharedGroup(targetPath) {
+		perm = 0o660
 	}
+	_ = atomicfile.Write(targetPath, b.Bytes(), perm)
 }
 
 // writeRepoEntries redacts each entry, refuses one that still holds a secret,
