@@ -552,9 +552,6 @@ func runRulesTo(w io.Writer, args []string) error {
 	for _, h := range known {
 		labelW = max(labelW, len(h))
 	}
-	for _, h := range unknown {
-		labelW = max(labelW, len(h))
-	}
 	for _, h := range known {
 		path := rulesPath(h)
 		state, err := rulesState(path, body)
@@ -657,10 +654,8 @@ func dropRulesBlock(target string) (path, action string, err error) {
 	// Each Hermes profile's SOUL.md got a block of its own from sync.
 	for _, p := range hermesProfileRules() {
 		pp, pa, perr := dropRulesBlockFor(p)
-		if perr != nil && err == nil {
+		if err == nil && (perr != nil || (pa != "unchanged" && action == "unchanged")) {
 			path, action, err = pp, pa, perr
-		} else if err == nil && pa != "unchanged" && action == "unchanged" {
-			path, action = pp, pa
 		}
 	}
 	return path, action, err
