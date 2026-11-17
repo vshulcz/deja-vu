@@ -50,7 +50,7 @@ func TestPersonalNotesEncryptTransparentlyWithVault(t *testing.T) {
 	}
 
 	// Inject a corrupt encrypted line alongside valid sealed lines; ParseNotesFile must still recover valid notes.
-	if err := os.WriteFile(NotesFile(), append(raw, []byte(vault.NoteLinePrefix+"!badb64!\n")...), 0o600); err != nil {
+	if err = os.WriteFile(NotesFile(), append(raw, []byte(vault.NoteLinePrefix+"!badb64!\n")...), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	ss, err := ParseNotesFile(NotesFile())

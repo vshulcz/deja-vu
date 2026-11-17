@@ -422,8 +422,8 @@ func EnsureForSearchNoWait(dir string, o query.Options, progress io.Writer) (bus
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	if err := ensureVaultUnlocked(dir); err != nil {
-		return false, err
+	if unlockErr := ensureVaultUnlocked(dir); unlockErr != nil {
+		return false, unlockErr
 	}
 	if autoUpdatesOff() {
 		return false, manualCheck(dir)

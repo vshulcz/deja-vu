@@ -28,7 +28,7 @@ const (
 	// EnvVaultFile overrides the vault metadata file location.
 	EnvVaultFile = "DEJA_VAULT_FILE"
 	// EnvVaultPassphrase supplies the passphrase non-interactively.
-	EnvVaultPassphrase = "DEJA_VAULT_PASSPHRASE"
+	EnvVaultPassphrase = "DEJA_VAULT_PASSPHRASE" //nolint:gosec // environment variable name, not a credential
 	// EnvVaultKey supplies a hex-encoded 32-byte raw DEK directly.
 	EnvVaultKey = "DEJA_VAULT_KEY"
 
@@ -199,21 +199,21 @@ func CheckUnlocked(indexDir string) ([]byte, error) {
 	if cfg.Locked {
 		return nil, ErrLocked
 	}
-	if expired, lastActivity := idleExpired(indexDir, cfg); expired {
-		_ = autoLock(indexDir, cfg, lastActivity)
+	if idleExpired(indexDir, cfg) {
+		autoLock(indexDir, cfg)
 		return nil, ErrLocked
 	}
 	if rawHex := strings.TrimSpace(os.Getenv(EnvVaultKey)); rawHex != "" {
-		dek, err := hex.DecodeString(rawHex)
-		if err != nil || len(dek) != 32 || !keyIDMatches(dek, cfg.KeyID) {
+		dek, decErr := hex.DecodeString(rawHex)
+		if decErr != nil || len(dek) != 32 || !keyIDMatches(dek, cfg.KeyID) {
 			return nil, errors.New("DEJA_VAULT_KEY does not match vault")
 		}
 		return dek, nil
 	}
 	if pass := os.Getenv(EnvVaultPassphrase); pass != "" {
-		dek, err := unwrapDEK(cfg, pass)
-		if err != nil {
-			return nil, err
+		dek, unwrapErr := unwrapDEK(cfg, pass)
+		if unwrapErr != nil {
+			return nil, unwrapErr
 		}
 		return dek, nil
 	}
@@ -224,9 +224,9 @@ func CheckUnlocked(indexDir string) ([]byte, error) {
 	return nil, ErrKeyUnavailable
 }
 
-func idleExpired(indexDir string, cfg Config) (bool, time.Time) {
+func idleExpired(indexDir string, cfg Config) bool {
 	if cfg.AutoLockSeconds <= 0 {
-		return false, time.Time{}
+		return false
 	}
 	var last time.Time
 	if cfg.UnlockedAt != "" {
@@ -242,12 +242,12 @@ func idleExpired(indexDir string, cfg Config) (bool, time.Time) {
 		}
 	}
 	if last.IsZero() {
-		return true, last
+		return true
 	}
-	return time.Since(last) > time.Duration(cfg.AutoLockSeconds)*time.Second, last
+	return time.Since(last) > time.Duration(cfg.AutoLockSeconds)*time.Second
 }
 
-func autoLock(indexDir string, cfg Config, _ time.Time) error {
+func autoLock(indexDir string, cfg Config) {
 	if indexDir != "" {
 		if dek, err := activeKeyring.Get(cfg.KeyID); err == nil && len(dek) == 32 && keyIDMatches(dek, cfg.KeyID) {
 			_ = SealTree(indexDir, dek)
@@ -257,7 +257,6 @@ func autoLock(indexDir string, cfg Config, _ time.Time) error {
 	cfg.Locked = true
 	_ = saveConfig(cfg)
 	_ = activeKeyring.Delete(cfg.KeyID)
-	return nil
 }
 
 func keyIDFor(dek []byte) string {

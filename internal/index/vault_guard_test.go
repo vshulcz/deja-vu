@@ -11,8 +11,7 @@ import (
 
 func TestVaultGuardFailsClosed(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("HOME", tmp)
-	t.Setenv("USERPROFILE", tmp)
+	setHome(t, tmp)
 	t.Setenv("DEJA_VAULT_FILE", filepath.Join(tmp, "vault.json"))
 	t.Setenv("DEJA_VAULT_BACKEND", "passphrase")
 	t.Setenv("DEJA_VAULT_PASSPHRASE", "index-vault-pass")

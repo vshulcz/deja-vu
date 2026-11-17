@@ -66,7 +66,8 @@ func (vr *vaultLineReader) Read(p []byte) (int, error) {
 			trimmed := bytes.TrimRight(line, "\r\n")
 			if bytes.HasPrefix(trimmed, []byte(vault.NoteLinePrefix)) {
 				if plain, ok := openPersonalNoteLine(vr.dek, trimmed); ok {
-					vr.buf = append(plain, '\n')
+					plain = append(plain, '\n')
+					vr.buf = plain
 				} else {
 					vr.buf = []byte("{malformed-sealed}\n")
 				}

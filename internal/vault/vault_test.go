@@ -45,6 +45,10 @@ func withTestVaultEnv(t *testing.T) (dir string, kr *memKeyring) {
 	t.Helper()
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("USERPROFILE", tmp)
+	t.Setenv("LOCALAPPDATA", tmp)
+	t.Setenv("AppData", filepath.Join(tmp, "appdata"))
+	t.Setenv("DEJA_VAULT_BACKEND", "")
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
 	t.Setenv("XDG_DATA_HOME", filepath.Join(tmp, "data"))
 	t.Setenv(EnvVaultFile, filepath.Join(tmp, "config", "deja", "vault.json"))
@@ -94,89 +98,99 @@ func TestVaultInitLockUnlockNoPlaintextOnDisk(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := Init(indexDir, "short", 0); err == nil {
+	if _, initErr := Init(indexDir, "short", 0); initErr == nil {
 		t.Fatal("Init accepted passphrase shorter than 8 chars")
 	}
-	backend, err := Init(indexDir, "correct-horse-passphrase", 0)
-	if err != nil {
-		t.Fatalf("Init: %v", err)
+	backend, initErr := Init(indexDir, "correct-horse-passphrase", 0)
+	if initErr != nil {
+		t.Fatalf("Init: %v", initErr)
 	}
 	if backend != "test-keyring" {
 		t.Fatalf("backend = %q, want test-keyring", backend)
 	}
-	if _, err := Init(indexDir, "correct-horse-passphrase", 0); !errors.Is(err, ErrAlreadyInitialized) {
-		t.Fatalf("second Init = %v, want ErrAlreadyInitialized", err)
+	if _, secondErr := Init(indexDir, "correct-horse-passphrase", 0); !errors.Is(secondErr, ErrAlreadyInitialized) {
+		t.Fatalf("second Init = %v, want ErrAlreadyInitialized", secondErr)
 	}
 
 	// Notes and snapshots must already be sealed on disk right after Init.
-	notesRaw, err := os.ReadFile(NotesPath())
-	if err != nil || strings.Contains(string(notesRaw), canary) || !strings.HasPrefix(string(notesRaw), NoteLinePrefix) {
-		t.Fatalf("notes not encrypted after Init: %q (%v)", notesRaw, err)
+	notesRaw, notesErr := os.ReadFile(NotesPath())
+	if notesErr != nil || strings.Contains(string(notesRaw), canary) || !strings.HasPrefix(string(notesRaw), NoteLinePrefix) {
+		t.Fatalf("notes not encrypted after Init: %q (%v)", notesRaw, notesErr)
 	}
-	snapsRaw, err := os.ReadFile(indexDir + ".injections.jsonl")
-	if err != nil || strings.Contains(string(snapsRaw), canary) {
-		t.Fatalf("snapshots leaked canary after Init: %q (%v)", snapsRaw, err)
+	snapsRaw, snapsErr := os.ReadFile(indexDir + ".injections.jsonl")
+	if snapsErr != nil || strings.Contains(string(snapsRaw), canary) {
+		t.Fatalf("snapshots leaked canary after Init: %q (%v)", snapsRaw, snapsErr)
 	}
 
-	dek, err := CheckUnlocked(indexDir)
-	if err != nil || len(dek) != 32 {
-		t.Fatalf("CheckUnlocked after Init = (%d, %v)", len(dek), err)
+	dek, dekErr := CheckUnlocked(indexDir)
+	if dekErr != nil || len(dek) != 32 {
+		t.Fatalf("CheckUnlocked after Init = (%d, %v)", len(dek), dekErr)
 	}
 	firstNoteLine, _, _ := strings.Cut(string(notesRaw), "\n")
-	plainNote, err := OpenNoteLine(dek, firstNoteLine)
-	if err != nil || !strings.Contains(string(plainNote), canary) {
-		t.Fatalf("OpenNoteLine failed: %q (%v)", plainNote, err)
+	plainNote, plainErr := OpenNoteLine(dek, firstNoteLine)
+	if plainErr != nil || !strings.Contains(string(plainNote), canary) {
+		t.Fatalf("OpenNoteLine failed: %q (%v)", plainNote, plainErr)
 	}
 
 	// Lock seals indexDir + sidecars into .vault, wipes plaintext files, evicts keyring.
-	if err := Lock(indexDir, ""); err != nil {
-		t.Fatalf("Lock: %v", err)
+	if lockErr := Lock(indexDir, ""); lockErr != nil {
+		t.Fatalf("Lock: %v", lockErr)
 	}
 	if !IsLocked(indexDir) {
 		t.Fatal("expected IsLocked true after Lock")
 	}
-	if _, err := CheckUnlocked(indexDir); !errors.Is(err, ErrLocked) {
-		t.Fatalf("CheckUnlocked when locked = %v, want ErrLocked", err)
+	if _, chkErr := CheckUnlocked(indexDir); !errors.Is(chkErr, ErrLocked) {
+		t.Fatalf("CheckUnlocked when locked = %v, want ErrLocked", chkErr)
 	}
 	if len(kr.keys) != 0 {
 		t.Fatalf("keyring not evicted on Lock: %v", kr.keys)
 	}
-	if _, err := os.Stat(indexDir); !os.IsNotExist(err) {
+	if _, statErr := os.Stat(indexDir); !os.IsNotExist(statErr) {
 		t.Fatalf("plaintext indexDir still exists after Lock")
 	}
-	if _, err := os.Stat(ArchivePath(indexDir)); err != nil {
-		t.Fatalf("vault archive missing after Lock: %v", err)
+	if _, statErr := os.Stat(ArchivePath(indexDir)); statErr != nil {
+		t.Fatalf("vault archive missing after Lock: %v", statErr)
 	}
-	rootWalkErr := filepath.WalkDir(filepath.Dir(filepath.Dir(indexDir)), func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
+	walkBase := filepath.Dir(filepath.Dir(indexDir))
+	walkRoot, openRootErr := os.OpenRoot(walkBase)
+	if openRootErr != nil {
+		t.Fatal(openRootErr)
+	}
+	rootWalkErr := filepath.WalkDir(walkBase, func(path string, d os.DirEntry, werr error) error {
+		if werr != nil || d.IsDir() {
+			return werr
 		}
-		b, _ := os.ReadFile(path)
+		relPath, relErr := filepath.Rel(walkBase, path)
+		if relErr != nil {
+			return relErr
+		}
+		b, _ := walkRoot.ReadFile(relPath)
 		if strings.Contains(string(b), canary) {
 			t.Errorf("canary plaintext found on disk at %s while locked", path)
 		}
 		return nil
 	})
+	_ = walkRoot.Close()
 	if rootWalkErr != nil {
 		t.Fatal(rootWalkErr)
 	}
 
-	if err := Unlock(indexDir, "wrong-passphrase"); err == nil {
+	if wrongErr := Unlock(indexDir, "wrong-passphrase"); wrongErr == nil {
 		t.Fatal("Unlock succeeded with wrong passphrase")
 	}
-	if err := Unlock(indexDir, "correct-horse-passphrase"); err != nil {
-		t.Fatalf("Unlock: %v", err)
+	if unlockErr := Unlock(indexDir, "correct-horse-passphrase"); unlockErr != nil {
+		t.Fatalf("Unlock: %v", unlockErr)
 	}
 	if IsLocked(indexDir) {
 		t.Fatal("expected IsLocked false after Unlock")
 	}
-	restored, err := os.ReadFile(filepath.Join(indexDir, "records.bin"))
-	if err != nil || string(restored) != "header "+canary {
-		t.Fatalf("restored records.bin = %q, err = %v", restored, err)
+	restored, restErr := os.ReadFile(filepath.Join(indexDir, "records.bin"))
+	if restErr != nil || string(restored) != "header "+canary {
+		t.Fatalf("restored records.bin = %q, err = %v", restored, restErr)
 	}
-	sidecar, err := os.ReadFile(indexDir + ".dejavu")
-	if err != nil || string(sidecar) != canary {
-		t.Fatalf("restored sidecar = %q, err = %v", sidecar, err)
+	sidecar, sideErr := os.ReadFile(indexDir + ".dejavu")
+	if sideErr != nil || string(sidecar) != canary {
+		t.Fatalf("restored sidecar = %q, err = %v", sidecar, sideErr)
 	}
 }
 
@@ -255,9 +269,9 @@ func TestVaultFailClosedAndArchiveTamper(t *testing.T) {
 		t.Fatalf("SealTree multi-chunk: %v", err)
 	}
 	arch := ArchivePath(indexDir)
-	orig, err := os.ReadFile(arch)
-	if err != nil {
-		t.Fatal(err)
+	orig, readErr := os.ReadFile(arch)
+	if readErr != nil {
+		t.Fatal(readErr)
 	}
 	// Truncating final chunk must fail authentication.
 	if err := os.WriteFile(arch, orig[:len(orig)-10], 0o600); err != nil {
@@ -282,12 +296,12 @@ func TestVaultFailClosedAndArchiveTamper(t *testing.T) {
 	if err := OpenTree(indexDir, dek); err != nil {
 		t.Fatalf("OpenTree valid multi-chunk: %v", err)
 	}
-	snapEnc, err := SealSnapshot(dek, "hello world")
-	if err != nil {
-		t.Fatal(err)
+	snapEnc, snapErr := SealSnapshot(dek, "hello world")
+	if snapErr != nil {
+		t.Fatal(snapErr)
 	}
-	if got, err := OpenSnapshot(dek, snapEnc); err != nil || got != "hello world" {
-		t.Fatalf("OpenSnapshot = (%q, %v)", got, err)
+	if got, openErr := OpenSnapshot(dek, snapEnc); openErr != nil || got != "hello world" {
+		t.Fatalf("OpenSnapshot = (%q, %v)", got, openErr)
 	}
 }
 
@@ -321,7 +335,7 @@ func TestVaultOSKeyringCommandsAndEdgeCases(t *testing.T) {
 	})
 
 	store := map[string]string{}
-	execKeyringFn = func(bin string, args []string, stdin string, _ []string) ([]byte, error) {
+	execKeyringFn = func(bin string, args []string, stdin string, extraEnv []string) ([]byte, error) {
 		switch bin {
 		case "/usr/bin/security":
 			if len(args) > 0 && args[0] == "add-generic-password" {
@@ -336,6 +350,40 @@ func TestVaultOSKeyringCommandsAndEdgeCases(t *testing.T) {
 			}
 			delete(store, args[4])
 			return nil, nil
+		case "secret-tool":
+			if len(args) > 0 && args[0] == "store" {
+				store[args[5]] = strings.TrimSpace(stdin)
+				return nil, nil
+			}
+			if len(args) > 0 && args[0] == "lookup" {
+				if v, ok := store[args[4]]; ok {
+					return []byte(v + "\n"), nil
+				}
+				return nil, errors.New("not found")
+			}
+			delete(store, args[4])
+			return nil, nil
+		case "powershell":
+			var dpapiFile string
+			for _, kv := range extraEnv {
+				if v, ok := strings.CutPrefix(kv, "DEJA_DPAPI_PATH="); ok {
+					dpapiFile = v
+				}
+			}
+			if dpapiFile == "" {
+				return nil, errors.New("missing DEJA_DPAPI_PATH")
+			}
+			if stdin != "" {
+				if werr := os.WriteFile(dpapiFile, []byte(strings.TrimSpace(stdin)), 0o600); werr != nil {
+					return nil, werr
+				}
+				return nil, nil
+			}
+			b, rerr := os.ReadFile(dpapiFile)
+			if rerr != nil {
+				return nil, rerr
+			}
+			return append(b, '\n'), nil
 		default:
 			return nil, nil
 		}
@@ -348,43 +396,43 @@ func TestVaultOSKeyringCommandsAndEdgeCases(t *testing.T) {
 	dek := make([]byte, 32)
 	_, _ = rand.Read(dek)
 	keyID := keyIDFor(dek)
-	if err := okRing.Set("bad", dek); err == nil {
+	if setErr := okRing.Set("bad", dek); setErr == nil {
 		t.Fatal("expected invalid keyID error on Set")
 	}
-	if _, err := okRing.Get("bad"); err == nil {
+	if _, getErr := okRing.Get("bad"); getErr == nil {
 		t.Fatal("expected invalid keyID error on Get")
 	}
-	if err := okRing.Set(keyID, dek); err != nil {
-		t.Fatalf("osKeyring.Set: %v", err)
+	if setErr := okRing.Set(keyID, dek); setErr != nil {
+		t.Fatalf("osKeyring.Set: %v", setErr)
 	}
-	got, err := okRing.Get(keyID)
-	if err != nil || hex.EncodeToString(got) != hex.EncodeToString(dek) {
-		t.Fatalf("osKeyring.Get = (%x, %v)", got, err)
+	got, getErr := okRing.Get(keyID)
+	if getErr != nil || hex.EncodeToString(got) != hex.EncodeToString(dek) {
+		t.Fatalf("osKeyring.Get = (%x, %v)", got, getErr)
 	}
-	if err := okRing.Delete(keyID); err != nil {
-		t.Fatalf("osKeyring.Delete: %v", err)
+	if delErr := okRing.Delete(keyID); delErr != nil {
+		t.Fatalf("osKeyring.Delete: %v", delErr)
 	}
-	if _, err := okRing.Get(keyID); err == nil {
+	if _, getAfterErr := okRing.Get(keyID); getAfterErr == nil {
 		t.Fatal("expected error after Delete")
 	}
 
 	for _, goos := range []string{"darwin", "linux", "windows"} {
 		for _, op := range []string{"set", "get", "delete"} {
-			if _, _, _, _, err := keyringCommand(goos, op, keyID, hex.EncodeToString(dek)); err != nil {
-				t.Fatalf("keyringCommand(%s, %s): %v", goos, op, err)
+			if _, _, _, _, cmdErr := keyringCommand(goos, op, keyID, hex.EncodeToString(dek)); cmdErr != nil {
+				t.Fatalf("keyringCommand(%s, %s): %v", goos, op, cmdErr)
 			}
 		}
 	}
-	if _, _, _, _, err := keyringCommand("plan9", "get", keyID, ""); err == nil {
+	if _, _, _, _, planErr := keyringCommand("plan9", "get", keyID, ""); planErr == nil {
 		t.Fatal("expected error on unsupported OS keyring")
 	}
 
 	// Headless fallback: Set fails during Init, yet Init succeeds with passphrase backend and
 	// Lock with empty dir or passphrase fallback behaves cleanly.
 	activeKeyring = &memKeyring{name: "test-kr", keys: map[string][]byte{}, failSet: true}
-	backend, err := Init(indexDir, "headless-passphrase", 0)
-	if err != nil || backend != "passphrase" {
-		t.Fatalf("headless Init = (%q, %v)", backend, err)
+	backend, headlessErr := Init(indexDir, "headless-passphrase", 0)
+	if headlessErr != nil || backend != "passphrase" {
+		t.Fatalf("headless Init = (%q, %v)", backend, headlessErr)
 	}
 	if err := os.MkdirAll(indexDir, 0o700); err != nil {
 		t.Fatal(err)
@@ -445,63 +493,77 @@ func TestVaultOSKeyringCommandsAndEdgeCases(t *testing.T) {
 	if err := okRing.Delete("bad"); err != nil {
 		t.Fatalf("Delete invalid keyID = %v", err)
 	}
-	execKeyringFn = func(string, []string, string, []string) ([]byte, error) {
-		return nil, errors.New("delete failed")
-	}
-	if err := okRing.Delete(keyID); err == nil {
-		t.Fatal("expected osKeyring.Delete error")
+	if runtime.GOOS == "windows" {
+		winPath, perr := dpapiPath(keyID)
+		if perr != nil {
+			t.Fatal(perr)
+		}
+		if mkErr := os.MkdirAll(filepath.Join(winPath, "sub"), 0o700); mkErr != nil {
+			t.Fatal(mkErr)
+		}
+		if delErr := okRing.Delete(keyID); delErr == nil {
+			t.Fatal("expected osKeyring.Delete error")
+		}
+		_ = os.RemoveAll(winPath)
+	} else {
+		execKeyringFn = func(string, []string, string, []string) ([]byte, error) {
+			return nil, errors.New("delete failed")
+		}
+		if delErr := okRing.Delete(keyID); delErr == nil {
+			t.Fatal("expected osKeyring.Delete error")
+		}
 	}
 	execKeyringFn = oldExec
-	if _, err := defaultExecKeyring("nonexistent-deja-keyring-bin", []string{"--check"}, "stdin-line\n", []string{"DEJA_TEST=1"}); err == nil {
+	if _, execErr := defaultExecKeyring("nonexistent-deja-keyring-bin", []string{"--check"}, "stdin-line\n", []string{"DEJA_TEST=1"}); execErr == nil {
 		t.Fatal("expected error from missing keyring binary")
 	}
 	execKeyringFn = func(string, []string, string, []string) ([]byte, error) {
 		return []byte("not-hex"), errors.New("boom")
 	}
-	if err := okRing.Set(keyID, dek); err == nil {
+	if setErr := okRing.Set(keyID, dek); setErr == nil {
 		t.Fatal("expected osKeyring.Set error")
 	}
 	execKeyringFn = func(string, []string, string, []string) ([]byte, error) {
 		return []byte("not-hex"), nil
 	}
-	if _, err := okRing.Get(keyID); err == nil {
+	if _, getErr2 := okRing.Get(keyID); getErr2 == nil {
 		t.Fatal("expected osKeyring.Get decode error")
 	}
 	t.Setenv("DEJA_VAULT_BACKEND", "passphrase")
-	if err := okRing.Set(keyID, dek); err == nil {
+	if setErr := okRing.Set(keyID, dek); setErr == nil {
 		t.Fatal("expected Set error when passphrase backend forced")
 	}
-	if _, err := okRing.Get(keyID); err == nil {
+	if _, getErr3 := okRing.Get(keyID); getErr3 == nil {
 		t.Fatal("expected Get error when passphrase backend forced")
 	}
-	if err := okRing.Delete(keyID); err != nil {
-		t.Fatalf("expected nil Delete when passphrase backend forced: %v", err)
+	if delErr := okRing.Delete(keyID); delErr != nil {
+		t.Fatalf("expected nil Delete when passphrase backend forced: %v", delErr)
 	}
 	t.Setenv("DEJA_VAULT_BACKEND", "")
 
 	// chunkReader & OpenTree corruption checks.
-	if _, err := newChunkReader(bytes.NewReader([]byte("BAD112345678")), dek); err == nil {
+	if _, chunkErr := newChunkReader(bytes.NewReader([]byte("BAD112345678")), dek); chunkErr == nil {
 		t.Fatal("expected magic error")
 	}
 	var rawBuf bytes.Buffer
-	cw, err := newChunkWriter(&rawBuf, dek)
-	if err != nil {
-		t.Fatal(err)
+	cw, cwErr := newChunkWriter(&rawBuf, dek)
+	if cwErr != nil {
+		t.Fatal(cwErr)
 	}
 	var badTar bytes.Buffer
 	tw := tar.NewWriter(&badTar)
-	if err := tw.WriteHeader(&tar.Header{Typeflag: tar.TypeReg, Name: "../escape", Size: 1}); err != nil {
-		t.Fatal(err)
+	if hdrErr := tw.WriteHeader(&tar.Header{Typeflag: tar.TypeReg, Name: "../escape", Size: 1}); hdrErr != nil {
+		t.Fatal(hdrErr)
 	}
 	_, _ = tw.Write([]byte("x"))
 	_ = tw.Close()
 	_, _ = cw.Write(badTar.Bytes())
 	_ = cw.Close()
 	archPath := ArchivePath(indexDir)
-	if err := os.WriteFile(archPath, rawBuf.Bytes(), 0o600); err != nil {
-		t.Fatal(err)
+	if writeErr := os.WriteFile(archPath, rawBuf.Bytes(), 0o600); writeErr != nil {
+		t.Fatal(writeErr)
 	}
-	if err := OpenTree(indexDir, dek); err == nil {
+	if openErr := OpenTree(indexDir, dek); openErr == nil {
 		t.Fatal("expected unsafe path error in OpenTree")
 	}
 	var badChunk bytes.Buffer
@@ -510,18 +572,18 @@ func TestVaultOSKeyringCommandsAndEdgeCases(t *testing.T) {
 	binary.BigEndian.PutUint32(hdr[:4], 0)
 	hdr[4] = 0
 	badChunk.Write(hdr[:])
-	crBad, err := newChunkReader(&badChunk, dek)
-	if err != nil {
-		t.Fatal(err)
+	crBad, badErr := newChunkReader(&badChunk, dek)
+	if badErr != nil {
+		t.Fatal(badErr)
 	}
-	if _, err := crBad.Read(make([]byte, 8)); err == nil {
+	if _, readBadErr := crBad.Read(make([]byte, 8)); readBadErr == nil {
 		t.Fatal("expected chunk length error")
 	}
 	// Trailing bytes past final frame must fail VerifyEOF.
 	trailing := append(append([]byte(nil), rawBuf.Bytes()...), byte(0xff))
-	crTrail, err := newChunkReader(bytes.NewReader(trailing), dek)
-	if err != nil {
-		t.Fatal(err)
+	crTrail, trailErr := newChunkReader(bytes.NewReader(trailing), dek)
+	if trailErr != nil {
+		t.Fatal(trailErr)
 	}
 	twDrop := make([]byte, 4096)
 	for {
@@ -570,6 +632,7 @@ func TestVaultOSKeyringCommandsAndEdgeCases(t *testing.T) {
 		t.Fatalf("Unlock uninitialized = %v", err)
 	}
 	t.Setenv(EnvVaultFile, "")
+	t.Setenv("AppData", "")
 	t.Setenv("HOME", "")
 	_ = homeDir()
 	t.Setenv("HOME", "relative-home-not-abs")
@@ -621,13 +684,13 @@ func TestVaultOSKeyringCommandsAndEdgeCases(t *testing.T) {
 	if _, err := openAEAD([]byte("bad"), nil, make([]byte, 32)); err == nil {
 		t.Fatal("expected openAEAD key length error")
 	}
-	if exp, _ := idleExpired("", Config{AutoLockSeconds: 10}); !exp {
+	if !idleExpired("", Config{AutoLockSeconds: 10}) {
 		t.Fatal("expected empty UnlockedAt to report expired")
 	}
 	idxUsage := filepath.Join(tmpRoot, "u", "index.db")
 	_ = os.MkdirAll(filepath.Dir(idxUsage), 0o700)
 	_ = os.WriteFile(idxUsage+".usage.jsonl", []byte("{}\n"), 0o600)
-	if exp, _ := idleExpired(idxUsage, Config{AutoLockSeconds: 60, UnlockedAt: time.Now().UTC().Add(-2 * time.Minute).Format(time.RFC3339Nano)}); exp {
+	if idleExpired(idxUsage, Config{AutoLockSeconds: 60, UnlockedAt: time.Now().UTC().Add(-2 * time.Minute).Format(time.RFC3339Nano)}) {
 		t.Fatal("expected recent .usage.jsonl modtime to refresh idle timer")
 	}
 	// Unsupported tar entry type & invalid chunk frame flag.
@@ -639,8 +702,8 @@ func TestVaultOSKeyringCommandsAndEdgeCases(t *testing.T) {
 	scw, _ := newChunkWriter(&symEnc, dek)
 	_, _ = scw.Write(symTar.Bytes())
 	_ = scw.Close()
-	if err := os.WriteFile(ArchivePath(idxBlocked), symEnc.Bytes(), 0o600); err == nil {
-		if err := OpenTree(idxBlocked, dek); err == nil {
+	if werr := os.WriteFile(ArchivePath(idxBlocked), symEnc.Bytes(), 0o600); werr == nil {
+		if openErr := OpenTree(idxBlocked, dek); openErr == nil {
 			t.Fatal("expected OpenTree unsupported tar entry error")
 		}
 	}
@@ -692,6 +755,8 @@ func TestVaultOSKeyringCommandsAndEdgeCases(t *testing.T) {
 	}
 
 	t.Setenv("HOME", tmpRoot)
+	t.Setenv("USERPROFILE", tmpRoot)
+	t.Setenv("AppData", filepath.Join(tmpRoot, "appdata"))
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpRoot, "cfg"))
 	t.Setenv("XDG_DATA_HOME", filepath.Join(tmpRoot, "dat"))
 	// Make vault config parent a regular file so saveConfig fails inside Init and cleans keyring.
