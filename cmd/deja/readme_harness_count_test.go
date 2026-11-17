@@ -80,6 +80,7 @@ func TestReadmeSpellsTheHarnessCountTheRegistryHas(t *testing.T) {
 		"docs/ARCHITECTURE.md",
 		"server.json",
 		"packaging/mcpb/manifest.json",
+		"packaging/mcpb/registry-server.json",
 		"docs/guide/harnesses.html",
 		"claude-plugin/README.md",
 		"codex-plugin/README.md",

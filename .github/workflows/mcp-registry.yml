@@ -27,22 +27,38 @@ jobs:
           fi
           echo "version=${ref#v}" >> "$GITHUB_OUTPUT"
       - name: Wait for the npm package to land
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          version="${{ steps.ver.outputs.version }}"
           for _ in $(seq 1 30); do
-            if curl -fsSL "https://registry.npmjs.org/@vshulcz/deja-vu/${version}" >/dev/null 2>&1; then
+            if curl -fsSL "https://registry.npmjs.org/@vshulcz/deja-vu/${VERSION}" >/dev/null 2>&1; then
               exit 0
             fi
             sleep 30
           done
-          echo "npm package ${version} not visible yet" >&2
+          echo "npm package ${VERSION} not visible yet" >&2
           exit 1
-      - name: Stamp the release version into server.json
+      - name: Download release MCPB bundle checksum
+        id: mcpb
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
-          version="${{ steps.ver.outputs.version }}"
-          python3 - "$version" <<'PY'
+          asset="deja-vu_${VERSION}_registry.mcpb"
+          tmp="$(mktemp -d)"
+          gh release download "v${VERSION}" --repo "${GITHUB_REPOSITORY}" --pattern "${asset}" --dir "${tmp}"
+          sha="$(sha256sum "${tmp}/${asset}" | awk '{print $1}')"
+          rm -rf "${tmp}"
+          echo "sha256=${sha}" >> "$GITHUB_OUTPUT"
+      - name: Stamp the release version into the registry manifests
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          MCPB_SHA: ${{ steps.mcpb.outputs.sha256 }}
+        run: |
+          python3 - "$VERSION" "$MCPB_SHA" "$GITHUB_REPOSITORY" <<'PY'
           import json, sys
-          version = sys.argv[1]
+          version, mcpb_sha, repo = sys.argv[1], sys.argv[2], sys.argv[3]
+
           with open("server.json") as f:
               manifest = json.load(f)
           manifest["version"] = version
@@ -50,12 +66,37 @@ jobs:
               pkg["version"] = version
           with open("server.json", "w") as f:
               json.dump(manifest, f, indent=2)
+              f.write("\n")
+
+          with open("packaging/mcpb/registry-server.json") as f:
+              mcpb = json.load(f)
+          mcpb["version"] = version
+          for pkg in mcpb.get("packages", []):
+              pkg["version"] = version
+              pkg["identifier"] = f"https://github.com/{repo}/releases/download/v{version}/deja-vu_{version}_registry.mcpb"
+              pkg["fileSha256"] = mcpb_sha
+          with open("packaging/mcpb/registry-server.json", "w") as f:
+              json.dump(mcpb, f, indent=2)
+              f.write("\n")
           PY
       - name: Install mcp-publisher
         run: |
           curl -fsSL https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz | tar xz
           sudo mv mcp-publisher /usr/local/bin/
+      - name: Validate registry manifests
+        run: |
+          mcp-publisher validate server.json
+          mcp-publisher validate packaging/mcpb/registry-server.json
       - name: Publish to the MCP registry
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
           mcp-publisher login github-oidc
-          mcp-publisher publish
+          for manifest in server.json packaging/mcpb/registry-server.json; do
+            name="$(python3 -c 'import json,sys,urllib.parse; print(urllib.parse.quote(json.load(open(sys.argv[1]))["name"], safe=""))' "$manifest")"
+            if curl -fsSL "https://registry.modelcontextprotocol.io/v0/servers/${name}/versions/${VERSION}" >/dev/null 2>&1; then
+              echo "Skipping ${manifest}: version ${VERSION} already published"
+              continue
+            fi
+            mcp-publisher publish "$manifest"
+          done
