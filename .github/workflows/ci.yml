@@ -559,9 +559,16 @@ jobs:
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
+  # Sequenced behind test-shard so macos-latest does not queue a fourth hosted
+  # macOS runner alongside the three test shards and expire unstarted at 15m
+  # (#6068). Runs alongside the coverage merge, so the critical path adds only
+  # the smoke script itself.
   e2e:
+    needs: test-shard
+    if: ${{ !cancelled() }}
     name: e2e smoke
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:

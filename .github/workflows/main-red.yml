@@ -51,3 +51,32 @@ jobs:
             gh issue create --repo "$REPO" --label main-red \
               --title "main is red" --body "$body"
           fi
+
+  clear:
+    name: Clear the alarm
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Close the alarm if main's tip is green
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          set -euo pipefail
+          existing=$(gh issue list --repo "$REPO" --state open --label main-red \
+            --json number --jq '.[0].number // empty')
+          if [ -z "$existing" ]; then
+            exit 0
+          fi
+          tip=$(gh api "repos/$REPO/commits/main" --jq '.sha')
+          if [ "$SHA" != "$tip" ]; then
+            echo "passed on $SHA, but main is at $tip — leaving #$existing open"
+            exit 0
+          fi
+          gh issue close "$existing" --repo "$REPO" \
+            --comment "main CI passed on \`${SHA}\` — [the run](${RUN_URL})."
