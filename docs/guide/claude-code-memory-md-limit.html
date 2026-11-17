@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Code MEMORY.md 200-line limit — deja-vu</title>
+<meta name="description" content="Why Claude Code truncates MEMORY.md at 200 lines or 25 KB, what belongs in CLAUDE.md vs .deja/memory.jsonl, and how to recall past sessions on demand.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/claude-code-memory-md-limit.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/claude-code-memory-md-limit.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/claude-code-memory-md-limit.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Claude Code MEMORY.md 200-line limit">
+<meta property="og:description" content="Why Claude Code truncates MEMORY.md at 200 lines or 25 KB, what belongs in CLAUDE.md vs .deja/memory.jsonl, and how to recall past sessions on demand.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/claude-code-memory-md-limit.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Claude Code MEMORY.md 200-line limit">
+<meta name="twitter:description" content="Why Claude Code truncates MEMORY.md at 200 lines or 25 KB, what belongs in CLAUDE.md vs .deja/memory.jsonl, and how to recall past sessions on demand.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Claude Code MEMORY.md 200-line limit", "description": "Why Claude Code truncates MEMORY.md at 200 lines or 25 KB, what belongs in CLAUDE.md vs .deja/memory.jsonl, and how to recall past sessions on demand.", "url": "https://vshulcz.github.io/deja-vu/guide/claude-code-memory-md-limit.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/claude-code-memory-md-limit.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-17", "dateModified": "2026-11-17"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"MEMORY.md 200-line limit","item":"https://vshulcz.github.io/deja-vu/guide/claude-code-memory-md-limit.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why does Claude Code stop reading MEMORY.md after 200 lines?","acceptedAnswer":{"@type":"Answer","text":"Claude Code caps the auto-memory entrypoint MEMORY.md at 200 lines or 25 KB per session load so system prompts stay bounded. Entries appended past that limit are omitted until trimmed or moved into topic files or on-demand retrieval."}},{"@type":"Question","name":"What belongs in CLAUDE.md vs deja-vu?","acceptedAnswer":{"@type":"Answer","text":"Keep build commands, test flags, and invariable style rules in CLAUDE.md. Leave session fixes, compiler error resolutions, past command runs, and file rationale in your transcript index via deja-vu so they only consume tokens when relevant."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="nav-cta" href="https://github.com/vshulcz/deja-vu"><span class="star-ic" aria-hidden="true">★</span>GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold" open><summary>Why agents forget <span class="n">17</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="switch-agents-without-losing-context.html">Session handoffs</a>
+<a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="claude-code-memory-md-limit.html" aria-current="page">MEMORY.md 200-line limit</a>
+<a href="claude-code-memory-hooks.html">Claude Code memory hooks</a>
+<a href="codex-memories-config.html">Codex memories &amp; config</a>
+<a href="cursor-mcp-memory.html">Cursor MCP memory</a>
+<a href="one-rules-file.html">One rules file</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold"><summary>Session history <span class="n">13</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="codex-history.html">Codex history</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="repo-memory.html">Repo memory</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="recover-overwritten-files.html">Recover overwritten files</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
+</details>
+<details class="grpfold"><summary>Deleting sessions <span class="n">39</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb too large</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-copilot-cli-session-history.html">Copilot CLI</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-roo-task-history.html">Roo Code</a>
+<a href="delete-zed-thread-history.html">Zed</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+<a href="delete-kimi-code-session-history.html">Kimi Code</a>
+<a href="delete-dsh-session-history.html">dsh</a>
+<a href="delete-commandcode-session-history.html">Command Code</a>
+<a href="delete-junie-session-history.html">Junie</a>
+<a href="delete-goose-session-history.html">Goose</a>
+<a href="delete-windsurf-cascade-history.html">Windsurf</a>
+<a href="delete-qwen-code-chat-history.html">Qwen Code</a>
+<a href="delete-trae-sessions.html">TRAE CLI</a>
+<a href="delete-codebuddy-sessions.html">CodeBuddy</a>
+<a href="delete-antigravity-history.html">Antigravity</a>
+<a href="delete-pi-session-history.html">pi</a>
+<a href="delete-senpi-session-history.html">Senpi</a>
+<a href="delete-crush-session-history.html">Crush</a>
+<a href="delete-hermes-session-history.html">Hermes</a>
+<a href="delete-cherrystudio-session-history.html">Cherry Studio</a>
+<a href="delete-codewhale-session-history.html">CodeWhale</a>
+<a href="delete-aider-chat-history.html">aider</a>
+<a href="delete-openclaw-session-history.html">OpenClaw</a>
+<a href="delete-grok-session-history.html">Grok Build</a>
+<a href="delete-devin-session-history.html">Devin CLI</a>
+<a href="delete-mimo-session-history.html">MiMo-Code</a>
+<a href="delete-omnigent-session-history.html">Omnigent</a>
+<a href="delete-orca-session-history.html">Orca</a>
+</details>
+<details class="grpfold"><summary>Per-agent guides <span class="n">50</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-claw-code.html">Claw Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-cmux.html">cmux</a>
+<a href="memory-for-codebuddy.html">CodeBuddy Code</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-devin.html">Devin CLI</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-herdr.html">herdr</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-jetbrains.html">JetBrains AI Assistant</a>
+<a href="memory-for-junie.html">Junie</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-mimo.html">MiMo-Code</a>
+<a href="memory-for-mcode.html">MiniMax Code</a>
+<a href="memory-for-muse.html">Muse Code</a>
+<a href="memory-for-oh-my-claudecode.html">oh-my-claudecode</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-omnigent.html">Omnigent</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-orca.html">Orca</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-trae.html">TRAE CLI</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-windsurf.html">Windsurf</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="mem0-alternative.html">Mem0 alternative</a>
+<a href="specstory-alternative.html">SpecStory alternative</a>
+<a href="basic-memory-alternative.html">Basic Memory alternative</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Claude Code MEMORY.md 200-line limit</h1>
+<p class="pagelede">keep entrypoint instructions small; pull past fixes and errors from indexed transcripts on demand<span class="mins" data-mins></span></p>
+
+<p>Claude Code's auto-memory loads <code>MEMORY.md</code> at the start of every session and truncates the entrypoint after 200 lines or 25 KB. Even below the cutoff, copying build notes, bug postmortems, and debugging history into <code>MEMORY.md</code> or <code>CLAUDE.md</code> taxes every single prompt with stale text.</p>
+
+<div class="save-first"><b>Offload history out of MEMORY.md:</b> <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> indexes the JSONL transcripts Claude Code and 47 other agents already write to disk, injecting matched snippets up to 1,536 bytes per prompt only when the current turn hits past work.<div class="save-actions"><div class="save-cmd"><span class="p">$</span><code>brew install deja-vu &amp;&amp; deja install claude-auto</code><button type="button">copy</button></div><div class="save-cmd"><span class="p">$</span><code>npx @vshulcz/deja-vu install claude-auto</code><button type="button">copy</button></div><a class="save-btn" href="https://github.com/vshulcz/deja-vu">deja-vu on GitHub</a><a class="save-demo" href="getting-started.html">Quick start &rarr;</a></div></div>
+
+<h2>Why always-loaded memory files break down</h2>
+<p>Three failure modes appear once <code>MEMORY.md</code> passes its first sprint:</p>
+<ul>
+<li><b>Hard truncation at line 200 / 25 KB:</b> newer notes appended past the cutoff drop silently on session start unless manually reorganized into topic files.</li>
+<li><b>Fixed token tax on unrelated turns:</b> a migration workaround pasted into <code>MEMORY.md</code> sits in context while editing CSS or writing SQL queries.</li>
+<li><b>Isolated per tool and machine path:</b> what Codex CLI, Cursor, or opencode solved yesterday in the same repo never reaches Claude Code's <code>MEMORY.md</code>.</li>
+</ul>
+
+<h2>Three layers instead of one overflowing file</h2>
+<table>
+<thead><tr><th>Layer</th><th>Keep short / bounded</th><th>Who reads it</th></tr></thead>
+<tbody>
+<tr><td><code>CLAUDE.md</code> / <code>.claude/rules/*.md</code></td><td>Repo build commands, architecture boundaries, non-negotiable conventions (&lt; 100 lines)</td><td>Claude Code on every session start</td></tr>
+<tr><td><code>.deja/memory.jsonl</code></td><td>Curated repo gotchas, settled choices, and dead ends promoted via <code>deja repo candidates</code> and <code>deja repo add &lt;id&gt; --kind gotcha</code></td><td>Any teammate or agent via hooks or MCP</td></tr>
+<tr><td><code>~/.deja/deja.db</code></td><td>Full transcripts across 48 coding agents from before and after install (secret-redacted SQLite + FTS5)</td><td>Queried in 0.7 to 0.8 ms by hooks (1,536 bytes per prompt, about 4 KB per tool call) and the <code>deja</code> MCP tool</td></tr>
+</tbody>
+</table>
+
+<h2>Moving history out without losing recall</h2>
+<p>Trim <code>MEMORY.md</code> and <code>CLAUDE.md</code> back to active workspace rules, then index the transcripts already under <code>~/.claude/projects/</code>:</p>
+<pre>$ deja index
+$ deja install claude-auto</pre>
+<p><code>deja install claude-auto</code> leaves your existing rules files intact, registers the single stdio MCP tool <code>deja</code> (477 schema tokens, 8 modes), and attaches Claude Code lifecycle hooks so errors and prior command patterns surface verbatim when needed. For multi-step engineering tasks on the same repository, measured hook plus MCP recall completed work in 52,815 vs 103,443 total tokens compared to an unassisted run, and achieved 97.2% R@5 across all 500 LongMemEval-S questions.</p>
+
+<h2>Keeping team gotchas in git</h2>
+<p>When a session uncovers a project rule that should travel with the repository rather than stay local to one developer's machine, promote that candidate into <code>.deja/memory.jsonl</code>:</p>
+<pre>$ deja repo candidates
+$ deja repo add a1b2c3d4 --kind gotcha</pre>
+<p>Entries stay capped cleanly (600 chars per record, 500 records / 1 MB limit), use <code>merge=union</code> to avoid git merge conflicts, and avoid polluting every Claude Code prompt unless relevant.</p>
+
+<nav class="related-guides" aria-label="Related guides">
+<p><a href="rules-files.html">When CLAUDE.md grows</a> · <a href="claude-code-memory-hooks.html">Claude Code memory hooks</a> · <a href="repo-memory.html">Repo memory (.deja/memory.jsonl)</a> · <a href="token-cost.html">What memory costs</a></p>
+</nav>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

@@ -1,116 +1,105 @@
 # deja-vu
 
-> deja-vu (`github.com/vshulcz/deja-vu`, CLI `deja`) is an open-source local memory and session-history search tool for coding agents, built as a single Go binary from the session transcripts agents already write to disk. deja indexes what Claude Code, Codex, Cursor, opencode, Gemini CLI, Zed and forty-two more agents wrote on this machine (including Qwen Code and Crush) — including the months before it was installed — and answers from them over MCP, hooks, the command line, or a full-screen search in the terminal. BM25 over the transcripts: no model, no embeddings unless you point `deja embed` at an endpoint, and no network use besides the commands that exist for it (`deja update`, `deja sync ssh`, `deja doctor`'s version check) and a daily release check, which DEJA_OFFLINE=1 turns off.
+> deja-vu (`https://github.com/vshulcz/deja-vu`, CLI `deja`) is a local cross-agent memory, transcript search, task handoff, and uncommitted code recovery tool for AI coding agents. It ships as one MIT-licensed Go binary (~18.6 MB) with zero background daemon, zero required LLM or API keys, and zero cloud dependency. Instead of starting empty at install time, `deja` indexes the session transcripts already on disk across all 48 coding agents (Claude Code, Codex, Cursor, opencode, Gemini CLI, Zed and forty-two more agents, including Cline, Roo Code, Windsurf, Goose, and OpenClaw) and serves shared local memory back via stdio MCP, lifecycle hooks, CLI, and TUI.
 
-Two things distinguish it from memory tools that record forward: it starts full, because the history is already on disk, and recall arrives without being asked — at session start, on each prompt, before an edit or a command, after a command fails, and on the way back from a compaction, where deja keeps the task, files and commands the summary drops. Over MCP, a single `deja` tool exposes eight modes (`recall`, `context`, `blame`, `fix`, `how`, `orient`, `remember`, `handoff`); from the CLI, `deja handoff` passes a live task to another agent, `deja blame <file>:<line>` traces which session wrote a line, and `deja restore <path>` recovers uncommitted code an agent overwrote. Credentials are stripped as the index is built.
+- **Full documentation bundle for LLMs:** [llms-full.txt](https://vshulcz.github.io/deja-vu/llms-full.txt)
+- **Website & interactive demo:** [deja-vu docs](https://vshulcz.github.io/deja-vu/) · [live browser view](https://vshulcz.github.io/deja-vu/view/)
 
-Install is one command (`npx @vshulcz/deja-vu install --auto`, `curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto`, or `brew install deja-vu && deja install --auto`); `npx @vshulcz/deja-vu audit` checks local stores, retention risk, and recoverable files across detected agents without installing.
+## Architecture & capabilities
 
-Run `deja` with no arguments in a terminal and it opens a full-screen search over every agent's history: results as you type, the session read at the match, then `r` to resume it in its own agent or `o` to continue it in another with what it asked, decided and left open. The box takes filters (`codex:`, `yesterday`, `in:<project>`), `/` finds a word inside an open session, and a Deleted tab holds sessions their agent deleted that deja still has, and puts one back where the agent can reopen it. With `DEJA_TUI=0` or `TERM=dumb` a bare `deja` prints a text brief instead, and `deja <query>` searches from the shell.
+- **Day-zero transcript indexing:** Parses the JSONL and SQLite stores coding agents already write to disk, redacts credentials at index time, and builds an append-only local FTS5/BM25 index (`13.6 s` cold build on 19,195 sessions; ~50 ms incremental refresh via watermarks; ~4% index footprint; optional embeddings via `deja embed`).
+- **Automatic lifecycle hooks (`deja install --auto`):** Injects bounded recall only when relevant without waiting for the agent to search:
+  - `SessionStart` (capped at `2 KB`): project decisions and open friction walls before the first prompt.
+  - `UserPromptSubmit` (capped at `1,536 bytes per prompt`): recalls prior cross-agent solutions (`deja-vu — from Codex CLI, 4 months ago: ...`).
+  - `PreToolUse`: names prior decisions or errors for the exact file or command about to run.
+  - `PostToolUse` / `PostToolUseFailure`: surfaces the command that fixed the same error on this machine previously.
+  - `PreCompact` -> next hook (capped at `4 KB`): preserves task state, decisions, exact commands with `[passed]`/`[failed]` status, and open items across context compaction (measured across 43 compactions: native summaries keep 77% of decisions and 0.2% of commands).
+  - `SessionEnd`: clears the live session stamp so the next session sees the finished work immediately.
+- **Single stdio MCP tool (`deja`) with 8 modes:** `recall` (under `about 4 KB per tool call`), `context`, `blame`, `fix`, `how`, `orient`, `remember`, `handoff`. Costs `477 tokens` per turn in context (1 tool definition vs `745–8,283 tokens` in multi-tool servers).
+- **Git-shared repository memory (`.deja/memory.jsonl`):** `deja repo candidates` and `deja repo add <id>` commit vetted decisions, rejected approaches, and gotchas alongside code using `merge=union` in `.deja/.gitattributes`; treated as untrusted reference data (`{"activations":{"auto":{"repo":false}}}` in trust policy).
+- **Cross-agent handoff & code recovery:** `deja handoff --to codex` transfers live goal, decisions, edited files, passing checks, and remaining work across agents; `deja restore <path>` recovers uncommitted edits clobbered by an agent; `deja blame <file>:<line>` links code lines to the agent session that wrote them.
+- **Install:** `npx @vshulcz/deja-vu install --auto`, `brew install deja-vu && deja install --auto`, or `curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto`. Inspect without installing via `npx @vshulcz/deja-vu stats --no-index --card` or `npx @vshulcz/deja-vu audit`. Run `DEJA_OFFLINE=1` to disable the daily version check.
 
-## Start here
+## Verified benchmarks
 
-- [Getting started](https://vshulcz.github.io/deja-vu/guide/getting-started.html): install, wire an agent, and the first query
-- [Recover overwritten files](https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html): restore uncommitted code an agent replaced before git commit via deja restore
-- [Recover a deleted Claude Code session](https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html): reopen or keep searchable a session Claude Code purged under cleanupPeriodDays
-- [Claude Code: No conversation found with session ID](https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html): why --resume fails across directories or after 30-day cleanup, and how to recover the transcript
+- **LongMemEval-S (`scripts/longmemeval`, all 500 questions):** **88.2% hit@1**, **97.2% R@5** (`hit@5`), 98.6% hit@10, 99.4% hit@20, 0.921 MRR, ~14.5 ms median search, zero LLM calls. (470-question cleaned set: 88.9% hit@1, 97.4% hit@5, 0.926 MRR, ~15.5 ms).
+- **LoCoMo:** **71.9% hit@1**, **91.4% R@5** (`hit@5`), 95.7% hit@10, 0.802 MRR, 1,982 questions, ~3.5 ms median search (`scripts/locomo`).
+- **Day-zero 19,195-session corpus (`docs/guide/day-zero.html`):** **13.6 s** cold index build (vs 72 s ctx, 95 s agentmemory, 3 min 56 s agentsview, 56 min CASS, ~3 h MemPalace); **26 ms** first answer; **0.7–0.8 ms** in-process lookup; **19/100** hit@1 and **36/100** hit@5 vs **0/100** for forward-capture plugins on day zero.
+- **End-to-end token cost:** **52,815 tokens** with `deja` vs **103,443** without memory on a real solved repository task (medians of 11 alternated runs; earlier run 53,558 vs 126,222). On seeded 30-chain context tasks (`deja bench context`): **1,096** median tokens at 1.00 coverage vs 80,547 (replay) and 273,238 (grep).
+
+## Quick comparison
+
+| Tool | Capture & day-zero | Runtime / daemon | LLM key required | Coding agents covered |
+| :--- | :--- | :--- | :--- | :--- |
+| **deja-vu** | Indexes existing disk transcripts + 7 lifecycle hooks + `.deja/memory.jsonl` | One 18.6 MB Go binary, none | No (lexical BM25; optional `deja embed`) | 48 native parsers + MCP |
+| **claude-mem** | Hooks from install on (0 on day zero) | Bun worker + Chroma | Yes (hosted, OpenRouter, Gemini, or Anthropic) | 9 (Claude Code, Codex T3, Cursor, opencode, etc.) |
+| **Mem0 / OpenMemory** | SDK `add` / hooks from install on | Hosted API or Docker server | Yes (`gpt-5-mini` default self-hosted) | Plugins/MCP for 7+ agents |
+| **agentmemory** | Hooks + `import-jsonl` (Claude Code only) | Node daemon on two ports | Optional (BM25 keyless default) | MCP + 12 integrations |
+| **MemPalace** | Hooks + `mine` (Claude Code, Codex, Cursor) | Python + ChromaDB + 300 MB model | No (local embedding model) | 3 (Claude Code, Codex, Cursor) |
+| **supermemory** | Stop hook forwards conversation to API | Hosted API or `supermemory local` | Yes (extraction model) | 7 plugins + MCP |
+| **basic-memory** | Agent writes Markdown notes over MCP | Local SQLite + sync + FastEmbed | No key (local FastEmbed) | MCP clients |
+| **@modelcontextprotocol/server-memory** | Agent calls MCP graph tools manually (`memory.json`) | Node (`npx`) MCP server | No | MCP clients (no transcript indexing or hooks) |
+| **cass** | Indexes existing transcripts (no auto-recall hooks) | Local Rust binary | No (optional MiniLM) | 26 pipeline / 32 connectors |
+
+## Core setup & workflow guides
+
+- [Getting started](https://vshulcz.github.io/deja-vu/guide/getting-started.html): install, wire every detected agent, and run your first search
+- [Agents & MCP](https://vshulcz.github.io/deja-vu/guide/agents.html): single `deja` MCP tool with 8 modes, hook injection limits, and per-harness behavior
+- [CLI reference](https://vshulcz.github.io/deja-vu/guide/commands.html): every subcommand and flag
+- [Search and ranking](https://vshulcz.github.io/deja-vu/guide/search.html): BM25, filters (`codex:`, `in:<project>`, dates), field boosts, and optional `deja embed`
+- [Claude Code MEMORY.md 200-line limit](https://vshulcz.github.io/deja-vu/guide/claude-code-memory-md-limit.html): why auto-memory truncates at 200 lines / 25 KB and how to keep instructions lean with on-demand recall
+- [Claude Code memory hooks](https://vshulcz.github.io/deja-vu/guide/claude-code-memory-hooks.html): `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUseFailure`, and `PreCompact` in `~/.claude/settings.json`
+- [Codex CLI memories & config](https://vshulcz.github.io/deja-vu/guide/codex-memories-config.html): `~/.codex/config.toml` `[features]`, `AGENTS.md` 32 KiB limit, `/hooks` trust approval, and `[mcp_servers.deja]`
+- [Cursor MCP memory setup](https://vshulcz.github.io/deja-vu/guide/cursor-mcp-memory.html): configuring `~/.cursor/mcp.json` and hooks alongside `.cursor/rules/*.mdc` and `state.vscdb`
+- [Project memory in the repository](https://vshulcz.github.io/deja-vu/guide/repo-memory.html): commit picked decisions, rejected approaches, and gotchas into `.deja/memory.jsonl` for teammates
+- [Where history lives](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html): the conversation history file each of the forty-eight agents writes, and its format
+- [Recover overwritten files](https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html): restore uncommitted code an agent replaced before git commit via `deja restore`
+- [Recover a deleted Claude Code session](https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html): reopen or keep searchable a session Claude Code purged under `cleanupPeriodDays`
+- [Claude Code: No conversation found with session ID](https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html): why `--resume` fails across directories or after 30-day cleanup, and how to recover the transcript
 - [Claude Code usage limit handoff](https://vshulcz.github.io/deja-vu/guide/claude-code-usage-limit-handoff.html): continue an active Claude Code task in Codex, Cursor, or opencode when a rate limit hits
+- [Switching agents when quotas run out](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html): carry active session state across Claude Code, Codex, Gemini CLI, OpenCode, Hermes, and DSH with `deja handoff`
 - [Why agents forget](https://vshulcz.github.io/deja-vu/guide/forgetting.html): what ends with a session and what survives on disk
 - [Does my agent remember previous conversations](https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html): what Claude Code, Codex and Cursor keep between sessions, and what they do not
-- [Where history lives](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html): the conversation history file each of the forty-eight agents writes, and its format
-- [Credentials in transcripts](https://vshulcz.github.io/deja-vu/guide/credentials-in-transcripts.html): coding agents record command output verbatim, so keys and connection strings sit in plaintext transcripts; how to find them with deja secrets and what to do
-- [Session files on disk](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html): how to delete Claude Code sessions, how large ~/.claude/projects gets, what is inside a session file, and what deleting one costs
-- [Delete Cline task history](https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html): distinguish the modern CLI session store from the VS Code extension task tree and remove only the conversation data you intend to delete
-- [Delete Roo Code task history](https://vshulcz.github.io/deja-vu/guide/delete-roo-task-history.html): Find Roo Code history across editor hosts and custom storage. Delete one task or all tasks, understand what is lost, or keep the history searchable.
-- [Delete Zed agent thread history](https://vshulcz.github.io/deja-vu/guide/delete-zed-thread-history.html): Find Zed agent threads in threads.db, delete one through the history view, or remove the built-in agent database with Zed closed. Know what is lost.
-- [Delete Kiro session history](https://vshulcz.github.io/deja-vu/guide/delete-kiro-session-history.html): the CLI writes a transcript and header pair per session and the IDE a directory per session under ~/.kiro/sessions; remove the right one, and check the globalStorage and TUI copies that tree does not cover
-- [Delete Kimi Code session history](https://vshulcz.github.io/deja-vu/guide/delete-kimi-code-session-history.html): one directory per session under ~/.kimi-code/sessions; remove the whole directory, since state.json alone still lists a session
-- [Delete Command Code session history](https://vshulcz.github.io/deja-vu/guide/delete-commandcode-session-history.html): one .jsonl file per session under ~/.commandcode/projects; remove the file or project folder, and run deja index first to keep it searchable
-- [Delete DeepSeek Harness session history](https://vshulcz.github.io/deja-vu/guide/delete-dsh-session-history.html): one directory per session under ~/.dsh/sessions holding zstd logs; remove the whole directory, and Cherry Studio keeps its own .dsh store, which deja delete does not cover
-- [Delete Junie session history](https://vshulcz.github.io/deja-vu/guide/delete-junie-session-history.html): each session is a directory under ~/.junie/sessions; remove the session directory, and understand that index.jsonl retains metadata and logs
-- [Delete Goose session history](https://vshulcz.github.io/deja-vu/guide/delete-goose-session-history.html): since 1.10.0 every session is a row in sessions.db; remove one with goose session remove, and delete the legacy JSONL files goose no longer manages yourself
-- [Delete Windsurf Cascade history](https://vshulcz.github.io/deja-vu/guide/delete-windsurf-cascade-history.html): one encrypted .pb file per conversation under ~/.codeium/windsurf/cascade; find the file, delete one or all, and leave the rules, MCP config and settings beside it alone
-- [Delete Qwen Code chat history](https://vshulcz.github.io/deja-vu/guide/delete-qwen-code-chat-history.html): one JSONL file per session under ~/.qwen/projects/<project>/chats, plus its sub-agent logs; delete one or all and leave settings alone
-- [Delete TRAE CLI session history](https://vshulcz.github.io/deja-vu/guide/delete-trae-sessions.html): session rollouts under ~/.trae/sessions; remove one session or clear the directory while leaving traecli.toml alone
-- [Delete Amp thread history](https://vshulcz.github.io/deja-vu/guide/delete-amp-thread-history.html): one JSON file per thread under ~/.local/share/amp/threads, so deleting one conversation is deleting one file; the thread in your Amp account is separate
-- [Delete Continue session history](https://vshulcz.github.io/deja-vu/guide/delete-continue-session-history.html): one JSON file per session plus a sessions.json list the history view reads; remove the entry with the file, or the session stays listed and cannot be deleted from Continue
-- [Delete pi session history](https://vshulcz.github.io/deja-vu/guide/delete-pi-session-history.html): each session is a single JSONL file under ~/.pi/agent/sessions; delete one file or a whole project directory, or use deja delete with dry-run preview
-- [Delete Crush session history](https://vshulcz.github.io/deja-vu/guide/delete-crush-session-history.html): one crush.db SQLite file per project under .crush/crush.db, listed in ~/.local/share/crush/projects.json; remove one session or a project's history and leave global config alone
-- [Delete Hermes session history](https://vshulcz.github.io/deja-vu/guide/delete-hermes-session-history.html): every conversation and compacted archive lives in ~/.hermes/state.db or profiles/<profile>/state.db; remove one session with hermes sessions delete or clear the database cleanly
-- [Delete Cherry Studio session history](https://vshulcz.github.io/deja-vu/guide/delete-cherrystudio-session-history.html): Claude, pi and dsh transcripts under CherryStudio/Data/Agents on macOS, Linux and Windows; delete the session files by hand, and run deja index first so they stay searchable
-- [Delete CodeWhale session history](https://vshulcz.github.io/deja-vu/guide/delete-codewhale-session-history.html): one JSON file per session under ~/.codewhale/sessions; remove one session file or clear the directory, and how to keep history searchable with deja
-- [Delete aider chat history](https://vshulcz.github.io/deja-vu/guide/delete-aider-chat-history.html): every session in a project is a block in one .aider.chat.history.md at the git root; cut one session's block or remove the file, leave .aider.conf.yml alone, and keep both searchable with deja
-- [Delete OpenClaw session history](https://vshulcz.github.io/deja-vu/guide/delete-openclaw-session-history.html): since 2026.8 one openclaw-agent.sqlite per agent, which also holds its credentials; delete with openclaw sessions delete, then clear the archive it keeps in the database and as a .jsonl.deleted.<ts>.zst file
-- [Delete Grok Build session history](https://vshulcz.github.io/deja-vu/guide/delete-grok-session-history.html): one directory per session under ~/.grok/sessions holding the ACP stream in updates.jsonl and the summary grok lists it by; remove the directory, and leave grok-dev's grok.db alone
-- [Delete Senpi session history](https://vshulcz.github.io/deja-vu/guide/delete-senpi-session-history.html): each session is a single JSONL file under ~/.senpi/agent/sessions; delete one file or a project directory, or use deja delete with dry-run preview; Kimchi's --<encoded-cwd>-- layout noted
-- [Delete Devin CLI session history](https://vshulcz.github.io/deja-vu/guide/delete-devin-session-history.html): sessions.db and the summaries folder under devin/; deja delete does not take devin, so index first, then remove both
-- [Delete old Claude Code sessions](https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html): `find ~/.claude/projects -mtime +30 -delete` or `cleanupPeriodDays`, and why age frees far less disk than size
-- [Delete Codex CLI sessions](https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html): one rollout, one day, or all of ~/.codex/sessions, and why ~/.codex/history.jsonl keeps your prompts regardless
-- [Delete CodeBuddy and WorkBuddy session history](https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html): one JSONL per session under ~/.codebuddy/projects and the sub-agent directory beside it; WorkBuddy keeps its own copies in its own homes
-- [Delete Antigravity conversation history](https://vshulcz.github.io/deja-vu/guide/delete-antigravity-history.html): a conversation is six things under ~/.gemini/antigravity, not just its brain directory; use the app's Delete, then VACUUM conversation_summaries.db, which still holds the deleted text
-- [Delete Cursor chat history](https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html): where the chats live in state.vscdb, why deleting the file resets more than chats, and what the CLI writes separately
-- [Cursor state.vscdb too large](https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html): which chats fill a 30–125 GB state.vscdb, shrinking it safest first, and keeping the chats you delete searchable
-- [Delete Gemini CLI chat history](https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html): chats under ~/.gemini/tmp, mapping a project id back to a directory, and what the prompt log keeps
-- [Delete opencode session history](https://vshulcz.github.io/deja-vu/guide/delete-opencode-session-history.html): one SQLite database, what its tables hold, and why deleting rows does not free the space
-- [Delete VS Code Copilot Chat history](https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html): where the conversations are kept and what goes with them
-- [Delete Copilot CLI session history](https://vshulcz.github.io/deja-vu/guide/delete-copilot-cli-session-history.html): one directory per session under session-state, found by the id in events.jsonl rather than the directory name
-- [Delete Kilo Code task history](https://vshulcz.github.io/deja-vu/guide/delete-kilo-code-task-history.html): task JSON under the extension's storage, and the CLI's separate SQLite store
-- [CLI reference](https://vshulcz.github.io/deja-vu/guide/commands.html): every command and flag
-- [Search and ranking](https://vshulcz.github.io/deja-vu/guide/search.html): how BM25, filters, field boosts and optional embeddings work
-- [Agents & MCP](https://vshulcz.github.io/deja-vu/guide/agents.html): the deja MCP tool and its modes, and what each harness supports
-
-## Problems it answers
-
 - [The agent lost the context you had](https://vshulcz.github.io/deja-vu/guide/lost-context.html): after a crash, a clear, or a restart
-- [The context window is full](https://vshulcz.github.io/deja-vu/guide/context-window-full.html): what compaction keeps (77% of decisions, 0.2% of commands, measured) and what to do instead
-- [Resuming a session](https://vshulcz.github.io/deja-vu/guide/resume-a-session.html): find it across every agent, reopen it in the one that owns it
-- [The agent repeats a mistake you already fixed](https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html): the same error again, in a repository that solved it before
+- [The context window is full](https://vshulcz.github.io/deja-vu/guide/context-window-full.html): what compaction keeps (77% of decisions, 0.2% of commands) and what to do instead
+- [After compaction](https://vshulcz.github.io/deja-vu/guide/after-compaction.html): recovering the commands a summary dropped, and the 4 KB packet deja hands back automatically
+- [The agent repeats a mistake you already fixed](https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html): stopping repeat errors using prior fix pairs and rejected-decision tracking
 - [Finding a session](https://vshulcz.github.io/deja-vu/guide/find-a-session.html): search chat history across every agent at once
-- [Codex CLI history](https://vshulcz.github.io/deja-vu/guide/codex-history.html): where Codex keeps sessions, the .jsonl.zst rollouts grep misses after a week, jq and sqlite3 recipes, search and sync
-- [Codex resume](https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html): codex resume, --all, --last and exec resume, why a session is missing from the picker, "no rollout found for thread id" and archived sessions
-- [No conversation found with session ID](https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html): what the claude --resume error means, five causes reproduced on 2.1.295, finding the file and getting the session back
+- [Resuming a session](https://vshulcz.github.io/deja-vu/guide/resume-a-session.html): find it across every agent, reopen it in the one that owns it
+- [Codex CLI history](https://vshulcz.github.io/deja-vu/guide/codex-history.html): where Codex keeps `.jsonl` / `.jsonl.zst` rollouts, jq and sqlite3 recipes, search and sync
+- [Codex resume](https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html): `codex resume`, `--all`, `--last`, `exec resume`, and "no rollout found for thread id"
 - [Switching agents](https://vshulcz.github.io/deja-vu/guide/switching-agents.html): move between Claude Code, Codex and Cursor without re-explaining
-- [Switching agents when quotas run out](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html): carry active session state across Claude Code, Codex, Gemini CLI, OpenCode, Hermes, and DSH with deja handoff, CC Switch, and Magpie
 - [Parallel sessions](https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html): running multiple coding agents across worktrees and keeping their session history shared
 - [When CLAUDE.md grows too large](https://vshulcz.github.io/deja-vu/guide/rules-files.html): what belongs in standing rules vs on-demand session recall
-- [One set of rules for every agent](https://vshulcz.github.io/deja-vu/guide/one-rules-file.html): which rules file each agent reads, sharing AGENTS.md in a repository, and keeping your global rules in step with deja rules sync
-- [Project memory in the repository](https://vshulcz.github.io/deja-vu/guide/repo-memory.html): commit picked decisions, rejected approaches and gotchas into .deja/memory.jsonl so teammates' agents inherit them on clone
-- [After compaction](https://vshulcz.github.io/deja-vu/guide/after-compaction.html): recovering the commands a summary dropped, and the packet deja hands back automatically
-- [Auditing an agent](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html): review agent changes with deja review and deja blame when the diff cannot say what was tried
-- [Exporting a conversation](https://vshulcz.github.io/deja-vu/guide/export-conversations.html): markdown, JSON, or a shareable page
-- [Across machines](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html): sync between machines with no server
-- [What memory costs](https://vshulcz.github.io/deja-vu/guide/token-cost.html): the measured token cost of recall
-- [Stats card to PNG](https://vshulcz.github.io/deja-vu/card/): turn the card `deja stats --card` writes into a PNG, in the browser
+- [One set of rules for every agent](https://vshulcz.github.io/deja-vu/guide/one-rules-file.html): mapping `CLAUDE.md`, `AGENTS.md`, `GEMINI.md` and global rules across agents
+- [Auditing an agent](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html): review agent changes with `deja review` and `deja blame`
+- [Exporting a conversation](https://vshulcz.github.io/deja-vu/guide/export-conversations.html): markdown, JSON, or a shareable sanitized page
+- [Across machines](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html): SSH sync between machines with no central server
+- [What memory costs](https://vshulcz.github.io/deja-vu/guide/token-cost.html): measured token cost of recall vs replay/grep and injection caps
+- [Credentials in transcripts](https://vshulcz.github.io/deja-vu/guide/credentials-in-transcripts.html): finding plaintext keys written by coding agents with `deja secrets`
+- [Stats card to PNG](https://vshulcz.github.io/deja-vu/card/): convert `deja stats --card` SVGs into PNGs in the browser
 
-## 中文
+## Benchmarks, alternatives & technical reference
 
-- [快速开始](https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html)：安装、接上智能体、第一次查询
-- [智能体记得之前的对话吗](https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html)：各个工具跨会话留下了什么
-- [为什么会忘事](https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html)：会话结束时消失的是什么，磁盘上留下的是什么
-- [上下文丢了，怎么找回来](https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html)：崩溃、清空或重启之后，会话记录还在，怎么把工作找回来
-- [历史文件在哪里](https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html)：四十八个智能体各自把会话写在磁盘的哪里，用什么格式
-- [Codex 的会话历史](https://vshulcz.github.io/deja-vu/zh/guide/codex-history.html)：Codex 把会话放在哪里、一周之后 grep 漏掉的 .jsonl.zst、jq 和 sqlite3 的读法，以及搜索和同步
-- [删除 Codex 的会话](https://vshulcz.github.io/deja-vu/zh/guide/delete-codex-sessions.html)：删一次 rollout、删一天或删掉整个 ~/.codex/sessions，以及为什么 history.jsonl 里的提示词不受影响
-- [删除 Cursor 的聊天记录](https://vshulcz.github.io/deja-vu/zh/guide/delete-cursor-chat-history.html)：聊天是 state.vscdb 里的行，删掉整个文件会重置的不只是聊天，命令行转录另存一处
-- [Codex 会话恢复](https://vshulcz.github.io/deja-vu/zh/guide/codex-resume-session.html)：codex resume、--all、--last 与 exec resume，会话不在选择器里的原因，以及 no rollout found 和 is archived
-- [找不到会话](https://vshulcz.github.io/deja-vu/zh/guide/no-conversation-found-claude-code.html)：claude --resume 报 No conversation found with session ID 的五种原因、怎么定位文件，以及文件已经没了怎么办
-- [上下文窗口满了](https://vshulcz.github.io/deja-vu/zh/guide/context-window-full.html)：压缩实测保留了 77% 的决定和 0.2% 的命令，与其为不断增长的窗口付账，不如按需取回
-- [会话文件怎么删](https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html)：Claude Code 的会话文件怎么删、能占多大、删掉之后失去什么
-- [找回被删掉的会话](https://vshulcz.github.io/deja-vu/zh/guide/recover-a-deleted-session.html)：claude --resume 里找不到那次会话时，四种原因里有三种不是删除，真正还能找回的是什么
-- [找回解决问题的那次会话](https://vshulcz.github.io/deja-vu/zh/guide/find-a-session.html)：按记得的词在所有智能体里同时搜历史，然后继续那次对话
-- [怎么删掉 Claude Code 的旧会话](https://vshulcz.github.io/deja-vu/zh/guide/delete-old-claude-sessions.html)：find 命令或 cleanupPeriodDays 按时间删，以及为什么按时间删腾出的磁盘远比按大小删少
-- [给 Claude Code 加记忆](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-claude-code.html)：MCP 服务器、钩子，还有插件市场
-- [给 Codex CLI 加记忆](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-codex.html)：MCP 服务器、需要你批准的钩子，以及插件市场
-- [给 Cursor 加记忆](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-cursor.html)：它的聊天记录在 SQLite 里，而旁边的那个终端智能体是同一段历史
-- [接着昨天的会话继续](https://vshulcz.github.io/deja-vu/zh/guide/resume-a-session.html)：先在所有智能体里找到会话，再在它所属的那个里重新打开，或者只取摘要
-- [隐私](https://vshulcz.github.io/deja-vu/zh/guide/privacy.html)：索引什么、脱敏什么、什么永远不出这台机器，以及怎么控制留下什么
-- [Cursor 的 state.vscdb 太大](https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html)：两条只读查询找出占满 30–125 GB 的对话，按最安全顺序瘦身并保住聊天记录
-- [claude-mem 替代方案](https://vshulcz.github.io/deja-vu/zh/guide/claude-mem-alternative.html)：直接从磁盘已有转录建立记忆，无需模型摘要或后台常驻进程
-- [把项目记忆提交进代码仓库](https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html)：通过 .deja/memory.jsonl 与团队共享经过验证的决定与被回滚的方案
+- [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html): LongMemEval-S (500q: 88.2% hit@1, 97.2% R@5, 98.6% hit@10, 0.921 MRR, ~14.5 ms; 470q cleaned: 88.9% hit@1, 97.4% R@5), LoCoMo (71.9% hit@1, 91.4% R@5, 1,982q), and `deja bench` suites
+- [How it compares](https://vshulcz.github.io/deja-vu/guide/compare.html): matrix covering deja-vu, claude-mem, Mem0, Letta, memU, Memori, agentmemory, MemPalace, supermemory, cognee, Graphiti / Zep, Hindsight, basic-memory, MCP server-memory, cass, ctx, Agent Sessions, agent-historian, casr, agentsview, and claude-history
+- [claude-mem alternative](https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html): verbatim local indexing with no Bun worker, LLM key, or empty day zero
+- [Mem0 alternative](https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html): retroactive local memory across 48 coding agents without cloud APIs or Docker
+- [SpecStory alternative](https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html): index existing transcripts across 48 agents without CLI wrappers or `.specstory` folders
+- [Basic Memory alternative](https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html): automatic transcript indexing and hooks without maintaining a Markdown vault by hand
+- [Day zero](https://vshulcz.github.io/deja-vu/guide/day-zero.html): 7 memory tools measured head-to-head on 19,195 existing sessions on disk
+- [Session format registry](https://vshulcz.github.io/deja-vu/registry/README.html): storage paths and schemas for all 48 agents
+- [Privacy](https://vshulcz.github.io/deja-vu/guide/privacy.html): secret redaction, trust scopes, and local-only storage
+- [Architecture](https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md): incremental index format, watermarks, and search pipeline
+- [Security model](https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md): redaction rules and untrusted-data framing
+- [Building deja into your own tool](https://github.com/vshulcz/deja-vu/blob/main/docs/INTEGRATING.md): MCP contract, `--json` schemas, and hook commands
+- [Installing deja for an agent](https://github.com/vshulcz/deja-vu/blob/main/llms-install.md): machine-executable install guide for coding agents
+- [JSON output](https://github.com/vshulcz/deja-vu/blob/main/docs/json-output.md): `--json` output schemas
+- [Compaction recovery](https://github.com/vshulcz/deja-vu/blob/main/docs/compaction.md): pre-compaction capture specification and bounds
 
-## Per-harness setup
+## Per-agent setup
 
-- [Claude Code, Codex and the rest](https://vshulcz.github.io/deja-vu/guide/harnesses.html): the full support matrix
+- [Claude Code, Codex and the rest](https://vshulcz.github.io/deja-vu/guide/harnesses.html): full support matrix across all 48 harnesses (hooks, MCP, restore, resume)
 - [Claude Code](https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html)
 - [Codex](https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html)
 - [Cursor](https://vshulcz.github.io/deja-vu/guide/memory-for-cursor.html)
@@ -147,38 +136,43 @@ Run `deja` with no arguments in a terminal and it opens a full-screen search ove
 - [ZCode](https://vshulcz.github.io/deja-vu/guide/memory-for-zcode.html)
 - [Reasonix](https://vshulcz.github.io/deja-vu/guide/memory-for-reasonix.html): a plugin package; recall rides in the turn tail, not the system prompt
 - [CodeWhale](https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html)
-- [Windsurf / Devin Desktop](https://vshulcz.github.io/deja-vu/guide/memory-for-windsurf.html): no hook output reaches Cascade, so recall is pulled through MCP, a global rule, a skill and a /deja workflow
-- [TRAE CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-trae.html): the MCP server in traecli.toml and Codex's hooks in cli/hooks.json, which run once trusted at start-up
-- [CodeBuddy Code & WorkBuddy](https://vshulcz.github.io/deja-vu/guide/memory-for-codebuddy.html): MCP, four hooks in ~/.codebuddy/settings.json, a skill, and /deja
-- [Junie](https://vshulcz.github.io/deja-vu/guide/memory-for-junie.html): MCP in ~/.junie/mcp/mcp.json and the shared skill in ~/.agents/skills/deja-history/SKILL.md
-- [JetBrains AI Assistant](https://vshulcz.github.io/deja-vu/guide/memory-for-jetbrains.html): MCP in ~/.ai/mcp/mcp.json; the plugin runs no user hooks, and a chat reopens from the IDE history panel
-- [MiniMax Code](https://vshulcz.github.io/deja-vu/guide/memory-for-mcode.html): the MCP server in ~/.minimax/mcp.json and a plugin under ~/.minimax/plugins/deja with the skill and the hooks
-- [Muse Code](https://vshulcz.github.io/deja-vu/guide/memory-for-muse.html): the MCP server and the hooks in ~/.config/muse/settings.json, and the skill in ~/.agents/skills
-- [Claw Code](https://vshulcz.github.io/deja-vu/guide/memory-for-claw-code.html): session JSON/JSONL transcripts under ~/.claw/sessions/, recalled via MCP and ~/.claude/skills/deja-history/SKILL.md
-- [oh-my-claudecode](https://vshulcz.github.io/deja-vu/guide/memory-for-oh-my-claudecode.html): Claude Code plugin overlay; deja indexes the underlying Claude Code transcripts and wires Claude hooks once
-- [herdr](https://vshulcz.github.io/deja-vu/guide/memory-for-herdr.html): TUI supervisor over Claude Code, Codex, Cursor, OpenCode, and Grok; deja indexes each child agent's session files
-- [cmux](https://vshulcz.github.io/deja-vu/guide/memory-for-cmux.html): Ghostty-based multiplexer for AI terminals; deja indexes the inner agents' logs while cmux holds layout state
+- [Windsurf / Devin Desktop](https://vshulcz.github.io/deja-vu/guide/memory-for-windsurf.html): recall via MCP, global rule, skill, and `/deja` workflow
+- [TRAE CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-trae.html): MCP server in `traecli.toml` and Codex hooks in `cli/hooks.json`
+- [CodeBuddy Code & WorkBuddy](https://vshulcz.github.io/deja-vu/guide/memory-for-codebuddy.html): MCP, four hooks in `~/.codebuddy/settings.json`, skill, and `/deja`
+- [Junie](https://vshulcz.github.io/deja-vu/guide/memory-for-junie.html): MCP in `~/.junie/mcp/mcp.json` and shared skill in `~/.agents/skills/deja-history/SKILL.md`
+- [JetBrains AI Assistant](https://vshulcz.github.io/deja-vu/guide/memory-for-jetbrains.html): MCP in `~/.ai/mcp/mcp.json`
+- [MiniMax Code](https://vshulcz.github.io/deja-vu/guide/memory-for-mcode.html): MCP server in `~/.minimax/mcp.json` and plugin hooks
+- [Muse Code](https://vshulcz.github.io/deja-vu/guide/memory-for-muse.html): MCP server and hooks in `~/.config/muse/settings.json`
+- [Claw Code](https://vshulcz.github.io/deja-vu/guide/memory-for-claw-code.html): transcripts under `~/.claw/sessions/`, recalled via MCP and skill
+- [oh-my-claudecode](https://vshulcz.github.io/deja-vu/guide/memory-for-oh-my-claudecode.html): Claude Code plugin overlay backed by Claude Code transcripts and hooks
+- [herdr](https://vshulcz.github.io/deja-vu/guide/memory-for-herdr.html): TUI supervisor over Claude Code, Codex, Cursor, OpenCode, and Grok
+- [cmux](https://vshulcz.github.io/deja-vu/guide/memory-for-cmux.html): Ghostty-based multiplexer for AI terminals; inner agent transcripts indexed directly
 
-## Evidence
+## 中文
 
-- [Building deja into your own tool](https://github.com/vshulcz/deja-vu/blob/main/docs/INTEGRATING.md): the MCP server, the JSON surfaces, the hook commands, what is a contract and what is not, and how to isolate it in tests
-- [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html): 88.9% hit@1 on LongMemEval-S (470-question cleaned set; 97.2% R@5 across all 500 questions), 71.9% on LoCoMo, both harnesses in the repository
-- [How it compares](https://vshulcz.github.io/deja-vu/guide/compare.html): next to Mem0, Letta, memU, Memori, claude-mem, agentmemory, MemPalace, cognee, Graphiti / Zep, Hindsight, cass, Agent Sessions, agent-historian, casr and agentsview
-- [claude-mem alternative](https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html): deja-vu next to claude-mem — memory from existing transcripts with no model or worker, the day-zero difference, and running both
-- [Mem0 alternative](https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html): deja-vu next to Mem0 and OpenMemory — retroactive local session memory across 48 coding agents with no LLM extraction key, cloud API, or Docker stack
-- [SpecStory alternative](https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html): deja-vu next to SpecStory — index existing transcripts across 48 agents without CLI wrappers or per-repo .specstory folders
-- [Basic Memory alternative](https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html): deja-vu next to Basic Memory — automatic transcript indexing and hooks without maintaining a Markdown vault by hand
-- [Day zero](https://vshulcz.github.io/deja-vu/guide/day-zero.html): eight tools installed on one machine that already held 19,195 sessions, then asked 100 questions only that history answers — build time, first answer, search latency, hit@1; the driver for every row is in the repository
-- [Session format registry](https://vshulcz.github.io/deja-vu/registry/README.html): where each of the forty-eight agents stores its sessions, with fixtures
-- [Privacy](https://vshulcz.github.io/deja-vu/guide/privacy.html): what is read, what is redacted, what never leaves
-
-## Optional
-
-- [Architecture](https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md)
-- [Security model](https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md)
-- [Installing deja for an agent](https://github.com/vshulcz/deja-vu/blob/main/llms-install.md): the install page written for an agent doing it on a user's behalf
-- [JSON output](https://github.com/vshulcz/deja-vu/blob/main/docs/json-output.md): the shape of every `--json` result
-- [Compaction recovery](https://github.com/vshulcz/deja-vu/blob/main/docs/compaction.md): what is captured before a compaction, what is handed back, and the limits
+- [快速开始](https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html)：安装、接上智能体、第一次查询
+- [智能体记得之前的对话吗](https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html)：各个工具跨会话留下了什么
+- [为什么会忘事](https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html)：会话结束时消失的是什么，磁盘上留下的是什么
+- [上下文丢了，怎么找回来](https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html)：崩溃、清空或重启之后，会话记录还在，怎么把工作找回来
+- [历史文件在哪里](https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html)：四十八个智能体各自把会话写在磁盘的哪里，用什么格式
+- [Codex 的会话历史](https://vshulcz.github.io/deja-vu/zh/guide/codex-history.html)：Codex 把会话放在哪里、一周之后 grep 漏掉的 .jsonl.zst、jq 和 sqlite3 的读法，以及搜索和同步
+- [删除 Codex 的会话](https://vshulcz.github.io/deja-vu/zh/guide/delete-codex-sessions.html)：删一次 rollout、删一天或删掉整个 ~/.codex/sessions，以及为什么 history.jsonl 里的提示词不受影响
+- [删除 Cursor 的聊天记录](https://vshulcz.github.io/deja-vu/zh/guide/delete-cursor-chat-history.html)：聊天是 state.vscdb 里的行，删掉整个文件会重置的不只是聊天，命令行转录另存一处
+- [Codex 会话恢复](https://vshulcz.github.io/deja-vu/zh/guide/codex-resume-session.html)：codex resume、--all、--last 与 exec resume，会话不在选择器里的原因，以及 no rollout found 和 is archived
+- [找不到会话](https://vshulcz.github.io/deja-vu/zh/guide/no-conversation-found-claude-code.html)：claude --resume 报 No conversation found with session ID 的五种原因、怎么定位文件，以及文件已经没了怎么办
+- [上下文窗口满了](https://vshulcz.github.io/deja-vu/zh/guide/context-window-full.html)：压缩实测保留了 77% 的决定和 0.2% 的命令，与其为不断增长的窗口付账，不如按需取回
+- [会话文件怎么删](https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html)：Claude Code 的会话文件怎么删、能占多大、删掉之后失去什么
+- [找回被删掉的会话](https://vshulcz.github.io/deja-vu/zh/guide/recover-a-deleted-session.html)：claude --resume 里找不到那次会话时，四种原因里有三种不是删除，真正还能找回的是什么
+- [找回解决问题的那次会话](https://vshulcz.github.io/deja-vu/zh/guide/find-a-session.html)：按记得的词在所有智能体里同时搜历史，然后继续那次对话
+- [怎么删掉 Claude Code 的旧会话](https://vshulcz.github.io/deja-vu/zh/guide/delete-old-claude-sessions.html)：find 命令或 cleanupPeriodDays 按时间删，以及为什么按时间删腾出的磁盘远比按大小删少
+- [给 Claude Code 加记忆](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-claude-code.html)：MCP 服务器、钩子，还有插件市场
+- [给 Codex CLI 加记忆](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-codex.html)：MCP 服务器、需要你批准的钩子，以及插件市场
+- [给 Cursor 加记忆](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-cursor.html)：它的聊天记录在 SQLite 里，而旁边的那个终端智能体是同一段历史
+- [接着昨天的会话继续](https://vshulcz.github.io/deja-vu/zh/guide/resume-a-session.html)：先在所有智能体里找到会话，再在它所属的那个里重新打开，或者只取摘要
+- [隐私](https://vshulcz.github.io/deja-vu/zh/guide/privacy.html)：索引什么、脱敏什么、什么永远不出这台机器，以及怎么控制留下什么
+- [Cursor 的 state.vscdb 太大](https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html)：两条只读查询找出占满 30–125 GB 的对话，按最安全顺序瘦身并保住聊天记录
+- [claude-mem 替代方案](https://vshulcz.github.io/deja-vu/zh/guide/claude-mem-alternative.html)：直接从磁盘已有转录建立记忆，无需模型摘要或后台常驻进程
+- [把项目记忆提交进代码仓库](https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html)：通过 .deja/memory.jsonl 与团队共享经过验证的决定与被回滚的方案
 
 ## Русский
 
@@ -188,3 +182,45 @@ Run `deja` with no arguments in a terminal and it opens a full-screen search ove
 - [Удаление истории чатов Cursor](https://vshulcz.github.io/deja-vu/ru/guide/delete-cursor-chat-history.html): где хранятся чаты Cursor на диске и как очистить их по одному проекту
 - [Где хранятся сессии Codex CLI](https://vshulcz.github.io/deja-vu/ru/guide/codex-history.html): файлы `rollout-*.jsonl` в `~/.codex/sessions` и как искать по ним
 - [Помнит ли агент прошлые сессии?](https://vshulcz.github.io/deja-vu/ru/guide/does-my-agent-remember.html): что помнят Claude Code, Codex и Cursor сами по себе и что добавляет deja-vu
+
+## Optional: Session storage cleanup & deletion
+
+- [Session files on disk](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html): how to delete Claude Code sessions, `~/.claude/projects` sizing, and how to keep history searchable
+- [Delete old Claude Code sessions](https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html): pruning by age (`cleanupPeriodDays`) vs size
+- [Delete Codex CLI sessions](https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html): removing `~/.codex/sessions` rollouts vs `~/.codex/history.jsonl`
+- [Delete Cursor chat history](https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html): `state.vscdb` rows vs resetting workspace settings
+- [Cursor state.vscdb too large](https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html): finding oversized composer rows in a 30–125 GB `state.vscdb` and shrinking safely
+- [Delete Cline task history](https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html): CLI session store vs VS Code extension task tree
+- [Delete Roo Code task history](https://vshulcz.github.io/deja-vu/guide/delete-roo-task-history.html): editor hosts and custom storage cleanup
+- [Delete Zed agent thread history](https://vshulcz.github.io/deja-vu/guide/delete-zed-thread-history.html): cleaning `threads.db` safely with Zed closed
+- [Delete Kiro session history](https://vshulcz.github.io/deja-vu/guide/delete-kiro-session-history.html): `~/.kiro/sessions` CLI/IDE layouts and globalStorage copies
+- [Delete Kimi Code session history](https://vshulcz.github.io/deja-vu/guide/delete-kimi-code-session-history.html): `~/.kimi-code/sessions` directory cleanup vs `state.json`
+- [Delete Command Code session history](https://vshulcz.github.io/deja-vu/guide/delete-commandcode-session-history.html): `~/.commandcode/projects` `.jsonl` files
+- [Delete DeepSeek Harness session history](https://vshulcz.github.io/deja-vu/guide/delete-dsh-session-history.html): `~/.dsh/sessions` zstd logs and Cherry Studio copies
+- [Delete Junie session history](https://vshulcz.github.io/deja-vu/guide/delete-junie-session-history.html): `~/.junie/sessions` directories and `index.jsonl`
+- [Delete Goose session history](https://vshulcz.github.io/deja-vu/guide/delete-goose-session-history.html): `sessions.db` rows via `goose session remove` and legacy JSONL
+- [Delete Windsurf Cascade history](https://vshulcz.github.io/deja-vu/guide/delete-windsurf-cascade-history.html): encrypted `.pb` files under `~/.codeium/windsurf/cascade`
+- [Delete Qwen Code chat history](https://vshulcz.github.io/deja-vu/guide/delete-qwen-code-chat-history.html): `~/.qwen/projects/<project>/chats` JSONL and sub-agent logs
+- [Delete TRAE CLI session history](https://vshulcz.github.io/deja-vu/guide/delete-trae-sessions.html): `~/.trae/sessions` rollouts while preserving `traecli.toml`
+- [Delete Amp thread history](https://vshulcz.github.io/deja-vu/guide/delete-amp-thread-history.html): `~/.local/share/amp/threads` JSON files vs cloud copy
+- [Delete Continue session history](https://vshulcz.github.io/deja-vu/guide/delete-continue-session-history.html): session JSON files paired with `sessions.json`
+- [Delete pi session history](https://vshulcz.github.io/deja-vu/guide/delete-pi-session-history.html): `~/.pi/agent/sessions` JSONL files and dry-run delete
+- [Delete Crush session history](https://vshulcz.github.io/deja-vu/guide/delete-crush-session-history.html): `.crush/crush.db` and `projects.json`
+- [Delete Hermes session history](https://vshulcz.github.io/deja-vu/guide/delete-hermes-session-history.html): `~/.hermes/state.db` and profile databases
+- [Delete Cherry Studio session history](https://vshulcz.github.io/deja-vu/guide/delete-cherrystudio-session-history.html): `CherryStudio/Data/Agents` logs across Claude, pi, and dsh
+- [Delete CodeWhale session history](https://vshulcz.github.io/deja-vu/guide/delete-codewhale-session-history.html): `~/.codewhale/sessions` JSON files
+- [Delete aider chat history](https://vshulcz.github.io/deja-vu/guide/delete-aider-chat-history.html): `.aider.chat.history.md` blocks at git root
+- [Delete OpenClaw session history](https://vshulcz.github.io/deja-vu/guide/delete-openclaw-session-history.html): `openclaw-agent.sqlite` archives and `.jsonl.deleted.<ts>.zst`
+- [Delete Grok Build session history](https://vshulcz.github.io/deja-vu/guide/delete-grok-session-history.html): `~/.grok/sessions` ACP streams vs `grok.db`
+- [Delete Senpi session history](https://vshulcz.github.io/deja-vu/guide/delete-senpi-session-history.html): `~/.senpi/agent/sessions` and Kimchi `--<encoded-cwd>--` layout
+- [Delete Devin CLI session history](https://vshulcz.github.io/deja-vu/guide/delete-devin-session-history.html): `sessions.db` and summaries under `devin/`
+- [Delete CodeBuddy and WorkBuddy session history](https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html): `~/.codebuddy/projects` JSONL files and WorkBuddy homes
+- [Delete Antigravity conversation history](https://vshulcz.github.io/deja-vu/guide/delete-antigravity-history.html): `~/.gemini/antigravity` artifacts and `VACUUM conversation_summaries.db`
+- [Delete Gemini CLI chat history](https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html): `~/.gemini/tmp` chats and prompt logs
+- [Delete opencode session history](https://vshulcz.github.io/deja-vu/guide/delete-opencode-session-history.html): OpenCode SQLite tables and reclaiming space
+- [Delete VS Code Copilot Chat history](https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html): VS Code storage locations and cleanup
+- [Delete Copilot CLI session history](https://vshulcz.github.io/deja-vu/guide/delete-copilot-cli-session-history.html): `session-state` directories keyed by `events.jsonl`
+- [Delete Kilo Code task history](https://vshulcz.github.io/deja-vu/guide/delete-kilo-code-task-history.html): extension task JSON vs CLI SQLite store
+- [Delete MiMo-Code session history](https://vshulcz.github.io/deja-vu/guide/delete-mimo-session-history.html): local MiMo-Code transcript storage cleanup
+- [Delete Omnigent session history](https://vshulcz.github.io/deja-vu/guide/delete-omnigent-session-history.html): local Omnigent transcript storage cleanup
+- [Delete Orca session history](https://vshulcz.github.io/deja-vu/guide/delete-orca-session-history.html): local Orca session store cleanup

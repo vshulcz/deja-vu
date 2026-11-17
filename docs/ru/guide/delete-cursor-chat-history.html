@@ -29,15 +29,14 @@
 <link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
 <link rel="stylesheet" href="../../assets/site.css">
 <meta name="author" content="vshulcz">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:160">
 <meta name="theme-color" content="#0d0b16">
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
 <link rel="apple-touch-icon" href="../../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Как удалить историю чатов Cursor и что при этом теряется", "description": "Где Cursor хранит чаты в state.vscdb и логи CLI, почему удаление файла сбрасывает настройки IDE и как сохранить поиск по удалённым чатам через deja-vu.", "url": "https://vshulcz.github.io/deja-vu/ru/guide/delete-cursor-chat-history.html", "inLanguage": "ru", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/ru/guide/delete-cursor-chat-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-01", "dateModified": "2026-11-01"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Как удалить историю чатов Cursor и что при этом теряется", "description": "Где Cursor хранит чаты в state.vscdb и логи CLI, почему удаление файла сбрасывает настройки IDE и как сохранить поиск по удалённым чатам через deja-vu.", "url": "https://vshulcz.github.io/deja-vu/ru/guide/delete-cursor-chat-history.html", "inLanguage": "ru", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/ru/guide/delete-cursor-chat-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-01", "dateModified": "2026-11-17"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Удаление истории чатов Cursor", "item": "https://vshulcz.github.io/deja-vu/ru/guide/delete-cursor-chat-history.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Где Cursor хранит историю чатов?", "acceptedAnswer": {"@type": "Answer", "text": "В SQLite-базе state.vscdb внутри ~/Library/Application Support/Cursor/User (macOS) или ~/.config/Cursor/User (Linux) — в папках globalStorage/ и workspaceStorage/<id>/. Транскрипты Cursor CLI лежат отдельно в ~/.cursor/projects/<encoded-path>/agent-transcripts/."}}, {"@type": "Question", "name": "Как безопасно удалить историю чатов Cursor?", "acceptedAnswer": {"@type": "Answer", "text": "В IDE удаляйте чаты через интерфейс самого Cursor, так как state.vscdb хранит и другие настройки редактора. Логи Cursor CLI можно удалять напрямую файлами или через deja delete <id>."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -70,7 +69,7 @@
 <div class="save-first"><b>Перед очисткой чатов:</b> у Cursor нет корзины или архива для удалённых диалогов. Запустите <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> (<code>deja index</code>) перед удалением — deja проиндексирует и базу <code>state.vscdb</code>, и файлы CLI, чтобы вы могли искать старые решения из Cursor, Claude Code или Codex.</div>
 
 <h2>Где хранятся чаты Cursor</h2>
-<pre># база IDE (macOS)
+<pre data-nosnippet># база IDE (macOS)
 ls -lh ~/Library/Application\ Support/Cursor/User/globalStorage/state.vscdb
 
 # количество чатов в базе

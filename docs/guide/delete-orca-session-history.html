@@ -17,7 +17,7 @@
 <link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 <meta name="author" content="vshulcz">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:160">
 <meta name="theme-color" content="#0d0b16">
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
@@ -31,9 +31,8 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Orca session history", "description": "Orca keeps recorded sessions in one SQLite database named agent-session-journal.db. Where it lives, what removing it deletes, and how to index first.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-orca-session-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-orca-session-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-12", "dateModified": "2026-11-14"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Orca session history", "description": "Orca keeps recorded sessions in one SQLite database named agent-session-journal.db. Where it lives, what removing it deletes, and how to index first.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-orca-session-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-orca-session-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-12", "dateModified": "2026-11-17"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Orca session history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-orca-session-history.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does Orca store its session journal?", "acceptedAnswer": {"@type": "Answer", "text": "In agent-session-journal.db under ~/Library/Application Support/orca on macOS, ~/.config/orca on Linux, or %APPDATA%/orca on Windows."}}, {"@type": "Question", "name": "Can deja delete an Orca session?", "acceptedAnswer": {"@type": "Answer", "text": "No. deja delete does not take orca sessions because the store is one shared SQLite database. With Orca closed, remove agent-session-journal.db yourself."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -47,7 +46,7 @@
 <a href="commands.html">CLI reference</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
-<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
 <a href="forgetting.html">Why agents forget</a>
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="lost-context.html">Lost context</a>
@@ -59,6 +58,10 @@
 <a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
 <a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="claude-code-memory-md-limit.html">MEMORY.md 200-line limit</a>
+<a href="claude-code-memory-hooks.html">Claude Code memory hooks</a>
+<a href="codex-memories-config.html">Codex memories &amp; config</a>
+<a href="cursor-mcp-memory.html">Cursor MCP memory</a>
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
@@ -196,7 +199,7 @@ ${XDG_CONFIG_HOME:-~/.config}/orca/agent-session-journal.db
 
 <h2>How to delete it</h2>
 <p><code>deja delete</code> does not take <code>orca</code> sessions because the database is shared across all recorded sessions. With Orca closed, remove the database file:</p>
-<pre>rm ~/Library/Application\ Support/orca/agent-session-journal.db</pre>
+<pre data-nosnippet>rm ~/Library/Application\ Support/orca/agent-session-journal.db</pre>
 
 <h2>Keeping it searchable instead</h2>
 <p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads this database through <code>sqlite3</code> — along with the other forty-seven agents' histories on the machine — into one local index:</p>

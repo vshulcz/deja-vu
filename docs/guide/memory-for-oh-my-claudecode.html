@@ -31,7 +31,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to oh-my-claudecode", "description": "Give oh-my-claudecode workers persistent memory across all forty-eight coding agents using local Claude Code transcripts, without editing CLAUDE.md.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-oh-my-claudecode.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-oh-my-claudecode.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-14", "dateModified": "2026-11-15"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to oh-my-claudecode", "description": "Give oh-my-claudecode workers persistent memory across all forty-eight coding agents using local Claude Code transcripts, without editing CLAUDE.md.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-oh-my-claudecode.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-oh-my-claudecode.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-14", "dateModified": "2026-11-16"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for oh-my-claudecode", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-oh-my-claudecode.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does oh-my-claudecode share memory across sessions?", "acceptedAnswer": {"@type": "Answer", "text": "oh-my-claudecode (OMC) orchestrates multi-agent workflows inside Claude Code, where each session and spawned worker starts with a clean context window. deja indexes the underlying Claude Code transcripts alongside every other harness on the machine so OMC sessions can recall prior fixes and decisions."}}, {"@type": "Question", "name": "How do I wire deja into oh-my-claudecode alongside OMC?", "acceptedAnswer": {"@type": "Answer", "text": "Run deja install claude-auto (or deja install --auto to wire every installed harness). It configures Claude Code's MCP server, skill, /deja command, and lifecycle hooks without altering ~/.claude/.omc-config.json."}}, {"@type": "Question", "name": "Will deja overwrite oh-my-claudecode rules in CLAUDE.md?", "acceptedAnswer": {"@type": "Answer", "text": "No. deja never modifies ./.claude/CLAUDE.md or ~/.claude/CLAUDE-omc.md; recalled context is injected on demand via hooks and the deja MCP tool."}}]}</script>
 </head>
@@ -47,7 +47,7 @@
 <a href="commands.html">CLI reference</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
-<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
 <a href="forgetting.html">Why agents forget</a>
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="lost-context.html">Lost context</a>
@@ -59,6 +59,10 @@
 <a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
 <a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="claude-code-memory-md-limit.html">MEMORY.md 200-line limit</a>
+<a href="claude-code-memory-hooks.html">Claude Code memory hooks</a>
+<a href="codex-memories-config.html">Codex memories &amp; config</a>
+<a href="cursor-mcp-memory.html">Cursor MCP memory</a>
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>

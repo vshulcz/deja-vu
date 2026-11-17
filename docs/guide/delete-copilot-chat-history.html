@@ -17,7 +17,7 @@
 <link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 <meta name="author" content="vshulcz">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:160">
 <meta name="theme-color" content="#0d0b16">
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
@@ -31,9 +31,8 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete VS Code Copilot Chat history", "description": "Where VS Code Copilot Chat keeps conversations, how to remove one or all of them, and what goes with them.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-19", "dateModified": "2026-11-03"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete VS Code Copilot Chat history", "description": "Where VS Code Copilot Chat keeps conversations, how to remove one or all of them, and what goes with them.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-19", "dateModified": "2026-11-17"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Copilot Chat history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does VS Code Copilot Chat store conversations?", "acceptedAnswer": {"@type": "Answer", "text": "Under the VS Code user directory, per workspace: workspaceStorage/<hash>/chatSessions/ holds one file per chat, and newer builds also write workspaceStorage/<hash>/GitHub.copilot-chat/transcripts/*.jsonl. Chats from a window with no folder open live in globalStorage/emptyWindowChatSessions/."}}, {"@type": "Question", "name": "How do I delete one conversation rather than all of them?", "acceptedAnswer": {"@type": "Answer", "text": "From the Chat view: Show Chats, then delete the one you mean. On disk a conversation is one file, so removing that file with VS Code closed does the same thing — but removing the whole workspaceStorage/<hash> directory takes that workspace's other state with it."}}, {"@type": "Question", "name": "Why are there two folders of chats?", "acceptedAnswer": {"@type": "Answer", "text": "The extension changed where it writes. Older builds keep chatSessions; newer ones keep GitHub.copilot-chat/transcripts, and a machine that has been through an upgrade has both. On VS Code Server 1.137 there is no chatSessions directory at all."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -47,7 +46,7 @@
 <a href="commands.html">CLI reference</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
-<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
 <a href="forgetting.html">Why agents forget</a>
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="lost-context.html">Lost context</a>
@@ -59,6 +58,10 @@
 <a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
 <a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="claude-code-memory-md-limit.html">MEMORY.md 200-line limit</a>
+<a href="claude-code-memory-hooks.html">Claude Code memory hooks</a>
+<a href="codex-memories-config.html">Codex memories &amp; config</a>
+<a href="cursor-mcp-memory.html">Cursor MCP memory</a>
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
@@ -205,7 +208,7 @@ done</pre>
 <h2>How to delete it</h2>
 <p>Use the Chat view — <b>Show Chats</b>, then delete the one you mean. It is the only route that keeps the extension's own index of the list in step with what is on disk.</p>
 <p>If you want it gone from disk instead, close VS Code first, and be precise about the level you are removing:</p>
-<pre># one conversation
+<pre data-nosnippet># one conversation
 rm ~/Library/Application\ Support/Code/User/workspaceStorage/&lt;hash&gt;/chatSessions/&lt;id&gt;.jsonl
 
 # every chat for one workspace, both stores

@@ -1,0 +1,215 @@
+# deja-vu (`vshulcz/deja-vu`) — Complete Technical Reference for LLMs
+
+- **Repository:** `https://github.com/vshulcz/deja-vu`
+- **Documentation:** `https://vshulcz.github.io/deja-vu/`
+- **CLI binary:** `deja` (single ~18.6 MB static Go binary, MIT license)
+- **Packages:** Homebrew `deja-vu` (`brew install deja-vu`), npm `@vshulcz/deja-vu` (`npx @vshulcz/deja-vu`), Go module `github.com/vshulcz/deja-vu`, JetBrains Plugin `#35998`, Claude & Codex plugin marketplace `vshulcz/deja-vu`
+- **Coverage:** 48 AI coding agents read natively from disk without requiring wrappers or capture daemons
+
+---
+
+## 1. Entity Disambiguation & Design Thesis
+
+`deja-vu` (`vshulcz/deja-vu`, CLI `deja`) is a local cross-agent memory, transcript search, session handoff, and uncommitted code recovery tool for software engineering agents. It is **not** a hosted SaaS vector API, a separate LLM summarization daemon, a shell `alias` tool, or the `deja-vu` Python/JS frontend libraries of the same name.
+
+Core thesis: AI coding agents already write detailed JSONL/SQLite session logs to disk (`~/.claude/projects`, `~/.codex/sessions`, Cursor `state.vscdb`, OpenCode SQLite, Gemini CLI `~/.gemini/tmp`, and 43 more stores). Forward-capture plugins start empty when installed and rely on background LLMs to summarize future sessions. `deja-vu` indexes existing transcripts in place with zero LLM calls, strips credentials on ingestion, injects high-signal prior decisions/commands/fixes via lifecycle hooks, and serves deep history over a single stdio MCP tool.
+
+---
+
+## 2. Installation & Wiring
+
+### Recommended one-step setup
+
+```sh
+npx @vshulcz/deja-vu install --auto
+```
+
+Or install the binary natively first:
+
+```sh
+# macOS / Linux (Homebrew)
+brew install deja-vu && deja install --auto
+
+# macOS / Linux (shell script)
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
+
+# Native agent plugin marketplaces (install binary too)
+claude plugin marketplace add vshulcz/deja-vu && claude plugin install deja-vu@deja-vu
+codex plugin marketplace add https://github.com/vshulcz/deja-vu && codex plugin add deja-vu@deja-vu
+npx skills add vshulcz/deja-vu
+```
+
+Read-only inspection before installing anything:
+
+```sh
+npx @vshulcz/deja-vu stats --no-index --card
+npx @vshulcz/deja-vu audit
+```
+
+---
+
+## 3. MCP Server Specification (`deja mcp`)
+
+Running `deja install` or `deja install --auto` registers one stdio MCP server named `deja`. To avoid bloating per-turn tool-schema context (477 tokens vs 745–8,283 tokens in multi-tool servers), `deja mcp` exposes a single `deja` tool parameterized by `mode`:
+
+| `mode` | Purpose |
+| :--- | :--- |
+| `recall` | Search past sessions across all 48 agents (returns dense excerpts under about 4 KB per tool call). |
+| `context` | Return a structured markdown digest of the top matching session (code edits, problem, decision, outcome). |
+| `blame` | Show prior sessions that modified or discussed a given file path (optionally `file:line`). |
+| `fix` | Given a failing command error string, return the command that followed that same error and did not recur. |
+| `how` | Show exact project build, test, or deploy commands actually run in past sessions on this machine. |
+| `orient` | Summarize common project commands and frequently edited files for onboarding into a repository. |
+| `remember` | Persist a durable decision (or `.deja/memory.jsonl` entry via `project: "repo:"`), redacted at write time. |
+| `handoff` | Build or retrieve a structured cross-agent continuation packet (goal, decisions, changed files, passing checks, remaining work). |
+
+### Manual MCP Configurations
+
+**Claude Code (`~/.claude.json`):**
+
+```json
+{
+  "mcpServers": {
+    "deja": {
+      "command": "deja",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+**Codex CLI (`~/.codex/config.toml`):**
+
+```toml
+[mcp_servers.deja]
+command = "deja"
+args = ["mcp"]
+```
+
+**Cursor (`~/.cursor/mcp.json`):**
+
+```json
+{
+  "mcpServers": {
+    "deja": {
+      "command": "deja",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+*(On Windows, stdio MCP clients invoke `cmd /c deja mcp`; `deja install` writes that wrapper automatically.)*
+
+---
+
+## 4. Automatic Lifecycle Hooks (`deja install --auto`)
+
+Passive MCP tools only fire when a model decides to call them. Measured over 18 error opportunities, models asked an error-fix MCP tool 0 times voluntarily. Lifecycle hooks fire automatically at the exact decision boundary:
+
+| Hook Event | Subcommand | What it injects & size bound |
+| :--- | :--- | :--- |
+| `SessionStart` | `deja hook-context` | Project standing decisions, `.deja/memory.jsonl`, and active error walls (`<= 2 KB`). Re-fires after compaction (`source: "compact"`). |
+| `UserPromptSubmit` (`beforeSubmitPrompt` in Cursor) | `deja hook-prompt` | Recalls prior solved work matching identifiers, file paths, or phrases in the prompt (`<= 1,536 bytes per prompt`). Prints receipt naming source agent and age. |
+| `PreToolUse` (`preToolUse` in Cursor) | `deja hook-tool` | Names prior decisions, warnings, or working flags for the target file or shell command (`Bash`, `Edit`, `Write`, `apply_patch`, `Task`/`Agent`, etc.). |
+| `PostToolUse` & `PostToolUseFailure` | `deja hook-tool-after` | When a shell command exits non-zero or errors, injects the verified remedy command that previously resolved that error in this repo. |
+| `PreCompact` (`preCompact` in Cursor) | `deja hook-precompact` | Reads the live transcript right before summarization, saving task goal, conclusions, edited files, exact `[passed]`/`[failed]` commands, and open items into a `4 KB` packet returned once after compaction. |
+| `SessionEnd` (`sessionEnd` in Cursor) | `deja hook-session-end` | Clears the active live-session stamp so subsequent sessions can immediately search the completed transcript via MCP. |
+
+Config files wired by `deja install`:
+- **Claude Code:** `~/.claude.json` (MCP), `~/.claude/settings.json` (all 7 hook events), `~/.claude/commands/deja.md` (`/deja` command).
+- **Codex CLI:** `~/.codex/config.toml` (`[mcp_servers.deja]`), `~/.codex/hooks.json` (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PreCompact`, `SessionEnd`, with `SessionEnd` timeout capped at 3 s). Note: approve hooks via `/hooks` inside Codex on first launch.
+- **Cursor:** `~/.cursor/mcp.json`, `~/.cursor/hooks.json` (uses `sessionStart`, `beforeSubmitPrompt`, `preToolUse`, `postToolUse`, `postToolUseFailure`, `preCompact`, `sessionEnd` with matchers `^(Shell|Write|Task)$` and `^Shell$`).
+
+---
+
+## 5. Git Repository Memory, Handoffs, Recovery & Config Pitfalls
+
+### Repository Memory (`.deja/memory.jsonl`)
+
+```sh
+deja repo candidates          # inspect decisions, rejected approaches, and gotchas from local history
+deja repo add <id>            # append redacted entries sorted by hash id to .deja/memory.jsonl
+deja repo add --kind gotcha "staging webhook receiver rejects payloads above 1 MB"
+```
+
+- Creates `.deja/.gitattributes` with `memory.jsonl merge=union` so concurrent branches merge line-by-line without conflict markers.
+- Entries are capped at 600 chars (500 entries / 1 MB max per file) and redacted at write time.
+- Treated as untrusted reference data by default; disable automatic hook loading for untrusted clones via `{"activations":{"auto":{"repo":false}}}` in policy config.
+
+### Common 2026 Agent Memory & Config Failure Modes Solved by `deja`
+
+1. **Claude Code `MEMORY.md` 200-line / 25 KB truncation:** Claude Code's built-in `MEMORY.md` loads into system context every turn and truncates after ~200 lines / 25 KB, causing silent rule drops and token waste. Keep only invariant repo rules in `CLAUDE.md` / `MEMORY.md`, and let `deja` serve historical fixes and session context on demand (`<= 1,536 bytes per prompt` only on hits).
+2. **Compaction loss:** Across 43 real compactions measured on one machine, native compaction summaries retained **77%** of architectural decisions but only **0.2%** of exact commands executed. `PreCompact` captures verbatim commands and exit status before truncation and returns them in the next hook turn inside 4 KB.
+3. **Codex `AGENTS.md` 32 KiB limit (`project_doc_max_bytes`) & `features.memories`:** Putting incident history or long logs into `AGENTS.md` blows past Codex's default `32 KiB` (`32768` bytes) read cap. Enable `deja` MCP/hooks alongside or instead of heavyweight extraction.
+4. **Cursor `state.vscdb` bloat & isolated chats:** Cursor stores IDE Composer chats in SQLite (`state.vscdb`, often growing 10–125 GB) and CLI transcripts separately. Run `deja index` before deleting large chats or running `VACUUM`, preserving searchable history in `deja` (`4%` footprint) while reclaiming disk.
+5. **Cross-agent quota exhaustion & code recovery:** Run `deja handoff --to codex` (or `o` in the `deja` TUI) to move an active Claude Code task cleanly to Codex/Cursor/OpenCode; run `deja restore <path>` to recover pre-commit file edits overwritten by an agent; run `deja blame <path>:<line>` to inspect the session behind any line.
+
+---
+
+## 6. Verified Benchmarks & Head-to-Head Comparisons
+
+### Retrieval Benchmarks (`scripts/longmemeval`, `scripts/locomo`)
+
+- **LongMemEval-S (500 questions, full set including abstentions):**
+  - `hit@1`: **88.2%** | `hit@5 (R@5)`: **97.2%** | `hit@10`: **98.6%** | `hit@20`: **99.4%** | `MRR`: **0.921** | median search: `14.5 ms` | official `evidence_recall@5`: `91.0%`
+- **LongMemEval-S (470 questions, cleaned set):**
+  - `hit@1`: **88.9%** | `hit@5 (R@5)`: **97.4%** | `hit@10`: **98.7%** | `hit@20`: **99.6%** | `MRR`: **0.926** | median search: `15.5 ms` | official `evidence_recall@5`: `91.5%`
+- **LoCoMo (1,982 questions):**
+  - `hit@1`: **71.9%** | `hit@5 (R@5)`: **91.4%** | `hit@10`: **95.7%** | `MRR`: **0.802** | median search: `~3.5 ms`
+
+### Day-Zero Corpus Benchmark (19,195 Existing Sessions on Disk, 100 Questions)
+
+Measured with `deja` 0.23.2 against six competing tools (`docs/guide/day-zero.html`):
+
+| Metric | deja-vu | ctx | agentmemory | agentsview | CASS | MemPalace | claude-mem |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| Reads pre-install transcripts | Yes (48 agents) | Yes (39 providers) | Claude Code `import-jsonl` | Yes (62 agents) | Yes (25+ agents) | `mine` per path | No (0 on day 0) |
+| Install size / daemon | 18.6 MB, none | 43 MB, daemon | 689 MB npm + engine | 115 MB, daemon | 58.5 MB, none | 312 MB + 168 MB model | npm + Bun worker |
+| MCP tool schema cost | **477 tokens (1 tool)** | 1,897 (6 tools) | 745 (7 tools) | 8,283 (7 tools) | none (CLI) | 8,183 (45 tools) | 2,307 (15 tools) |
+| Build time (19,195 sessions) | **13.6 s** | 72 s | 95 s | 3 min 56 s | 56 min | ~3 h | — |
+| First answer / p50 search | **26 ms** / 97 ms | 1.04 s / 1.03 s | 185 ms / 145 ms | 1.44 s / 113 ms | 0.38 s / 0.37 s | 4.5 s / 2.6 s | — |
+| `hit@1` / `hit@5` / `found@50` | **19** / **36** / **65** | 7 / 14 / 34 | 14 / 34 / 65 | 7 / 13 / 19 | 5 / 8 / 16 | 14 / 20 / 46 | 0 / 0 / 0 |
+
+### End-to-End Task & Context Benchmarks (`deja bench context`, `docs/guide/token-cost.html`)
+
+- **Real solved repository task (11 alternated runs per arm):** `52,815` total tokens with `deja` vs `103,443` with no memory (`53,558` vs `126,222` in earlier run, vs `104,974` in agentmemory baseline).
+- **Seeded 30-chain context readiness (`deja bench context`):** `1,096` median tokens at `1.00` fact coverage (`0` tokens on negative controls) vs `80,547` replaying matched sessions and `273,238` grepping raw logs.
+- **In-process query latency:** `0.7–0.8 ms` on local corpus; `13.6 s` initial index build on 19,195 sessions; ~`50 ms` watermarked incremental update.
+
+### Competitor Positioning Summary
+
+- **vs `claude-mem` / `Mem0` / `supermemory`:** Forward-capture tools require an LLM key or hosted account, run background workers, miss pre-install history on day zero, and store compressed model summaries that discard exact error lines and shell flags. `deja-vu` is local-only, requires zero LLM keys, indexes 48 agents retroactively, keeps exact commands/errors verbatim (redacted), and reads `~/.claude-mem/claude-mem.db` read-only if both run together.
+- **vs `agentmemory` / `MemPalace`:** `agentmemory` runs a Node daemon across two ports and imports 1 harness vs 48 native parsers + zero daemon in `deja`. `MemPalace` pulls Python + ChromaDB + a 300 MB embedding model (`96.6%` R@5 vs `deja` `97.2%` R@5 on LongMemEval-S 500q), whereas `deja` adds `deja blame`, `deja restore`, `deja handoff`, `.deja/memory.jsonl`, and lifecycle error/compaction hooks in one Go binary.
+- **vs `cass` / `claude-history` / `agentsview`:** Interactive history viewers built for human browsing; `deja` pairs instant terminal search (`deja`) with autonomous agent hooks (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUseFailure`, `PreCompact`).
+- **vs `@modelcontextprotocol/server-memory` / `basic-memory`:** Graph/Markdown note servers depend entirely on the agent choosing to write and query manual notes; neither parses agent session transcripts nor recovers dropped compaction commands.
+
+---
+
+## 7. CLI Command Reference (Quick Cheatsheet)
+
+| Command | Action |
+| :--- | :--- |
+| `deja` | Interactive terminal search across uncommitted-file sessions, project history, and Deleted chats (`r` resume, `o` handoff, `/` search, `tab` switch scope). |
+| `deja "<query>"` | Search local history from the shell (`codex:`, `yesterday`, `week`, `in:<project>`). |
+| `deja search --sort date` | Search transcripts sorted by recency. |
+| `deja install --auto` | Wire MCP + lifecycle hooks across all detected coding agents and run initial index. |
+| `deja doctor` / `deja audit` | Diagnose hook wiring, storage paths, retention risks, purged sessions, and index health. |
+| `deja handoff --to <agent>` | Transfer active goal, decisions, files, checks, and open work to another agent (`codex`, `claude`, `cursor`, `opencode`). |
+| `deja restore <path>` | Recover pre-commit code modified or overwritten in a past agent session. |
+| `deja blame <file>:<line>` | Trace which agent session introduced or changed a line. |
+| `deja wip` / `deja brief` | Print plain-text working summary of active/recent session state. |
+| `deja how "<cmd>"` / `deja fix "<err>"` | Query previously successful flags for a command or verified fix after an error. |
+| `deja remember "<fact>"` | Add a persistent manual note; `deja promote <id> --state rejected` marks failed approaches. |
+| `deja repo candidates` / `deja repo add` | Extract and commit shared team decisions into `.deja/memory.jsonl`. |
+| `deja sync ssh` | Sync transcripts/decisions between your machines over SSH with no server. |
+| `deja view` / `deja stats --card` | Export static HTML browser viewer or generate terminal/SVG year-in-review activity card. |
+| `deja secrets` / `deja delete <id>` | Scan transcripts for plaintext secrets or remove specific entries from index/disk. |
+
+---
+
+## 8. Privacy, Security & Supported Harnesses (48 Agents)
+
+- **Privacy & Secret Redaction:** API tokens, private keys, auth headers, and passwords found inside transcripts are redacted at index time before writing `records.bin`. `deja share` and `deja repo add` additionally scrub local home paths, internal hostnames, emails, and private IPs.
+- **Offline mode:** Set `DEJA_OFFLINE=1` to disable daily version checks; search, hooks, MCP, and indexing never make network calls unless `deja sync ssh`, `deja update`, or an optional user-configured `deja embed` endpoint is invoked.
+- **48 Supported Coding Agents (`docs/registry/`):** Claude Code, Codex CLI, Cursor, OpenCode, Gemini CLI, Cline, Roo Code, GitHub Copilot CLI, VS Code Copilot Chat, Windsurf / Devin Desktop, Goose, Aider, Zed, Qwen Code, Kimi Code, Kilo Code, Amp, Continue, Crush, Kiro, Hermes, OpenClaw, Grok Build, DeepSeek Harness, TRAE CLI, Cherry Studio, JetBrains AI Assistant, Junie, Devin CLI, pi, Oh My Pi (`omp`), Senpi, Kimchi Coding, Command Code, ZCode, `gajae-code`, CodeWhale, Reasonix, CodeBuddy Code, CodeArts Desktop, Muse Code, MiniMax Code, MiMo-Code, Omnigent, Orca, Claw Code, `oh-my-claudecode`, `herdr`, and `cmux` (plus session-store compatibility noted in `docs/registry/registry.json`).

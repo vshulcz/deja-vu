@@ -29,15 +29,14 @@
 <link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
 <link rel="stylesheet" href="../../assets/site.css">
 <meta name="author" content="vshulcz">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:160">
 <meta name="theme-color" content="#0d0b16">
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
 <link rel="apple-touch-icon" href="../../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Cursor 的 state.vscdb 太大：是什么塞满了它，以及怎么安全瘦身", "description": "Cursor 的 state.vscdb 膨胀到 30–125 GB：两条只读 SQLite 查询找出哪些对话占满了空间，按最安全顺序瘦身，并保留删掉的聊天记录。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-05", "dateModified": "2026-11-05"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Cursor 的 state.vscdb 太大：是什么塞满了它，以及怎么安全瘦身", "description": "Cursor 的 state.vscdb 膨胀到 30–125 GB：两条只读 SQLite 查询找出哪些对话占满了空间，按最安全顺序瘦身，并保留删掉的聊天记录。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-05", "dateModified": "2026-11-17"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "state.vscdb 太大", "item": "https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "为什么 Cursor 的 state.vscdb 会膨胀到几十 GB？", "acceptedAnswer": {"@type": "Answer", "text": "state.vscdb 是一个 SQLite 数据库，其中的 cursorDiskKV 表存着所有聊天记录（composerData、bubbleId）以及 Agent 的检查点与大对象（checkpointId、agentKv）。几个超长的 Agent 会话往往就占了绝大部分体积。"}}, {"@type": "Question", "name": "state.vscdb.backup 可以直接删掉吗？", "acceptedAnswer": {"@type": "Answer", "text": "可以。Cursor 已经不再更新这个旧备份文件，退出 Cursor 后直接删除即可释放空间，不会影响当前聊天记录。"}}, {"@type": "Question", "name": "清理或重置 state.vscdb 之前怎么保留里面的历史对话？", "acceptedAnswer": {"@type": "Answer", "text": "Cursor 本身没有归档功能。清理前先运行一次 deja index，它会通过 sqlite3 只读读取 state.vscdb 并建立紧凑的本地全文索引；之后即使你在 Cursor 里删掉对话或移走整个数据库，这些对话依然可以用 deja 搜索和查看。"}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -98,18 +97,18 @@
 <h2>先不改文件，只读查出是谁占了空间</h2>
 <p>退出 Cursor，或者直接带 <code>-readonly</code> 查询。两条查询都会扫全表，50 GB 的文件大约需要几分钟。</p>
 <p>看哪一类键占了空间：</p>
-<pre>sqlite3 -readonly state.vscdb "
+<pre data-nosnippet>sqlite3 -readonly state.vscdb "
 SELECT substr(key, 1, instr(key, ':') - 1) AS kind, count(*),
        round(sum(length(CAST(value AS BLOB))) / 1e9, 2) AS gb
 FROM cursorDiskKV GROUP BY kind ORDER BY gb DESC;"</pre>
 <p>看具体是哪几个会话占得最多：</p>
-<pre>sqlite3 -readonly state.vscdb "
+<pre data-nosnippet>sqlite3 -readonly state.vscdb "
 SELECT substr(key, 10, 36) AS chat, count(*) AS messages,
        round(sum(length(CAST(value AS BLOB))) / 1e6) AS mb
 FROM cursorDiskKV WHERE key LIKE 'bubbleId:%'
 GROUP BY chat ORDER BY mb DESC LIMIT 15;"</pre>
 <p>再查出某个会话的标题，方便在 Cursor 列表里找到它：</p>
-<pre>sqlite3 -readonly state.vscdb "
+<pre data-nosnippet>sqlite3 -readonly state.vscdb "
 SELECT json_extract(value, '$.name') FROM cursorDiskKV
 WHERE key = 'composerData:&lt;chat id&gt;';"</pre>
 <p>通常结果都是少数几个极长的 Agent 会话占掉了大半个文件，而不是几千个小对话。</p>

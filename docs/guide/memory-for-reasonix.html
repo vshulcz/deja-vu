@@ -32,7 +32,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Reasonix", "description": "Reasonix keeps every session and can resume one; nothing reads the others back. deja installs a Reasonix plugin with its MCP server, skill, slash command and an extension, and indexes every other agent on the machine.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-reasonix.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-reasonix.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-27", "dateModified": "2026-11-15"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Reasonix", "description": "Reasonix keeps every session and can resume one; nothing reads the others back. deja installs a Reasonix plugin with its MCP server, skill, slash command and an extension, and indexes every other agent on the machine.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-reasonix.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-reasonix.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-27", "dateModified": "2026-11-16"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for Reasonix", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-reasonix.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Reasonix remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It keeps every session under ~/.reasonix and can resume one with --resume, but a new session reads none of the others. deja indexes them with every other agent's transcripts on the machine and gives the model a tool to search them."}}, {"@type": "Question", "name": "How do I add memory to Reasonix?", "acceptedAnswer": {"@type": "Answer", "text": "deja install reasonix-auto installs a Reasonix plugin named deja: an MCP server, a skill, a /deja command and an extension that adds recall to the turn at input.receive, the fix for a failed command at tool.after, and deja's record of the folded turns at compaction. It goes through reasonix plugin install when reasonix is on PATH."}}, {"@type": "Question", "name": "Does deja break Reasonix's prefix cache?", "acceptedAnswer": {"@type": "Answer", "text": "No. The system prompt is never edited. Recall is appended to the user turn, which is the tail of the request, and stays byte-identical in every later request's prefix."}}]}</script>
 </head>
@@ -48,7 +48,7 @@
 <a href="commands.html">CLI reference</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
-<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
 <a href="forgetting.html">Why agents forget</a>
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="lost-context.html">Lost context</a>
@@ -60,6 +60,10 @@
 <a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
 <a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="claude-code-memory-md-limit.html">MEMORY.md 200-line limit</a>
+<a href="claude-code-memory-hooks.html">Claude Code memory hooks</a>
+<a href="codex-memories-config.html">Codex memories &amp; config</a>
+<a href="cursor-mcp-memory.html">Cursor MCP memory</a>
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>

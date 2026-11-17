@@ -16,7 +16,7 @@
 <link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 <meta name="author" content="vshulcz">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:160">
 <meta name="theme-color" content="#0d0b16">
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
@@ -27,7 +27,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete Junie session history","description":"Junie keeps each session in a directory under ~/.junie/sessions. Find it, remove one session or all, and understand what remains in index.jsonl.","url":"https://vshulcz.github.io/deja-vu/guide/delete-junie-session-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished": "2026-10-24","dateModified": "2026-11-03","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete Junie session history","description":"Junie keeps each session in a directory under ~/.junie/sessions. Find it, remove one session or all, and understand what remains in index.jsonl.","url":"https://vshulcz.github.io/deja-vu/guide/delete-junie-session-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished": "2026-10-24","dateModified": "2026-11-17","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -40,7 +40,7 @@
 <a href="commands.html">CLI reference</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
-<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
 <a href="forgetting.html">Why agents forget</a>
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="lost-context.html">Lost context</a>
@@ -52,6 +52,10 @@
 <a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
 <a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="claude-code-memory-md-limit.html">MEMORY.md 200-line limit</a>
+<a href="claude-code-memory-hooks.html">Claude Code memory hooks</a>
+<a href="codex-memories-config.html">Codex memories &amp; config</a>
+<a href="cursor-mcp-memory.html">Cursor MCP memory</a>
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
@@ -190,10 +194,10 @@
 
 <h2>How to delete one session</h2>
 <p>Close Junie and any IDE instance running AI Assistant so an active session cannot rewrite its files, then delete the session directory:</p>
-<pre>rm -rf "${JUNIE_HOME:-$HOME/.junie}/sessions/&lt;session-id&gt;"</pre>
+<pre data-nosnippet>rm -rf "${JUNIE_HOME:-$HOME/.junie}/sessions/&lt;session-id&gt;"</pre>
 <p>Removing the directory deletes the conversation log, the state, and the rendered <code>transcript.md</code>. Removing the directory leaves the session's line in <code>sessions/index.jsonl</code>; this index line holds only the path and task name, not the conversation contents.</p>
 <p>To clear every session, remove the <code>sessions</code> directory. That removes every session across all projects; other configuration files under <code>~/.junie</code> are not touched:</p>
-<pre>rm -rf "${JUNIE_HOME:-$HOME/.junie}/sessions"</pre>
+<pre data-nosnippet>rm -rf "${JUNIE_HOME:-$HOME/.junie}/sessions"</pre>
 
 <h2>What you lose</h2>
 <p>The conversation turns, the tool calls (commands, file inspections, and edits), the agent's task state, and the rendered <code>transcript.md</code>. Once deleted, Junie cannot restore the session, and <code>junie --session-id &lt;id&gt; --resume</code> will no longer find it unless you have a separate backup.</p>

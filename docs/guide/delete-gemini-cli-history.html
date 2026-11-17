@@ -17,7 +17,7 @@
 <link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 <meta name="author" content="vshulcz">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:160">
 <meta name="theme-color" content="#0d0b16">
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
@@ -31,9 +31,8 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Gemini CLI chat history", "description": "Where Gemini CLI keeps chats under ~/.gemini/tmp, how to map a project id back to a directory, what to delete and what the prompt log keeps.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-19", "dateModified": "2026-11-03"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Gemini CLI chat history", "description": "Where Gemini CLI keeps chats under ~/.gemini/tmp, how to map a project id back to a directory, what to delete and what the prompt log keeps.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-19", "dateModified": "2026-11-17"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Gemini CLI chat history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does Gemini CLI store chat history?", "acceptedAnswer": {"@type": "Answer", "text": "Under ~/.gemini/tmp/<project-id>/chats/, as .json or .jsonl files — one per chat, with a sub-agent's run nested one directory deeper. GEMINI_CLI_HOME moves the whole tree."}}, {"@type": "Question", "name": "Which directory belongs to which project?", "acceptedAnswer": {"@type": "Answer", "text": "The directory name is a project id, not a path. ~/.gemini/projects.json maps ids back to directories, and a .project_root file inside the id directory names it as well."}}, {"@type": "Question", "name": "Does deleting a chat delete the prompt log?", "acceptedAnswer": {"@type": "Answer", "text": "No. logs.json sits beside the chats in the same id directory and keeps what you typed; it survives deleting the chats and has to be removed separately."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -47,7 +46,7 @@
 <a href="commands.html">CLI reference</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
-<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
 <a href="forgetting.html">Why agents forget</a>
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="lost-context.html">Lost context</a>
@@ -59,6 +58,10 @@
 <a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
 <a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="claude-code-memory-md-limit.html">MEMORY.md 200-line limit</a>
+<a href="claude-code-memory-hooks.html">Claude Code memory hooks</a>
+<a href="codex-memories-config.html">Codex memories &amp; config</a>
+<a href="cursor-mcp-memory.html">Cursor MCP memory</a>
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
@@ -209,7 +212,7 @@ done</pre>
 <p>Without one of those, deleting by directory name is deleting something you cannot identify.</p>
 
 <h2>How to delete it</h2>
-<pre># one chat
+<pre data-nosnippet># one chat
 rm ~/.gemini/tmp/&lt;project-id&gt;/chats/&lt;file&gt;
 
 # every chat for one project, sub-agent runs included

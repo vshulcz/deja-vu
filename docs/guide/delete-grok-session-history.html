@@ -17,7 +17,7 @@
 <link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 <meta name="author" content="vshulcz">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:160">
 <meta name="theme-color" content="#0d0b16">
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
@@ -31,9 +31,8 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Grok Build session history", "description": "Grok Build keeps each session in its own directory under ~/.grok/sessions. Remove one with deja delete or by hand, and keep the rest searchable.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-grok-session-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-grok-session-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-09", "dateModified": "2026-11-09"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Grok Build session history", "description": "Grok Build keeps each session in its own directory under ~/.grok/sessions. Remove one with deja delete or by hand, and keep the rest searchable.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-grok-session-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-grok-session-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-09", "dateModified": "2026-11-17"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Grok Build session history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-grok-session-history.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does Grok Build store its session history?", "acceptedAnswer": {"@type": "Answer", "text": "In ${GROK_HOME:-~/.grok}/sessions/<url-encoded working directory>/<session id>/, one directory per session: updates.jsonl holds the ACP conversation and summary.json the title, working directory and timestamps. The grok.db beside them belongs to grok-dev, another CLI."}}, {"@type": "Question", "name": "How do I delete one Grok Build session?", "acceptedAnswer": {"@type": "Answer", "text": "Close Grok Build and remove the session's directory under ~/.grok/sessions/. Removing only updates.jsonl leaves a summary.json that still lists the session. With deja installed, deja delete <id> --dry-run lists the same paths first."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -47,7 +46,7 @@
 <a href="commands.html">CLI reference</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
-<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
 <a href="forgetting.html">Why agents forget</a>
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="lost-context.html">Lost context</a>
@@ -59,6 +58,10 @@
 <a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
 <a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="claude-code-memory-md-limit.html">MEMORY.md 200-line limit</a>
+<a href="claude-code-memory-hooks.html">Claude Code memory hooks</a>
+<a href="codex-memories-config.html">Codex memories &amp; config</a>
+<a href="cursor-mcp-memory.html">Cursor MCP memory</a>
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
@@ -196,7 +199,7 @@
 
 <h2>How to delete one session</h2>
 <p>Close Grok Build first so a running session cannot rewrite its files, then remove the session's directory:</p>
-<pre>rm -r "${GROK_HOME:-$HOME/.grok}/sessions/&lt;encoded-cwd&gt;/&lt;session-id&gt;"</pre>
+<pre data-nosnippet>rm -r "${GROK_HOME:-$HOME/.grok}/sessions/&lt;encoded-cwd&gt;/&lt;session-id&gt;"</pre>
 <p>Do not delete only <code>updates.jsonl</code>: the <code>summary.json</code> left behind still lists the session, now with no conversation behind it. Grok Build scopes its session list by working directory, so removing the directory is also what takes the session out of the list for that project.</p>
 <p>To clear everything, remove the <code>sessions</code> directory. That removes every session of every project; <code>config.toml</code>, the hooks in <code>hooks/</code>, the plugin wiring and <code>GROK.md</code> are not touched.</p>
 

@@ -17,7 +17,7 @@
 <link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 <meta name="author" content="vshulcz">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:160">
 <meta name="theme-color" content="#0d0b16">
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
@@ -31,9 +31,8 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Kilo Code task history", "description": "Kilo Code keeps each task as JSON under the VS Code extension's storage, and its CLI keeps a separate SQLite store.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-kilo-code-task-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-kilo-code-task-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-19", "dateModified": "2026-11-03"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Kilo Code task history", "description": "Kilo Code keeps each task as JSON under the VS Code extension's storage, and its CLI keeps a separate SQLite store.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-kilo-code-task-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-kilo-code-task-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-19", "dateModified": "2026-11-17"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Kilo Code task history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-kilo-code-task-history.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does Kilo Code store task history?", "acceptedAnswer": {"@type": "Answer", "text": "Two places. The VS Code extension writes one directory per task under its global storage, kilocode.kilo-code/tasks/<id>/api_conversation_history.json, and the CLI keeps its own SQLite store at ~/.local/share/kilo/kilo.db."}}, {"@type": "Question", "name": "Does deleting a task in the extension remove the CLI's copy?", "acceptedAnswer": {"@type": "Answer", "text": "No. They are separate stores with separate contents: a task removed in VS Code leaves whatever the CLI recorded, and clearing the CLI database leaves the extension's task directories."}}, {"@type": "Question", "name": "Which VS Code builds does this cover?", "acceptedAnswer": {"@type": "Answer", "text": "Code, Code - Insiders, VSCodium, and the forks that reuse the same layout, including Cursor and Windsurf — each keeps its own globalStorage, so the same extension can have several unrelated task trees on one machine."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -47,7 +46,7 @@
 <a href="commands.html">CLI reference</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
-<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
 <a href="forgetting.html">Why agents forget</a>
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="lost-context.html">Lost context</a>
@@ -59,6 +58,10 @@
 <a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
 <a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="claude-code-memory-md-limit.html">MEMORY.md 200-line limit</a>
+<a href="claude-code-memory-hooks.html">Claude Code memory hooks</a>
+<a href="codex-memories-config.html">Codex memories &amp; config</a>
+<a href="cursor-mcp-memory.html">Cursor MCP memory</a>
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
@@ -195,10 +198,10 @@
 
 <h2>How to delete it</h2>
 <p>In the extension, delete the task from Kilo's own history view. On disk a task is one directory, so with VS Code closed:</p>
-<pre>rm -rf &lt;globalStorage&gt;/kilocode.kilo-code/tasks/&lt;id&gt;
+<pre data-nosnippet>rm -rf &lt;globalStorage&gt;/kilocode.kilo-code/tasks/&lt;id&gt;
 rm -rf &lt;globalStorage&gt;/kilocode.kilo-code/tasks</pre>
 <p>The CLI is the half people forget. Its history is rows in a database, so removing the file is the whole operation, and deleting rows will not shrink it:</p>
-<pre>rm ~/.local/share/kilo/kilo.db</pre>
+<pre data-nosnippet>rm ~/.local/share/kilo/kilo.db</pre>
 <p>Both halves, then — clearing one and calling it done is how a conversation you meant to remove stays on the machine.</p>
 
 <h2>What you lose</h2>

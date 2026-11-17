@@ -28,15 +28,14 @@
 <link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
 <link rel="stylesheet" href="../../assets/site.css">
 <meta name="author" content="vshulcz">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:160">
 <meta name="theme-color" content="#0d0b16">
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
 <link rel="apple-touch-icon" href="../../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "怎么删除 Cursor 的聊天记录，以及会失去什么", "description": "怎么删除 Cursor 的聊天记录——聊天存在 state.vscdb 里的什么位置、为什么删掉整个文件会重置的不只是聊天，以及命令行版另外写了什么。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/delete-cursor-chat-history.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/delete-cursor-chat-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-15", "dateModified": "2026-11-05"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "怎么删除 Cursor 的聊天记录，以及会失去什么", "description": "怎么删除 Cursor 的聊天记录——聊天存在 state.vscdb 里的什么位置、为什么删掉整个文件会重置的不只是聊天，以及命令行版另外写了什么。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/delete-cursor-chat-history.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/delete-cursor-chat-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-15", "dateModified": "2026-11-17"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "删除 Cursor 的聊天记录", "item": "https://vshulcz.github.io/deja-vu/zh/guide/delete-cursor-chat-history.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Cursor 把聊天记录存在哪里？", "acceptedAnswer": {"@type": "Answer", "text": "在 state.vscdb，这是 Cursor 用户目录下的一个 SQLite 数据库——macOS 上是 ~/Library/Application Support/Cursor/User，别处是 ~/.config/Cursor/User——在 globalStorage/ 和各个 workspaceStorage/<id>/ 下。聊天是 cursorDiskKV 表里的行：每个聊天一个 composerData:<id>，每条消息一个 bubbleId:<chat>:<bubble>。"}}, {"@type": "Question", "name": "怎么删除 Cursor 的聊天记录？", "acceptedAnswer": {"@type": "Answer", "text": "在 Cursor 界面里删掉一个聊天是安全的做法。它写入的那个数据库还装着 IDE 其余的状态，所以删掉 state.vscdb 在清掉聊天的同时也清掉里面别的所有东西。Cursor 命令行的转录是分开的纯文件，在 ~/.cursor/projects/<encoded-path>/agent-transcripts 下，可以单独删。"}}, {"@type": "Question", "name": "Cursor 是把聊天归档而不是删除吗？", "acceptedAnswer": {"@type": "Answer", "text": "没有可以恢复的归档目录：你删掉的聊天就从数据库里没了。只有事先索引过它的东西，才是唯一剩下的副本。"}}, {"@type": "Question", "name": "为什么 Cursor 的历史是数据库而不是文件？", "acceptedAnswer": {"@type": "Answer", "text": "Cursor 是 VS Code 的分支，用 VS Code 的键值存储保存扩展状态，所以聊天是放在其他 IDE 状态旁边的值，而不是一个会话一个文件。读它们需要 sqlite3 命令行。"}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -83,7 +82,7 @@
 
 <h2>聊天在哪里</h2>
 <p>用户目录在 macOS 上是 <code>~/Library/Application Support/Cursor/User</code>，别处是 <code>~/.config/Cursor/User</code>，<code>state.vscdb</code> 在 <code>globalStorage/</code> 下，以及每个 <code>workspaceStorage/&lt;id&gt;/</code> 下。库里面，<code>cursorDiskKV</code> 表给每个聊天存一个值，键是 <code>composerData:&lt;id&gt;</code>，每条消息一个值，键是 <code>bubbleId:&lt;chat-id&gt;:&lt;bubble-id&gt;</code>。Cursor CLI 是简单的那种：<code>~/.cursor/projects/&lt;encoded-path&gt;/agent-transcripts/**/*.jsonl</code>，一个转录一个文件。</p>
-<pre># IDE 的库
+<pre data-nosnippet># IDE 的库
 ls -lh ~/Library/Application\ Support/Cursor/User/globalStorage/state.vscdb
 
 # 里面有什么，前提是装了 sqlite3
@@ -96,7 +95,7 @@ ls -t ~/.cursor/projects/*/agent-transcripts/**/*.jsonl | head</pre>
 <h2>怎么删</h2>
 <p>从 Cursor 界面里删掉一个聊天。这不是在打太极——那个数据库是 IDE 拥有的、正在使用的状态，在编辑器运行时从底下改它，是人们连窗口布局和扩展设置一起弄丢的原因，本来只想删一个聊天。</p>
 <p>如果你要的是历史从磁盘上消失，而不只是从列表里消失，先关掉 Cursor，并且清楚自己在删什么：</p>
-<pre># 这个数据库里的聊天，以及其余每一处状态
+<pre data-nosnippet># 这个数据库里的聊天，以及其余每一处状态
 rm ~/Library/Application\ Support/Cursor/User/globalStorage/state.vscdb
 
 # 某个工作区的聊天和那个工作区的状态

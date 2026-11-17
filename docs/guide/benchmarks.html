@@ -4,12 +4,12 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Coding-agent memory benchmarks: quality and cost — deja-vu</title>
-<meta name="description" content="Reproducible, honest measurements of deja's search quality and the token cost of reaching working context — run them yourself.">
+<title>AI Coding Memory Benchmarks: 97.2% LongMemEval — deja-vu</title>
+<meta name="description" content="Reproducible benchmarks: 97.2% R@5 on LongMemEval-S (500q), 91.4% R@5 on LoCoMo, 13.6s build on 19,195 sessions, and 52,815 vs 103,443 real-task tokens.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Coding-agent memory benchmarks: quality and cost">
-<meta property="og:description" content="Reproducible, honest measurements of deja's search quality and the token cost of reaching working context — run them yourself.">
+<meta property="og:title" content="AI Coding Memory Benchmarks: 97.2% LongMemEval">
+<meta property="og:description" content="Reproducible benchmarks: 97.2% R@5 on LongMemEval-S (500q), 91.4% R@5 on LoCoMo, 13.6s build on 19,195 sessions, and 52,815 vs 103,443 real-task tokens.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -25,14 +25,14 @@
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
-<meta name="twitter:title" content="Coding-agent memory benchmarks: quality and cost">
-<meta name="twitter:description" content="Reproducible, honest measurements of deja's search quality and the token cost of reaching working context — run them yourself.">
+<meta name="twitter:title" content="AI Coding Memory Benchmarks: 97.2% LongMemEval">
+<meta name="twitter:description" content="Reproducible benchmarks: 97.2% R@5 on LongMemEval-S (500q), 91.4% R@5 on LoCoMo, 13.6s build on 19,195 sessions, and 52,815 vs 103,443 real-task tokens.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Benchmarks", "description": "Reproducible, honest measurements of deja's search quality and the token cost of reaching working context — run them yourself.", "url": "https://vshulcz.github.io/deja-vu/guide/benchmarks.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/benchmarks.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-07-19", "dateModified": "2026-10-28"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "AI Coding Memory Benchmarks: 97.2% LongMemEval", "description": "Reproducible benchmarks: 97.2% R@5 on LongMemEval-S (500q), 91.4% R@5 on LoCoMo, 13.6s build on 19,195 sessions, and 52,815 vs 103,443 real-task tokens.", "url": "https://vshulcz.github.io/deja-vu/guide/benchmarks.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/benchmarks.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-07-19", "dateModified": "2026-10-28"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Benchmarks","item":"https://vshulcz.github.io/deja-vu/guide/benchmarks.html"}]}</script>
 </head>
 <body>
@@ -47,7 +47,7 @@
 <a href="commands.html">CLI reference</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
-<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
 <a href="forgetting.html">Why agents forget</a>
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="lost-context.html">Lost context</a>
@@ -59,6 +59,10 @@
 <a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
 <a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="claude-code-memory-md-limit.html">MEMORY.md 200-line limit</a>
+<a href="claude-code-memory-hooks.html">Claude Code memory hooks</a>
+<a href="codex-memories-config.html">Codex memories &amp; config</a>
+<a href="cursor-mcp-memory.html">Cursor MCP memory</a>
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
