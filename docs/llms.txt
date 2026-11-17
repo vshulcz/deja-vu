@@ -82,6 +82,7 @@
 ## Benchmarks, alternatives & technical reference
 
 - [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html): LongMemEval-S (500q: 88.2% hit@1, 97.2% R@5, 98.6% hit@10, 0.921 MRR, ~14.5 ms; 470q cleaned: 88.9% hit@1, 97.4% R@5), LoCoMo (71.9% hit@1, 91.4% R@5, 1,982q), and `deja bench` suites
+- [Standalone benchmark suite](https://github.com/vshulcz/coding-agent-memory-benchmark): machine-readable JSON/JSONL runs, zero-dependency Python verifier, and external LongMemEval-S submission scorer
 - [How it compares](https://vshulcz.github.io/deja-vu/guide/compare.html): matrix covering deja-vu, claude-mem, Mem0, Letta, memU, Memori, agentmemory, MemPalace, supermemory, cognee, Graphiti / Zep, Hindsight, basic-memory, MCP server-memory, cass, ctx, Agent Sessions, agent-historian, casr, agentsview, and claude-history
 - [claude-mem alternative](https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html): verbatim local indexing with no Bun worker, LLM key, or empty day zero
 - [Mem0 alternative](https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html): retroactive local memory across 48 coding agents without cloud APIs or Docker

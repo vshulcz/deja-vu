@@ -18,6 +18,13 @@
     <summary>Shared local memory, session history search, cross-agent handoff, and uncommitted code recovery across 48 coding agents (Claude Code, Codex, Cursor, OpenCode, Gemini CLI, OpenClaw and 42 more agents). One Go binary, zero LLM calls.</summary>
   </entry>
   <entry>
+    <title>AI Coding Memory Benchmarks: 97.2% LongMemEval — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/benchmarks.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html"></link>
+    <updated>2026-11-17T00:00:00Z</updated>
+    <summary>Reproducible benchmarks: 97.2% R@5 on LongMemEval-S (500q), 91.4% R@5 on LoCoMo, 13.6s build on 19,195 sessions, and 52,815 vs 103,443 real-task tokens.</summary>
+  </entry>
+  <entry>
     <title>Claude Code memory hooks in settings.json — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/claude-code-memory-hooks.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/claude-code-memory-hooks.html"></link>
@@ -65,6 +72,13 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html"></link>
     <updated>2026-11-17T00:00:00Z</updated>
     <summary>Why Cursor&#39;s state.vscdb and state.vscdb.backup hit 10–125 GB, why deleting it wipes every chat, and step-by-step SQLite commands to shrink it safely.</summary>
+  </entry>
+  <entry>
+    <title>What each memory tool knows the day you install it — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/day-zero.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/day-zero.html"></link>
+    <updated>2026-11-17T00:00:00Z</updated>
+    <summary>Seven tools on a machine with 19,195 sessions already on disk, asked 100 questions only that history answers: build time, first answer, hit@1.</summary>
   </entry>
   <entry>
     <title>Delete or Purge Codex CLI Sessions — deja-vu</title>
@@ -275,19 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-devin.html"></link>
     <updated>2026-11-16T00:00:00Z</updated>
     <summary>How to give Devin CLI recall over every coding agent&#39;s sessions on the machine — the MCP server, the hooks on each prompt, and CLI install versus plugin.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to DeepSeek Harness: all agents — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html"></link>
-    <updated>2026-11-16T00:00:00Z</updated>
-    <summary>How to give dsh recall over the sessions every coding agent on the machine already wrote — the plugin, the tools, and how it behaves beside the CLI install.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Gemini CLI: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html"></link>
-    <updated>2026-11-16T00:00:00Z</updated>
-    <summary>How to give Gemini CLI recall over every coding agent&#39;s sessions on this machine — one extension install, and what the CLI install adds on top.</summary>
   </entry>
 </feed>
