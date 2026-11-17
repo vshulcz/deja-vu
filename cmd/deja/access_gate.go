@@ -11,7 +11,7 @@ import (
 
 const (
 	envDejaClient      = "DEJA_CLIENT"
-	envDejaClientToken = "DEJA_CLIENT_TOKEN"
+	envDejaClientToken = "DEJA_CLIENT_TOKEN" //nolint:gosec // environment variable name, not a credential
 )
 
 var accessExemptCommands = map[string]bool{

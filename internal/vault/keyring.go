@@ -2,6 +2,7 @@ package vault
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // Keyring stores and retrieves raw 32-byte DEKs in an OS credential store.
@@ -26,7 +28,9 @@ var (
 )
 
 func defaultExecKeyring(bin string, args []string, stdin string, extraEnv []string) ([]byte, error) {
-	cmd := exec.Command(bin, args...) //nolint:gosec // constant OS credential store binaries with validated hex key IDs
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bin, args...)
 	if len(extraEnv) > 0 {
 		cmd.Env = append(os.Environ(), extraEnv...)
 	}
@@ -59,7 +63,7 @@ func validKeyID(keyID string) bool {
 	}
 	for i := range len(keyID) {
 		c := keyID[i]
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 			return false
 		}
 	}
@@ -126,7 +130,7 @@ func (osKeyring) Set(keyID string, dek []byte) error {
 		return err
 	}
 	if out, err := execKeyringFn(bin, args, stdin, env); err != nil {
-		return fmt.Errorf("%s set: %v (%s)", activeKeyring.Name(), err, strings.TrimSpace(string(out)))
+		return fmt.Errorf("%s set: %w (%s)", activeKeyring.Name(), err, strings.TrimSpace(string(out)))
 	}
 	return nil
 }
@@ -172,7 +176,7 @@ func (osKeyring) Delete(keyID string) error {
 	}
 	bin, args, stdin, env, err := keyringCommand(runtime.GOOS, "delete", keyID, "")
 	if err != nil {
-		return nil
+		return err
 	}
 	_, err = execKeyringFn(bin, args, stdin, env)
 	return err

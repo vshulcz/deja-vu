@@ -50,10 +50,10 @@ func AppendPromotedSourced(project, title, text, session, state string, tags []s
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
+	if mkErr := os.MkdirAll(filepath.Dir(path), 0o700); mkErr != nil {
+		return mkErr
 	}
-	if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
+	if info, lstatErr := os.Lstat(path); lstatErr == nil && info.Mode()&os.ModeSymlink != 0 {
 		return errors.New("notes file is a symlink")
 	}
 	// An identical re-promote is not a correction. `promote` writes a record
@@ -75,7 +75,7 @@ func AppendPromotedSourced(project, title, text, session, state string, tags []s
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	if err := f.Chmod(0o600); err != nil && runtime.GOOS != "windows" {
+	if err = f.Chmod(0o600); err != nil && runtime.GOOS != "windows" {
 		return err
 	}
 	if now.IsZero() {
@@ -85,8 +85,8 @@ func AppendPromotedSourced(project, title, text, session, state string, tags []s
 	if !srcTS.IsZero() {
 		stamp = srcTS.UTC().Format(time.RFC3339Nano)
 	}
-	if err := padTrailingNewline(f); err != nil {
-		return err
+	if padErr := padTrailingNewline(f); padErr != nil {
+		return padErr
 	}
 	raw, err := json.Marshal(note{
 		TS: now.UTC().Format(time.RFC3339Nano), Project: project, Text: text,

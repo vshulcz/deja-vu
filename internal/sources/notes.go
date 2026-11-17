@@ -350,13 +350,13 @@ func AppendNoteTagged(project, text string, tags []string, now time.Time) error 
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
+	if mkErr := os.MkdirAll(filepath.Dir(path), 0o700); mkErr != nil {
+		return mkErr
 	}
 	if noteAlreadyStored(path, project, strings.TrimSpace(text)) {
 		return ErrNoteExists
 	}
-	if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
+	if info, lstatErr := os.Lstat(path); lstatErr == nil && info.Mode()&os.ModeSymlink != 0 {
 		return errors.New("notes file is a symlink")
 	}
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0o600)
@@ -364,14 +364,14 @@ func AppendNoteTagged(project, text string, tags []string, now time.Time) error 
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	if err := f.Chmod(0o600); err != nil && runtime.GOOS != "windows" {
+	if err = f.Chmod(0o600); err != nil && runtime.GOOS != "windows" {
 		return err
 	}
 	if now.IsZero() {
 		now = time.Now()
 	}
-	if err := padTrailingNewline(f); err != nil {
-		return err
+	if padErr := padTrailingNewline(f); padErr != nil {
+		return padErr
 	}
 	raw, err := json.Marshal(note{TS: now.UTC().Format(time.RFC3339Nano), Project: project, Text: text, Tags: NormalizeTags(tags)})
 	if err != nil {

@@ -15,6 +15,8 @@ func withAccessVaultEnv(t *testing.T) string {
 	t.Helper()
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
+	t.Setenv("USERPROFILE", tmp)
+	t.Setenv("DEJA_VAULT_BACKEND", "passphrase")
 	t.Setenv(vault.EnvVaultFile, filepath.Join(tmp, "vault.json"))
 	t.Setenv(vault.EnvVaultPassphrase, "test-passphrase-123")
 	t.Setenv(vault.EnvVaultKey, "")
@@ -72,11 +74,11 @@ func TestSnapshotsEncryptWhenVaultEnabled(t *testing.T) {
 
 	// Lock vault: Snapshots must fail closed to placeholder without crashing.
 	t.Setenv(vault.EnvVaultPassphrase, "")
-	if err := vault.Lock(dir, "test-passphrase-123"); err != nil {
+	if err = vault.Lock(dir, "test-passphrase-123"); err != nil {
 		t.Fatal(err)
 	}
 	// Put an encrypted snapshot line back to test locked Snapshots fallback.
-	if err := os.WriteFile(SnapshotPath(dir), raw, 0o600); err != nil {
+	if err = os.WriteFile(SnapshotPath(dir), raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	RecordDigest(dir, KindHook, "should-not-write", 1, 10) // fail-closed write skip
@@ -87,12 +89,12 @@ func TestSnapshotsEncryptWhenVaultEnabled(t *testing.T) {
 
 	// Unlock before testing mixed plaintext + corrupt enc:v1 snapshot lines so OpenTree does not overwrite the fixture.
 	t.Setenv(vault.EnvVaultPassphrase, "test-passphrase-123")
-	if err := vault.Unlock(dir, "test-passphrase-123"); err != nil {
+	if err = vault.Unlock(dir, "test-passphrase-123"); err != nil {
 		t.Fatal(err)
 	}
 	mixed := `{"t":"2026-11-17T00:00:00Z","kind":"hook","bytes":5,"digest":"plain"}` + "\n" +
 		`{"t":"2026-11-17T00:00:01Z","kind":"hook","bytes":5,"digest":"` + vault.NoteLinePrefix + `not-base64!"}` + "\n"
-	if err := os.WriteFile(SnapshotPath(dir), []byte(mixed), 0o600); err != nil {
+	if err = os.WriteFile(SnapshotPath(dir), []byte(mixed), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	decMixed := Snapshots(dir, 5)

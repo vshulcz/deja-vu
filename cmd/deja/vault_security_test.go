@@ -18,6 +18,7 @@ import (
 func withSecurityVaultEnv(t *testing.T) (tmp, dir string) {
 	t.Helper()
 	tmp = hermeticEnv(t)
+	t.Setenv("DEJA_VAULT_BACKEND", "passphrase")
 	dir = index.DefaultDir()
 	oldIter := vault.KDFIterations
 	vault.KDFIterations = 1000
@@ -349,7 +350,10 @@ func TestClientPolicyAuthAndScopesEndToEnd(t *testing.T) {
 	if betaTxt := vaultReplyText(scoped[3]); strings.Contains(betaTxt, "beta internal secret") || !strings.Contains(betaTxt, "not being shown") {
 		t.Fatalf("out-of-scope beta content check failed: %v", scoped[3])
 	}
-	listRaw, _ := json.Marshal(scoped[4])
+	listRaw, marshalErr := json.Marshal(scoped[4])
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
 	if !strings.Contains(string(listRaw), "sess-alpha-1") || strings.Contains(string(listRaw), "sess-beta-1") {
 		t.Fatalf("resources/list leaked out-of-scope session: %s", listRaw)
 	}

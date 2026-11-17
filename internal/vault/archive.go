@@ -22,9 +22,10 @@ import (
 )
 
 const (
-	archiveMagic     = "DJV1"
-	archiveChunkSize = 1 << 20 // 1 MiB
-	maxArchiveFiles  = 1 << 20
+	archiveMagic        = "DJV1"
+	archiveChunkSize    = 1 << 20 // 1 MiB
+	maxArchiveFiles     = 1 << 20
+	maxArchiveFileBytes = int64(512 << 20)
 )
 
 var contentSidecars = []string{
@@ -258,52 +259,69 @@ func OpenTree(indexDir string, dek []byte) error {
 	}
 	defer func() { _ = os.RemoveAll(stage) }()
 
+	stageRoot, err := os.OpenRoot(stage)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = stageRoot.Close() }()
+
 	tr := tar.NewReader(cr)
 	entries := 0
 	for {
-		hdr, err := tr.Next()
-		if errors.Is(err, io.EOF) {
+		hdr, nextErr := tr.Next()
+		if errors.Is(nextErr, io.EOF) {
 			break
 		}
-		if err != nil {
-			return err
+		if nextErr != nil {
+			return nextErr
 		}
 		entries++
 		if entries > maxArchiveFiles {
 			return errors.New("vault archive exceeds file limit")
 		}
-		rel := filepath.Clean(filepath.FromSlash(hdr.Name))
-		if filepath.IsAbs(rel) || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		if strings.Contains(hdr.Name, "..") {
 			return fmt.Errorf("unsafe path in vault archive: %q", hdr.Name)
 		}
-		target := filepath.Join(stage, rel)
+		rel := filepath.Clean(filepath.FromSlash(hdr.Name))
+		if rel == "." {
+			continue
+		}
+		if !filepath.IsLocal(rel) {
+			return fmt.Errorf("unsafe path in vault archive: %q", hdr.Name)
+		}
 		switch hdr.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(target, 0o700); err != nil {
-				return err
+			if mkErr := stageRoot.MkdirAll(rel, 0o700); mkErr != nil {
+				return mkErr
 			}
 		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
-				return err
+			if parent := filepath.Dir(rel); parent != "." {
+				if mkErr := stageRoot.MkdirAll(parent, 0o700); mkErr != nil {
+					return mkErr
+				}
 			}
-			out, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
-			if err != nil {
-				return err
+			if hdr.Size < 0 || hdr.Size > maxArchiveFileBytes {
+				return fmt.Errorf("vault archive entry %q exceeds size limit (%d)", hdr.Name, hdr.Size)
 			}
-			if _, err := io.Copy(out, tr); err != nil {
+			out, openErr := stageRoot.OpenFile(rel, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+			if openErr != nil {
+				return openErr
+			}
+			if _, copyErr := io.CopyN(out, tr, hdr.Size); copyErr != nil {
 				_ = out.Close()
-				return err
+				return copyErr
 			}
-			if err := out.Close(); err != nil {
-				return err
+			if closeErr := out.Close(); closeErr != nil {
+				return closeErr
 			}
 		default:
 			return fmt.Errorf("unsupported tar entry type %d in vault archive", hdr.Typeflag)
 		}
 	}
-	if err := cr.VerifyEOF(); err != nil {
-		return err
+	if verifyErr := cr.VerifyEOF(); verifyErr != nil {
+		return verifyErr
 	}
+	_ = stageRoot.Close()
 
 	stagedIndex := filepath.Join(stage, "index")
 	if fi, err := os.Stat(stagedIndex); err == nil && fi.IsDir() {
@@ -327,25 +345,25 @@ func OpenTree(indexDir string, dek []byte) error {
 }
 
 func writeTreeToTar(tw *tar.Writer, base string) error {
-	if _, err := os.Stat(base); err == nil {
-		err = filepath.WalkDir(base, func(path string, d fs.DirEntry, werr error) error {
+	if _, statErr := os.Stat(base); statErr == nil {
+		walkErr := filepath.WalkDir(base, func(path string, d fs.DirEntry, werr error) error {
 			if werr != nil {
 				return werr
 			}
 			if d.Type()&os.ModeSymlink != 0 {
 				return nil
 			}
-			rel, err := filepath.Rel(base, path)
-			if err != nil {
-				return err
+			rel, relErr := filepath.Rel(base, path)
+			if relErr != nil {
+				return relErr
 			}
 			name := "index"
 			if rel != "." {
 				name = filepath.ToSlash(filepath.Join("index", rel))
 			}
-			info, err := d.Info()
-			if err != nil {
-				return err
+			info, infoErr := d.Info()
+			if infoErr != nil {
+				return infoErr
 			}
 			if d.IsDir() {
 				return tw.WriteHeader(&tar.Header{
@@ -357,8 +375,8 @@ func writeTreeToTar(tw *tar.Writer, base string) error {
 			}
 			return addFileToTar(tw, path, name, info)
 		})
-		if err != nil {
-			return err
+		if walkErr != nil {
+			return walkErr
 		}
 	}
 	for _, suf := range contentSidecars {
@@ -387,8 +405,8 @@ func addFileToTar(tw *tar.Writer, srcPath, tarName string, info fs.FileInfo) err
 		Mode:     0o600,
 		ModTime:  info.ModTime(),
 	}
-	if err := tw.WriteHeader(hdr); err != nil {
-		return err
+	if hdrErr := tw.WriteHeader(hdr); hdrErr != nil {
+		return hdrErr
 	}
 	_, err = io.CopyN(tw, f, info.Size())
 	return err
