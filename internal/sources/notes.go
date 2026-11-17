@@ -274,6 +274,10 @@ var ErrNoteExists = errors.New("note already remembered")
 // for. Promoted notes are skipped — those carry provenance and a lifecycle,
 // and a `remember` is not a correction to one.
 func noteAlreadyStored(path, project, text string) bool {
+	dek, err := personalNotesDEK(path)
+	if err != nil {
+		return false
+	}
 	f, err := os.Open(path)
 	if err != nil {
 		return false
@@ -295,10 +299,12 @@ func noteAlreadyStored(path, project, text string) bool {
 		}
 		line = bytes.TrimSpace(line)
 		if len(line) > 0 {
-			var n note
-			if json.Unmarshal(line, &n) == nil && n.Kind == "" &&
-				n.Project == project && strings.TrimSpace(n.Text) == text {
-				return true
+			if plain, ok := openPersonalNoteLine(dek, line); ok {
+				var n note
+				if json.Unmarshal(plain, &n) == nil && n.Kind == "" &&
+					n.Project == project && strings.TrimSpace(n.Text) == text {
+					return true
+				}
 			}
 		}
 		if err != nil {
@@ -340,6 +346,10 @@ func AppendNoteTagged(project, text string, tags []string, now time.Time) error 
 		return errors.New("text required")
 	}
 	path := NotesFile()
+	dek, err := personalNotesDEK(path)
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
@@ -363,7 +373,16 @@ func AppendNoteTagged(project, text string, tags []string, now time.Time) error 
 	if err := padTrailingNewline(f); err != nil {
 		return err
 	}
-	return json.NewEncoder(f).Encode(note{TS: now.UTC().Format(time.RFC3339Nano), Project: project, Text: text, Tags: NormalizeTags(tags)})
+	raw, err := json.Marshal(note{TS: now.UTC().Format(time.RFC3339Nano), Project: project, Text: text, Tags: NormalizeTags(tags)})
+	if err != nil {
+		return err
+	}
+	line, err := sealPersonalNoteLine(dek, raw)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(line)
+	return err
 }
 
 // AppendRepoNoteTagged appends a sanitized note to <repo>/.deja/notes.jsonl and

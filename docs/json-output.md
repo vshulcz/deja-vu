@@ -1242,6 +1242,12 @@ injection counters, and their timestamps do not start the recall window.
 A kind this list does not name may still appear: another version of deja may
 have written it, and the log keeps what it was given.
 
+When access control or encrypted-store auditing is active, denied, locked, or
+policy-checked operations append a `kind: "access"` row with `bytes: 0`. These
+rows never carry query text or memory content and carry additive metadata fields:
+`surface` (`cli`, `mcp`, `hook`), `client`, `action` (`read` or `write`),
+`project_scope`, `decision` (`allow`, `deny`, or `locked`), and `deny_reason`.
+
 `bytes` is the size of the text that changed hands — what deja served, or, for
 `remember`, the note the agent wrote — and `raw` the size of the transcripts
 behind a served digest, which is omitted when there is none. `bytes` is always

@@ -54,6 +54,9 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 			n, seenN = x, true
 		}
 	}
+	if err := enforceClientPolicy(dir, "cli", cliClientName(), "read", ""); err != nil {
+		return err
+	}
 	if last {
 		snaps := usage.Snapshots(dir, 1)
 		if len(snaps) == 0 {
@@ -126,7 +129,7 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 			// a host that sent nothing at all (#2161).
 			into = " · into: unknown (the host sent a payload deja could not read)"
 		}
-		fmt.Fprintf(w, "%s  %-14s %s%s%s%s%s\n", e.Time.Local().Format("2006-01-02 15:04"), logKindLabel(e.Kind), humanBytes(int64(e.Bytes)), sess, into, compactionFailureNote(e), mark)
+		fmt.Fprintf(w, "%s  %-14s %s%s%s%s%s%s\n", e.Time.Local().Format("2006-01-02 15:04"), logKindLabel(e.Kind), humanBytes(int64(e.Bytes)), sess, into, accessTail(e), compactionFailureNote(e), mark)
 	}
 	if total > len(events) {
 		// Nobody typed the 20 — it is the default above — and this is the
@@ -309,6 +312,38 @@ func logKindLabel(kind string) string {
 		return "compaction"
 	case usage.KindCompactionRecovery:
 		return "recovered"
+	case usage.KindAccess:
+		return "access"
 	}
 	return kind
+}
+
+func accessTail(e usage.Event) string {
+	if e.Kind != usage.KindAccess {
+		return ""
+	}
+	client := e.Client
+	if client == "" {
+		client = "-"
+	}
+	surface := e.Surface
+	if surface == "" {
+		surface = "-"
+	}
+	action := e.Action
+	if action == "" {
+		action = "-"
+	}
+	decision := e.Decision
+	if decision == "" {
+		decision = "-"
+	}
+	out := fmt.Sprintf(" · %s · %s · %s · %s", surface, client, action, decision)
+	if e.ProjectScope != "" {
+		out += " · project: " + e.ProjectScope
+	}
+	if e.DenyReason != "" {
+		out += " (" + e.DenyReason + ")"
+	}
+	return out
 }

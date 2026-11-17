@@ -431,6 +431,10 @@ func boundedFrom(path string, f *os.File, offset int64) io.Reader {
 }
 
 func scanJSONLFromOffset(path string, offset int64, fn func(map[string]any)) error {
+	dek, err := personalNotesDEK(path)
+	if err != nil {
+		return err
+	}
 	f, err := os.Open(path)
 	if err != nil {
 		return err
@@ -441,7 +445,7 @@ func scanJSONLFromOffset(path string, offset int64, fn func(map[string]any)) err
 			return err
 		}
 	}
-	return scanJSONLReader(path, boundedFrom(path, f, offset), fn)
+	return scanJSONLReader(path, newVaultLineReader(boundedFrom(path, f, offset), dek), fn)
 }
 
 // scanJSONLReader is the line loop of scanJSONLFromOffset over any reader;

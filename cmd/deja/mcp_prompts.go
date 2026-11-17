@@ -48,6 +48,9 @@ func mcpPromptGet(dir string, params json.RawMessage) (any, int, string) {
 	if query == "" {
 		return nil, -32602, "query required"
 	}
+	if err := checkMCPAccess(dir, "read", ""); err != nil {
+		return nil, -32602, err.Error()
+	}
 	args, err := json.Marshal(map[string]string{"query": query})
 	if err != nil {
 		return nil, -32603, err.Error()

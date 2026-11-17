@@ -95,6 +95,9 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	if err := denyPolicyHidden(prefix, s, os.Stderr); err != nil {
 		return err
 	}
+	if err := checkCLIAccess(dir, "write", s.Project); err != nil {
+		return err
+	}
 	// The exclude list is a privacy control that only runs at ingest, so an
 	// index built before the pattern still holds the session — share refuses
 	// it for that reason (#1307). promote copied the session's opening line
