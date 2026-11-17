@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -194,6 +195,9 @@ var commands = map[string]command{
 	"doctor":        func(dir string, rest []string) error { return runDoctor(os.Stdout, rest, doctorLookup, dir) },
 	"warmup":        cmdWarmup,
 	"warmup-status": cmdWarmupStatus,
+	"init":          cmdInit,
+	"lock":          cmdLock,
+	"unlock":        cmdUnlock,
 	"index":         cmdIndex,
 	"embed":         runEmbed,
 	"bench":         func(_ string, rest []string) error { return runBench(rest) },
@@ -375,6 +379,9 @@ func run(args []string) error {
 		return err
 	}
 	if len(args) == 0 {
+		if err := checkCLIAccess(dir, "read", ""); err != nil {
+			return err
+		}
 		// briefWanted, not logoWanted: a reader who turned colour off still
 		// has an index and a terminal, and the brief is what that reader came
 		// for (#1596).
@@ -411,6 +418,18 @@ func run(args []string) error {
 		if !dispatchKnows(args[0]) && !strings.HasPrefix(args[0], "hook-") {
 			fmt.Print(wrapUsage(helpForCommand("search"), printableWidth(os.Stdout)))
 			return nil
+		}
+	}
+	if strings.HasPrefix(args[0], "hook-") || args[0] == "statusline" || args[0] == "warmup-status" {
+		if dispatchKnows(args[0]) && !hookAccessAllowed(dir) {
+			if args[0] == "hook-session-end" && slices.Contains(args[1:], "--json") {
+				fmt.Println("{}")
+			}
+			return nil
+		}
+	} else if !accessExemptCommands[args[0]] {
+		if err := checkCLIAccess(dir, "read", ""); err != nil {
+			return err
 		}
 	}
 	switch args[0] {

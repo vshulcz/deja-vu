@@ -70,6 +70,9 @@ const (
 	// transcript action count; it is still recorded so stats do not turn a
 	// missing observation into a successful zero.
 	KindCompactionRecovery = "compaction_recovery"
+	// KindAccess records an access decision (allow/deny/locked) with surface,
+	// client name, action, and project scope, without any query or memory text.
+	KindAccess = "access"
 )
 
 // servedKinds are the events that hand an agent memory it asked for: the two
@@ -169,6 +172,12 @@ type Event struct {
 	CompactionMTimeDeltaMS int64  `json:"compaction_mtime_delta_ms,omitempty"`
 	CompactionReadMS       int64  `json:"compaction_read_ms,omitempty"`
 	CompactionSameFile     *bool  `json:"compaction_same_file,omitempty"`
+	Surface                string `json:"surface,omitempty"`
+	Client                 string `json:"client,omitempty"`
+	Action                 string `json:"action,omitempty"`
+	ProjectScope           string `json:"project_scope,omitempty"`
+	Decision               string `json:"decision,omitempty"`
+	DenyReason             string `json:"deny_reason,omitempty"`
 }
 
 // Summary is the usage log totalled.

@@ -7,6 +7,9 @@
 package policy
 
 import (
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -57,6 +60,21 @@ type Policy struct {
 	// lookup hints in recall and hooks while keeping session history recall
 	// and .deja/memory.jsonl rules active (#6070).
 	SourceHints *bool `json:"source_hints,omitempty"`
+	// Write maps write surfaces ("cli", "mcp", "*") to allow/deny (#5823).
+	Write map[string]bool `json:"write,omitempty"`
+	// RequireClients restricts memory access to explicitly enrolled Clients (#5823).
+	RequireClients bool `json:"require_clients,omitempty"`
+	// Clients maps normalized client names to per-client read/write/project rules (#5823).
+	Clients map[string]ClientRule `json:"clients,omitempty"`
+	// ClientTokens maps normalized client names to 64-char hex SHA-256 digests (#5823).
+	ClientTokens map[string]string `json:"client_tokens,omitempty"`
+}
+
+// ClientRule configures read/write grants and allowed project names for one client.
+type ClientRule struct {
+	Read     *bool    `json:"read,omitempty"`
+	Write    *bool    `json:"write,omitempty"`
+	Projects []string `json:"projects,omitempty"`
 }
 
 // SearchOnlyOn reports "search_only": true in the policy file.
@@ -296,7 +314,7 @@ func Diagnose() (exists bool, unknown []string, err error) {
 	if json.Unmarshal(b, &top) == nil {
 		for key := range top {
 			switch key {
-			case "activations", "ignore", "auto_index", "search_only", "source_hints":
+			case "activations", "ignore", "auto_index", "search_only", "source_hints", "write", "require_clients", "clients", "client_tokens":
 			default:
 				unknown = append(unknown, key)
 			}
@@ -318,6 +336,141 @@ func Diagnose() (exists bool, unknown []string, err error) {
 			unknown = append(unknown, activation+"."+origin)
 		}
 	}
+	for surface := range p.Write {
+		switch surface {
+		case "cli", "mcp", "*":
+		default:
+			unknown = append(unknown, "write."+surface)
+		}
+	}
+	for client, digest := range p.ClientTokens {
+		if !isSHA256Hex(digest) {
+			unknown = append(unknown, "client_tokens."+client)
+		}
+	}
 	sort.Strings(unknown)
 	return true, unknown, nil
+}
+
+// NormalizeClient normalizes an enrolled client identifier for lookups.
+func NormalizeClient(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
+}
+
+func isSHA256Hex(s string) bool {
+	s = strings.ToLower(strings.TrimSpace(s))
+	if len(s) != 64 {
+		return false
+	}
+	for i := range len(s) {
+		c := s[i]
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			return false
+		}
+	}
+	return true
+}
+
+func (p Policy) findClientRule(client string) (ClientRule, bool) {
+	c := NormalizeClient(client)
+	if r, ok := p.Clients[c]; ok {
+		return r, true
+	}
+	for k, r := range p.Clients {
+		if NormalizeClient(k) == c {
+			return r, true
+		}
+	}
+	return ClientRule{}, false
+}
+
+func (p Policy) expectedClientToken(client string) (string, bool) {
+	c := NormalizeClient(client)
+	if d, ok := p.ClientTokens[c]; ok {
+		return d, true
+	}
+	for k, d := range p.ClientTokens {
+		if NormalizeClient(k) == c {
+			return d, true
+		}
+	}
+	return "", false
+}
+
+// AuthenticateClient checks enrollment and constant-time SHA-256 client token digest.
+func (p Policy) AuthenticateClient(client, presentedToken string) (bool, string) {
+	c := NormalizeClient(client)
+	_, enrolled := p.findClientRule(c)
+	if p.RequireClients && (!enrolled || c == "") {
+		return false, "client not enrolled"
+	}
+	wantHex, hasToken := p.expectedClientToken(c)
+	if hasToken || (p.RequireClients && len(p.ClientTokens) > 0 && c != "cli") {
+		if !hasToken || presentedToken == "" {
+			return false, "client token required"
+		}
+		sum := sha256.Sum256([]byte(presentedToken))
+		gotHex := hex.EncodeToString(sum[:])
+		wantNorm := strings.ToLower(strings.TrimSpace(wantHex))
+		if subtle.ConstantTimeCompare([]byte(gotHex), []byte(wantNorm)) != 1 {
+			return false, "invalid client token"
+		}
+	}
+	return true, ""
+}
+
+// AllowsClientProject reports whether client may access project.
+func (p Policy) AllowsClientProject(client, project string) bool {
+	if project == "" {
+		return true
+	}
+	rule, ok := p.findClientRule(client)
+	if !ok || len(rule.Projects) == 0 {
+		return true
+	}
+	for _, pat := range rule.Projects {
+		if pat == "*" || pat == project {
+			return true
+		}
+	}
+	return false
+}
+
+// AllowsClientRead reports whether client is authenticated and permitted to read project on surface.
+func (p Policy) AllowsClientRead(surface, client, presentedToken, project string) (bool, string) {
+	_ = surface
+	if ok, reason := p.AuthenticateClient(client, presentedToken); !ok {
+		return false, reason
+	}
+	if rule, ok := p.findClientRule(client); ok && rule.Read != nil && !*rule.Read {
+		return false, "client read denied"
+	}
+	if !p.AllowsClientProject(client, project) {
+		return false, "project outside client scope"
+	}
+	return true, ""
+}
+
+// AllowsClientWrite reports whether client is permitted to write notes on surface and project.
+func (p Policy) AllowsClientWrite(surface, client, presentedToken, project string) (bool, string) {
+	if ok, reason := p.AuthenticateClient(client, presentedToken); !ok {
+		return false, reason
+	}
+	if v, ok := p.Write[surface]; ok && !v {
+		return false, "write denied on " + surface
+	}
+	if v, ok := p.Write["*"]; ok && !v {
+		return false, "write denied"
+	}
+	rule, enrolled := p.findClientRule(client)
+	if p.RequireClients && (!enrolled || rule.Write == nil || !*rule.Write) {
+		return false, "client write not granted"
+	}
+	if enrolled && rule.Write != nil && !*rule.Write {
+		return false, "client write denied"
+	}
+	if !p.AllowsClientProject(client, project) {
+		return false, "project outside client scope"
+	}
+	return true, ""
 }

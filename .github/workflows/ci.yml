@@ -520,6 +520,7 @@ jobs:
             [internal/prompt]=95 [internal/query]=100 [internal/redact]=98
             [internal/search]=93 [internal/sources]=87 [internal/stats]=94
             [internal/termwidth]=100 [internal/testenv]=88 [internal/tui]=90 [internal/usage]=95
+            [internal/vault]=85
           )
           fail=0
           declare -A seen=()

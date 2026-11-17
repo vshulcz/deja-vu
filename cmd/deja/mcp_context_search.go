@@ -109,6 +109,9 @@ func contextSearchCall(dir string, raw json.RawMessage) map[string]any {
 	if msg != "" {
 		return contextSearchError(msg)
 	}
+	if err := checkMCPAccess(dir, "read", ""); err != nil {
+		return contextSearchError(contextSearchFailed)
+	}
 	if buildingNowForAgent(dir) != "" {
 		return contextSearchError(contextSearchIndexing)
 	}

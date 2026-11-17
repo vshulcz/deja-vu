@@ -3599,6 +3599,7 @@ func TestEveryValueFlagIsGuardedInEveryShell(t *testing.T) {
 		{"friction", []string{"--limit", "--settle", "--unsettle"}},
 		{"fix", []string{"--limit"}},
 		{"tests", []string{"--limit"}},
+		{"init", []string{"--auto-lock"}},
 		{"mcp", []string{"--http"}},
 		{"search", []string{"--harness", "--project", "--since", "--role", "--session", "--limit", "--sort"}},
 	}

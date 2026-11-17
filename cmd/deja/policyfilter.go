@@ -12,6 +12,11 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
+// policyAllowsProject reports whether activation and the active client both allow project.
+func policyAllowsProject(pol policy.Policy, activation, project string) bool {
+	return pol.Allows(activation, project) && pol.AllowsClientProject(activeClientForPolicy(), project)
+}
+
 // metaVisible reports whether a manifest entry passes all three visibility
 // gates for activation: harness exclusion (DEJA_EXCLUDE_HARNESSES), .dejaignore
 // path/project rules, and the trust policy for activation.
@@ -23,6 +28,9 @@ func metaVisible(pol policy.Policy, activation string, m index.SessionMeta) bool
 	if sources.HarnessExcluded(m.Harness) || pol.Ignored(m.Path, m.Project) {
 		return false
 	}
+	if !pol.AllowsClientProject(activeClientForPolicy(), m.Project) {
+		return false
+	}
 	return activation == "" || pol.Allows(activation, m.Project)
 }
 
@@ -30,6 +38,9 @@ func metaVisible(pol policy.Policy, activation string, m index.SessionMeta) bool
 // trust predicate (such as findReusedMemory's allow callback).
 func metaVisibleAllow(pol policy.Policy, allow func(string) bool, m index.SessionMeta) bool {
 	if sources.HarnessExcluded(m.Harness) || pol.Ignored(m.Path, m.Project) {
+		return false
+	}
+	if !pol.AllowsClientProject(activeClientForPolicy(), m.Project) {
 		return false
 	}
 	return allow == nil || allow(m.Project)
@@ -42,9 +53,13 @@ func metaVisibleAllow(pol policy.Policy, allow func(string) bool, m index.Sessio
 // act on (#680).
 func policyFilterHitsCounted(activation string, hits []search.Hit) ([]search.Hit, int) {
 	before := len(hits)
-	kept := policy.Filter(policy.Load(), activation, hits, func(h search.Hit) string {
-		return h.Session.Project
-	})
+	pol := policy.Load()
+	kept := make([]search.Hit, 0, len(hits))
+	for _, h := range hits {
+		if policyAllowsProject(pol, activation, h.Session.Project) {
+			kept = append(kept, h)
+		}
+	}
 	return kept, before - len(kept)
 }
 
@@ -81,19 +96,21 @@ func ignoredHiddenNoteFor(where string, hidden int) string {
 // policyFilterBlame is policyFilterHits for blame results, which carry whole
 // sessions rather than budgeted snippets — the path that most needs the rule.
 func policyFilterBlame(activation string, hits []search.BlameHit) []search.BlameHit {
-	return policy.Filter(policy.Load(), activation, hits, func(h search.BlameHit) string {
-		return h.Session.Project
-	})
+	pol := policy.Load()
+	out := make([]search.BlameHit, 0, len(hits))
+	for _, h := range hits {
+		if policyAllowsProject(pol, activation, h.Session.Project) {
+			out = append(out, h)
+		}
+	}
+	return out
 }
 
 // policyFilterSessionsCounted is the same gate for paths that carry sessions
 // rather than hits — the listing, whose whole output is titles (#937).
 func policyFilterSessionsCounted(activation string, ss []model.Session) ([]model.Session, int) {
-	before := len(ss)
-	kept := policy.Filter(policy.Load(), activation, ss, func(s model.Session) string {
-		return s.Project
-	})
-	return kept, before - len(kept)
+	kept, _ := policyFilterSessionsSplit(activation, ss)
+	return kept, len(ss) - len(kept)
 }
 
 // policyFilterSessionsSplit is policyFilterSessionsCounted with the withheld
@@ -102,7 +119,7 @@ func policyFilterSessionsCounted(activation string, ss []model.Session) ([]model
 func policyFilterSessionsSplit(activation string, ss []model.Session) (keep, withheld []model.Session) {
 	p := policy.Load()
 	for _, s := range ss {
-		if p.Allows(activation, s.Project) {
+		if policyAllowsProject(p, activation, s.Project) {
 			keep = append(keep, s)
 			continue
 		}
@@ -119,7 +136,7 @@ func policyHiddenProjects(activation string, ss []model.Session) map[string]bool
 	p := policy.Load()
 	hidden := map[string]bool{}
 	for _, s := range ss {
-		if s.Project != "" && !p.Allows(activation, s.Project) {
+		if s.Project != "" && !policyAllowsProject(p, activation, s.Project) {
 			hidden[s.Project] = true
 		}
 	}

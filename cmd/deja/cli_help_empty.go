@@ -199,6 +199,9 @@ var flagsOfOtherCommands = map[string]string{
 	"--http":             "mcp",
 	"--secrets":          "audit",
 	"--fail-on-secrets":  "audit",
+	"--encrypted":        "init",
+	"--passphrase-stdin": "unlock",
+	"--auto-lock":        "init",
 }
 
 // searchFlags is every flag the bare search form accepts, for the typo check.
