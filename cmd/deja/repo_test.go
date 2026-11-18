@@ -1214,9 +1214,9 @@ func TestHookPrecisionAndGuardrails(t *testing.T) {
 			t.Fatalf("conversational 'Do not suggest restore' without code symbol/path was pinned: %+v", e)
 		}
 	}
-	pkMulti := promptPicker{
-		leadTerms: []string{"ranking", "blame", "json", "parse"},
-		idfOf:     map[string]float64{"ranking": 4.5, "blame": 5.2, "json": 3.1, "parse": 2.8},
+	pkMulti := search.PromptPicker{
+		LeadTerms: []string{"ranking", "blame", "json", "parse"},
+		IDFOf:     map[string]float64{"ranking": 4.5, "blame": 5.2, "json": 3.1, "parse": 2.8},
 	}
 	sessTwoNamed := model.Session{
 		ID:      "two-named",
@@ -1225,7 +1225,7 @@ func TestHookPrecisionAndGuardrails(t *testing.T) {
 			{Role: "user", Text: "how does blame ranking order sessions?"},
 		},
 	}
-	if !pkMulti.leadTermsMeet(sessTwoNamed) {
+	if !pkMulti.LeadTermsMeet(sessTwoNamed) {
 		t.Fatal("leadTermsMeet should accept session carrying top-2 highest-IDF named lead terms (blame + ranking)")
 	}
 }

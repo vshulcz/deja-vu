@@ -1,11 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
 )
 
@@ -131,5 +134,98 @@ func TestFailingTestSourceLinePythonTraceback(t *testing.T) {
 	gotWin := failingTestSourceLine(dir, winTB, policy.Policy{})
 	if !strings.HasPrefix(gotWin, "failing test line — pkg/worker.py:3:") || !strings.Contains(gotWin, "raise ValueError") {
 		t.Fatalf("failingTestSourceLine(windows venv) = %q, want prefix failing test line — pkg/worker.py:3:", gotWin)
+	}
+}
+
+func TestFileMetaMatchesRepoSubpath(t *testing.T) {
+	formsMeta := index.SessionMeta{Touched: []string{"webapp/forms/models.py"}}
+	authMeta := index.SessionMeta{Touched: []string{"webapp/auth/models.py"}}
+	bareMeta := index.SessionMeta{Touched: []string{"models.py"}}
+
+	if !fileMetaMatchesRepoSubpath(formsMeta, "/Users/alex/repo", "/Users/alex/repo/webapp/forms/models.py") {
+		t.Fatal("expected exact subpath match to be kept")
+	}
+	if fileMetaMatchesRepoSubpath(authMeta, "/Users/alex/repo", "/Users/alex/repo/webapp/forms/models.py") {
+		t.Fatal("expected sibling module auth/models.py to be filtered out for webapp/forms/models.py")
+	}
+	if !fileMetaMatchesRepoSubpath(bareMeta, "/Users/alex/repo", "/Users/alex/repo/webapp/forms/models.py") {
+		t.Fatal("expected bare basename session without directory info to remain compatible")
+	}
+}
+
+func TestSubpathScopingPreventsSiblingModuleDecisionAndCountLeak(t *testing.T) {
+	tmp := hermeticEnv(t)
+	indexDir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", indexDir)
+
+	repoDir := filepath.Join(tmp, "work")
+	if err := os.MkdirAll(filepath.Join(repoDir, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	formsFile := filepath.Join(repoDir, "webapp", "forms", "models.py")
+	authFile := filepath.Join(repoDir, "webapp", "auth", "models.py")
+	billingFile := filepath.Join(repoDir, "webapp", "billing", "models.py")
+	for _, f := range []string{formsFile, authFile, billingFile} {
+		if err := os.MkdirAll(filepath.Dir(f), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(formsFile, []byte("class ModelFormField:\n    pass\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(authFile, []byte("class UserAuthAccount:\n    pass\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(billingFile, []byte("class BillingInvoice:\n    pass\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	proj := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-work")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeSess := func(id, file, dec string, day int) {
+		ts := time.Date(2026, 9, day, 10, 0, 0, 0, time.UTC).Format(time.RFC3339)
+		uJSON, err := json.Marshal(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dJSON, err := json.Marshal(dec)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cwdJSON, err := json.Marshal(repoDir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lines := []string{
+			`{"type":"user","sessionId":"` + id + `","cwd":` + string(cwdJSON) + `,"timestamp":"` + ts + `","message":{"role":"user","content":"update module"}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":` + string(cwdJSON) + `,"timestamp":"` + ts + `","message":{"role":"assistant","content":[{"type":"tool_use","id":"u1","name":"Edit","input":{"file_path":` + string(uJSON) + `,"old_string":"a","new_string":"b"}},{"type":"text","text":` + string(dJSON) + `}]}}`,
+		}
+		if err := os.WriteFile(filepath.Join(proj, id+".jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeSess("s-forms-1", formsFile, "Decision: ModelFormField validation in models.py must preserve initial values.", 1)
+	writeSess("s-forms-2", formsFile, "Updated ModelFormField error propagation in models.py.", 2)
+	writeSess("s-auth-1", authFile, "Decision: UserAuthAccount in models.py hashes tokens on save.", 3)
+	writeSess("s-auth-2", authFile, "Verified UserAuthAccount migration in models.py.", 4)
+	writeSess("s-billing-1", billingFile, "Decision: BillingInvoice in models.py rounds totals per line item.", 5)
+	if err := index.Ensure(indexDir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	self := func(index.SessionMeta, string) bool { return false }
+	got := fileHookLineOutsideWithEdit(indexDir, repoDir, formsFile, "", self)
+	if !strings.Contains(got, "2 sessions") || !strings.Contains(got, "ModelFormField") {
+		t.Fatalf("expected 2-session subpath-scoped decision with ModelFormField, got %q", got)
+	}
+	for _, leaked := range []string{"UserAuthAccount", "BillingInvoice", "5 sessions"} {
+		if strings.Contains(got, leaked) {
+			t.Fatalf("unexpected sibling-module data %q leaked into forms/models.py: %q", leaked, got)
+		}
+	}
+	if billingGot := fileHookLineOutsideWithEdit(indexDir, repoDir, billingFile, "", self); billingGot != "" {
+		t.Fatalf("expected single-session billing/models.py to stay below 2-session bar, got %q", billingGot)
 	}
 }

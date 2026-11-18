@@ -148,6 +148,9 @@ func measureLiveRepo(indexDir, cwd string) (liveBenchReport, error) {
 				if !fileMetaInScope(meta, path, nil) && !fileMetaInScope(meta, path, projNames) {
 					continue
 				}
+				if !fileMetaMatchesRepoSubpath(meta, root, path) {
+					continue
+				}
 				sessions++
 			}
 		}
