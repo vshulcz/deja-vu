@@ -52,8 +52,8 @@ func TestMCPServerNamesStayConsistentAcrossManifests(t *testing.T) {
 	}
 
 	sort.Strings(manifests)
-	if len(manifests) != 12 {
-		t.Fatalf("found %d JSON manifests with mcpServers objects, want 12: %v", len(manifests), manifests)
+	if len(manifests) != 13 {
+		t.Fatalf("found %d JSON manifests with mcpServers objects, want 13: %v", len(manifests), manifests)
 	}
 	if len(failures) > 0 {
 		t.Fatalf("MCP server names drifted:\n%s", strings.Join(failures, "\n"))

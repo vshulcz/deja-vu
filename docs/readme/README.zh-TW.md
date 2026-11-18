@@ -1,8 +1,10 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
-    <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
-  </picture>
+  <a href="https://github.com/vshulcz/deja-vu">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
+      <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
+    </picture>
+  </a>
 </p>
 
 <p align="center"><b>跨 48 個編碼代理的本地共享記憶、跨代理交接與程式碼復原。</b></p>
@@ -26,7 +28,7 @@ deja 在本地索引全部歷史，讓代理跨 <code>/compact</code> 保住上�
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>官網與互動搜尋</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>瀏覽器線上展示</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">評測</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">與同類比較</a></p>
+<p align="center"><a href="https://github.com/vshulcz/deja-vu"><b>GitHub</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/"><b>官網與互動搜尋</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>瀏覽器線上展示</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">評測</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">與同類比較</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同一個問題問同一個代理兩次：沒有記憶時它毫無印象，有 deja 時它用八個月前的結論作答"></p>
 
@@ -444,5 +446,3 @@ deja 會讀取什麼、絕不向外傳送什麼，以及如何排除專案或遺
 ## 授權
 
 MIT © [Vladislav Shulcz](https://github.com/vshulcz)
-
-⭐ [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)

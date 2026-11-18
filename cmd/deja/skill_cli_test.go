@@ -190,3 +190,26 @@ func TestInstalledSkillsKeepMetadataFlat(t *testing.T) {
 		}
 	}
 }
+
+func TestRootSkillManifest(t *testing.T) {
+	body := string(repoFile(t, "SKILL.md"))
+	parts := strings.SplitN(body, "---\n", 3)
+	if len(parts) != 3 || parts[0] != "" {
+		t.Fatal("SKILL.md is missing YAML frontmatter")
+	}
+	if name := frontmatterField(body, "name"); name != "deja-vu" {
+		t.Fatalf("SKILL.md name = %q, want deja-vu", name)
+	}
+	if frontmatterField(body, "description") == "" {
+		t.Fatal("SKILL.md description is empty")
+	}
+	if strings.Contains(parts[1], "metadata:") {
+		t.Fatal("SKILL.md frontmatter must stay flat without a metadata block")
+	}
+	if !strings.Contains(body, `deja recall "<query>"`) {
+		t.Fatal("SKILL.md must show deja recall \"<query>\"")
+	}
+	if strings.Contains(body, "search --json") {
+		t.Fatal("SKILL.md must not reference search --json")
+	}
+}

@@ -41,17 +41,19 @@ func TestDocsDescribingTheMCPSurfaceNameTheModesItDeclares(t *testing.T) {
 	// gained or lost has to reach them.
 	enumerating := []string{
 		"README.md",
+		"SKILL.md",
 		"llms-install.md",
 		"docs/ARCHITECTURE.md",
 		"extensions/zed/README.md",
 		"extensions/kimi/README.md",
 		"extensions/grok/README.md",
 	}
-	// Documents that describe the shape without the list. GEMINI.md is loaded
-	// into every Gemini session and says so: the detail stays in the tool
+	// Documents that describe the shape without the list. GEMINI.md and QWEN.md
+	// are loaded into every session and say so: the detail stays in the tool
 	// description, which is the only copy that cannot go stale.
 	shapeOnly := []string{
 		"GEMINI.md",
+		"QWEN.md",
 		"docs/guide/agents.html",
 	}
 

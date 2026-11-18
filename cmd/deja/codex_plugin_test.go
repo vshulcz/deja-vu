@@ -262,3 +262,67 @@ func TestCodexPluginListingMetadata(t *testing.T) {
 		}
 	}
 }
+
+func TestRootCodexPluginManifest(t *testing.T) {
+	var manifest struct {
+		Name       string `json:"name"`
+		Version    string `json:"version"`
+		Skills     string `json:"skills"`
+		MCPServers string `json:"mcpServers"`
+		Hooks      string `json:"hooks"`
+		Interface  struct {
+			ComposerIcon string `json:"composerIcon"`
+			Logo         string `json:"logo"`
+			LogoDark     string `json:"logoDark"`
+		} `json:"interface"`
+	}
+	if err := json.Unmarshal(repoFile(t, ".codex-plugin/plugin.json"), &manifest); err != nil {
+		t.Fatalf(".codex-plugin/plugin.json: %v", err)
+	}
+	if manifest.Name == "" || manifest.Version == "" {
+		t.Fatalf(".codex-plugin/plugin.json missing name/version: %+v", manifest)
+	}
+	for _, rel := range []string{
+		manifest.Skills,
+		manifest.MCPServers,
+		manifest.Hooks,
+		manifest.Interface.ComposerIcon,
+		manifest.Interface.Logo,
+		manifest.Interface.LogoDark,
+	} {
+		if !strings.HasPrefix(rel, "./") {
+			t.Fatalf(".codex-plugin/plugin.json path %q must be repo-relative with ./ prefix", rel)
+		}
+		if _, err := os.Stat(filepath.Join("..", "..", filepath.FromSlash(strings.TrimPrefix(rel, "./")))); err != nil {
+			t.Fatalf(".codex-plugin/plugin.json points at %s which does not exist: %v", rel, err)
+		}
+	}
+
+	var hooksFile struct {
+		Hooks map[string][]struct {
+			Hooks []struct {
+				Command string `json:"command"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(repoFile(t, ".codex-plugin/hooks.json"), &hooksFile); err != nil {
+		t.Fatalf(".codex-plugin/hooks.json: %v", err)
+	}
+	if len(hooksFile.Hooks) != 5 {
+		t.Fatalf(".codex-plugin/hooks.json declares %d hook events, want 5", len(hooksFile.Hooks))
+	}
+	for event, entries := range hooksFile.Hooks {
+		for _, entry := range entries {
+			for _, h := range entry.Hooks {
+				rel, ok := strings.CutPrefix(h.Command, "${PLUGIN_ROOT}/")
+				if !ok {
+					t.Fatalf("%s hook command %q must start with ${PLUGIN_ROOT}/", event, h.Command)
+				}
+				scriptRel, _, _ := strings.Cut(rel, " ")
+				if _, err := os.Stat(filepath.Join("..", "..", filepath.FromSlash(scriptRel))); err != nil {
+					t.Fatalf("%s hook script %q does not resolve from repo root: %v", event, scriptRel, err)
+				}
+			}
+		}
+	}
+}

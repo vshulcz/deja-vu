@@ -21,7 +21,7 @@ func TestTheIntroductionsCountEveryHarness(t *testing.T) {
 	n := registryHarnessCount(t, root)
 	// "and <count> more", with the agents it names in the words just before it.
 	phrase := regexp.MustCompile(`and\s+([a-z-]+)\s+more`)
-	names := regexp.MustCompile(`Claude Code|Codex|Cursor|opencode|Gemini|Copilot|Zed`)
+	names := regexp.MustCompile(`Claude Code|Codex|Cursor|opencode|Gemini|Qwen Code|Copilot|Zed`)
 	files := []string{
 		"extensions/zed/README.md",
 		"extensions/kimi/README.md",
@@ -35,6 +35,7 @@ func TestTheIntroductionsCountEveryHarness(t *testing.T) {
 		"kimi.plugin.json",
 		"plugin.json",
 		"gemini-extension.json",
+		"qwen-extension.json",
 	}
 	checked := 0
 	for _, f := range files {

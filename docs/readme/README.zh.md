@@ -1,8 +1,10 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
-    <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
-  </picture>
+  <a href="https://github.com/vshulcz/deja-vu">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
+      <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
+    </picture>
+  </a>
 </p>
 
 <p align="center"><b>跨 48 个编程智能体的本地共享记忆、跨智能体交接与代码恢复。</b></p>
@@ -26,7 +28,7 @@ deja 在本地索引全部历史，让智能体跨 <code>/compact</code> 保住�
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>官网与交互搜索</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>浏览器在线演示</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html">中文快速开始</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">评测</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">与同类对比</a></p>
+<p align="center"><a href="https://github.com/vshulcz/deja-vu"><b>GitHub</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/"><b>官网与交互搜索</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>浏览器在线演示</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html">中文快速开始</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">评测</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">与同类对比</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同一个问题问同一个智能体两次：没有记忆时它毫无印象，有 deja 时它用八个月前的结论作答"></p>
 
@@ -432,5 +434,3 @@ deja 读取什么、绝不向外发送什么，以及如何排除项目或遗忘
 ## 许可
 
 MIT © [Vladislav Shulcz](https://github.com/vshulcz)
-
-⭐ [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)

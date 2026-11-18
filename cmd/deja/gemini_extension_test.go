@@ -39,3 +39,35 @@ func TestGeminiExtensionSharesTheInstallerName(t *testing.T) {
 		t.Fatalf("MCP command is %v; it has to be the binary on PATH, since an extension ships files rather than binaries", server["command"])
 	}
 }
+
+func TestQwenExtensionManifest(t *testing.T) {
+	var manifest struct {
+		Name            string                    `json:"name"`
+		Version         string                    `json:"version"`
+		Description     string                    `json:"description"`
+		ContextFileName string                    `json:"contextFileName"`
+		MCPServers      map[string]map[string]any `json:"mcpServers"`
+	}
+	if err := json.Unmarshal(repoFile(t, "qwen-extension.json"), &manifest); err != nil {
+		t.Fatalf("qwen-extension.json: %v", err)
+	}
+	if manifest.Name != geminiExtensionName {
+		t.Fatalf("manifest name = %q, want %q", manifest.Name, geminiExtensionName)
+	}
+	if manifest.Version == "" || manifest.Description == "" {
+		t.Fatal("qwen-extension.json must declare non-empty version and description")
+	}
+	if manifest.ContextFileName != "QWEN.md" {
+		t.Fatalf("contextFileName = %q, want QWEN.md", manifest.ContextFileName)
+	}
+	if len(repoFile(t, manifest.ContextFileName)) == 0 {
+		t.Fatalf("%s is empty", manifest.ContextFileName)
+	}
+	server, ok := manifest.MCPServers["deja"]
+	if !ok {
+		t.Fatal("qwen-extension.json declares no deja MCP server")
+	}
+	if server["command"] != "deja" {
+		t.Fatalf("MCP command = %v, want deja", server["command"])
+	}
+}

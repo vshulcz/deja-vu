@@ -1,8 +1,10 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
-    <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
-  </picture>
+  <a href="https://github.com/vshulcz/deja-vu">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
+      <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
+    </picture>
+  </a>
 </p>
 
 <p align="center"><b>Общая локальная память, передача задач между агентами и восстановление кода для 48 кодинг-агентов.</b></p>
@@ -26,7 +28,7 @@ deja индексирует всю историю локально, чтобы �
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>Сайт и интерактивный поиск</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>Живое демо в браузере</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/ru/guide/getting-started.html">Быстрый старт (RU)</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Замеры</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Сравнение</a></p>
+<p align="center"><a href="https://github.com/vshulcz/deja-vu"><b>GitHub</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/"><b>Сайт и интерактивный поиск</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>Живое демо в браузере</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/ru/guide/getting-started.html">Быстрый старт (RU)</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Замеры</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Сравнение</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="один и тот же вопрос одному и тому же агенту дважды: без памяти он не помнит ничего, с deja отвечает выводом восьмимесячной давности"></p>
 
@@ -469,5 +471,3 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ## Лицензия
 
 MIT © [Vladislav Shulcz](https://github.com/vshulcz)
-
-⭐ [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)

@@ -1,8 +1,10 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
-    <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
-  </picture>
+  <a href="https://github.com/vshulcz/deja-vu">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
+      <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
+    </picture>
+  </a>
 </p>
 
 <p align="center"><b>48개 코딩 에이전트를 아우르는 로컬 공유 기억, 에이전트 간 작업 인계, 코드 복구.</b></p>
@@ -26,7 +28,7 @@ deja는 그 기록을 로컬에서 색인해 <code>/compact</code> 이후에도 
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>문서 및 대화형 검색</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>브라우저 라이브 데모</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">벤치마크</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">비교</a></p>
+<p align="center"><a href="https://github.com/vshulcz/deja-vu"><b>GitHub</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/"><b>문서 및 대화형 검색</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>브라우저 라이브 데모</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">벤치마크</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">비교</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="같은 에이전트에게 같은 질문을 두 번: 기억이 없을 때는 아무것도 모르고, deja가 있으면 8개월 전 결론으로 답한다"></p>
 
@@ -466,5 +468,3 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ## 라이선스
 
 MIT © [Vladislav Shulcz](https://github.com/vshulcz)
-
-⭐ [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)

@@ -1,8 +1,10 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
-    <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
-  </picture>
+  <a href="https://github.com/vshulcz/deja-vu">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
+      <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
+    </picture>
+  </a>
 </p>
 
 <p align="center"><b>48 कोडिंग एजेंट्स के लिए साझा लोकल मेमोरी, एजेंट हैंडऑफ़ और कोड रिकवरी।</b></p>
@@ -26,7 +28,7 @@ deja सब कुछ लोकल रूप से इंडेक्स कर
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>वेबसाइट और इंटरैक्टिव खोज</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>ब्राउज़र में लाइव डेमो</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">बेंचमार्क</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">तुलना</a></p>
+<p align="center"><a href="https://github.com/vshulcz/deja-vu"><b>GitHub</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/"><b>वेबसाइट और इंटरैक्टिव खोज</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>ब्राउज़र में लाइव डेमो</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">बेंचमार्क</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">तुलना</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="एक ही सवाल एक ही एजेंट से दो बार: मेमोरी के बिना उसे कुछ याद नहीं, deja के साथ वह आठ महीने पुराने नतीजे से जवाब देता है"></p>
 
@@ -474,5 +476,3 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ## लाइसेंस
 
 MIT © [Vladislav Shulcz](https://github.com/vshulcz)
-
-⭐ [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)

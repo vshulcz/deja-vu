@@ -1,7 +1,7 @@
 {
   "name": "@vshulcz/deja-vu",
   "version": "0.0.0",
-  "description": "Shared local memory, session history search, cross-agent handoff, and uncommitted code recovery across 48 coding agents — Claude Code, Codex, Cursor, OpenCode, Gemini CLI, OpenClaw & more (CLI & MCP).",
+  "description": "Local MCP memory, session history search, cross-agent handoff, and code recovery for Claude Code, Codex, Cursor, OpenCode, Gemini CLI, and 43 more coding agents.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -39,7 +39,15 @@
     "cline",
     "roo-code",
     "recall",
-    "local-first"
+    "local-first",
+    "claude",
+    "code",
+    "gemini",
+    "qwen",
+    "session",
+    "history",
+    "search",
+    "context"
   ],
   "engines": {
     "node": ">=18"
