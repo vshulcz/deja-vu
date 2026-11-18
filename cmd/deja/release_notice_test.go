@@ -93,7 +93,7 @@ func TestReleaseNoticeNeverStartsALookWhereItMayNotSpeak(t *testing.T) {
 	}
 
 	refuse("not interactive", startReleaseNotice([]string{"search", "x"}, false, dir, now, spawn))
-	for _, cmd := range []string{"update", "doctor", "version", "--version", "-version"} {
+	for _, cmd := range []string{"update", "doctor", "status", "version", "--version", "-version"} {
 		refuse("deja "+cmd, startReleaseNotice([]string{cmd}, true, dir, now, spawn))
 	}
 	refuse("relative index dir", startReleaseNotice(nil, true, filepath.Join(".cache", "deja", "index"), now, spawn))

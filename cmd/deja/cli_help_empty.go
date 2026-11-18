@@ -219,7 +219,9 @@ var (
 	rememberFlags = []string{"--project", "--tag", "--repo"}
 	restoreFlags  = []string{"--force", "--span", "--out", "--all"}
 	promoteFlags  = []string{"--state", "--note", "--to", "--tag", "--repo"}
-	handoffFlags  = []string{"--to", "--exec"}
+	handoffFlags  = []string{"--to", "--project", "--harness", "--exec"}
+	statusFlags   = []string{"--json", "--harness"}
+	trailFlags    = []string{"--json", "--all-projects", "--project", "--harness", "--limit"}
 )
 
 var searchFlags = []string{

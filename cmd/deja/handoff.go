@@ -33,9 +33,11 @@ const handoffBudget = 6 * 1024
 // id-prefix picks one explicitly.
 func runHandoff(dir string, args []string, stdout io.Writer) error {
 	target := ""
+	project := ""
+	harness := ""
 	prefix := ""
 	doExec := false
-	args = splitKnownValueFlags(args, "--to")
+	args = splitKnownValueFlags(args, "--to", "--project", "--harness")
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--to":
@@ -50,6 +52,21 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 				return fmt.Errorf("handoff: --to needs an agent name: %s", strings.Join(handoffTargets(), ", "))
 			}
 			target = args[i+1]
+			i++
+		case "--project":
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
+				return errors.New("handoff: --project needs a project name")
+			}
+			project = args[i+1]
+			i++
+		case "--harness":
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
+				return errors.New("handoff: --harness needs a source name")
+			}
+			harness = args[i+1]
+			if err := checkHarness(&harness); err != nil {
+				return err
+			}
 			i++
 		case "--exec":
 			doExec = true
@@ -84,7 +101,7 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 		}
 		return fmt.Errorf("%s has no CLI prompt entry — run `deja handoff --to %s` and paste the digest into a new chat", target, target)
 	}
-	s, err := handoffSource(dir, prefix)
+	s, err := handoffSourceFiltered(dir, prefix, project, harness)
 	if err != nil {
 		return err
 	}
@@ -202,6 +219,83 @@ func prefixArg(prefix string) string {
 		return ""
 	}
 	return " " + prefix
+}
+
+// handoffSourceFiltered resolves the handed-off session, narrowing prefix or
+// latest-session lookup by optional --project and --harness filters.
+func handoffSourceFiltered(dir, prefix, project, harness string) (model.Session, error) {
+	if project == "" && harness == "" {
+		return handoffSource(dir, prefix)
+	}
+	picked := pickedOnScreen != nil && prefix == pickedOnScreen.ID
+	if !picked {
+		if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
+			return model.Session{}, err
+		}
+	}
+	var scope []string
+	explicitProject := project != ""
+	if explicitProject {
+		scope = howScope("", project, false)
+	} else {
+		scope = howScope(howCwd(), "", false)
+	}
+	if prefix != "" {
+		s, ok, err := index.FindByPrefixIn(dir, prefix, harness)
+		if !picked && harness == "" {
+			noteAmbiguousPrefix(dir, prefix, "handing off")
+		}
+		if err != nil {
+			return model.Session{}, err
+		}
+		if !ok {
+			return model.Session{}, noSessionMatches(dir, prefix)
+		}
+		if explicitProject && !handoffMatchesScope(s.Project, scope, true) {
+			return model.Session{}, fmt.Errorf("handoff: session %s is in project %q, not %q", s.ID, s.Project, project)
+		}
+		return s, nil
+	}
+	metas, err := index.AllMetaShared(dir)
+	if err != nil {
+		return model.Session{}, err
+	}
+	var newest index.SessionMeta
+	for _, m := range metas {
+		if harness != "" && m.Harness != harness {
+			continue
+		}
+		if !handoffMatchesScope(m.Project, scope, explicitProject) {
+			continue
+		}
+		if newest.ID == "" || m.Updated.After(newest.Updated) || (m.Updated.Equal(newest.Updated) && m.ID > newest.ID) {
+			newest = m
+		}
+	}
+	if newest.ID != "" {
+		if s, ok, err := index.FindByIdentity(dir, newest.Harness, newest.ID); err == nil && ok {
+			return s, nil
+		}
+	}
+	if explicitProject && harness != "" {
+		return model.Session{}, fmt.Errorf("no %s session indexed for project %q — run `deja last --harness %s` to pick by id", harness, project, harness)
+	}
+	if explicitProject {
+		return model.Session{}, fmt.Errorf("no session indexed for project %q — run `deja last` to pick by id", project)
+	}
+	return model.Session{}, fmt.Errorf("no %s session indexed for this project — run `deja last --harness %s` to pick by id", harness, harness)
+}
+
+func handoffMatchesScope(sessProject string, scope []string, explicitProject bool) bool {
+	if len(scope) == 0 {
+		return true
+	}
+	for _, name := range scope {
+		if index.ProjectInScopeStrict(sessProject, name) || (explicitProject && howProjectMatches(sessProject, []string{name})) {
+			return true
+		}
+	}
+	return false
 }
 
 // handoffSource resolves the session being handed off: an explicit id-prefix,

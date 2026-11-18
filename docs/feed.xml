@@ -53,6 +53,13 @@
     <summary>Configure Codex CLI with ~/.codex/config.toml MCP, AGENTS.md 32 KiB limit context, features.memories comparison, and ~/.codex/hooks.json /hooks approval.</summary>
   </entry>
   <entry>
+    <title>deja CLI reference: search, recall, blame, stats — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/commands.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/commands.html"></link>
+    <updated>2026-11-18T00:00:00Z</updated>
+    <summary>Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
+  </entry>
+  <entry>
     <title>Compare Claude Code, Codex and Cursor memory — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/compare.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/compare.html"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-crush.html"></link>
     <updated>2026-11-16T00:00:00Z</updated>
     <summary>Crush keeps one history store per project and reads none of the others. deja adds an MCP server, a skill, a /user:deja command and a PreToolUse hook.</summary>
-  </entry>
-  <entry>
-    <title>Persistent Memory for Cursor + CLI Agents — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-cursor.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-cursor.html"></link>
-    <updated>2026-11-16T00:00:00Z</updated>
-    <summary>Connect Cursor&#39;s SQLite state.vscdb across 48 coding agents (Claude Code, Codex, OpenCode) via ~/.cursor/mcp.json and 7 hooks in ~/.cursor/hooks.json.</summary>
   </entry>
 </feed>
