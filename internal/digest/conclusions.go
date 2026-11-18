@@ -19,6 +19,7 @@ var decisionMarkers = []string{
 	"decision:", "решение:",
 	"root cause", "because", "the fix", "fixed", "decided", "instead of",
 	"turned out", "the problem was", "solution", "so the answer", "conclusion",
+	"core fix", "fix:", "fix in ", "fixed in ", "bug was ",
 	"works now", "passes now", "merged", "released", "chose", "won't work",
 	// Half the sessions on a real store are in Russian, and a list of English
 	// phrases reads every line of them as a passing mention. These are the
@@ -85,7 +86,8 @@ func CarriesDecision(text string) bool {
 var planAfterMarker = []string{
 	"теперь давай", "теперь главное", "теперь нужно", "теперь надо",
 	"теперь буду", "теперь сделаю", "теперь я", "now let's", "now i'll",
-	"now we need", "now i will",
+	"now we need", "now i will", "now let me", "excellent! now let me",
+	"great! now let me", "perfect! now let me", "now i can",
 	"现在让我们", "现在我来", "接下来我", "现在需要",
 }
 
@@ -160,6 +162,7 @@ func CarriesDecisionExcept(text string, asked []string) bool {
 		low = strings.ReplaceAll(low, p, " ")
 	}
 	low = blankOpeningNow(low)
+	low = blankPlanClauses(low)
 	for _, d := range decisionMarkers {
 		if !marksLine(low, d) {
 			continue
@@ -178,6 +181,45 @@ func CarriesDecisionExcept(text string, asked []string) bool {
 	return carriesLearnedDecision(low, text, asked)
 }
 
+// blankPlanClauses clears mid-message plan narration clauses while preserving
+// any preceding or following outcome clause in the same message.
+func blankPlanClauses(low string) string {
+	b := []byte(low)
+	start := 0
+	for i := 0; i <= len(low); {
+		sepLen := 0
+		if i < len(low) {
+			switch low[i] {
+			case '\n':
+				sepLen = 1
+			case '.', '!', '?', ';':
+				if i+1 < len(low) && (low[i+1] == ' ' || low[i+1] == '\t' || low[i+1] == '\n') {
+					sepLen = 1
+				}
+			}
+		}
+		if i < len(low) && sepLen == 0 {
+			i++
+			continue
+		}
+		trimmed := strings.TrimLeft(low[start:i], " \t\"'*-•`")
+		for _, p := range planOpeners {
+			if strings.HasPrefix(trimmed, p) {
+				for k := start; k < i; k++ {
+					b[k] = ' '
+				}
+				break
+			}
+		}
+		if i == len(low) {
+			break
+		}
+		i += sepLen
+		start = i
+	}
+	return string(b)
+}
+
 // planOpeners are how a line announces what is about to happen rather than
 // reporting what came of it. planAfterMarker handles the same idea mid-sentence
 // ("готово. теперь давай"); this is its sibling for the opening clause, where
@@ -191,7 +233,11 @@ func CarriesDecisionExcept(text string, asked []string) bool {
 // line rather than being blanked out of it.
 var planOpeners = []string{
 	"i'll ", "i will ", "i'm going to", "i am going to", "let me ", "let's ",
-	"going to ", "about to ",
+	"going to ", "about to ", "i need to ", "we need to ", "first, let", "next, let",
+	"let me check", "let me look", "let me modify", "let me update",
+	"now let me ", "excellent! now let me ", "great! now let me ", "perfect! now let me ",
+	"wait, i ", "wait — i ", "actually, i think",
+	"based on my analysis, i've identified", "based on my analysis, i have identified",
 	"ищу", "проверяю", "смотрю", "читаю", "реализую", "добавляю", "пишу ",
 	"делаю", "начинаю", "перемеряю", "спавню", "запускаю", "собираю", "сейчас ",
 	"пересобираю", "пересоберу", "понял, пересобираю", "понял, сейчас", "замерю", "замеряю",
@@ -423,6 +469,15 @@ func conclusions(s model.Session, budget int, limit int, substantial bool) []str
 		}
 		if verifiedTurnSynthesis(s.Messages, i, m.Text, sawEditInTurn, sawPassCmdInTurn) {
 			trajVerified[m.Text] = true
+		} else if strings.HasPrefix(strings.TrimSpace(m.Text), "#") {
+			cand := m.Text
+			if sub, ok := preferOutcomeMarkdownSection(m.Text, false); ok {
+				cand = sub
+			}
+			if clean := strings.TrimSpace(StripAssistantBoilerplate(cand)); clean != "" && !strings.HasPrefix(clean, "#") &&
+				verifiedTurnSynthesis(s.Messages, i, clean, sawEditInTurn, sawPassCmdInTurn) {
+				trajVerified[m.Text] = true
+			}
 		}
 		assistants = append(assistants, m)
 	}
@@ -434,9 +489,16 @@ func conclusions(s model.Session, budget int, limit int, substantial bool) []str
 	var out []string
 	spent := 0
 	for i := len(picked) - 1; i >= 0 && len(out) < limit; i-- {
-		line := decisionLead(MessageText(picked[i].Text), substantial)
+		line, fromOutcome := extractConclusionLead(picked[i].Text, substantial, false)
 		if line == "" {
 			continue
+		}
+		if spent+len(line) > budget {
+			if !fromOutcome {
+				if alt, ok := extractConclusionLead(picked[i].Text, substantial, true); ok && alt != "" {
+					line = alt
+				}
+			}
 		}
 		if spent+len(line) > budget {
 			// Whole sentences or nothing. Cutting here left a conclusion that
@@ -513,32 +575,378 @@ func concludingFirstWithTrajectory(ms []model.Message, trajVerified map[string]b
 	return append(plain, concluding...)
 }
 
-// decisionLead is the part of a picked message the block quotes: its opening
-// two sentences, unless the words that make it a conclusion are further in.
-//
-// A reply is diagnosis-first, so the opening is the right default and #1336's
-// whole-sentences rule is built on it. But the head is not always where the
-// conclusion lives, and when it is not, the block quoted the diagnosis and
-// dropped the outcome — In real-world stores, 211 of 490 sessions that
-// settled something handed over a block that no longer read as one (#2243).
-//
-// One sentence, not the head plus it: the budget is the reason the conclusion
-// fell off in the first place.
-func decisionLead(text string, substantial bool) string {
-	head := firstSentences(text, 2)
+// extractConclusionLead picks the outcome section or opening conclusion
+// sentences from raw, skipping celebratory transition chatter.
+func extractConclusionLead(raw string, substantial, allowShortPreambleSecondary bool) (string, bool) {
+	sub, fromOutcome := preferOutcomeMarkdownSection(raw, allowShortPreambleSecondary)
+	cleaned := MessageText(stripMarkdownHeadings(sub))
+	return decisionLeadFromClean(cleaned, substantial, fromOutcome), fromOutcome
+}
+
+func decisionLeadFromClean(cleanText string, substantial, fromOutcome bool) string {
+	head := firstSentences(cleanText, 2)
 	if substantial {
-		head = substantialLead(text, head)
+		head = substantialLead(cleanText, head)
 	}
-	if head == "" || CarriesDecision(head) {
+	if head != "" && isCelebratoryBoilerplate(head) {
+		if tail := skipCelebratoryPrefix(cleanText); tail != "" {
+			nextHead := firstSentences(tail, 2)
+			if substantial {
+				nextHead = substantialLead(tail, nextHead)
+			}
+			if nextHead != "" && !isCelebratoryBoilerplate(nextHead) {
+				head = nextHead
+				cleanText = tail
+			}
+		}
+	}
+	if head == "" || fromOutcome || CarriesDecision(head) {
 		return head
 	}
-	for _, sent := range sentencesOf(text) {
+	for _, sent := range sentencesOf(cleanText) {
 		// "Fixed the same way." carries a marker and nothing else.
+		if isCelebratoryBoilerplate(sent) {
+			continue
+		}
 		if CarriesDecision(sent) && (!substantial || !thinSentence(sent)) {
 			return sent
 		}
 	}
 	return head
+}
+
+var primaryOutcomeSectionLabels = map[string]bool{
+	"root cause": true, "the root cause": true,
+	"solution": true, "the solution": true,
+	"resolution": true, "what was fixed": true,
+	"fix summary": true, "changes made": true,
+	"причина": true, "корневая причина": true,
+	"решение": true, "итог": true,
+	"резюме исправления": true, "что исправлено": true, "что изменилось": true,
+}
+
+var secondaryOutcomeSectionLabels = map[string]bool{
+	"fix": true, "the fix": true,
+	"исправление": true, "фикс": true,
+}
+
+func sectionLabelAtLine(trimmed string) (label string, inlineLine string, ok bool) {
+	if strings.HasPrefix(trimmed, "#") {
+		inner := strings.TrimSpace(strings.TrimLeft(trimmed, "#"))
+		if unwrapped, uok := stripStandaloneBoldHeading(inner); uok {
+			inner = unwrapped
+		}
+		low := strings.ToLower(strings.TrimSpace(strings.TrimRight(inner, ":")))
+		return low, "", low != ""
+	}
+	if inner, uok := stripStandaloneBoldHeading(trimmed); uok {
+		low := strings.ToLower(inner)
+		return low, "", low != ""
+	}
+	s := strings.TrimSpace(trimmed)
+	s = strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(s, "- "), "* "))
+	if strings.HasPrefix(s, "**") {
+		if end := strings.Index(s[2:], "**"); end > 0 {
+			rawLbl := strings.TrimSpace(s[2 : 2+end])
+			after := strings.TrimSpace(s[2+end+2:])
+			if strings.HasPrefix(after, ":") || strings.HasSuffix(rawLbl, ":") {
+				low := strings.ToLower(strings.TrimSpace(strings.TrimRight(rawLbl, ":")))
+				if low != "" {
+					return low, s, true
+				}
+			}
+		}
+	}
+	return "", "", false
+}
+
+func stripFencedCodeBlocks(text string) string {
+	lines := strings.Split(text, "\n")
+	out := make([]string, 0, len(lines))
+	inFence := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+			inFence = !inFence
+			continue
+		}
+		if !inFence {
+			out = append(out, line)
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+func preferOutcomeMarkdownSection(text string, includeSecondaryOnShortPreamble bool) (string, bool) {
+	lines := strings.Split(text, "\n")
+	if len(lines) == 0 {
+		return text, false
+	}
+	inFence := false
+	seenNonEmpty := false
+	firstIdx := -1
+	firstReplacement := ""
+	headOutcome := false
+	trySection := func(idx int, replacement string) (string, bool) {
+		tailLines := append([]string(nil), lines[idx:]...)
+		if replacement != "" {
+			tailLines[0] = replacement
+		}
+		tail := strings.Join(tailLines, "\n")
+		prose := strings.TrimSpace(MessageText(stripMarkdownHeadings(stripFencedCodeBlocks(tail))))
+		if len(strings.Fields(prose)) < 5 || !SaysSomething(prose) {
+			return "", false
+		}
+		return tail, true
+	}
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~") {
+			inFence = !inFence
+			continue
+		}
+		if inFence || trimmed == "" {
+			continue
+		}
+		lbl, inline, ok := sectionLabelAtLine(trimmed)
+		if ok && (primaryOutcomeSectionLabels[lbl] || secondaryOutcomeSectionLabels[lbl]) {
+			switch {
+			case !seenNonEmpty:
+				headOutcome = true
+				if firstIdx < 0 && primaryOutcomeSectionLabels[lbl] {
+					firstIdx = i
+					firstReplacement = inline
+				}
+			case primaryOutcomeSectionLabels[lbl]:
+				if tail, valid := trySection(i, inline); valid {
+					return tail, true
+				}
+			case secondaryOutcomeSectionLabels[lbl] && firstIdx < 0:
+				before := strings.TrimSpace(MessageText(stripMarkdownHeadings(stripFencedCodeBlocks(strings.Join(lines[:i], "\n")))))
+				if includeSecondaryOnShortPreamble || len(sentencesOf(before)) >= 2 {
+					if tail, valid := trySection(i, inline); valid {
+						return tail, true
+					}
+				}
+			}
+		}
+		seenNonEmpty = true
+	}
+	if firstIdx == 0 {
+		if tail, valid := trySection(0, firstReplacement); valid {
+			return tail, true
+		}
+	}
+	return text, headOutcome
+}
+
+// IsCelebratoryBoilerplate reports whether s opens with celebratory or transition chatter.
+func IsCelebratoryBoilerplate(s string) bool {
+	return isCelebratoryBoilerplate(s)
+}
+
+func isCelebratoryBoilerplate(s string) bool {
+	low := strings.ToLower(strings.TrimSpace(s))
+	for _, p := range []string{
+		"perfect!", "excellent!", "great!", "awesome!", "wonderful!", "done!",
+		"perfect,", "excellent,", "great,",
+		"i've successfully ", "i have successfully ", "i successfully ",
+		"successfully fixed ", "the fix has been implemented",
+		"the issue has been resolved", "all tests pass", "all tests are passing",
+		"the fix works", "the fix is working", "the fix is complete", "the fix looks good",
+		"now let me test", "now let's test", "now let me run", "now let's run",
+		"now let me create a", "now let's create a",
+		"now let me add a test", "now let's add a test",
+		"now let me check", "now let's check",
+		"now let me verify", "now let's verify",
+		"let me test the fix", "let's test the fix", "let's test this fix",
+		"let me implement the fix", "now let me implement the fix",
+		"i'll help you ", "i will help you ", "let me help you ",
+		"let me start by ", "let's start by ", "let me look into ", "let me investigate ",
+		"отлично!", "супер!", "прекрасно!", "готово!",
+		"все тесты проходят", "теперь проверим", "теперь запустим",
+	} {
+		if strings.HasPrefix(low, p) {
+			return true
+		}
+	}
+	return false
+}
+
+var structuralHeadingLabels = map[string]bool{
+	"": true, "summary": true, "bug summary": true, "fix summary": true, "conclusion": true, "overview": true,
+	"changes": true, "changes made": true, "verification": true,
+	"the problem": true, "problem": true, "the issue": true, "issue": true,
+	"the fix": true, "fix": true, "the solution": true, "solution": true,
+	"root cause": true, "background": true, "context": true, "details": true,
+	"findings": true, "explanation": true, "what was fixed": true,
+	"what changed": true, "files modified": true, "files changed": true,
+	"test results": true, "tests": true,
+	"итог": true, "резюме": true, "проблема": true, "описание проблемы": true,
+	"причина": true, "корневая причина": true, "решение": true, "исправление": true,
+	"фикс": true, "изменения": true, "проверка": true, "тестирование": true,
+	"тесты": true, "детали": true, "контекст": true,
+}
+
+var metaIntroPrefixes = []string{
+	"here's what ", "here is what ",
+	"here's a summary", "here is a summary",
+	"here are the changes",
+	"here's what was done", "here is what was done",
+	"below is what ", "below is a summary",
+	"let me create a summary", "let me provide a summary", "let me summarize",
+	"this is what i found",
+	"what i found", "what was done", "what changed",
+	"вот что ", "краткий итог", "ниже привед", "что было сделано",
+}
+
+func stripMetaIntroClause(line string) string {
+	trimmed := strings.TrimSpace(line)
+	if !strings.HasSuffix(trimmed, ":") {
+		return line
+	}
+	low := strings.ToLower(trimmed)
+	for _, p := range metaIntroPrefixes {
+		if strings.HasPrefix(low, p) {
+			return ""
+		}
+	}
+	cutAt := -1
+	for _, sep := range []string{". ", "! ", "? "} {
+		for _, p := range metaIntroPrefixes {
+			if idx := strings.Index(low, sep+p); idx >= 0 {
+				cand := idx + 1
+				if cutAt < 0 || cand < cutAt {
+					cutAt = cand
+				}
+			}
+		}
+	}
+	if cutAt >= 0 {
+		return strings.TrimSpace(trimmed[:cutAt])
+	}
+	return line
+}
+
+func stripStandaloneBoldHeading(trimmed string) (string, bool) {
+	var inner string
+	switch {
+	case strings.HasPrefix(trimmed, "**") && strings.HasSuffix(trimmed, "**:"):
+		inner = trimmed[2 : len(trimmed)-3]
+	case strings.HasPrefix(trimmed, "**") && strings.HasSuffix(trimmed, "**") && len(trimmed) > 4:
+		inner = trimmed[2 : len(trimmed)-2]
+	default:
+		return "", false
+	}
+	if strings.Contains(inner, "**") {
+		return "", false
+	}
+	inner = strings.TrimSpace(strings.TrimRight(strings.TrimSpace(inner), ":"))
+	if inner == "" {
+		return "", false
+	}
+	return inner, true
+}
+
+func ensureHeadingTerminator(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	last, _ := utf8.DecodeLastRuneInString(s)
+	switch last {
+	case '.', '!', '?', ':', '\u3002', '\uff01', '\uff1f':
+		return s
+	}
+	return s + "."
+}
+
+func stripMarkdownHeadings(text string) string {
+	lines := strings.Split(text, "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if cleaned := stripMetaIntroClause(line); cleaned != line {
+			if strings.TrimSpace(cleaned) == "" {
+				continue
+			}
+			line = cleaned
+		}
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") {
+			inner := strings.TrimSpace(strings.TrimLeft(trimmed, "#"))
+			if unwrapped, ok := stripStandaloneBoldHeading(inner); ok {
+				inner = unwrapped
+			}
+			low := strings.ToLower(strings.TrimSpace(strings.TrimRight(inner, ":")))
+			if structuralHeadingLabels[low] {
+				continue
+			}
+			out = append(out, ensureHeadingTerminator(inner))
+			continue
+		}
+		if inner, ok := stripStandaloneBoldHeading(trimmed); ok {
+			if structuralHeadingLabels[strings.ToLower(inner)] {
+				continue
+			}
+			out = append(out, ensureHeadingTerminator(inner))
+			continue
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
+}
+
+// StripAssistantBoilerplate strips markdown heading markers and leading
+// celebratory or meta-intro lines when subsequent non-empty prose follows.
+func StripAssistantBoilerplate(text string) string {
+	text = stripMarkdownHeadings(text)
+	lines := strings.Split(text, "\n")
+	hasLaterNonEmpty := func(idx int) bool {
+		for j := idx + 1; j < len(lines); j++ {
+			if strings.TrimSpace(lines[j]) != "" {
+				return true
+			}
+		}
+		return false
+	}
+	start := 0
+	stripped := false
+	for i := range lines {
+		t := strings.TrimSpace(lines[i])
+		if t == "" {
+			if stripped {
+				start = i + 1
+			}
+			continue
+		}
+		trimmed := strings.TrimSpace(skipCelebratoryPrefix(t))
+		if trimmed != t && trimmed != "" && !isCelebratoryBoilerplate(trimmed) {
+			lines[i] = trimmed
+			break
+		}
+		if hasLaterNonEmpty(i) && (isCelebratoryBoilerplate(t) || trimmed == "" || isCelebratoryBoilerplate(trimmed)) {
+			start = i + 1
+			stripped = true
+			continue
+		}
+		break
+	}
+	return strings.Join(lines[start:], "\n")
+}
+
+func skipCelebratoryPrefix(text string) string {
+	sents := sentencesOf(text)
+	for i, sent := range sents {
+		if isCelebratoryBoilerplate(sent) {
+			continue
+		}
+		// Rebuild from the first non-celebratory sentence onwards.
+		if idx := strings.Index(text, sent); idx >= 0 {
+			return strings.TrimSpace(text[idx:])
+		}
+		return strings.TrimSpace(strings.Join(sents[i:], " "))
+	}
+	return ""
 }
 
 // sentencesOf splits on the same stops firstSentences counts, so the two agree
