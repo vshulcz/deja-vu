@@ -891,16 +891,10 @@ func (rp *replacePass) commit() error {
 			return err
 		}
 	} else {
-		moved, err := carriedPostings(rp.dir, rp.old, rp.carried)
+		var err error
+		unposted, err = rp.writeCompactedPostings()
 		if err != nil {
 			return err
-		}
-		mergePostings(moved, rp.buckets)
-		if err := writeBucketsConcurrent(filepath.Join(rp.tmp, "buckets"), moved); err != nil {
-			return err
-		}
-		if !rp.m.SearchOnly {
-			unposted = cooccurUnindexed(rp.dir, moved)
 		}
 	}
 	settleCopies(&rp.m, rp.old.Sessions, rp.changed, rp.replacements)

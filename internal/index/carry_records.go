@@ -5,11 +5,8 @@ import (
 	"errors"
 	"io"
 	"os"
-	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
-	"sync"
 	"sync/atomic"
 )
 
@@ -163,29 +160,9 @@ func eachStoredRecord(path string, t *recordTables, fn func(off int64, payload [
 	}
 }
 
-// carriedPostings is the postings of the carried records: the old index's,
-// each moved to the record's new offset. A posting whose record was not
-// carried goes with it. The old buckets are read in parallel, one file to a
-// worker, since a bucket's tokens are its own.
-//
-// It answers what tokenizing the records again would, because a store of
-// another tokenizer is a store of another version and never reaches this pass.
-// A postings directory that is not whole cannot be trusted to; the records are
-// tokenized again from the old log then, the way they always were.
-func carriedPostings(dir string, old Manifest, c *carriedRecords) (bucketPostings, error) {
-	if len(c.old) == 0 {
-		return bucketPostings{}, nil
-	}
-	c.index()
-	if out, err := movedPostings(filepath.Join(dir, "buckets"), old.BucketFiles, c); err == nil {
-		return out, nil
-	}
-	return retokenizeCarried(filepath.Join(dir, "records.bin"), tablesFromManifest(old), c)
-}
-
 var errBucketsShort = errors.New("postings files missing")
 
-func movedPostings(bdir string, want int, c *carriedRecords) (bucketPostings, error) {
+func postingBucketNames(bdir string, want int) ([]string, error) {
 	entries, err := os.ReadDir(bdir)
 	if err != nil {
 		return nil, err
@@ -207,53 +184,7 @@ func movedPostings(bdir string, want int, c *carriedRecords) (bucketPostings, er
 	if len(names) == 0 || files < want {
 		return nil, errBucketsShort
 	}
-	workers := min(runtime.NumCPU(), len(names))
-	parts := make([]map[string][]posting, len(names))
-	var next atomic.Int64
-	// The first error, under a lock: readBucket's errors are of several
-	// types, which an atomic.Value refuses to hold in turn.
-	var mu sync.Mutex
-	var failed error
-	fail := func(err error) {
-		mu.Lock()
-		if failed == nil {
-			failed = err
-		}
-		mu.Unlock()
-	}
-	stopped := func() bool {
-		mu.Lock()
-		defer mu.Unlock()
-		return failed != nil
-	}
-	var wg sync.WaitGroup
-	for range workers {
-		wg.Go(func() {
-			for {
-				i := int(next.Add(1)) - 1
-				if i >= len(names) || stopped() {
-					return
-				}
-				data, err := readBucket(filepath.Join(bdir, names[i]))
-				if err != nil {
-					fail(err)
-					return
-				}
-				parts[i] = c.move(data)
-			}
-		})
-	}
-	wg.Wait()
-	if failed != nil {
-		return nil, failed
-	}
-	out := make(bucketPostings, len(names))
-	for i, n := range names {
-		if len(parts[i]) > 0 {
-			out[strings.TrimSuffix(n, ".bin")] = parts[i]
-		}
-	}
-	return out, nil
+	return names, nil
 }
 
 // move rewrites one bucket's postings onto the new log, dropping those of
