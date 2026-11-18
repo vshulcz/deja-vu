@@ -607,6 +607,16 @@ func callMCPToolRaw(dir, name string, raw json.RawMessage, served *int) (string,
 	}
 	raw = spreadQ(name, raw)
 	switch name {
+	case "recall", "recall_context", "blame", "fix", "how", "orient", "handoff":
+		var scope struct {
+			Project string `json:"project"`
+		}
+		_ = json.Unmarshal(raw, &scope)
+		if err := checkMCPAccess(dir, "read", scope.Project); err != nil {
+			return "", err
+		}
+	}
+	switch name {
 	case "recall":
 		return callMCPRecall(dir, raw, served)
 	case "recall_context":
@@ -710,6 +720,18 @@ func callMCPToolRaw(dir, name string, raw json.RawMessage, served *int) (string,
 			Tags    []string `json:"tags"`
 		}
 		if err := decodeToolArgs(name, raw, &a); err != nil {
+			return "", err
+		}
+		targetProject := strings.TrimSpace(a.Project)
+		if _, repo, _ := repoRememberKind(targetProject); repo || targetProject == "" {
+			targetProject = "notes"
+			if cwd, err := os.Getwd(); err == nil {
+				if p := sources.ClaudeProjectName(cwd); p != "" {
+					targetProject = p
+				}
+			}
+		}
+		if err := checkMCPAccess(dir, "write", targetProject); err != nil {
 			return "", err
 		}
 		if strings.TrimSpace(a.Text) == "" {

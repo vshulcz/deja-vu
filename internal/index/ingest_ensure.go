@@ -74,6 +74,9 @@ func EnsureChecked(c *FreshCheck, force bool, progress io.Writer) error {
 	if c == nil {
 		return errors.New("index: EnsureChecked without a check")
 	}
+	if err := ensureVaultUnlocked(c.dir); err != nil {
+		return err
+	}
 	if autoUpdatesOff() {
 		return manualCheck(c.dir)
 	}
@@ -275,6 +278,9 @@ func Ensure(dir string, harness string, force bool, progress io.Writer) error {
 	if dir == "" {
 		dir = DefaultDir()
 	}
+	if err := ensureVaultUnlocked(dir); err != nil {
+		return err
+	}
 	if autoUpdatesOff() {
 		return manualCheck(dir)
 	}
@@ -357,6 +363,9 @@ func EnsureUnlessBusy(dir string, progress io.Writer) (bool, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
+	if err := ensureVaultUnlocked(dir); err != nil {
+		return false, err
+	}
 	if autoUpdatesOff() {
 		return false, manualCheck(dir)
 	}
@@ -382,6 +391,9 @@ func EnsureUnlessBusy(dir string, progress io.Writer) (bool, error) {
 func EnsureForSearch(dir string, o query.Options, force bool, progress io.Writer) error {
 	if dir == "" {
 		dir = DefaultDir()
+	}
+	if err := ensureVaultUnlocked(dir); err != nil {
+		return err
 	}
 	if autoUpdatesOff() {
 		return manualCheck(dir)
@@ -409,6 +421,9 @@ func EnsureForSearch(dir string, o query.Options, force bool, progress io.Writer
 func EnsureForSearchNoWait(dir string, o query.Options, progress io.Writer) (busy bool, err error) {
 	if dir == "" {
 		dir = DefaultDir()
+	}
+	if unlockErr := ensureVaultUnlocked(dir); unlockErr != nil {
+		return false, unlockErr
 	}
 	if autoUpdatesOff() {
 		return false, manualCheck(dir)

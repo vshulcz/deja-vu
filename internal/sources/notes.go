@@ -274,6 +274,10 @@ var ErrNoteExists = errors.New("note already remembered")
 // for. Promoted notes are skipped — those carry provenance and a lifecycle,
 // and a `remember` is not a correction to one.
 func noteAlreadyStored(path, project, text string) bool {
+	dek, err := personalNotesDEK(path)
+	if err != nil {
+		return false
+	}
 	f, err := os.Open(path)
 	if err != nil {
 		return false
@@ -295,10 +299,12 @@ func noteAlreadyStored(path, project, text string) bool {
 		}
 		line = bytes.TrimSpace(line)
 		if len(line) > 0 {
-			var n note
-			if json.Unmarshal(line, &n) == nil && n.Kind == "" &&
-				n.Project == project && strings.TrimSpace(n.Text) == text {
-				return true
+			if plain, ok := openPersonalNoteLine(dek, line); ok {
+				var n note
+				if json.Unmarshal(plain, &n) == nil && n.Kind == "" &&
+					n.Project == project && strings.TrimSpace(n.Text) == text {
+					return true
+				}
 			}
 		}
 		if err != nil {
@@ -340,13 +346,17 @@ func AppendNoteTagged(project, text string, tags []string, now time.Time) error 
 		return errors.New("text required")
 	}
 	path := NotesFile()
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	dek, err := personalNotesDEK(path)
+	if err != nil {
 		return err
+	}
+	if mkErr := os.MkdirAll(filepath.Dir(path), 0o700); mkErr != nil {
+		return mkErr
 	}
 	if noteAlreadyStored(path, project, strings.TrimSpace(text)) {
 		return ErrNoteExists
 	}
-	if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
+	if info, lstatErr := os.Lstat(path); lstatErr == nil && info.Mode()&os.ModeSymlink != 0 {
 		return errors.New("notes file is a symlink")
 	}
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0o600)
@@ -354,16 +364,25 @@ func AppendNoteTagged(project, text string, tags []string, now time.Time) error 
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	if err := f.Chmod(0o600); err != nil && runtime.GOOS != "windows" {
+	if err = f.Chmod(0o600); err != nil && runtime.GOOS != "windows" {
 		return err
 	}
 	if now.IsZero() {
 		now = time.Now()
 	}
-	if err := padTrailingNewline(f); err != nil {
+	if padErr := padTrailingNewline(f); padErr != nil {
+		return padErr
+	}
+	raw, err := json.Marshal(note{TS: now.UTC().Format(time.RFC3339Nano), Project: project, Text: text, Tags: NormalizeTags(tags)})
+	if err != nil {
 		return err
 	}
-	return json.NewEncoder(f).Encode(note{TS: now.UTC().Format(time.RFC3339Nano), Project: project, Text: text, Tags: NormalizeTags(tags)})
+	line, err := sealPersonalNoteLine(dek, raw)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(line)
+	return err
 }
 
 // AppendRepoNoteTagged appends a sanitized note to <repo>/.deja/notes.jsonl and

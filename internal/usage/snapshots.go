@@ -288,13 +288,17 @@ func snapshotWriteAt(indexDir, kind, digest, into string, sessions int, policyNa
 	if digest == "" {
 		return
 	}
+	clipped, safeTerms, ok := sealSnapshotPayload(indexDir, clipDigest(digest), terms)
+	if !ok {
+		return
+	}
 	p := SnapshotPath(indexDir)
 	if err := atomicfile.MkdirSharedAll(filepath.Dir(p)); err != nil {
 		return
 	}
 	b, err := marshalSnapshot(Snapshot{Time: at, Kind: kind, Sessions: sessions,
-		Bytes: len(digest), Policy: policyName, Terms: terms, Into: into,
-		Unreadable: unreadable, Projects: projects, Digest: clipDigest(digest)})
+		Bytes: len(digest), Policy: policyName, Terms: safeTerms, Into: into,
+		Unreadable: unreadable, Projects: projects, Digest: clipped})
 	if err != nil {
 		return
 	}
@@ -414,7 +418,7 @@ func Snapshots(indexDir string, n int) []Snapshot {
 	if n > 0 && len(out) > n {
 		out = out[:n]
 	}
-	return out
+	return unsealSnapshots(indexDir, out)
 }
 
 // Events returns up to n usage events, newest first. n <= 0 means all.

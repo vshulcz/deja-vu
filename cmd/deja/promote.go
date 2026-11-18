@@ -92,21 +92,8 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	// content to a file and the note it built repeated the wall, both under a
 	// deny that share and handoff already honour on the same id. Gate here so
 	// the whole command refuses, the way share does.
-	if err := denyPolicyHidden(prefix, s, os.Stderr); err != nil {
+	if err := checkPromoteAllowed(dir, prefix, s); err != nil {
 		return err
-	}
-	// The exclude list is a privacy control that only runs at ingest, so an
-	// index built before the pattern still holds the session — share refuses
-	// it for that reason (#1307). promote copied the session's opening line
-	// into deja's own store and reported that the note now outranks the
-	// transcript in recall, while every reading surface filters that note out
-	// again for the same project (#2278).
-	// Correcting a note that already exists is exempt: it copies nothing new
-	// out of the excluded project, and taking a mark back on work you have
-	// since excluded is exactly the cleanup someone would want. The note stays
-	// invisible either way, and `deja forget --session deja-note-…` removes it.
-	if s.Harness != "deja" && sources.ExcludedProject(s.Project) {
-		return fmt.Errorf("%s is in a project your exclude list covers — a note promoted from it is filtered out of recall too; `deja index --rebuild` drops the session, or remove the pattern to promote it", prefix)
 	}
 	src := s.Key()
 	if s.Harness == "deja" {
@@ -498,4 +485,27 @@ func promotedNoteSource(noteID string) (string, string, string, bool) {
 		}
 	}
 	return src, title, body, found
+}
+
+func checkPromoteAllowed(dir, prefix string, s model.Session) error {
+	if err := denyPolicyHidden(prefix, s, os.Stderr); err != nil {
+		return err
+	}
+	if err := checkCLIAccess(dir, "write", s.Project); err != nil {
+		return err
+	}
+	// The exclude list is a privacy control that only runs at ingest, so an
+	// index built before the pattern still holds the session — share refuses
+	// it for that reason (#1307). promote copied the session's opening line
+	// into deja's own store and reported that the note now outranks the
+	// transcript in recall, while every reading surface filters that note out
+	// again for the same project (#2278).
+	// Correcting a note that already exists is exempt: it copies nothing new
+	// out of the excluded project, and taking a mark back on work you have
+	// since excluded is exactly the cleanup someone would want. The note stays
+	// invisible either way, and `deja forget --session deja-note-…` removes it.
+	if s.Harness != "deja" && sources.ExcludedProject(s.Project) {
+		return fmt.Errorf("%s is in a project your exclude list covers — a note promoted from it is filtered out of recall too; `deja index --rebuild` drops the session, or remove the pattern to promote it", prefix)
+	}
+	return nil
 }

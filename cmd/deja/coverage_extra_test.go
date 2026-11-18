@@ -134,6 +134,15 @@ func hermeticEnv(t *testing.T) string {
 	t.Setenv("CODEBUDDY_CONFIG_DIR", "")
 	t.Setenv("WORKBUDDY_CONFIG_DIR", "")
 	t.Setenv("DEJA_CODEBUDDY_ROOTS", "")
+	t.Setenv("DEJA_POLICY_FILE", "")
+	t.Setenv("DEJA_VAULT_FILE", filepath.Join(tmp, "vault.json"))
+	t.Setenv("DEJA_VAULT_BACKEND", "passphrase")
+	t.Setenv("DEJA_VAULT_PASSPHRASE", "")
+	t.Setenv("DEJA_VAULT_KEY", "")
+	t.Setenv("DEJA_CLIENT", "")
+	t.Setenv("DEJA_CLIENT_TOKEN", "")
+	setMCPClient("")
+	t.Cleanup(func() { setMCPClient("") })
 	t.Setenv("NO_COLOR", "1")
 	return tmp
 }

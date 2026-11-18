@@ -502,6 +502,9 @@ func manifestFresh(m Manifest, files map[string]FileState, scope string) bool {
 var manifestDecodes atomic.Int64
 
 func readManifest(dir string) (Manifest, error) {
+	if err := ensureVaultUnlocked(dir); err != nil {
+		return Manifest{}, err
+	}
 	manifestDecodes.Add(1)
 	var core manifestCore
 	if err := readGob(filepath.Join(dir, "manifest.gob"), &core); err != nil {
