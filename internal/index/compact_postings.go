@@ -168,7 +168,8 @@ func (rp *replacePass) writeCompactedPostings() (map[string]bool, error) {
 			}
 		}
 	}
-	// Only short or unreadable postings reach this whole-map fallback, as upstream does.
+	// Only a short or unreadable postings directory reaches this fallback,
+	// which still builds the whole map.
 	moved, err := retokenizeCarried(filepath.Join(rp.dir, "records.bin"), tablesFromManifest(rp.old), rp.carried)
 	if err != nil {
 		return nil, err
