@@ -1,8 +1,10 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
-    <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
-  </picture>
+  <a href="https://github.com/vshulcz/deja-vu">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
+      <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
+    </picture>
+  </a>
 </p>
 
 <p align="center"><b>Memória local compartilhada, transferência entre agentes e recuperação de código para 48 agentes de código.</b></p>
@@ -26,7 +28,7 @@ O deja indexa tudo localmente para que seus agentes mantenham o contexto após o
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>Site e busca interativa</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>Demo ao vivo no navegador</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Comparação</a></p>
+<p align="center"><a href="https://github.com/vshulcz/deja-vu"><b>GitHub</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/"><b>Site e busca interativa</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>Demo ao vivo no navegador</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Comparação</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="a mesma pergunta ao mesmo agente duas vezes: sem memória ele não lembra de nada, com o deja responde com uma conclusão de oito meses atrás"></p>
 
@@ -478,5 +480,3 @@ e como excluir um projeto ou esquecer uma sessão está em
 ## Licença
 
 MIT © [Vladislav Shulcz](https://github.com/vshulcz)
-
-⭐ [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)

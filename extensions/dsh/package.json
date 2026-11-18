@@ -1,7 +1,7 @@
 {
   "name": "dsh-deja",
   "version": "0.24.2",
-  "description": "deja-vu memory for DeepSeek Harness and DSH Desktop: the session history of forty-seven other coding agents, searchable and recalled before each step — a local index, no LLM.",
+  "description": "deja-vu MCP memory and session history search for DeepSeek Harness and DSH Desktop across forty-seven other coding agents (Claude Code, Codex, Cursor, OpenCode, Gemini CLI) — local index, no LLM.",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -49,7 +49,12 @@
     "mcp",
     "mcp-server",
     "session-search",
-    "local-first"
+    "local-first",
+    "claude",
+    "code",
+    "session",
+    "history",
+    "search"
   ],
   "engines": {
     "node": ">=18"

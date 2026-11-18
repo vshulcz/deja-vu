@@ -64,7 +64,7 @@ func TestEveryHarnessPackageIsATarget(t *testing.T) {
 	got := targets()
 	// Named here rather than read from the list under test: a list that lost an
 	// entry would otherwise check nothing and pass.
-	for _, name := range []string{"dsh", "opencode", "openclaw", "pi"} {
+	for _, name := range []string{"dsh", "opencode", "openclaw", "pi", "magpie"} {
 		path := filepath.Join("extensions", name, "package.json")
 		if _, ok := got[path]; !ok {
 			t.Fatalf("%s is not pinned", path)
@@ -74,7 +74,7 @@ func TestEveryHarnessPackageIsATarget(t *testing.T) {
 		}
 	}
 	// And the manifests that were already covered stay covered.
-	for _, path := range []string{scoopPath, installer, codexPlugin, codebuddyPlugin, kimiConst, agentPlugin} {
+	for _, path := range []string{scoopPath, installer, codexPlugin, codexRootPlugin, codebuddyPlugin, qwenExtension, kimiConst, agentPlugin} {
 		if _, ok := got[path]; !ok {
 			t.Fatalf("%s dropped out of the pinned set", path)
 		}

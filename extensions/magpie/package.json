@@ -1,7 +1,7 @@
 {
   "name": "@vshulcz/magpie-deja",
   "version": "0.24.2",
-  "description": "Project-scoped session recall from your local deja-vu index for coding agents behind Magpie. Recalled excerpts are appended to the request sent to your model provider.",
+  "description": "Local MCP memory and project-scoped session history recall for Claude Code, Codex, Cursor, and other coding agents behind the Magpie gateway.",
   "type": "module",
   "files": [
     "deja.hooks.mjs",
@@ -34,13 +34,20 @@
     "cursor",
     "gemini-cli",
     "opencode",
-    "hermes"
+    "hermes",
+    "claude",
+    "code",
+    "mcp",
+    "mcp-server",
+    "session",
+    "history",
+    "search"
   ],
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
-    "@vshulcz/deja-vu": "^0.24.1"
+    "@vshulcz/deja-vu": "^0.24.2"
   },
   "magpie": {
     "hooks": "./deja.hooks.mjs",

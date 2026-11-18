@@ -1,7 +1,7 @@
 {
   "name": "opencode-deja",
   "version": "0.24.2",
-  "description": "deja-vu memory for opencode: the session history of forty-seven other coding agents, searchable and recalled on every request — a local index, no LLM.",
+  "description": "deja-vu MCP memory and session history search for OpenCode across forty-seven other coding agents (Claude Code, Codex, Cursor, Gemini CLI, OpenClaw) — local index, no LLM.",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -45,7 +45,12 @@
     "mcp",
     "mcp-server",
     "session-search",
-    "local-first"
+    "local-first",
+    "claude",
+    "code",
+    "session",
+    "history",
+    "search"
   ],
   "engines": {
     "node": ">=18"

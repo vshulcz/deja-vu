@@ -51,6 +51,8 @@ archives:
       # "Configuration file not found at .../gemini-extension.json".
       - gemini-extension.json
       - GEMINI.md
+      - qwen-extension.json
+      - QWEN.md
 
 checksum:
   name_template: checksums.txt

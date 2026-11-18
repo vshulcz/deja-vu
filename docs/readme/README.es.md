@@ -1,8 +1,10 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
-    <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
-  </picture>
+  <a href="https://github.com/vshulcz/deja-vu">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
+      <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
+    </picture>
+  </a>
 </p>
 
 <p align="center"><b>Memoria local compartida, traspaso entre agentes y recuperación de código para 48 agentes de código.</b></p>
@@ -26,7 +28,7 @@ deja lo indexa todo localmente para que tus agentes conserven el contexto tras <
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>Sitio web y búsqueda interactiva</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>Demo interactiva en el navegador</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Comparación</a></p>
+<p align="center"><a href="https://github.com/vshulcz/deja-vu"><b>GitHub</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/"><b>Sitio web y búsqueda interactiva</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>Demo interactiva en el navegador</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Comparación</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="la misma pregunta al mismo agente dos veces: sin memoria no recuerda nada, con deja responde con una conclusión de hace ocho meses"></p>
 
@@ -483,5 +485,3 @@ excluir un proyecto u olvidar una sesión está en [Privacidad](#privacidad).
 ## Licencia
 
 MIT © [Vladislav Shulcz](https://github.com/vshulcz)
-
-⭐ [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)

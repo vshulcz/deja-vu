@@ -41,7 +41,8 @@ const (
 	// release asset, so the version committed here is the one a user sees. It
 	// sat at 0.1.0 from July through 0.17.1 because nothing compared it to
 	// anything.
-	codexPlugin = "codex-plugin/.codex-plugin/plugin.json"
+	codexPlugin     = "codex-plugin/.codex-plugin/plugin.json"
+	codexRootPlugin = ".codex-plugin/plugin.json"
 	// Same reasoning for the Claude bundle, which the directory mirrors from
 	// the default branch. It had no version field at all until the directory's
 	// own scanner asked for one.
@@ -64,9 +65,10 @@ const (
 	// default branch, so their versions are what the listing shows.
 	antigravityPlugin     = "antigravity-plugin/plugin.json"
 	antigravityRootPlugin = ".antigravity-plugin/plugin.json"
-	// The Gemini gallery crawls the manifest at the repository root and shows
-	// its version, and `gemini extensions install` reads the same file.
+	// The Gemini and Qwen galleries crawl the manifests at the repository root
+	// and show their version, and extensions install reads the same files.
 	geminiExtension = "gemini-extension.json"
+	qwenExtension   = "qwen-extension.json"
 	// The Agent Plugins manifest at the root: directories that read that
 	// layout take it straight from the default branch, so its version is the
 	// one a listing shows.
@@ -102,7 +104,7 @@ const (
 // npmHarnessPackages are the plugins published to npm that install the deja
 // binary package as a dependency. Their own version is set at publish time;
 // what is pinned here is which deja they ask for.
-var npmHarnessPackages = []string{"dsh", "opencode", "openclaw", "pi"}
+var npmHarnessPackages = []string{"dsh", "opencode", "openclaw", "pi", "magpie"}
 
 type pins struct {
 	version string
@@ -183,6 +185,7 @@ func targets() map[string]func(pins) ([]byte, error) {
 		localePath:            renderLocale,
 		installer:             renderInstaller,
 		codexPlugin:           renderPluginVersion(codexPlugin),
+		codexRootPlugin:       renderPluginVersion(codexRootPlugin),
 		claudePlugin:          renderPluginVersion(claudePlugin),
 		claudeAgentPlugin:     renderPluginVersion(claudeAgentPlugin),
 		codebuddyPlugin:       renderPluginVersion(codebuddyPlugin),
@@ -191,6 +194,7 @@ func targets() map[string]func(pins) ([]byte, error) {
 		antigravityPlugin:     renderPluginVersion(antigravityPlugin),
 		antigravityRootPlugin: renderPluginVersion(antigravityRootPlugin),
 		geminiExtension:       renderPluginVersion(geminiExtension),
+		qwenExtension:         renderPluginVersion(qwenExtension),
 		kimiPlugin:            renderPluginVersion(kimiPlugin),
 		kimiPacked:            renderPluginVersion(kimiPacked),
 		kimiConst:             renderGoVersionConst(kimiConst, "kimiPluginVersion"),

@@ -1,8 +1,10 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
-    <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
-  </picture>
+  <a href="https://github.com/vshulcz/deja-vu">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
+      <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
+    </picture>
+  </a>
 </p>
 
 <p align="center"><b>48 kodlama ajanı arasında paylaşılan yerel bellek, ajanlar arası görev devri ve kod kurtarma.</b></p>
@@ -26,7 +28,7 @@ deja tüm geçmişi yerel olarak indeksler; böylece ajanlarınız <code>/compac
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/"><b>Web sitesi ve etkileşimli arama</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>Tarayıcıda canlı demo</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Ölçümler</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Karşılaştırma</a></p>
+<p align="center"><a href="https://github.com/vshulcz/deja-vu"><b>GitHub</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/"><b>Web sitesi ve etkileşimli arama</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>Tarayıcıda canlı demo</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Ölçümler</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Karşılaştırma</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="aynı soru aynı ajana iki kez: bellek yokken hiçbir şey hatırlamıyor, deja varken sekiz ay önceki sonuçla yanıtlıyor"></p>
 
@@ -478,5 +480,3 @@ bir projeyi hariç tutma ya da oturum unutma adımları [Gizlilik](#gizlilik) b�
 ## Lisans
 
 MIT © [Vladislav Shulcz](https://github.com/vshulcz)
-
-⭐ [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)

@@ -1,8 +1,10 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
-    <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
-  </picture>
+  <a href="https://github.com/vshulcz/deja-vu">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
+      <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
+    </picture>
+  </a>
 </p>
 
 <p align="center"><b>48 のコーディングエージェントをまたぐローカル共有メモリ、エージェント間ハンドオフ、コード復元。</b></p>
@@ -26,7 +28,7 @@ deja はそれをローカルでインデックス化し、<code>/compact</code>
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">ドキュメント</a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">ブラウザデモ</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">ベンチマーク</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">他ツールとの比較</a> &middot; <a href="../../docs/INTEGRATING.md">自分のツールへの組み込み</a></p>
+<p align="center"><a href="https://github.com/vshulcz/deja-vu"><b>GitHub</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/">ドキュメント</a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">ブラウザデモ</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">ベンチマーク</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">他ツールとの比較</a> &middot; <a href="../../docs/INTEGRATING.md">自分のツールへの組み込み</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同じエージェントに同じ質問を2回する：記憶がないと何の記録もないが、deja があると8か月前の決定をもとに答える"></p>
 
@@ -666,5 +668,3 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ## ライセンス
 
 MIT © [Vladislav Shulcz](https://github.com/vshulcz)
-
-⭐ [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)

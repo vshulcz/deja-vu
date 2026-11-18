@@ -4,7 +4,7 @@ English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions
 
 [![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
 
-Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S · **13.6 s** to index 19,195 sessions · **half the tokens** of agentmemory) · [Full documentation](../../README.md) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/) · **[★ Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)**
+Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S · **13.6 s** to index 19,195 sessions · **half the tokens** of agentmemory) · [Full documentation](../../README.md) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/)
 
 DeepSeek Harness (and DSH Desktop, `anywhere-labs/dsh-desktop`, which bundles the `dsh` runtime and web UI) can already search its own sessions — that is what the built-in
 `session-query` subsystem does. This plugin answers the other question: what you
