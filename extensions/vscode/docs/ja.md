@@ -6,7 +6,7 @@
 
 **解決済みの不具合をコーディングエージェントが何度も調べ直すのを終わらせます。**
 
-[deja-vu](https://github.com/vshulcz/deja-vu) は Claude Code・Cursor・Codex・Windsurf・Copilot Chat・OpenCode・Cline・Roo Code ほか 40 種のコーディングエージェントがディスクへ保存しているセッショントランスクリプトを単一 Go バイナリでローカルインデックスします。LLM 不要・常駐デーモン不要です。
+[deja-vu](https://github.com/vshulcz/deja-vu) は Claude Code・Cursor・Codex・Windsurf・Copilot Chat・OpenCode・Cline・Roo Code ほか 41 種のコーディングエージェントがディスクへ保存しているセッショントランスクリプトを単一 Go バイナリでローカルインデックスします。LLM 不要・常駐デーモン不要です。
 
 **[★ GitHub でスター](https://github.com/vshulcz/deja-vu)** · **[ドキュメント](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[ベンチマーク](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
@@ -36,7 +36,7 @@ code --install-extension vshulcz.deja-status
 |---|---|
 | LongMemEval-S 検索精度（クレンジング済み 470 問） | **97.2% R@5**、**88.9% hit@1**（MemPalace 公表値 96.6%、agentmemory 95.2%） |
 | 同一リポジトリ作業でのトークン消費量 | **58% 削減** — agentmemory の**半分**（`52,815` 対 コールド時 `103,443`、11 ペア計測） |
-| プロセス内語彙検索レイテンシ | 48 種のエージェント横断で中央値 **0.7–0.8 ms** |
+| プロセス内語彙検索レイテンシ | 49 種のエージェント横断で中央値 **0.7–0.8 ms** |
 | 19,195 件の実セッションに対する初期インデックス時間 | **13.6 s**、API キー不要（7 ツール中の次点は 72 s） |
 
 ## リポジトリメモリとエージェント間の引き継ぎ

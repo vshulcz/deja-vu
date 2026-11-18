@@ -6,7 +6,7 @@
 
 **Ваши агенты больше не отлаживают с нуля то, что вы уже починили.**
 
-[deja-vu](https://github.com/vshulcz/deja-vu) локально индексирует историю сессий, которую Claude Code, Cursor, Codex, Windsurf, Copilot Chat, OpenCode, Cline, Roo Code и ещё 40 кодинг-агентов уже сохраняют на диск — один Go-бинарник, без LLM и без фонового демона.
+[deja-vu](https://github.com/vshulcz/deja-vu) локально индексирует историю сессий, которую Claude Code, Cursor, Codex, Windsurf, Copilot Chat, OpenCode, Cline, Roo Code и ещё 41 кодинг-агент уже сохраняют на диск — один Go-бинарник, без LLM и без фонового демона.
 
 **[★ Поставить звезду на GitHub](https://github.com/vshulcz/deja-vu)** · **[Документация](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[Бенчмарки](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
@@ -36,7 +36,7 @@ code --install-extension vshulcz.deja-status
 |---|---|
 | Точность на LongMemEval-S (470 очищенных вопросов) | **97.2% R@5**, **88.9% hit@1** (MemPalace 96.6%, agentmemory 95.2%) |
 | Расход токенов на повторных задачах в репозитории | **На 58% меньше токенов** — вдвое меньше agentmemory (`52,815` против `103,443` без памяти, 11 пар) |
-| Задержка лексического поиска в процессе | Медиана **0.7–0.8 мс** по 48 кодинг-агентам |
+| Задержка лексического поиска в процессе | Медиана **0.7–0.8 мс** по 49 кодинг-агентам |
 | Первичная индексация 19,195 реальных сессий | **13.6 с**, без API-ключей (следующий из 7 инструментов: 72 с) |
 
 ## Память в репозитории и передача сессии (`handoff`)

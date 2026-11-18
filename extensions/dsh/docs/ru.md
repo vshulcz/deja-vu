@@ -8,7 +8,7 @@
 
 ![Демонстрация deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Плагин `session-query` для DeepSeek Harness (`dsh`) и DSH Desktop (`anywhere-labs/dsh-desktop`). Помимо диалогов самого DSH, индексирует на диске историю ещё 47 кодинг-агентов (Claude Code, Codex, Cursor, Gemini, Hermes и др.) через единый Go-бинарник `deja` и локальный BM25 (`DEJA_OFFLINE=1` отключает ежедневную проверку релизов).
+Плагин `session-query` для DeepSeek Harness (`dsh`) и DSH Desktop (`anywhere-labs/dsh-desktop`). Помимо диалогов самого DSH, индексирует на диске историю ещё 48 кодинг-агентов (Claude Code, Codex, Cursor, Gemini, Hermes и др.) через единый Go-бинарник `deja` и локальный BM25 (`DEJA_OFFLINE=1` отключает ежедневную проверку релизов).
 
 ## Установка
 
@@ -20,7 +20,7 @@ dsh plugin --profile web add dsh-deja
 dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 ```
 
-Если бинарник `deja` ещё не стоит в системе, укажите `DEJA_BIN` или настройте все 48 агентов и `$DSH_HOME/plugins/deja/`:
+Если бинарник `deja` ещё не стоит в системе, укажите `DEJA_BIN` или настройте все 49 агентов и `$DSH_HOME/plugins/deja/`:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -75,7 +75,7 @@ node --test extensions/dsh/test/*.test.js
 
 | Полнота (Recall) | Расход токенов | Индексация и поиск |
 |---|---|---|
-| **97.2% R@5** на LongMemEval-S (88.9% hit@1 на 470 вопросах; у MemPalace заявлено 96.6%, у agentmemory — 95.2%) | **на 58% меньше токенов** (**вдвое меньше токенов**, чем у agentmemory на повторных задачах) | **13.6 с** на индекс 19,195 сессий / **0.7 мс** на поиск по 48 кодинг-агентам (следующий из 7 инструментов: 72 с) |
+| **97.2% R@5** на LongMemEval-S (88.9% hit@1 на 470 вопросах; у MemPalace заявлено 96.6%, у agentmemory — 95.2%) | **на 58% меньше токенов** (**вдвое меньше токенов**, чем у agentmemory на повторных задачах) | **13.6 с** на индекс 19,195 сессий / **0.7 мс** на поиск по 49 кодинг-агентам (следующий из 7 инструментов: 72 с) |
 
 ## Память в репозитории и передача сессии (`handoff`)
 

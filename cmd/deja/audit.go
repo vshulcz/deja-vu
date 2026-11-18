@@ -130,6 +130,7 @@ func collectAuditWithOptions(dir string, now time.Time, scanSecrets bool) auditR
 		{"aider", sources.AiderFiles},
 		{"goose", sources.GooseSessionFiles},
 		{"qwen", sources.QwenSessionFiles},
+		{"qoder", sources.QoderSessionFiles},
 		{"kimi", sources.KimiSessionFiles},
 		{"zed", func() []string { return []string{sources.ZedDB()} }},
 		{"windsurf", sources.WindsurfSessionFiles},

@@ -2,7 +2,7 @@
 
 [English](../README.md) | [简体中文](zh.md) | 繁體中文 | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-適用於 CodeWhale 的 Claude 相容外掛程式套件——提供 `deja` MCP 伺服器（`recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff`）、`deja-history` 技能與 `/deja` 指令，橫跨 48 款 AI 程式設計工具的歷史會話。
+適用於 CodeWhale 的 Claude 相容外掛程式套件——提供 `deja` MCP 伺服器（`recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff`）、`deja-history` 技能與 `/deja` 指令，橫跨 49 款 AI 程式設計工具的歷史會話。
 
 ![deja-vu 示範](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -29,7 +29,7 @@ deja install codewhale-auto
 
 | 召回率 | Token 用量 | 索引與檢索耗時 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1；MemPalace 公布 96.6%，agentmemory 為 95.2%） | **token 減少 58%**（同儲存庫重複任務上 token 用量只有 agentmemory 的**一半**） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 48 個程式設計代理的檢索僅 **0.7 ms**（7 款對比工具中第二名 72 秒） |
+| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1；MemPalace 公布 96.6%，agentmemory 為 95.2%） | **token 減少 58%**（同儲存庫重複任務上 token 用量只有 agentmemory 的**一半**） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 49 個程式設計代理的檢索僅 **0.7 ms**（7 款對比工具中第二名 72 秒） |
 
 ## 儲存庫記憶與跨代理接力
 

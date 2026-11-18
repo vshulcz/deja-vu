@@ -8,7 +8,7 @@ Teil von **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** auf Lo
 
 ![deja-vu Demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Dauerhaftes lokales Gedächtnis aus Ihren bisherigen Sitzungen in Claude Code, Codex, Cursor, opencode, Zed und 43 weiteren Coding-Agenten. Alles läuft lokal über die einzelne Go-Binary `deja` (`DEJA_OFFLINE=1` deaktiviert den täglichen Release-Check).
+Dauerhaftes lokales Gedächtnis aus Ihren bisherigen Sitzungen in Claude Code, Codex, Cursor, opencode, Zed und 44 weiteren Coding-Agenten. Alles läuft lokal über die einzelne Go-Binary `deja` (`DEJA_OFFLINE=1` deaktiviert den täglichen Release-Check).
 
 ## Installation
 
@@ -51,7 +51,7 @@ Genutzt werden `${GROK_PLUGIN_ROOT}` und `.mcp.json`. Fehlt `deja` unter Grok Bu
 
 | Recall | Tokens | Indexierung & Suche |
 |---|---|---|
-| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen; MemPalace veröffentlicht 96.6%, agentmemory 95.2%) | **58% weniger Tokens** (**halb so viele Tokens** wie agentmemory bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 48 Coding-Agents hinweg (Nächstbester von 7: 72 s) |
+| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen; MemPalace veröffentlicht 96.6%, agentmemory 95.2%) | **58% weniger Tokens** (**halb so viele Tokens** wie agentmemory bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 49 Coding-Agents hinweg (Nächstbester von 7: 72 s) |
 
 ## Repository-Gedächtnis & Agenten-Übergabe
 

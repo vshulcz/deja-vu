@@ -2,7 +2,7 @@
 
 [English](../README.md) | 简体中文 | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-`deja` 的 Orca v2 `trusted-worker` 插件——为 Orca 提供跨四十八个编程工具（Claude Code、Codex CLI、Cursor、opencode、Gemini CLI、Orca 及其他四十七个智能体）的本地会话记忆，涵盖安装 `deja` 之前已经记录的历史会话。
+`deja` 的 Orca v2 `trusted-worker` 插件——为 Orca 提供跨四十九个编程工具（Claude Code、Codex CLI、Cursor、opencode、Gemini CLI、Orca 及其他四十八个智能体）的本地会话记忆，涵盖安装 `deja` 之前已经记录的历史会话。
 
 ![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -36,7 +36,7 @@ deja install orca-auto
 
 | 召回率 | Token 用量 | 索引与检索耗时 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1；MemPalace 公布 96.6%，agentmemory 为 95.2%） | **token 减少 58%**（同一仓储重复任务上 token 用量只有 agentmemory 的**一半**） | **13.6 秒**索引 19,195 个历史会话 / 跨越 48 个编程智能体的检索仅 **0.7 ms**（7 款对比工具中第二名 72 秒） |
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1；MemPalace 公布 96.6%，agentmemory 为 95.2%） | **token 减少 58%**（同一仓储重复任务上 token 用量只有 agentmemory 的**一半**） | **13.6 秒**索引 19,195 个历史会话 / 跨越 49 个编程智能体的检索仅 **0.7 ms**（7 款对比工具中第二名 72 秒） |
 
 ## 仓库记忆与跨智能体接力
 

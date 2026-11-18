@@ -14,7 +14,7 @@ IntelliJ IDEA, GoLand, PyCharm, WebStorm, RustRover, CLion, PhpStorm ve Rider (`
 ## Özellikler
 
 - **Durum çubuğu bileşeni**: Etkin proje için canlı `deja statusline` istatistiklerini IDE durum çubuğunun sağında gösterir. Tıklandığında `deja-vu` eylem penceresini açar.
-- **AI oturumlarında arama (`Tools → deja-vu → Search AI Sessions...`)**: Desteklenen 48 kodlama ajanının tümünde yerel oturumları sorgular (`deja search --json`) ve seçilen kaydı salt okunur Markdown sekmesinde açar.
+- **AI oturumlarında arama (`Tools → deja-vu → Search AI Sessions...`)**: Desteklenen 49 kodlama ajanının tümünde yerel oturumları sorgular (`deja search --json`) ve seçilen kaydı salt okunur Markdown sekmesinde açar.
 - **Son AI oturumları (`Tools → deja-vu → Recent AI Sessions`)**: Makinedeki en güncel 50 oturumu (`deja last 50 --json`) hızlı arama filtresiyle listeler.
 - **Geçerli satır için AI Blame (Düzenleyici sağ tık menüsü / `Tools → deja-vu → AI Blame Current Line`)**: `deja blame <file>:<line> --json` komutunu (satır eşleşmezse `<file>` yedeğiyle) çalıştırır ve imlecin altındaki satırı yazan veya düzenleyen AI oturumunu açar.
 - **Ajanlar arası devir özeti kopyala (`Tools → deja-vu → Copy Cross-Agent Handoff`)**: Proje kökünde `deja handoff` çalıştırır, özeti panoya kopyalar ve salt okunur Markdown sekmesinde açar.
@@ -54,7 +54,7 @@ Kurulabilir arşiv `build/distributions/` dizinine yazılır.
 
 | İsabet (Recall) | Token | İndeksleme ve sorgu |
 |---|---|---|
-| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1; MemPalace %96.6, agentmemory %95.2 yayımlar) | **%58 daha az token** (tekrarlanan depo işlerinde agentmemory'nin **yarısı kadar token**) | 19,195 oturumu **13.6 sn**'de indeksler / 48 kodlama ajanı genelinde **0.7 ms** sorgu süresi (7 araçtan sonraki: 72 sn) |
+| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1; MemPalace %96.6, agentmemory %95.2 yayımlar) | **%58 daha az token** (tekrarlanan depo işlerinde agentmemory'nin **yarısı kadar token**) | 19,195 oturumu **13.6 sn**'de indeksler / 49 kodlama ajanı genelinde **0.7 ms** sorgu süresi (7 araçtan sonraki: 72 sn) |
 
 ## Depo belleği ve ajanlar arası devir (`handoff`)
 

@@ -14,7 +14,7 @@ Local cross-agent session recall, AI line blame, and handoff for IntelliJ IDEA, 
 ## Features
 
 - **Status bar widget**: Displays live `deja statusline` statistics for the active project on the right side of the IDE status bar. Clicking opens the `deja-vu` action popup.
-- **Search AI Sessions (`Tools → deja-vu → Search AI Sessions...`)**: Queries local sessions across all 48 supported coding agents (`deja search --json`) and opens the selected transcript in a read-only Markdown editor tab.
+- **Search AI Sessions (`Tools → deja-vu → Search AI Sessions...`)**: Queries local sessions across all 49 supported coding agents (`deja search --json`) and opens the selected transcript in a read-only Markdown editor tab.
 - **Recent AI Sessions (`Tools → deja-vu → Recent AI Sessions`)**: Lists the 50 most recent sessions on the machine (`deja last 50 --json`) with speed-search filtering.
 - **AI Blame Current Line (Editor context menu / `Tools → deja-vu → AI Blame Current Line`)**: Runs `deja blame <file>:<line> --json` (falling back to `<file>`) to open the AI session that wrote or modified the line under the caret.
 - **Copy Cross-Agent Handoff (`Tools → deja-vu → Copy Cross-Agent Handoff`)**: Runs `deja handoff` in the project root, copies the digest to the system clipboard, and opens it in a read-only Markdown tab.
@@ -54,7 +54,7 @@ The installable archive is written to `build/distributions/`.
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 48 coding agents (next of 7 tools: 72 s) |
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents (next of 7 tools: 72 s) |
 
 ## Repository memory & handoff
 

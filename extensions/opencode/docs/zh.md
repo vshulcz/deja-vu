@@ -6,7 +6,7 @@
 
 **[deja-vu](https://github.com/vshulcz/deja-vu)** 扩展（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · token 用量为 agentmemory 的**一半**）· [文档](https://vshulcz.github.io/deja-vu/zh/) · [在线演示](https://vshulcz.github.io/deja-vu/view/) · [评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) · **[★ GitHub 点赞](https://github.com/vshulcz/deja-vu)**
 
-opencode 记得自己的会话。这个插件回答的是另一个问题：你在这台机器上 Claude Code、Codex、Cursor、Gemini、Zed 等其他四十七个编程智能体里做过什么，包括你安装任何东西之前的那几个月。基于单文件 Go 二进制 `deja` 与本地 BM25 索引，无大模型、无云端嵌入；可用 `DEJA_OFFLINE=1` 关闭每日版本检查。
+opencode 记得自己的会话。这个插件回答的是另一个问题：你在这台机器上 Claude Code、Codex、Cursor、Gemini、Zed 等其他四十八个编程智能体里做过什么，包括你安装任何东西之前的那几个月。基于单文件 Go 二进制 `deja` 与本地 BM25 索引，无大模型、无云端嵌入；可用 `DEJA_OFFLINE=1` 关闭每日版本检查。
 
 ![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -56,7 +56,7 @@ opencode 记得自己的会话。这个插件回答的是另一个问题：你�
 - `tools`：控制是否暴露六个 `deja_*` 工具，默认 `true`。
 - `bin`：指定 `deja` 可执行文件的自定义路径。
 
-如果需要给全机 48 款编程工具统一配置包含 `recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff` 在内的完整 MCP 与无缝切工具交接，请运行 `deja install --auto`（参见[切换智能体不丢上下文](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)）。
+如果需要给全机 49 款编程工具统一配置包含 `recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff` 在内的完整 MCP 与无缝切工具交接，请运行 `deja install --auto`（参见[切换智能体不丢上下文](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)）。
 
 ## 使用哪份二进制
 
@@ -70,7 +70,7 @@ opencode 记得自己的会话。这个插件回答的是另一个问题：你�
 
 | 召回率 | Token 用量 | 索引与检索耗时 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1；MemPalace 公布 96.6%，agentmemory 为 95.2%） | **token 减少 58%**（同一仓储重复任务上 token 用量只有 agentmemory 的**一半**） | **13.6 秒**索引 19,195 个历史会话 / 跨越 48 个编程智能体的检索仅 **0.7 ms**（7 款对比工具中第二名 72 秒） |
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1；MemPalace 公布 96.6%，agentmemory 为 95.2%） | **token 减少 58%**（同一仓储重复任务上 token 用量只有 agentmemory 的**一半**） | **13.6 秒**索引 19,195 个历史会话 / 跨越 49 个编程智能体的检索仅 **0.7 ms**（7 款对比工具中第二名 72 秒） |
 
 ## 仓库记忆与跨智能体接力
 

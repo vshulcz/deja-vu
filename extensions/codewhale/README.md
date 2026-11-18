@@ -2,7 +2,7 @@
 
 English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/codewhale/docs/zh.md) | [繁體中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/codewhale/docs/zh-TW.md) | [日本語](https://github.com/vshulcz/deja-vu/blob/main/extensions/codewhale/docs/ja.md) | [한국어](https://github.com/vshulcz/deja-vu/blob/main/extensions/codewhale/docs/ko.md) | [Español](https://github.com/vshulcz/deja-vu/blob/main/extensions/codewhale/docs/es.md) | [Português](https://github.com/vshulcz/deja-vu/blob/main/extensions/codewhale/docs/pt.md) | [Français](https://github.com/vshulcz/deja-vu/blob/main/extensions/codewhale/docs/fr.md) | [Deutsch](https://github.com/vshulcz/deja-vu/blob/main/extensions/codewhale/docs/de.md) | [Русский](https://github.com/vshulcz/deja-vu/blob/main/extensions/codewhale/docs/ru.md) | [Türkçe](https://github.com/vshulcz/deja-vu/blob/main/extensions/codewhale/docs/tr.md) | [हिन्दी](https://github.com/vshulcz/deja-vu/blob/main/extensions/codewhale/docs/hi.md)
 
-Claude-compatible plugin bundle for CodeWhale — exposes the `deja` MCP server (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`), the `deja-history` skill, and `/deja` across sessions from forty-eight AI coding tools.
+Claude-compatible plugin bundle for CodeWhale — exposes the `deja` MCP server (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`), the `deja-history` skill, and `/deja` across sessions from forty-nine AI coding tools.
 
 ![deja-vu demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -29,7 +29,7 @@ deja install codewhale-auto
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 48 coding agents (next of 7 tools: 72 s) |
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents (next of 7 tools: 72 s) |
 
 ## Repository memory & handoff
 

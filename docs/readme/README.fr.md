@@ -7,9 +7,9 @@
   </a>
 </p>
 
-<p align="center"><b>Mémoire locale partagée, relais entre agents et récupération de code pour 48 agents de code.</b></p>
+<p align="center"><b>Mémoire locale partagée, relais entre agents et récupération de code pour 49 agents de code.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes et 41 autres agents enregistrent déjà chaque session sur le disque.<br>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes et 42 autres agents enregistrent déjà chaque session sur le disque.<br>
 deja indexe tout localement pour que vos agents gardent le contexte après <code>/compact</code>, se passent le relais via <code>deja handoff</code> et récupèrent du code écrasé via <code>deja restore</code> — sans LLM, un seul binaire Go.</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | Français | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -137,7 +137,7 @@ ce qui est indexé et quelle commande lancer ensuite.
 
 ## Ce que ça apporte
 
-**Résolu dans Codex, retenu par Claude.** Quarante-trois agents de code écrivent chaque conversation dans des
+**Résolu dans Codex, retenu par Claude.** Quarante-neuf agents de code écrivent chaque conversation dans des
 fichiers locaux, et deja transforme ces fichiers en une couche de mémoire qu'ils peuvent tous lire.
 
 | | |
@@ -269,7 +269,7 @@ Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Ro
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
 CodeArts Desktop ·
-TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed.
+Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed.
 
 Ce que chacun prend en charge — rappel MCP, rappel automatique, skills, commandes, resume, handoff — se trouve
 dans la [matrice des capacités du README anglais](../../README.md#supported-harnesses). Les emplacements de stockage
@@ -375,7 +375,7 @@ L'index est incrémental. Quand un fichier de session s'allonge, seul ce fichier
 | Capacité | `deja-vu` | `claude-mem` | `MemPalace` |
 | --- | --- | --- | --- |
 | Historique avant installation ([jour zéro](https://vshulcz.github.io/deja-vu/guide/day-zero.html)) | Oui — indexe les transcriptions existantes (`36/100` hit@1) | Non — enregistre après installation (`0/100`) | Claude Code, Codex, Cursor (`16/100`) |
-| Agents partagés | 48 harnais | 9 (hooks) | 3 (CLI) |
+| Agents partagés | 49 harnais | 9 (hooks) | 3 (CLI) |
 | LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
 | Runtime et dépendances | 1 binaire Go | Worker Bun + SQLite + Chroma | Python + modèle d'embedding de 300 Mo |
 | Appels LLM / compte requis | Aucun | Appels LLM d'observation | Aucun |

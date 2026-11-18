@@ -97,7 +97,46 @@ func TestQoderUnderRootRejectsForeignPaths(t *testing.T) {
 	if QoderUnderRoot(filepath.Join(root, "claude", "projects", "x", "s.jsonl")) {
 		t.Fatal("claimed a path outside the Qoder root")
 	}
+	if QoderUnderRoot(filepath.Join(root, "qoder", "projects-backup", "x", "s.jsonl")) {
+		t.Fatal("claimed a sibling directory sharing the projects prefix")
+	}
+	if QoderUnderRoot(filepath.Join(root, "qoder", "projects")) {
+		t.Fatal("claimed the projects root directory itself")
+	}
+	if QoderUnderRoot(filepath.Join(root, "qoder", "projects", "x", "meta.json")) {
+		t.Fatal("claimed a non-jsonl file under the Qoder root")
+	}
 	if !QoderUnderRoot(filepath.Join(root, "qoder", "projects", "x", "s.jsonl")) {
 		t.Fatal("rejected a path inside the Qoder root")
+	}
+}
+
+// Mid-file offset reads yield only newly appended turns for incremental indexing.
+func TestParseQoderFileFromOffsetMidFile(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("HOME", filepath.Join(root, "home"))
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
+	t.Setenv("DEJA_QODER_ROOT", filepath.Join(root, "qoder"))
+	unique := encodedFixtureSuffix(t)
+	project := filepath.Join(root, "qoder", "projects", "-workspace-app-"+unique)
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(project, "qo-offset.jsonl")
+	line1 := `{"type":"user","sessionId":"qo-offset","cwd":"/workspace/app","timestamp":"2026-01-02T03:04:05Z","uuid":"m1","isSidechain":false,"message":{"role":"user","content":[{"type":"text","text":"before mid"}]}}` + "\n"
+	line2 := `{"type":"assistant","sessionId":"qo-offset","cwd":"/workspace/app","timestamp":"2026-01-02T03:05:05Z","uuid":"m2","parentUuid":"m1","message":{"role":"assistant","content":[{"type":"text","text":"reply after mid"}]}}` + "\n"
+	if err := os.WriteFile(path, []byte(line1+line2), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mid := int64(len(line1))
+	got, err := ParseQoderFileFromOffset(path, mid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Harness != "qoder" || got[0].ID != "qo-offset" {
+		t.Fatalf("ParseQoderFileFromOffset = %#v", got)
+	}
+	if len(got[0].Messages) != 1 || got[0].Messages[0].Role != "assistant" || got[0].Messages[0].Text != "reply after mid" {
+		t.Fatalf("messages = %#v, want single post-offset assistant turn", got[0].Messages)
 	}
 }

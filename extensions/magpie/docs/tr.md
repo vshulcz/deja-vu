@@ -8,7 +8,7 @@
 
 ![deja-vu demosu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-> [Magpie](https://github.com/yetone/magpie) üzerinden geçen her sohbet isteğine makinenizdeki diğer 47 kodlama ajanının (Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes vb.) oturum belleğini otomatik ekler.
+> [Magpie](https://github.com/yetone/magpie) üzerinden geçen her sohbet isteğine makinenizdeki diğer 48 kodlama ajanının (Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes vb.) oturum belleğini otomatik ekler.
 
 OpenAI (`chat`, `responses`), Anthropic (`anthropic`) ve Gemini (`gemini`) protokollerini tek Go ikilisi `deja` ve yerel BM25 dizini üzerinden ek LLM gerektirmeden destekler (`DEJA_OFFLINE=1` günlük sürüm denetimini kapatır).
 
@@ -18,7 +18,7 @@ OpenAI (`chat`, `responses`), Anthropic (`anthropic`) ve Gemini (`gemini`) proto
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-Sistemde `deja` (`@vshulcz/deja-vu`, `brew install deja-vu` veya `install.sh`) kurulu olmalı ve `deja index` ile dizin oluşturulmalıdır. 48 kodlama ajanının tamamında `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember` ve `handoff` araçlarını bağlamak için:
+Sistemde `deja` (`@vshulcz/deja-vu`, `brew install deja-vu` veya `install.sh`) kurulu olmalı ve `deja index` ile dizin oluşturulmalıdır. 49 kodlama ajanının tamamında `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember` ve `handoff` araçlarını bağlamak için:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
@@ -50,7 +50,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 | İsabet (Recall) | Token | İndeksleme ve sorgu |
 |---|---|---|
-| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1; MemPalace %96.6, agentmemory %95.2 yayımlar) | **%58 daha az token** (tekrarlanan depo işlerinde agentmemory'nin **yarısı kadar token**) | 19,195 oturumu **13.6 sn**'de indeksler / 48 kodlama ajanı genelinde **0.7 ms** sorgu süresi (7 araçtan sonraki: 72 sn) |
+| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1; MemPalace %96.6, agentmemory %95.2 yayımlar) | **%58 daha az token** (tekrarlanan depo işlerinde agentmemory'nin **yarısı kadar token**) | 19,195 oturumu **13.6 sn**'de indeksler / 49 kodlama ajanı genelinde **0.7 ms** sorgu süresi (7 araçtan sonraki: 72 sn) |
 
 ## Depo belleği ve ajanlar arası devir (`handoff`)
 

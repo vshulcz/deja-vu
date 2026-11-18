@@ -7,7 +7,7 @@ English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions
 Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S · **13.6 s** to index 19,195 sessions · **half the tokens** of agentmemory) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/) · **[★ Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)**
 
 Grok remembers its own sessions. This plugin answers the other question: what
-you did in Claude Code, Codex, Cursor, opencode, Zed and forty-three more agents on
+you did in Claude Code, Codex, Cursor, opencode, Zed and forty-four more agents on
 this machine — including the months before you installed anything.
 
 It runs [deja](https://github.com/vshulcz/deja-vu), a local Go binary that
@@ -110,7 +110,7 @@ server, which is a worse thing to leave behind than an idle one.
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 48 coding agents (next of 7 tools: 72 s) |
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents (next of 7 tools: 72 s) |
 
 ## Repository memory & handoff
 

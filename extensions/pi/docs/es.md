@@ -8,7 +8,7 @@ Parte de **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** en Lon
 
 ![Demostración de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Memoria local para [pi](https://github.com/badlogic/pi-mono) alimentada con el historial de sesiones que otros 47 agentes de programación en tu equipo ya escriben en disco (Claude Code, Codex, Cursor, Gemini, OpenClaw, Hermes y más). Todo corre mediante un único binario Go (`deja`) con índice BM25 local, sin LLM ni embeddings; solo usa la red en comandos explícitos de actualización/sincronización y en la comprobación diaria desactivable con `DEJA_OFFLINE=1`.
+Memoria local para [pi](https://github.com/badlogic/pi-mono) alimentada con el historial de sesiones que otros 48 agentes de programación en tu equipo ya escriben en disco (Claude Code, Codex, Cursor, Gemini, OpenClaw, Hermes y más). Todo corre mediante un único binario Go (`deja`) con índice BM25 local, sin LLM ni embeddings; solo usa la red en comandos explícitos de actualización/sincronización y en la comprobación diaria desactivable con `DEJA_OFFLINE=1`.
 
 ## Instalación
 
@@ -47,7 +47,7 @@ La extensión resuelve el ejecutable `deja` en este orden:
 
 | Recall | Tokens | Indexado y búsqueda |
 |---|---|---|
-| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas; MemPalace publica 96.6%, agentmemory 95.2%) | **58% menos tokens** (**la mitad de tokens** que agentmemory en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 48 agentes de programación (el siguiente de 7: 72 s) |
+| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas; MemPalace publica 96.6%, agentmemory 95.2%) | **58% menos tokens** (**la mitad de tokens** que agentmemory en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 49 agentes de programación (el siguiente de 7: 72 s) |
 
 ## Memoria de repositorio y relevo entre agentes
 
@@ -57,7 +57,7 @@ Comparte decisiones validadas y callejones sin salida del proyecto vía git en `
 
 ## Privacidad
 
-El índice reside en `~/.cache/deja/index.db` (ajustable con `DEJA_INDEX_DIR`) y redacta automáticamente tokens `sk-*`, `ghp_*`, `AKIA*` y cabeceras `Bearer` durante la indexación. No se envía nada fuera de tu equipo salvo si ejecutas manualmente `deja embed` con un endpoint configurado. Configura las herramientas `recall`, `fix`, `blame` y `handoff` en los 48 agentes compatibles con `deja install --auto`.
+El índice reside en `~/.cache/deja/index.db` (ajustable con `DEJA_INDEX_DIR`) y redacta automáticamente tokens `sk-*`, `ghp_*`, `AKIA*` y cabeceras `Bearer` durante la indexación. No se envía nada fuera de tu equipo salvo si ejecutas manualmente `deja embed` con un endpoint configurado. Configura las herramientas `recall`, `fix`, `blame` y `handoff` en los 49 agentes compatibles con `deja install --auto`.
 
 ## Licencia
 

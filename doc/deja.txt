@@ -1,9 +1,9 @@
-*deja.txt*  Local session recall, AI blame, and handoff across 48 coding agents
+*deja.txt*  Local session recall, AI blame, and handoff across 49 coding agents
 
 ==============================================================================
 1. INTRODUCTION                                                         *deja*
 
-`deja-vu` indexes existing on-disk transcripts across forty-eight coding agents
+`deja-vu` indexes existing on-disk transcripts across forty-nine coding agents
 (Claude Code, Codex CLI, Cursor, opencode, Gemini CLI, aider, Goose, Kiro, and
 more) in SQLite FTS5 with < 1 ms lookup. This runtime plugin exposes session
 search, line-level AI session blame, diagnostic fix recall, and cross-agent

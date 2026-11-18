@@ -8,7 +8,7 @@
 
 ![deja-vu demosu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-DeepSeek Harness (`dsh`) ve DSH Desktop (`anywhere-labs/dsh-desktop`) için `session-query` eklentisi. DSH oturumlarının yanında makinenizdeki diğer 47 kodlama ajanının (Claude Code, Codex, Cursor, Gemini, Hermes vb.) geçmişini tek Go ikilisi `deja` ve yerel BM25 dizini üzerinden arar (`DEJA_OFFLINE=1` günlük sürüm kontrolünü kapatır).
+DeepSeek Harness (`dsh`) ve DSH Desktop (`anywhere-labs/dsh-desktop`) için `session-query` eklentisi. DSH oturumlarının yanında makinenizdeki diğer 48 kodlama ajanının (Claude Code, Codex, Cursor, Gemini, Hermes vb.) geçmişini tek Go ikilisi `deja` ve yerel BM25 dizini üzerinden arar (`DEJA_OFFLINE=1` günlük sürüm kontrolünü kapatır).
 
 ## Kurulum
 
@@ -20,7 +20,7 @@ dsh plugin --profile web add dsh-deja
 dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 ```
 
-`deja` henüz kurulu değilse `DEJA_BIN` tanımlayın ya da 48 ajanın tamamını ve `$DSH_HOME/plugins/deja/` konumunu kurun:
+`deja` henüz kurulu değilse `DEJA_BIN` tanımlayın ya da 49 ajanın tamamını ve `$DSH_HOME/plugins/deja/` konumunu kurun:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -75,7 +75,7 @@ Derleme gerektirmeyen tarayıcı testi `extensions/dsh/test/search-browser.html`
 
 | İsabet (Recall) | Token | İndeksleme ve sorgu |
 |---|---|---|
-| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1; MemPalace %96.6, agentmemory %95.2 yayımlar) | **%58 daha az token** (tekrarlanan depo işlerinde agentmemory'nin **yarısı kadar token**) | 19,195 oturumu **13.6 sn**'de indeksler / 48 kodlama ajanı genelinde **0.7 ms** sorgu süresi (7 araçtan sonraki: 72 sn) |
+| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1; MemPalace %96.6, agentmemory %95.2 yayımlar) | **%58 daha az token** (tekrarlanan depo işlerinde agentmemory'nin **yarısı kadar token**) | 19,195 oturumu **13.6 sn**'de indeksler / 49 kodlama ajanı genelinde **0.7 ms** sorgu süresi (7 araçtan sonraki: 72 sn) |
 
 ## Depo belleği ve ajanlar arası devir (`handoff`)
 

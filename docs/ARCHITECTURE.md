@@ -5,7 +5,7 @@ This document is for people changing `deja` internals.
 ## Source parsers
 
 Parsers live in `internal/sources` and return `[]model.Session`. The table is
-what the loader registers: the forty-eight coding agents plus deja's own notes,
+what the loader registers: the forty-nine coding agents plus deja's own notes,
 which is what `deja sources` prints. `docs/registry/` describes each store's
 layout in detail, and `internal/sources/registry_test.go` checks that index
 against the loader list.
@@ -65,6 +65,7 @@ keeping real links inside a store out of the walk.
 | Orca | `orca.go` | SQLite journal store at `~/Library/Application Support/orca-app/orca.db` (`~/.config/orca-app/orca.db` on Linux, `%APPDATA%\orca-app\orca.db` on Windows) |
 | Claw Code | `clawcode.go` | JSONL transcripts (`session_meta`, `prompt_history`, `message`) and legacy JSON snapshots under `${CLAW_CONFIG_HOME:-~/.claw}/sessions` |
 | CodeArts Desktop | `codearts.go` | JSONL with serde content variants under a two-level session directory |
+| Qoder | `qoder.go` | Claude Code-shaped JSONL under `~/.qoder/projects` |
 | deja notes | `notes.go` | `deja remember` entries in `notes.jsonl` |
 
 File-based sources are parsed with a worker pool sized to `runtime.NumCPU()`. Results are collected by input file index and then appended in sorted path order, so parsing can be parallel while index writes stay deterministic.

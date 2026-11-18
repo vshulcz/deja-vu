@@ -14,7 +14,7 @@ IntelliJ IDEA, GoLand, PyCharm, WebStorm, RustRover, CLion, PhpStorm, Rider(`202
 ## 기능
 
 - **상태 표시줄 위젯**: IDE 상태 표시줄 오른쪽에 현재 프로젝트의 실시간 `deja statusline` 통계를 표시합니다. 클릭하면 `deja-vu` 액션 팝업이 열립니다.
-- **AI 세션 검색 (`Tools → deja-vu → Search AI Sessions...`)**: 지원하는 48개 전체 코딩 에이전트의 로컬 세션을 검색(`deja search --json`)하고 선택한 기록을 읽기 전용 Markdown 편집기 탭에서 엽니다.
+- **AI 세션 검색 (`Tools → deja-vu → Search AI Sessions...`)**: 지원하는 49개 전체 코딩 에이전트의 로컬 세션을 검색(`deja search --json`)하고 선택한 기록을 읽기 전용 Markdown 편집기 탭에서 엽니다.
 - **최근 AI 세션 (`Tools → deja-vu → Recent AI Sessions`)**: 이 머신의 최근 50개 세션(`deja last 50 --json`)을 빠른 검색 필터와 함께 나열합니다.
 - **현재 줄 AI Blame (편집기 컨텍스트 메뉴 / `Tools → deja-vu → AI Blame Current Line`)**: `deja blame <file>:<line> --json`(일치 항목이 없으면 `<file>`로 폴백)을 실행하여 커서 위치의 줄을 작성하거나 수정한 AI 세션을 엽니다.
 - **에이전트 간 핸드오프 복사 (`Tools → deja-vu → Copy Cross-Agent Handoff`)**: 프로젝트 루트에서 `deja handoff`를 실행하고 요약을 클립보드에 복사한 뒤 읽기 전용 Markdown 탭으로 엽니다.
@@ -54,7 +54,7 @@ cd extensions/jetbrains
 
 | 재현율 (Recall) | 토큰 사용량 | 인덱싱 & 조회 속도 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1; MemPalace 공개치 96.6%, agentmemory 95.2%) | **토큰 58% 절감** (반복 저장소 작업에서 agentmemory 대비 **절반의 토큰**) | 19,195개 세션 **13.6초** 인덱싱 / 48개 코딩 에이전트 통합 **0.7 ms** 조회 (비교군 7종 중 2위 72초) |
+| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1; MemPalace 공개치 96.6%, agentmemory 95.2%) | **토큰 58% 절감** (반복 저장소 작업에서 agentmemory 대비 **절반의 토큰**) | 19,195개 세션 **13.6초** 인덱싱 / 49개 코딩 에이전트 통합 **0.7 ms** 조회 (비교군 7종 중 2위 72초) |
 
 ## 저장소 메모리 및 에이전트 간 핸드오프
 

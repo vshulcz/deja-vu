@@ -8,7 +8,7 @@ Parte de **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** en Lon
 
 ![Demostración de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-> Inyecta automáticamente contexto de sesiones previas de otros 47 agentes de programación de tu equipo (Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes, etc.) en cada petición que atraviesa [Magpie](https://github.com/yetone/magpie).
+> Inyecta automáticamente contexto de sesiones previas de otros 48 agentes de programación de tu equipo (Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes, etc.) en cada petición que atraviesa [Magpie](https://github.com/yetone/magpie).
 
 Funciona en los protocolos OpenAI (`chat`, `responses`), Anthropic (`anthropic`) y Gemini (`gemini`) apoyándose en el binario único en Go `deja` y su índice BM25 local, sin modelos adicionales ni embeddings externos (`DEJA_OFFLINE=1` desactiva además el aviso diario de versión).
 
@@ -18,7 +18,7 @@ Funciona en los protocolos OpenAI (`chat`, `responses`), Anthropic (`anthropic`)
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-Requiere el binario `deja` (`@vshulcz/deja-vu`, `brew install deja-vu` o `install.sh`) y un índice generado con `deja index`. Para habilitar además las herramientas `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember` y `handoff` en los 48 agentes compatibles:
+Requiere el binario `deja` (`@vshulcz/deja-vu`, `brew install deja-vu` o `install.sh`) y un índice generado con `deja index`. Para habilitar además las herramientas `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember` y `handoff` en los 49 agentes compatibles:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
@@ -50,7 +50,7 @@ Si la petición ya contiene `<deja-memory>` o `<deja-recall>`, el plugin omite l
 
 | Recall | Tokens | Indexado y búsqueda |
 |---|---|---|
-| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas; MemPalace publica 96.6%, agentmemory 95.2%) | **58% menos tokens** (**la mitad de tokens** que agentmemory en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 48 agentes de programación (el siguiente de 7: 72 s) |
+| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas; MemPalace publica 96.6%, agentmemory 95.2%) | **58% menos tokens** (**la mitad de tokens** que agentmemory en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 49 agentes de programación (el siguiente de 7: 72 s) |
 
 ## Memoria de repositorio y relevo entre agentes
 

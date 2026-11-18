@@ -6,7 +6,7 @@
 
 **[deja-vu](https://github.com/vshulcz/deja-vu)** eklentisi (LongMemEval-S'te **%97.2 R@5** · 19,195 oturumu **13.6 sn**'de indeksleme · agentmemory'nin **yarısı kadar token**) · [Belgeler](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Canlı demo](https://vshulcz.github.io/deja-vu/view/) · [Ölçümler](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) · **[★ GitHub'da yıldız ver](https://github.com/vshulcz/deja-vu)**
 
-[deja](https://github.com/vshulcz/deja-vu), kodlama ajanlarının diske yazdığı oturum dosyalarını — Claude Code, Codex, Cursor, opencode ve 44 diğer aracı — indeksler ve bunlardan yanıt üretir. Bu eklenti aynı indeksi Zed'in ajan paneline bağlam sunucusu (context server) olarak sunar; böylece bir sohbet deja kurulmadan önceki işler de dahil geçmişi arayabilir.
+[deja](https://github.com/vshulcz/deja-vu), kodlama ajanlarının diske yazdığı oturum dosyalarını — Claude Code, Codex, Cursor, opencode ve 45 diğer aracı — indeksler ve bunlardan yanıt üretir. Bu eklenti aynı indeksi Zed'in ajan paneline bağlam sunucusu (context server) olarak sunar; böylece bir sohbet deja kurulmadan önceki işler de dahil geçmişi arayabilir.
 
 ![deja-vu demosu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -49,7 +49,7 @@ Eklentiyi Zed'in eklenti listesinden kurun. İlk kullanımda Zed'den `deja --ver
 
 | İsabet (Recall) | Token | İndeksleme ve sorgu |
 |---|---|---|
-| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1; MemPalace %96.6, agentmemory %95.2 yayımlar) | **%58 daha az token** (tekrarlanan depo işlerinde agentmemory'nin **yarısı kadar token**) | 19,195 oturumu **13.6 sn**'de indeksler / 48 kodlama ajanı genelinde **0.7 ms** sorgu süresi (7 araçtan sonraki: 72 sn) |
+| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1; MemPalace %96.6, agentmemory %95.2 yayımlar) | **%58 daha az token** (tekrarlanan depo işlerinde agentmemory'nin **yarısı kadar token**) | 19,195 oturumu **13.6 sn**'de indeksler / 49 kodlama ajanı genelinde **0.7 ms** sorgu süresi (7 araçtan sonraki: 72 sn) |
 
 ## Depo belleği ve ajanlar arası devir (`handoff`)
 

@@ -8,7 +8,7 @@
 
 ![deja-vu demosu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Claude Code, Codex, Cursor, opencode, Zed ve diğer 43 kodlama ajanındaki yerel oturum geçmişinizden gelen kalıcı bellek. Tek Go ikilisi `deja` üzerinden tamamen yerel çalışır (`DEJA_OFFLINE=1` günlük sürüm kontrolünü kapatır).
+Claude Code, Codex, Cursor, opencode, Zed ve diğer 44 kodlama ajanındaki yerel oturum geçmişinizden gelen kalıcı bellek. Tek Go ikilisi `deja` üzerinden tamamen yerel çalışır (`DEJA_OFFLINE=1` günlük sürüm kontrolünü kapatır).
 
 ## Kurulum
 
@@ -51,7 +51,7 @@ grok plugin install deja
 
 | İsabet (Recall) | Token | İndeksleme ve sorgu |
 |---|---|---|
-| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1; MemPalace %96.6, agentmemory %95.2 yayımlar) | **%58 daha az token** (tekrarlanan depo işlerinde agentmemory'nin **yarısı kadar token**) | 19,195 oturumu **13.6 sn**'de indeksler / 48 kodlama ajanı genelinde **0.7 ms** sorgu süresi (7 araçtan sonraki: 72 sn) |
+| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1; MemPalace %96.6, agentmemory %95.2 yayımlar) | **%58 daha az token** (tekrarlanan depo işlerinde agentmemory'nin **yarısı kadar token**) | 19,195 oturumu **13.6 sn**'de indeksler / 49 kodlama ajanı genelinde **0.7 ms** sorgu süresi (7 araçtan sonraki: 72 sn) |
 
 ## Depo belleği ve ajanlar arası devir (`handoff`)
 

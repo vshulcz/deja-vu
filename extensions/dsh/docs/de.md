@@ -8,7 +8,7 @@ Teil von **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** auf Lo
 
 ![deja-vu Demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-`session-query`-Plugin für DeepSeek Harness (`dsh`) und DSH Desktop (`anywhere-labs/dsh-desktop`). Durchsucht neben DSH-Gesprächen lokal auch die Protokolle von 47 weiteren Coding-Agenten auf demselben Rechner (Claude Code, Codex, Cursor, Gemini, Hermes u. a.) über die einzelne Go-Binary `deja` und deren BM25-Index (`DEJA_OFFLINE=1` deaktiviert die tägliche Prüfung).
+`session-query`-Plugin für DeepSeek Harness (`dsh`) und DSH Desktop (`anywhere-labs/dsh-desktop`). Durchsucht neben DSH-Gesprächen lokal auch die Protokolle von 48 weiteren Coding-Agenten auf demselben Rechner (Claude Code, Codex, Cursor, Gemini, Hermes u. a.) über die einzelne Go-Binary `deja` und deren BM25-Index (`DEJA_OFFLINE=1` deaktiviert die tägliche Prüfung).
 
 ## Installation
 
@@ -20,7 +20,7 @@ dsh plugin --profile web add dsh-deja
 dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 ```
 
-Fehlt `deja` noch auf dem System, `DEJA_BIN` setzen oder alle 48 Agenten samt `$DSH_HOME/plugins/deja/` einrichten:
+Fehlt `deja` noch auf dem System, `DEJA_BIN` setzen oder alle 49 Agenten samt `$DSH_HOME/plugins/deja/` einrichten:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -75,7 +75,7 @@ Eine Browser-Testdatei ohne Build-Schritt liegt unter `extensions/dsh/test/searc
 
 | Recall | Tokens | Indexierung & Suche |
 |---|---|---|
-| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen; MemPalace veröffentlicht 96.6%, agentmemory 95.2%) | **58% weniger Tokens** (**halb so viele Tokens** wie agentmemory bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 48 Coding-Agents hinweg (Nächstbester von 7: 72 s) |
+| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen; MemPalace veröffentlicht 96.6%, agentmemory 95.2%) | **58% weniger Tokens** (**halb so viele Tokens** wie agentmemory bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 49 Coding-Agents hinweg (Nächstbester von 7: 72 s) |
 
 ## Repository-Gedächtnis & Agenten-Übergabe
 

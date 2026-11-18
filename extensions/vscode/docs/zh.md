@@ -6,7 +6,7 @@
 
 **让你的编程智能体不再重复排查已经解决过的问题。**
 
-[deja-vu](https://github.com/vshulcz/deja-vu) 本地索引 Claude Code、Cursor、Codex、Windsurf、Copilot Chat、OpenCode、Cline、Roo Code 与其他 40 个编程智能体写入磁盘的历史会话——单个 Go 二进制本地运行，无 LLM 调用、无后台守护进程。
+[deja-vu](https://github.com/vshulcz/deja-vu) 本地索引 Claude Code、Cursor、Codex、Windsurf、Copilot Chat、OpenCode、Cline、Roo Code 与其他 41 个编程智能体写入磁盘的历史会话——单个 Go 二进制本地运行，无 LLM 调用、无后台守护进程。
 
 **[★ 去 GitHub 点颗星](https://github.com/vshulcz/deja-vu)** · **[文档](https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html)** · **[基准评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
@@ -36,7 +36,7 @@ code --install-extension vshulcz.deja-status
 |---|---|
 | LongMemEval-S 检索准确率（470 道清洗后题目） | **97.2% R@5**，**88.9% hit@1**（MemPalace 公布 96.6%，agentmemory 为 95.2%） |
 | 重复仓库任务的 Token 消耗 | **减少 58%**——只有 agentmemory 的**一半**（`52,815` 对比冷启动 `103,443`，11 组配对测试） |
-| 进程内词法查询延迟 | 跨 48 个编程智能体中位数 **0.7–0.8 ms** |
+| 进程内词法查询延迟 | 跨 49 个编程智能体中位数 **0.7–0.8 ms** |
 | 对 19,195 个历史会话的零配置建库耗时 | **13.6 s**，无需 API Key（7 款工具中第二名为 72 s） |
 
 ## 仓库记忆与跨智能体接力

@@ -5,7 +5,7 @@
 
 Fait partie de **[deja-vu](https://github.com/vshulcz/deja-vu)** (**< 1 ms** SQLite FTS5 · **~4%** d'empreinte d'index · **0** token LLM à l'ingestion) · [Documentation](https://vshulcz.github.io/deja-vu/) · [Démo navigateur](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-Recherchez vos anciennes transcriptions d'agents, lancez un `blame` de ligne par session IA, retrouvez des correctifs d'erreurs et générez des transferts inter-agents couvrant Claude Code, Codex CLI, Cursor, opencode, Gemini CLI et 43 autres outils directement depuis Neovim.
+Recherchez vos anciennes transcriptions d'agents, lancez un `blame` de ligne par session IA, retrouvez des correctifs d'erreurs et générez des transferts inter-agents couvrant Claude Code, Codex CLI, Cursor, opencode, Gemini CLI et 44 autres outils directement depuis Neovim.
 
 ![Démo de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -78,7 +78,7 @@ Exécutez `:checkhealth deja` dans Neovim pour vérifier la détection du binair
 
 | Rappel | Tokens | Indexation & recherche |
 |---|---|---|
-| **97.2% R@5** sur LongMemEval-S (88.9% hit@1 sur 470 questions ; MemPalace publie 96.6%, agentmemory 95.2%) | **58% de tokens en moins** (**moitié moins de tokens** qu'agentmemory sur des tâches répétées) | **13.6 s** pour indexer 19,195 sessions / **0.7 ms** par requête sur 48 agents de code (suivant sur 7 : 72 s) |
+| **97.2% R@5** sur LongMemEval-S (88.9% hit@1 sur 470 questions ; MemPalace publie 96.6%, agentmemory 95.2%) | **58% de tokens en moins** (**moitié moins de tokens** qu'agentmemory sur des tâches répétées) | **13.6 s** pour indexer 19,195 sessions / **0.7 ms** par requête sur 49 agents de code (suivant sur 7 : 72 s) |
 
 ## Mémoire de dépôt & transfert inter-agents
 

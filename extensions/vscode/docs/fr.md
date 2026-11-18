@@ -6,7 +6,7 @@
 
 **Vos agents ne redéboguent plus ce que vous avez déjà corrigé.**
 
-[deja-vu](https://github.com/vshulcz/deja-vu) indexe localement les historiques de session que Claude Code, Cursor, Codex, Windsurf, Copilot Chat, OpenCode, Cline, Roo Code et 40 autres agents écrivent déjà sur disque — dans un seul binaire Go, sans LLM ni démon en arrière-plan.
+[deja-vu](https://github.com/vshulcz/deja-vu) indexe localement les historiques de session que Claude Code, Cursor, Codex, Windsurf, Copilot Chat, OpenCode, Cline, Roo Code et 41 autres agents écrivent déjà sur disque — dans un seul binaire Go, sans LLM ni démon en arrière-plan.
 
 **[★ Étoile sur GitHub](https://github.com/vshulcz/deja-vu)** · **[Documentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
@@ -36,7 +36,7 @@ code --install-extension vshulcz.deja-status
 |---|---|
 | Précision sur LongMemEval-S (470 questions nettoyées) | **97.2% R@5**, **88.9% hit@1** (MemPalace 96.6%, agentmemory 95.2%) |
 | Coût en tokens sur des tâches répétées | **58% de tokens en moins** — moitié moins qu'agentmemory (`52,815` vs `103,443` à froid, 11 paires) |
-| Latence de requête lexicale en mémoire | Médiane de **0.7–0.8 ms** sur 48 agents de code |
+| Latence de requête lexicale en mémoire | Médiane de **0.7–0.8 ms** sur 49 agents de code |
 | Indexation initiale sur 19,195 sessions réelles | **13.6 s**, sans clé API (suivant sur 7 outils : 72 s) |
 
 ## Mémoire de dépôt & transfert inter-agents

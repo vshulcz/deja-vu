@@ -29,9 +29,14 @@ func QoderSessionFiles() []string {
 }
 
 // QoderUnderRoot reports whether a path belongs to this store, so the registry
-// can claim it without stealing a stock Claude transcript.
+// can claim it without stealing a stock Claude transcript or a sibling folder.
 func QoderUnderRoot(p string) bool {
-	return strings.HasPrefix(p, filepath.Join(QoderRoot(), "projects"))
+	if !strings.HasSuffix(p, ".jsonl") {
+		return false
+	}
+	root := filepath.Clean(filepath.Join(QoderRoot(), "projects"))
+	rel, err := filepath.Rel(root, filepath.Clean(p))
+	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != ""
 }
 
 // LoadQoder reads every Qoder session on this machine.

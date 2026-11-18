@@ -5,7 +5,7 @@
 
 **[deja-vu](https://github.com/vshulcz/deja-vu)** parçası (**< 1 ms** SQLite FTS5 araması · **~%4** indeks boyutu · indekslemede **0** LLM token) · [Belgeler](https://vshulcz.github.io/deja-vu/) · [Tarayıcı demosu](https://vshulcz.github.io/deja-vu/view/) · [Ölçümler](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-Doğrudan Neovim içinden Claude Code, Codex CLI, Cursor, opencode, Gemini CLI ve 43 diğer araçtaki eski kodlama ajanı kayıtlarını arayın, satır düzeyinde AI oturum blame çalıştırın, hata çözümlerini çağırın ve ajanlar arası devir özetleri üretin.
+Doğrudan Neovim içinden Claude Code, Codex CLI, Cursor, opencode, Gemini CLI ve 44 diğer araçtaki eski kodlama ajanı kayıtlarını arayın, satır düzeyinde AI oturum blame çalıştırın, hata çözümlerini çağırın ve ajanlar arası devir özetleri üretin.
 
 ![deja-vu demosu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -78,7 +78,7 @@ sections = {
 
 | İsabet (Recall) | Token | İndeksleme ve sorgu |
 |---|---|---|
-| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1; MemPalace %96.6, agentmemory %95.2 yayımlar) | **%58 daha az token** (tekrarlanan depo işlerinde agentmemory'nin **yarısı kadar token**) | 19,195 oturumu **13.6 sn**'de indeksler / 48 kodlama ajanı genelinde **0.7 ms** sorgu süresi (7 araçtan sonraki: 72 sn) |
+| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1; MemPalace %96.6, agentmemory %95.2 yayımlar) | **%58 daha az token** (tekrarlanan depo işlerinde agentmemory'nin **yarısı kadar token**) | 19,195 oturumu **13.6 sn**'de indeksler / 49 kodlama ajanı genelinde **0.7 ms** sorgu süresi (7 araçtan sonraki: 72 sn) |
 
 ## Depo belleği ve ajanlar arası devir (`handoff`)
 

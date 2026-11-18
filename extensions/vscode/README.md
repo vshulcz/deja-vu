@@ -6,7 +6,7 @@ English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions
 
 **Your coding agents stop re-debugging what you already fixed.**
 
-[deja-vu](https://github.com/vshulcz/deja-vu) indexes the session transcripts Claude Code, Cursor, Codex, Windsurf, Copilot Chat, OpenCode, Cline, Roo Code and 40 other coding agents already write to disk — locally, in one Go binary, with no LLM and no background daemon.
+[deja-vu](https://github.com/vshulcz/deja-vu) indexes the session transcripts Claude Code, Cursor, Codex, Windsurf, Copilot Chat, OpenCode, Cline, Roo Code and 41 other coding agents already write to disk — locally, in one Go binary, with no LLM and no background daemon.
 
 **[★ Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)** · **[Documentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
@@ -36,7 +36,7 @@ code --install-extension vshulcz.deja-status
 |---|---|
 | LongMemEval-S retrieval accuracy (470 cleaned questions) | **97.2% R@5**, **88.9% hit@1** (MemPalace publishes 96.6%, agentmemory 95.2%) |
 | Task token cost on repeated repository work | **58% fewer tokens** — half the tokens of agentmemory (`52,815` vs `103,443` cold, 11 paired runs) |
-| In-process lexical query latency | **0.7–0.8 ms** median across 48 coding agents |
+| In-process lexical query latency | **0.7–0.8 ms** median across 49 coding agents |
 | Day-zero indexing over 19,195 real sessions | **13.6 s**, zero API keys (next of 7 tools: 72 s) |
 
 ## Repository memory & handoff
