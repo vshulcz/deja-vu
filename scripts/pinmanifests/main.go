@@ -76,7 +76,8 @@ const (
 	// it back, so the committed value drifts on its own: it sat at 0.13.0
 	// through eight minors while the registry served the right one. Pinned
 	// here so the file in the repository reads like the entry it produces.
-	serverJSON = "server.json"
+	serverJSON         = "server.json"
+	mcpbRegistryServer = "packaging/mcpb/registry-server.json"
 
 	// The Kimi Code plugin is packed into the release archive, so the version
 	// in its manifest is the one a Kimi user reads. It sat at 0.1.0 from the
@@ -195,6 +196,7 @@ func targets() map[string]func(pins) ([]byte, error) {
 		kimiConst:             renderGoVersionConst(kimiConst, "kimiPluginVersion"),
 		agentPlugin:           renderPluginVersion(agentPlugin),
 		serverJSON:            renderPluginVersion(serverJSON),
+		mcpbRegistryServer:    renderMCPBRegistryServer(mcpbRegistryServer),
 		specKitExtension:      renderYAMLExtensionVersion(specKitExtension),
 		vscodeExtension:       renderPluginVersion(vscodeExtension),
 	}
@@ -369,14 +371,35 @@ func renderPluginVersion(path string) func(pins) ([]byte, error) {
 	}
 }
 
+// renderMCPBRegistryServer updates the version fields and release bundle URL
+// in packaging/mcpb/registry-server.json. fileSha256 is stamped at publish time
+// from the uploaded release bundle because checksums.txt only covers archives.
+func renderMCPBRegistryServer(path string) func(pins) ([]byte, error) {
+	return func(p pins) ([]byte, error) {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		s := string(b)
+		if !jsonVersion.MatchString(s) {
+			return nil, fmt.Errorf("%s has no version field to pin", path)
+		}
+		s = jsonVersion.ReplaceAllString(s, `${1}"`+p.version+`"`)
+		s = tagRefs.ReplaceAllString(s, "/v"+p.version+"$1")
+		s = mcpbFileRefs.ReplaceAllString(s, "deja-vu_"+p.version+"_registry.mcpb")
+		return []byte(s), nil
+	}
+}
+
 var (
 	versionLine = regexp.MustCompile(`(?m)^PackageVersion: .*$`)
 	// (?m) because a tag reference is often the last thing on its line: the
 	// ReleaseNotesUrl in the winget locale sat at v0.16.1 through three
 	// releases while every reference followed by a slash moved (#2088).
-	tagRefs     = regexp.MustCompile(`(?m)/v\d+\.\d+\.\d+(/|$)`)
-	fileRefs    = regexp.MustCompile(`deja-vu_\d+\.\d+\.\d+_windows`)
-	jsonVersion = regexp.MustCompile(`(?m)^(\s*"version":\s*)"[^"]*"`)
+	tagRefs      = regexp.MustCompile(`(?m)/v\d+\.\d+\.\d+(/|$)`)
+	fileRefs     = regexp.MustCompile(`deja-vu_\d+\.\d+\.\d+_windows`)
+	mcpbFileRefs = regexp.MustCompile(`deja-vu_\d+\.\d+\.\d+_registry\.mcpb`)
+	jsonVersion  = regexp.MustCompile(`(?m)^(\s*"version":\s*)"[^"]*"`)
 	// Two-space indent: the extension block's own field, not a tool's
 	// `version:` under requires, which sits deeper.
 	yamlExtensionVersion = regexp.MustCompile(`(?m)^(  version:[ \t]*)"[^"\n]*"`)

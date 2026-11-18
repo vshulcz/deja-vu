@@ -20,6 +20,7 @@ func TestManifestDescriptionsFitTheRegistry(t *testing.T) {
 	for _, path := range []string{
 		filepath.Join("..", "..", "server.json"),
 		filepath.Join("..", "..", "packaging", "mcpb", "manifest.json"),
+		filepath.Join("..", "..", "packaging", "mcpb", "registry-server.json"),
 	} {
 		b, err := os.ReadFile(path)
 		if err != nil {

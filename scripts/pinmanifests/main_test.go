@@ -178,6 +178,66 @@ ShortDescription: memory for coding agents
 	}
 }
 
+func TestRenderMCPBRegistryServerMovesVersionAndBundleURL(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "registry-server.json")
+	original := `{
+  "version": "0.23.0",
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/vshulcz/deja-vu/releases/download/v0.23.0/deja-vu_0.23.0_registry.mcpb",
+      "fileSha256": "deadbeef",
+      "version": "0.23.0"
+    }
+  ]
+}
+`
+	if err := os.WriteFile(path, []byte(original), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+	p, err := parse("1.2.3", sample)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := renderMCPBRegistryServer("registry-server.json")(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(out)
+	if strings.Contains(got, "0.23.0") {
+		t.Fatalf("stale version left behind:\n%s", got)
+	}
+	if !strings.Contains(got, `"version": "1.2.3"`) || !strings.Contains(got, `/v1.2.3/deja-vu_1.2.3_registry.mcpb"`) {
+		t.Fatalf("version or bundle URL not updated:\n%s", got)
+	}
+	if !strings.Contains(got, `"fileSha256": "deadbeef"`) {
+		t.Fatalf("fileSha256 was unexpectedly altered:\n%s", got)
+	}
+}
+
+func TestRenderMCPBRegistryServerErrorsAndRegistration(t *testing.T) {
+	if fn := targets()[mcpbRegistryServer]; fn == nil {
+		t.Fatalf("targets()[%q] is nil", mcpbRegistryServer)
+	}
+	p, err := parse("1.2.3", sample)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if _, err := renderMCPBRegistryServer(filepath.Join(dir, "missing.json"))(p); err == nil {
+		t.Fatal("expected error for missing manifest")
+	}
+	noVer := filepath.Join(dir, "no-version.json")
+	if err := os.WriteFile(noVer, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := renderMCPBRegistryServer(noVer)(p); err == nil || !strings.Contains(err.Error(), "has no version field to pin") {
+		t.Fatalf("got err %v, want has no version field to pin", err)
+	}
+}
+
 func objAt(t *testing.T, m map[string]any, key string) map[string]any {
 	t.Helper()
 	v, ok := m[key].(map[string]any)
