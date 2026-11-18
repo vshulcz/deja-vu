@@ -52,16 +52,22 @@ import (
 // `<session>:<first message id of the part no earlier session carried>`
 // when it is not, and its Parent the session id.
 //
-// Read off Devin CLI 3000.11.3; `devin --resume <id>` takes the sessions
-// row's id. On Windows the store lives under %LOCALAPPDATA%\devin; Linux and
-// macOS share the XDG data directory, ~/.local/share/devin by default.
+// Read off Devin CLI 3000.11.3 (and Windows paths verified on 3000.14.30821);
+// `devin --resume <id>` takes the sessions row's id. On Windows the store
+// lives under %APPDATA%\devin alongside config.json and mcp_config.json
+// (%LOCALAPPDATA%\devin\cli holds only the installed CLI binary and tools);
+// Linux and macOS share the XDG data directory, ~/.local/share/devin by default.
 
-// devinDataDir is Devin CLI's local data directory, the platform's own.
-func devinDataDir() string {
-	if runtime.GOOS == "windows" {
-		app := os.Getenv("LOCALAPPDATA")
+// devinDataDir is Devin CLI's data directory, the platform's own.
+func devinDataDir() string { return devinDataDirFor(runtime.GOOS) }
+
+// devinDataDirFor is devinDataDir with the platform spelled out, so the
+// Windows branch is covered from any host the same way devinConfigDirFor is.
+func devinDataDirFor(goos string) string {
+	if goos == "windows" {
+		app := os.Getenv("APPDATA")
 		if app == "" {
-			app = filepath.Join(Home(), "AppData", "Local")
+			app = filepath.Join(Home(), "AppData", "Roaming")
 		}
 		return filepath.Join(app, "devin")
 	}

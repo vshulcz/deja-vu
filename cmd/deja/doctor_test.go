@@ -215,9 +215,10 @@ func TestDoctorJSONGolden(t *testing.T) {
 	// JetBrains IDEs' config directory, the same three homes.
 	got = strings.ReplaceAll(got, "<tmp>/home/Library/Application Support/JetBrains", "<tmp>/home/.config/JetBrains")
 	got = strings.ReplaceAll(got, "<tmp>/home/AppData/Roaming/JetBrains", "<tmp>/home/.config/JetBrains")
-	// Devin's store is under %LOCALAPPDATA%\devin on Windows and its config
-	// under %APPDATA%\devin; both normalise to the posix homes the golden keeps.
-	got = strings.ReplaceAll(got, "<tmp>/home/AppData/Local/devin", "<tmp>/home/.local/share/devin")
+	// Devin's store and config both live under %APPDATA%\devin on Windows;
+	// normalise the store tree to ~/.local/share/devin and the config files
+	// to ~/.config/devin, which is what the golden keeps.
+	got = strings.ReplaceAll(got, "<tmp>/home/AppData/Roaming/devin/cli", "<tmp>/home/.local/share/devin/cli")
 	got = strings.ReplaceAll(got, "<tmp>/home/AppData/Roaming/devin", "<tmp>/home/.config/devin")
 	// Orca's userData directory on macOS and Windows normalises to ~/.config/orca.
 	got = strings.ReplaceAll(got, "<tmp>/home/Library/Application Support/orca", "<tmp>/home/.config/orca")

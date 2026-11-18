@@ -1634,7 +1634,7 @@
       "store_paths": [
         "~/.local/share/devin/cli/sessions.db",
         "${XDG_DATA_HOME}/devin/cli/sessions.db",
-        "%LOCALAPPDATA%/devin/cli/sessions.db",
+        "%APPDATA%/devin/cli/sessions.db",
         "cli_sessions.db beside sessions.db (the legacy name)",
         "${DEJA_DEVIN_DB}"
       ],
@@ -1643,7 +1643,7 @@
         "fixtures/registry/devin/devin.sql"
       ],
       "parser_source": "internal/sources/devin.go",
-      "last_verified": "2026-10-07",
+      "last_verified": "2026-11-18",
       "display_name": "Devin CLI",
       "capabilities": {
         "mcp": true,

@@ -362,7 +362,7 @@ func TestLoadDevinReadsDiscoveredStores(t *testing.T) {
 
 func TestDevinDataDirFollowsXDG(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("Windows keeps its own root under LOCALAPPDATA, not XDG")
+		t.Skip("Windows keeps its own root under APPDATA, not XDG")
 	}
 	home := devinHome(t)
 	if got := devinDataDir(); got != filepath.Join(home, ".local", "share", "devin") {
@@ -371,6 +371,31 @@ func TestDevinDataDirFollowsXDG(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", filepath.Join(home, "xdg"))
 	if got := devinDataDir(); got != filepath.Join(home, "xdg", "devin") {
 		t.Fatalf("XDG_DATA_HOME ignored: %q", got)
+	}
+}
+
+func TestDevinDataDirFollowsPlatformConventions(t *testing.T) {
+	home := devinHome(t)
+	for _, c := range []struct {
+		name string
+		goos string
+		xdg  string
+		app  string
+		want string
+	}{
+		{"linux default", "linux", "", "", filepath.Join(home, ".local", "share", "devin")},
+		{"linux xdg", "linux", filepath.Join(home, "xdg"), "", filepath.Join(home, "xdg", "devin")},
+		{"macos xdg honoured", "darwin", filepath.Join(home, "xdg-mac"), "", filepath.Join(home, "xdg-mac", "devin")},
+		{"windows appdata", "windows", "", filepath.Join(home, "custom-roaming"), filepath.Join(home, "custom-roaming", "devin")},
+		{"windows fallback", "windows", "", "", filepath.Join(home, "AppData", "Roaming", "devin")},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Setenv("XDG_DATA_HOME", c.xdg)
+			t.Setenv("APPDATA", c.app)
+			if got := devinDataDirFor(c.goos); got != c.want {
+				t.Errorf("devinDataDirFor(%q) = %q, want %q", c.goos, got, c.want)
+			}
+		})
 	}
 }
 
