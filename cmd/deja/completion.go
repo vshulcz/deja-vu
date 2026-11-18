@@ -129,7 +129,7 @@ _deja_completion() {
             COMPREPLY=( $(compgen -W "--json --offline --deep --all" -- "$cur") )
             ;;
         audit)
-            COMPREPLY=( $(compgen -W "--json" -- "$cur") )
+            COMPREPLY=( $(compgen -W "--json --secrets --fail-on-secrets" -- "$cur") )
             ;;
         delete)
             COMPREPLY=( $(compgen -W "--dry-run --yes" -- "$cur") )
@@ -475,7 +475,7 @@ _deja() {
       _arguments '--json[print JSON]' '--offline[skip version check]' '--deep[verify index against sources]' '--all[list every store, missing ones included]'
       ;;
     audit)
-      _arguments '--json[print JSON]'
+      _arguments '--json[print JSON]' '--secrets[scan raw transcripts for unredacted credentials]' '--fail-on-secrets[exit non-zero when unredacted credentials are found]'
       ;;
     delete)
       _arguments '--dry-run[list the files, remove nothing]' '--yes[do not ask]' '1:session ID prefix:'
@@ -669,6 +669,8 @@ complete -c deja -n '__fish_seen_subcommand_from doctor' -l offline
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l deep
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l all
 complete -c deja -n '__fish_seen_subcommand_from audit' -l json
+complete -c deja -n '__fish_seen_subcommand_from audit' -l secrets -d 'Scan raw transcripts for unredacted credentials'
+complete -c deja -n '__fish_seen_subcommand_from audit' -l fail-on-secrets -d 'Exit non-zero when unredacted credentials are found'
 complete -c deja -n '__fish_seen_subcommand_from status' -l harness -r -a '%HARNESSES%'
 complete -c deja -n '__fish_seen_subcommand_from status' -l json
 complete -c deja -n '__fish_seen_subcommand_from delete' -l dry-run -d 'List the files, remove nothing'
@@ -859,7 +861,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 else { @('bash', 'zsh', 'fish', '-c', '--verify', '--json') }
             }
             'doctor' { @('--json', '--offline', '--deep', '--all') }
-            'audit' { @('--json') }
+            'audit' { @('--json', '--secrets', '--fail-on-secrets') }
             'delete' { @('--dry-run', '--yes') }
             'forget' {
                 if ($previous -in @('--session', '--project', '--before', '--unforget')) { @() }

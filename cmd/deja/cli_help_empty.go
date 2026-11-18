@@ -196,6 +196,8 @@ var flagsOfOtherCommands = map[string]string{
 	"--quiet":            "index",
 	"--context-search":   "mcp",
 	"--http":             "mcp",
+	"--secrets":          "audit",
+	"--fail-on-secrets":  "audit",
 }
 
 // searchFlags is every flag the bare search form accepts, for the typo check.
@@ -222,6 +224,7 @@ var (
 	handoffFlags  = []string{"--to", "--project", "--harness", "--exec"}
 	statusFlags   = []string{"--json", "--harness"}
 	trailFlags    = []string{"--json", "--all-projects", "--project", "--harness", "--limit"}
+	auditFlags    = []string{"--json", "--secrets", "--fail-on-secrets"}
 )
 
 var searchFlags = []string{
