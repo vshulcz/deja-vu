@@ -563,7 +563,7 @@ func callMCPRecall(dir string, raw json.RawMessage, served *int) (string, error)
 	if line := manualIndexLine(dir); line != "" {
 		dated = line + "\n\n"
 	}
-	brief := liveRecallBrief(dir, howCwd(), a.Query)
+	brief := liveRecallBriefScoped(dir, howCwd(), a.Project, int(a.Offset), a.Query)
 	budget := recallMCPBudget - recallFrameOverhead - len(env) - len(dated)
 	if brief != "" {
 		budget -= len(brief) + 2

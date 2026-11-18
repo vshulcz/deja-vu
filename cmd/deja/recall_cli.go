@@ -110,7 +110,7 @@ func runRecall(dir string, args []string, stdout io.Writer) error {
 		_, err := fmt.Fprintln(stdout, frameRecall(line))
 		return err
 	}
-	brief := liveRecallBrief(dir, howCwd(), q)
+	brief := liveRecallBriefScoped(dir, howCwd(), project, offset, q)
 	budget := recallMCPBudget - recallFrameOverhead
 	if brief != "" {
 		budget -= len(brief) + 2

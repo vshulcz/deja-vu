@@ -765,7 +765,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// in parallel: both found the packet undelivered and it arrived twice. The
 	// prompt hook carries it there.
 	if !once {
-		if delivered, err := emitCompactionRecovery(dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), eventName, shape, os.Stdout); delivered {
+		if delivered, err := emitCompactionRecoveryLocked(dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), eventName, shape, os.Stdout); delivered {
 			return err
 		}
 	}

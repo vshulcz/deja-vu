@@ -1145,13 +1145,14 @@ func orientRepoTree(cwd string) repoFileTree {
 		rel:    map[string]bool{},
 		base:   map[string]bool{},
 		byBase: map[string]string{},
-		at:     time.Now(),
 	}
 	fi, err := os.Stat(cwd)
 	if err != nil || !fi.IsDir() {
+		t.at = time.Now()
 		return t
 	}
 	count := 0
+	scanStart := time.Now()
 	_ = filepath.WalkDir(cwd, func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return nil //nolint:nilerr // unreadable subdirectories are skipped during best-effort walk
@@ -1164,7 +1165,7 @@ func orientRepoTree(cwd string) repoFileTree {
 			return nil
 		}
 		count++
-		if count > 8000 {
+		if count > 8000 || (count >= 64 && time.Since(scanStart) > 250*time.Millisecond) {
 			return fs.SkipAll
 		}
 		b := strings.ToLower(d.Name())
@@ -1178,6 +1179,7 @@ func orientRepoTree(cwd string) repoFileTree {
 		}
 		return nil
 	})
+	t.at = time.Now()
 	orientTreeCache.Store(cwd, t)
 	return t
 }

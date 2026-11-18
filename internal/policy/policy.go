@@ -18,6 +18,10 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
+// NoSourceHintsEnv disables live workspace source-file discovery in recall and
+// hooks while keeping historical recall, repo memory and hook guards active.
+const NoSourceHintsEnv = "DEJA_NO_SOURCE_HINTS"
+
 // Activations a policy can restrict.
 const (
 	ActivationSearch = "search"
@@ -49,6 +53,10 @@ type Policy struct {
 	// skips mining fixes, co-occurrence, commands, command failures and
 	// session facts (#5395).
 	SearchOnly bool `json:"search_only,omitempty"`
+	// SourceHints false disables live workspace source-file scanning and AST
+	// lookup hints in recall and hooks while keeping session history recall
+	// and .deja/memory.jsonl rules active (#6070).
+	SourceHints *bool `json:"source_hints,omitempty"`
 }
 
 // SearchOnlyOn reports "search_only": true in the policy file.
@@ -58,6 +66,26 @@ func SearchOnlyOn() bool { return Load().SearchOnly }
 func AutoIndexOff() bool {
 	p := Load()
 	return p.AutoIndex != nil && !*p.AutoIndex
+}
+
+// SourceHintsDisabled reports whether p explicitly sets "source_hints": false.
+func (p Policy) SourceHintsDisabled() bool {
+	return p.SourceHints != nil && !*p.SourceHints
+}
+
+// SourceHintsOff reports whether live workspace source-code discovery is
+// disabled via DEJA_NO_SOURCE_HINTS or "source_hints": false in policy.json.
+// An explicit DEJA_NO_SOURCE_HINTS=0/false/no/off overrides the policy file for
+// a single run (#6070).
+func SourceHintsOff() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(NoSourceHintsEnv))) {
+	case "":
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return true
+	}
+	return Load().SourceHintsDisabled()
 }
 
 // Path is where the policy file lives.
@@ -268,7 +296,7 @@ func Diagnose() (exists bool, unknown []string, err error) {
 	if json.Unmarshal(b, &top) == nil {
 		for key := range top {
 			switch key {
-			case "activations", "ignore", "auto_index", "search_only":
+			case "activations", "ignore", "auto_index", "search_only", "source_hints":
 			default:
 				unknown = append(unknown, key)
 			}

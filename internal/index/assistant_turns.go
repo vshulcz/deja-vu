@@ -145,70 +145,94 @@ var giveUpSearchWords = []string{
 	"отбросили", "отбросил", "отменил",
 }
 
-func (v *metaViews) giveUpRecordsByKey(dir string, m Manifest) map[string][]Record {
-	v.giveUpOnce.Do(func() {
-		gaveOrds := map[uint32]bool{}
-		for _, meta := range v.sessions {
-			if meta.GaveUp {
-				gaveOrds[meta.Ord] = true
-			}
+func (v *metaViews) giveUpRecordsForOrds(dir string, m Manifest, wantOrds map[uint32]string) map[string][]Record {
+	if len(wantOrds) == 0 {
+		return nil
+	}
+	v.giveUpMu.Lock()
+	if v.giveUpRecs == nil {
+		v.giveUpRecs = map[string][]Record{}
+	}
+	if v.giveUpLoaded == nil {
+		v.giveUpLoaded = map[string]bool{}
+	}
+	missingOrds := make(map[uint32]string, len(wantOrds))
+	for ord, key := range wantOrds {
+		if !v.giveUpLoaded[key] {
+			missingOrds[ord] = key
 		}
-		if len(gaveOrds) == 0 {
-			v.giveUpRecs = map[string][]Record{}
-			return
+	}
+	if len(missingOrds) == 0 {
+		out := make(map[string][]Record, len(wantOrds))
+		for _, key := range wantOrds {
+			out[key] = v.giveUpRecs[key]
 		}
-		seenOff := map[int64]bool{}
-		var offs []int64
-		for _, raw := range giveUpSearchWords {
-			var tokBuf [1 + tokenHitCap]byte
-			var tok string
-			eachWord(raw, &tokBuf, func(b []byte) {
-				if tok == "" {
-					tok = string(b)
-				}
-			})
+		v.giveUpMu.Unlock()
+		return out
+	}
+	v.giveUpMu.Unlock()
+
+	seenOff := map[int64]bool{}
+	var offs []int64
+	for _, raw := range giveUpSearchWords {
+		var tokBuf [1 + tokenHitCap]byte
+		var tok string
+		eachWord(raw, &tokBuf, func(b []byte) {
 			if tok == "" {
+				tok = string(b)
+			}
+		})
+		if tok == "" {
+			continue
+		}
+		posts, err := postingsFor(dir, tok)
+		if err != nil || len(posts) == 0 {
+			continue
+		}
+		for _, p := range posts {
+			if p.Tool || missingOrds[p.Sid] == "" || seenOff[p.Off] {
 				continue
 			}
-			posts, err := postingsFor(dir, tok)
-			if err != nil || len(posts) == 0 {
-				continue
-			}
-			for _, p := range posts {
-				if p.Tool || !gaveOrds[p.Sid] || seenOff[p.Off] {
-					continue
-				}
-				seenOff[p.Off] = true
-				offs = append(offs, p.Off)
-			}
+			seenOff[p.Off] = true
+			offs = append(offs, p.Off)
 		}
-		if len(offs) == 0 {
-			v.giveUpRecs = map[string][]Record{}
-			return
-		}
+	}
+	fetched := make(map[string][]Record, len(missingOrds))
+	loaded := true
+	if len(offs) > 0 {
 		slices.Sort(offs)
 		f, tbl, err := openRecordLog(dir)
 		if err != nil {
-			v.giveUpRecs = map[string][]Record{}
-			return
-		}
-		defer func() { _ = f.Close() }()
-		if tbl == nil {
-			tbl = tablesFromManifest(m)
-		}
-		byKey := make(map[string][]Record, len(gaveOrds))
-		_ = eachOffsetRecordAtInRoles(f, offs, tbl, map[string]bool{"user": true, "assistant": true}, func(_ int64, r Record) {
-			if r.Key == "" {
-				return
+			loaded = false
+		} else {
+			if tbl == nil {
+				tbl = tablesFromManifest(m)
 			}
-			if len(GiveUpExcerpts(r.Text)) == 0 {
-				return
+			_ = eachOffsetRecordAtInRoles(f, offs, tbl, map[string]bool{"user": true, "assistant": true}, func(_ int64, r Record) {
+				if r.Key == "" || len(GiveUpExcerpts(r.Text)) == 0 {
+					return
+				}
+				fetched[r.Key] = append(fetched[r.Key], r)
+			})
+			_ = f.Close()
+		}
+	}
+
+	v.giveUpMu.Lock()
+	if loaded {
+		for _, key := range missingOrds {
+			if !v.giveUpLoaded[key] {
+				v.giveUpRecs[key] = fetched[key]
+				v.giveUpLoaded[key] = true
 			}
-			byKey[r.Key] = append(byKey[r.Key], r)
-		})
-		v.giveUpRecs = byKey
-	})
-	return v.giveUpRecs
+		}
+	}
+	out := make(map[string][]Record, len(wantOrds))
+	for _, key := range wantOrds {
+		out[key] = v.giveUpRecs[key]
+	}
+	v.giveUpMu.Unlock()
+	return out
 }
 
 // GiveUpRecordsForKeys returns spoken ("user" and "assistant") records that
@@ -227,13 +251,22 @@ func GiveUpRecordsForKeys(dir string, allowedKeys map[string]bool) ([]Record, er
 	}
 	pol := policy.Load()
 	excluded := excludedHarnesses()
-	byKey := viewsFor(m).giveUpRecordsByKey(dir, m)
-	var out []Record
+	wantOrds := make(map[uint32]string, len(allowedKeys))
+	validKeys := make([]string, 0, len(allowedKeys))
 	for key := range allowedKeys {
 		meta, ok := m.Sessions[key]
-		if !ok || metaIgnoredOrExcluded(pol, excluded, meta) {
+		if !ok || !meta.GaveUp || metaIgnoredOrExcluded(pol, excluded, meta) {
 			continue
 		}
+		wantOrds[meta.Ord] = key
+		validKeys = append(validKeys, key)
+	}
+	if len(wantOrds) == 0 {
+		return nil, nil
+	}
+	byKey := viewsFor(m).giveUpRecordsForOrds(dir, m, wantOrds)
+	var out []Record
+	for _, key := range validKeys {
 		out = append(out, byKey[key]...)
 	}
 	return out, nil

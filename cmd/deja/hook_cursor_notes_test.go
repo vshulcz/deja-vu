@@ -21,7 +21,7 @@ func TestCursorSessionStartLeavesTheNotesForAHostThatShowsThem(t *testing.T) {
 	oldSpawn := spawnWarmup
 	spawnWarmup = func(_, _ string) error { return nil }
 	t.Cleanup(func() { spawnWarmup = oldSpawn })
-	t.Cleanup(func() { cursorHookHost = false })
+	t.Cleanup(func() { cursorHookHost.Store(false) })
 	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
 	if err := os.MkdirAll(store, 0o755); err != nil {
 		t.Fatal(err)
@@ -76,7 +76,7 @@ func TestCursorPromptGetsTheRecallWithoutTheReceipt(t *testing.T) {
 	ask := func(t *testing.T, payload func(cwd string) string) sessionStartHookResponse {
 		t.Helper()
 		hermeticEnv(t)
-		t.Cleanup(func() { cursorHookHost = false })
+		t.Cleanup(func() { cursorHookHost.Store(false) })
 		claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 		old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
 		writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-hay", "focus.jsonl"), "focus", []string{

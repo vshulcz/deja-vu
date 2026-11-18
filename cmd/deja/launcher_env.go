@@ -49,6 +49,7 @@ var launcherEnvSettings = map[string]bool{
 	"DEJA_MACHINE":               true,
 	"DEJA_AUTORECALL_LOCAL_ONLY": true,
 	"DEJA_NO_AUTO_INDEX":         true,
+	"DEJA_NO_SOURCE_HINTS":       true,
 	"DEJA_SEARCH_ONLY":           true,
 }
 

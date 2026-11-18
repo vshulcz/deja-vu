@@ -188,4 +188,23 @@ func TestGiveUpRecordsForKeysIndexesUserAndAssistantReversalsOnly(t *testing.T) 
 	if _, bad := seen["claude:s3"]; bad {
 		t.Errorf("test-soundness rollback s3 must not be indexed as GiveUp: %q", seen["claude:s3"])
 	}
+
+	// Incremental per-key queries on a warm manifest view must isolate each
+	// session key without missing subsequent keys or scanning records.bin for
+	// non-GaveUp keys.
+	onlyS1, err := GiveUpRecordsForKeys(dir, map[string]bool{"claude:s1": true})
+	if err != nil || len(onlyS1) != 1 || onlyS1[0].Key != "claude:s1" {
+		t.Fatalf("scoped s1 query = %+v (err=%v)", onlyS1, err)
+	}
+	onlyS2, err := GiveUpRecordsForKeys(dir, map[string]bool{"claude:s2": true})
+	if err != nil || len(onlyS2) != 1 || onlyS2[0].Key != "claude:s2" {
+		t.Fatalf("scoped s2 query = %+v (err=%v)", onlyS2, err)
+	}
+	if removeErr := os.Remove(filepath.Join(dir, "records.bin")); removeErr != nil {
+		t.Fatal(removeErr)
+	}
+	noOp, err := GiveUpRecordsForKeys(dir, map[string]bool{"claude:s3": true})
+	if err != nil || len(noOp) != 0 {
+		t.Fatalf("non-GaveUp key must not touch records.bin: got %+v, err=%v", noOp, err)
+	}
 }

@@ -31,8 +31,9 @@ type metaViews struct {
 	countedOnce sync.Once
 	counted     int
 
-	giveUpOnce sync.Once
-	giveUpRecs map[string][]Record
+	giveUpMu     sync.Mutex
+	giveUpRecs   map[string][]Record
+	giveUpLoaded map[string]bool
 }
 
 // viewsFor is the views of m's session table: the cached ones when m is the

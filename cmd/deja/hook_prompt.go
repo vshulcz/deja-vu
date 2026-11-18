@@ -148,8 +148,6 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// second line, a trailing NUL) keeps its recall instead of losing the
 	// whole payload to a syntax error.
 	payload := readHookPayload(stdin, hookStdinWait)
-	releaseSeenLock, _ := holdHookseenLock(dir)
-	defer releaseSeenLock()
 	// The error is kept, not swallowed: a decode that fails on a later field —
 	// `{"prompt":"…","session_id":123}` — reads the prompt, injects on it, and
 	// leaves a row saying the host named no session, when it named one deja
@@ -212,10 +210,10 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// answered a second payload with the first one's project (#2182).
 	cwd := hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots))
 	prevAssistant := syncLiveSessionRules(dir, cwd, input, asked)
-	nudge := joinPromptAdvisories(
-		promptDirectContext(dir, cwd, input.SessionID, asked, prevAssistant),
-		failureNudge(dir, asked),
-	)
+	seenFile := loadSeen(dir)
+	seen := seenFile.injected(input.SessionID)
+	advisories := collectPromptDirectAdvisories(dir, cwd, input.SessionID, asked, false, seen, nil, prevAssistant)
+	failNudge := failureNudge(dir, asked)
 	// Nobody asked. A harness delivers its own plumbing as the next user turn —
 	// a finished background task, a system reminder, a slash command's envelope
 	// — and the hook fires on it like a question. The terms are then the
@@ -224,18 +222,18 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// injected as recalled history, under a line telling the user deja fires on
 	// noise (#3156). Same test the digest uses on transcript messages.
 	if asked == "" || digest.IsAgentArtifact(asked) {
-		return emitNudgeOnly(stdout, plain, nudge)
+		return emitCommittedNudgeOnly(dir, cwd, input.SessionID, asked, advisories, failNudge, nil, nil, nil, nil, false, plain, stdout)
 	}
 	terms := prompt.Terms(focusPromptForTaskRecall(asked))
 	if !promptTermsWorthAsking(terms) {
-		return emitNudgeOnly(stdout, plain, nudge)
+		return emitCommittedNudgeOnly(dir, cwd, input.SessionID, asked, advisories, failNudge, nil, nil, nil, nil, false, plain, stdout)
 	}
 	// Version, not just presence: terms hash into buckets an index from
 	// another format never wrote, so a stale store answers every prompt with
 	// nothing and looks exactly like a user with no history (#777).
 	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.Damaged(dir) {
 		requestWarmup(dir)
-		return emitNudgeOnly(stdout, plain, nudge)
+		return emitCommittedNudgeOnly(dir, cwd, input.SessionID, asked, advisories, failNudge, nil, nil, nil, nil, false, plain, stdout)
 	}
 	// A new session whose first words ask to carry on another one gets that
 	// session's packet instead of a recall on the words of the request.
@@ -252,11 +250,9 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// Not for a spawned agent: a fleet is many readers behind one key, and ten
 	// agents sent out on the same work each need the answer once rather than
 	// the first one taking it for all of them (#2534).
-	// One read for every question this hook asks of the dedupe file (#3379).
-	seenFile := loadSeen(dir)
 	if !isSpawnedReader(input.SessionID) &&
 		seenFile.asked(input.SessionID, askKey(terms), repeatAskWindow) {
-		return emitNudgeOnly(stdout, plain, nudge)
+		return emitCommittedNudgeOnly(dir, cwd, input.SessionID, asked, advisories, failNudge, nil, nil, nil, nil, false, plain, stdout)
 	}
 	// Rank THIS project's sessions by how well they match the prompt terms
 	// (IDF-weighted), rather than reconstructing an AND query — natural
@@ -272,7 +268,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// same messages without the ban got thirty-eight, and only seven of those
 	// were word-for-word repeats. The same past session answers many questions
 	// in a day, and after the first answer it went silent.
-	seen := seenFile.injected(input.SessionID)
+	//
 	// A session shown a moment ago is skipped before it is read — that is what
 	// keeps an answering call from reading every candidate off disk. A session
 	// shown an hour ago is fair game again: the same past work answers many
@@ -313,12 +309,11 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	sel := selectPromptRankedCandidates(dir, cwd, asked, names, terms, self, skip, cut, true)
 	ranked, matched, strong, idfOf := sel.ranked, sel.matched, sel.strong, sel.idfOf
 	if len(ranked) == 0 {
-		return emitNudgeOnly(stdout, plain, nudge)
+		return emitCommittedNudgeOnly(dir, cwd, input.SessionID, asked, advisories, failNudge, nil, nil, nil, skip, false, plain, stdout)
 	}
 	ss, confident, worthDigest, extraMatches := sel.ss, sel.confident, sel.worthDigest, sel.extraMatches
 	if len(ss) == 0 {
-		nudge = attachRankedConsensusFallback(dir, cwd, input.SessionID, asked, nudge, ranked, matched, strong, seen, skip, false)
-		return emitNudgeOnly(stdout, plain, nudge)
+		return emitCommittedNudgeOnly(dir, cwd, input.SessionID, asked, advisories, failNudge, ranked, matched, strong, skip, true, plain, stdout)
 	}
 	ss = hydratePromptSessionsForDigest(dir, ss, cut)
 	// Of the two candidates, lead with the one that settled something about the
@@ -339,13 +334,12 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// "You have been here" on the strength of one word teaches the user to
 	// ignore the line. The recall itself still goes in.
 	// Not on a host that shows it to nobody: the window it keeps is spent.
-	showLine := confident && notesHaveReader() && dejaVuLineDue(dir, input.SessionID)
 	// The payload is sized to the claim. Two informative terms is a real match
 	// and earns the digest; a single rare term is a hint, and a hint that costs
 	// a full digest on every message is most of what deja spends. The pointer
 	// keeps it discoverable — the agent learns there is history here and can
 	// ask for it — for 134 bytes against the 0.5-1.3 KB a real digest measures.
-	var body string
+	nudge := joinPromptAdvisories(joinAdvisoryItems(advisories), failNudge)
 	// A long session stops paying for full digests once it has had a few. On
 	// this machine's injection log the fifth and later per-prompt blocks of a
 	// session were acted on 0 times in 53, against 1 in 12 for the second to
@@ -358,37 +352,38 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// this machine's transcripts 582 such blocks in a month were followed by a
 	// recall 0 times and by a file action the instructions did not already name
 	// 5 times: 18% of every token deja injected, at 53k tokens an action.
-	if worthDigest && (isSpawnedReader(input.SessionID) || digestBudgetSpent(seen, input.SessionID)) {
-		if cite := ss[0]; search.AskedBefore(cite, terms) == "" {
-			worthDigest = false
-		}
+	localWorth := effectiveDigestWorth(worthDigest, seen, input.SessionID, ss, terms)
+	body, shown, fullDigest, built := buildPromptBlockCandidate(dir, cwd, input.SessionID, asked, nudge, rejectedWarning, ss, ranked, matched, strong, idfOf, terms, confident, localWorth, seen, skip, extraMatches)
+	if !built {
+		return emitCommittedNudgeOnly(dir, cwd, input.SessionID, asked, advisories, failNudge, ranked, matched, strong, skip, true, plain, stdout)
 	}
-	fullDigest := worthDigest
-	shown := ss
-	if worthDigest {
-		full, shownDigest, ok := promptDigestBodyWithOverflowShown(dir, cwd, input.SessionID, ss, confident, terms, idfOf, asked, nudge, rejectedWarning, ranked, matched, strong, skip, extraMatches)
-		switch {
-		case ok:
-			body = full
-			if len(shownDigest) > 0 {
-				shown = shownDigest
-			}
-		case !confident:
-			fullDigest = false
-			body = buildWeakPromptPointerBody(dir, cwd, asked, ss, terms, nudge, ranked, matched, strong, seen, skip)
-		default:
-			nudge = attachRankedConsensusFallback(dir, cwd, input.SessionID, asked, nudge, ranked, matched, strong, seen, skip, false)
-			return emitNudgeOnly(stdout, plain, nudge)
+	releaseSeenLock, _ := holdHookseenLock(dir)
+	latestFile := loadSeen(dir)
+	if !isSpawnedReader(input.SessionID) && latestFile.asked(input.SessionID, askKey(terms), repeatAskWindow) {
+		releaseSeenLock()
+		return emitCommittedNudgeOnly(dir, cwd, input.SessionID, asked, advisories, failNudge, nil, nil, nil, skip, false, plain, stdout)
+	}
+	latestSeen := latestFile.injected(input.SessionID)
+	keptAdv, freshAdvToks := filterFreshPromptAdvisories(advisories, latestSeen)
+	latestNudge := joinPromptAdvisories(joinAdvisoryItems(keptAdv), failNudge)
+	latestWorth := effectiveDigestWorth(worthDigest, latestSeen, input.SessionID, ss, terms)
+	if len(keptAdv) != len(advisories) || latestWorth != localWorth {
+		body, shown, fullDigest, built = buildPromptBlockCandidate(dir, cwd, input.SessionID, asked, latestNudge, rejectedWarning, ss, ranked, matched, strong, idfOf, terms, confident, latestWorth, latestSeen, skip, extraMatches)
+		if !built {
+			releaseSeenLock()
+			return emitCommittedNudgeOnly(dir, cwd, input.SessionID, asked, keptAdv, failNudge, ranked, matched, strong, skip, true, plain, stdout)
 		}
-	} else {
-		body = buildWeakPromptPointerBody(dir, cwd, asked, ss, terms, nudge, ranked, matched, strong, seen, skip)
 	}
 	// The same block twice is wallpaper, and the reader stops looking. Judged
 	// on what would be shown, so a session whose other lines answer the next
 	// question still gets to answer it.
 	fp := blockFingerprint(body)
-	if seen[fp] || seen[digestSeenPrefix+fp] {
-		return emitNudgeOnly(stdout, plain, nudge)
+	if latestSeen[fp] || latestSeen[digestSeenPrefix+fp] {
+		if input.SessionID != "" && len(freshAdvToks) > 0 {
+			rememberInjectedIDs(dir, input.SessionID, freshAdvToks...)
+		}
+		releaseSeenLock()
+		return emitNudgeOnly(stdout, plain, latestNudge)
 	}
 	if fullDigest {
 		fp = digestSeenPrefix + fp
@@ -399,27 +394,74 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// passes it every time. In real-world stores, over eight near-identical
 	// nudges: nine sessions cited, fifteen quoted lines, eleven of them
 	// distinct, and the worst line four times under four ids.
-	filtered, freshQuotes, anyFresh := withoutSeenQuotes(seen, body)
+	filtered, freshQuotes, anyFresh := withoutSeenQuotes(latestSeen, body)
 	switch {
 	case anyFresh:
 		body = filtered
 	case !strings.HasPrefix(input.SessionID, spawnReaderPrefix):
 		// Every quote was delivered to this reader already, so the block is the
 		// same injection wearing another session's header.
-		return emitNudgeOnly(stdout, plain, nudge)
+		if input.SessionID != "" && len(freshAdvToks) > 0 {
+			rememberInjectedIDs(dir, input.SessionID, freshAdvToks...)
+		}
+		releaseSeenLock()
+		return emitNudgeOnly(stdout, plain, latestNudge)
 	}
 	// A spawned agent is a new reader even when the parent has heard it all: the
 	// key it recalls under is the parent plus the instructions, which exists to
 	// stop a re-spawn of the same agent repeating itself — not to send the
 	// second one in blind. Handing it what the parent saw is the whole point.
-	out := frameRecall(body)
+	if input.SessionID != "" && len(freshAdvToks) > 0 {
+		rememberInjectedIDs(dir, input.SessionID, freshAdvToks...)
+	}
 	rememberInjectedIDs(dir, input.SessionID, fp)
 	rememberInjectedIDs(dir, input.SessionID, freshQuotes...)
 	// Stamped, because the question is answered again once the window passes,
 	// where a block fingerprint holds for the life of the session.
 	rememberInjectedIDsFor(dir, input.SessionID, "", []string{askKey(terms)})
 	rememberInjectedFor(dir, input.SessionID, projectKey, shown)
+	showLine := confident && notesHaveReader() && dejaVuLineDue(dir, input.SessionID)
+	releaseSeenLock()
+	out := frameRecall(body)
 	return emitPromptBlock(stdout, dir, input.SessionID, out, shown, terms, unreadable, plain, showLine)
+}
+
+func effectiveDigestWorth(worthDigest bool, seen map[string]bool, sessionID string, ss []model.Session, terms []string) bool {
+	if !worthDigest {
+		return false
+	}
+	if !isSpawnedReader(sessionID) && !digestBudgetSpent(seen, sessionID) {
+		return true
+	}
+	return search.AskedBefore(ss[0], terms) != ""
+}
+
+func buildPromptBlockCandidate(
+	dir, cwd, sessionID, asked, nudge, rejectedWarning string,
+	ss, ranked []model.Session,
+	matched, strong []int,
+	idfOf map[string]float64,
+	terms []string,
+	confident, worthDigest bool,
+	seen, skip map[string]bool,
+	extraMatches int,
+) (string, []model.Session, bool, bool) {
+	if worthDigest {
+		full, shownDigest, ok := promptDigestBodyWithOverflowShown(dir, cwd, sessionID, ss, confident, terms, idfOf, asked, nudge, rejectedWarning, ranked, matched, strong, skip, extraMatches)
+		switch {
+		case ok:
+			shown := ss
+			if len(shownDigest) > 0 {
+				shown = shownDigest
+			}
+			return full, shown, true, true
+		case !confident:
+			return buildWeakPromptPointerBody(dir, cwd, asked, ss, terms, nudge, ranked, matched, strong, seen, skip), ss, false, true
+		default:
+			return "", nil, false, false
+		}
+	}
+	return buildWeakPromptPointerBody(dir, cwd, asked, ss, terms, nudge, ranked, matched, strong, seen, skip), ss, false, true
 }
 
 type promptRankSelection struct {
@@ -506,10 +548,10 @@ func selectPromptRankedCandidates(
 	// two slots below could go to the transcript while its own note waited
 	// behind it (#2803).
 	search.LiftNoteSessionsAligned(ranked, matched, strong, naming)
-	rankedAlreadyShown = 0
+	rankedAlreadyShown.Store(0)
 	for _, s := range ranked {
 		if skip[s.ID] {
-			rankedAlreadyShown++
+			rankedAlreadyShown.Add(1)
 		}
 	}
 	if err != nil || len(ranked) == 0 {
