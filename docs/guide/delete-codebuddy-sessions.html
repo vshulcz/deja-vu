@@ -6,18 +6,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>How to delete CodeBuddy session history — deja-vu</title>
 <meta name="description" content="How to delete CodeBuddy Code and WorkBuddy sessions — the .jsonl conversation, its .meta.json, rollback sidecar and file-history snapshots.">
-<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="How to delete CodeBuddy session history">
 <meta property="og:description" content="How to delete CodeBuddy Code and WorkBuddy sessions — the .jsonl conversation, its .meta.json, rollback sidecar and file-history snapshots.">
-<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
 <link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 <meta name="author" content="vshulcz">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:160">
 <meta name="theme-color" content="#0d0b16">
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
@@ -31,9 +31,8 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete CodeBuddy and WorkBuddy session history, and what you lose", "description": "How to delete CodeBuddy Code and WorkBuddy sessions — the .jsonl conversation, its .meta.json, rollback sidecar and file-history snapshots.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-16", "dateModified": "2026-11-03"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete CodeBuddy and WorkBuddy session history, and what you lose", "description": "How to delete CodeBuddy Code and WorkBuddy sessions — the .jsonl conversation, its .meta.json, rollback sidecar and file-history snapshots.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-16", "dateModified": "2026-11-17"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete CodeBuddy sessions", "item": "https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How do I delete a CodeBuddy session?", "acceptedAnswer": {"@type": "Answer", "text": "Remove <session-id>.jsonl under ${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/<folder>/, its <session-id>.meta.json, the <session-id>/ directory beside it (the sub-agent transcripts), its <session-id>.file-rollback.ndjson sidecar, and ~/.codebuddy/file-history/<session-id>/, the snapshots that /rewind uses. One project's sessions are one directory, so rm -rf projects/<folder> covers them all."}}, {"@type": "Question", "name": "Where does CodeBuddy Code store its sessions?", "acceptedAnswer": {"@type": "Answer", "text": "In a directory per working directory under ~/.codebuddy/projects, named by the cwd with /, \\ and : turned into - and the leading dash dropped, one JSONL per session. WorkBuddy keeps the same tree in ~/.workbuddy (workbuddy.cn) and ~/.workbuddy-ai (workbuddy.ai)."}}, {"@type": "Question", "name": "Do the sub-agent transcripts stay when I delete the session file?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. <session-id>/subagents/agent-*.jsonl sit in a directory of the same name beside the file, so remove both unless you want the sub-agent turns kept."}}, {"@type": "Question", "name": "Does deleting a CodeBuddy session affect WorkBuddy?", "acceptedAnswer": {"@type": "Answer", "text": "No. WorkBuddy writes its own sessions in its own homes; remove ~/.workbuddy/projects or ~/.workbuddy-ai/projects separately."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -47,7 +46,7 @@
 <a href="commands.html">CLI reference</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
-<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
 <a href="forgetting.html">Why agents forget</a>
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="lost-context.html">Lost context</a>
@@ -59,6 +58,10 @@
 <a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
 <a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="claude-code-memory-md-limit.html">MEMORY.md 200-line limit</a>
+<a href="claude-code-memory-hooks.html">Claude Code memory hooks</a>
+<a href="codex-memories-config.html">Codex memories &amp; config</a>
+<a href="cursor-mcp-memory.html">Cursor MCP memory</a>
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
@@ -191,7 +194,7 @@
 
 <h2>How to delete CodeBuddy sessions</h2>
 <p>The files and the sub-agent directory sit beside each other: <code>&lt;session-id&gt;.jsonl</code> is the conversation, <code>&lt;session-id&gt;.meta.json</code> its metadata, and <code>&lt;session-id&gt;/subagents/agent-*.jsonl</code> holds the turns its sub-agents ran. The session also leaves a <code>&lt;session-id&gt;.file-rollback.ndjson</code> sidecar beside them and the snapshots its edits made in <code>~/.codebuddy/file-history/&lt;session-id&gt;/</code> — the same set CodeBuddy's own delete removes. Removing the file alone leaves everything else on disk, so the one-session command names all of it.</p>
-<pre># the project directories, one per working directory
+<pre data-nosnippet># the project directories, one per working directory
 ls ~/.codebuddy/projects
 
 # one session — the conversation, its metadata file, the sub-agent

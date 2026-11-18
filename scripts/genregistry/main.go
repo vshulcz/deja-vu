@@ -94,7 +94,8 @@ func run() error {
 	sort.Slice(links, func(i, j int) bool {
 		return strings.ToLower(links[i].Label) < strings.ToLower(links[j].Label)
 	})
-	var written []string
+	var sitemapPages []string
+	rendered := 0
 	for _, path := range paths {
 		id := strings.TrimSuffix(filepath.Base(path), ".md")
 		src, err := os.ReadFile(path)
@@ -116,12 +117,15 @@ func run() error {
 		if err := os.WriteFile(out, []byte(render(page, body, links)), 0o644); err != nil {
 			return err
 		}
-		written = append(written, "registry/"+id+".html")
+		rendered++
+		if id == "README" {
+			sitemapPages = append(sitemapPages, "registry/"+id+".html")
+		}
 	}
-	if err := writeSitemap(written); err != nil {
+	if err := writeSitemap(sitemapPages); err != nil {
 		return err
 	}
-	fmt.Printf("wrote %d registry pages and the sitemap\n", len(written))
+	fmt.Printf("wrote %d registry pages and the sitemap\n", rendered)
 	return nil
 }
 
@@ -202,7 +206,7 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!DOCTYPE html>
 <link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 <meta name="author" content="vshulcz">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="robots" content="{{.Robots}}">
 <meta name="theme-color" content="#0d0b16">
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
@@ -239,7 +243,7 @@ history.</p>
 `))
 
 type pageData struct {
-	Title, Description, Heading, URL, Site string
+	Title, Description, Heading, URL, Site, Robots string
 	// Others is how many other formats deja reads, spelled out. It was a word
 	// typed into the template, so every one of these twenty pages kept saying
 	// seventeen after three harnesses landed.
@@ -283,10 +287,14 @@ func render(m meta, body string, others []link) string {
 			map[string]any{"@type": "ListItem", "position": 3, "name": m.Heading, "item": url},
 		},
 	}
+	robots := "noindex,follow"
+	if m.Slug == "README" {
+		robots = "index,follow,max-image-preview:large,max-snippet:-1"
+	}
 	var b strings.Builder
 	err := pageTemplate.Execute(&b, pageData{
 		Title: m.Title, Description: m.Description, Heading: m.Heading,
-		URL: url, Site: site, Article: article, Crumbs: crumbs,
+		URL: url, Site: site, Robots: robots, Article: article, Crumbs: crumbs,
 		// Every page but this one. The list is one page per harness format —
 		// README is skipped when it is built — so this is the count the
 		// sentence means.
@@ -316,7 +324,17 @@ func writeSitemap(registryPages []string) error {
 	if err != nil {
 		return err
 	}
-	text := string(b)
+	wantRegistry := map[string]bool{}
+	for _, p := range registryPages {
+		wantRegistry[site+"/"+p] = true
+	}
+	text := urlRe.ReplaceAllStringFunc(string(b), func(line string) string {
+		loc := urlRe.FindStringSubmatch(line)[1]
+		if strings.HasPrefix(loc, site+"/registry/") && !wantRegistry[loc] {
+			return ""
+		}
+		return line
+	})
 	var add strings.Builder
 	for _, p := range registryPages {
 		loc := site + "/" + p

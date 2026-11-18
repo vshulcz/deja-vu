@@ -34,7 +34,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Muse Code", "description": "How to give Muse Code recall over every coding agent's sessions on the machine — the MCP server and hooks in settings.json, and the skill in ~/.agents/skills.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-muse.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-muse.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-09", "dateModified": "2026-11-15"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Muse Code", "description": "How to give Muse Code recall over every coding agent's sessions on the machine — the MCP server and hooks in settings.json, and the skill in ~/.agents/skills.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-muse.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-muse.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-09", "dateModified": "2026-11-16"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Memory for Muse Code (muse)","item":"https://vshulcz.github.io/deja-vu/guide/memory-for-muse.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I give Muse Code memory of past sessions?","acceptedAnswer":{"@type":"Answer","text":"Run deja install muse-auto. It writes the deja MCP server and the hooks into ~/.config/muse/settings.json and the deja-history skill into ~/.agents/skills."}},{"@type":"Question","name":"Where are Muse Code sessions stored?","acceptedAnswer":{"@type":"Answer","text":"Under ~/.local/share/muse/sessions/YYYY/MM/DD/<id>/session.jsonl, or under $XDG_DATA_HOME/muse when that is set, which is what deja indexes. DEJA_MUSE_ROOTS overrides the roots."}},{"@type":"Question","name":"Does deja read Muse Code subagent runs?","acceptedAnswer":{"@type":"Answer","text":"Yes, as their task, edits and last turns. DEJA_INCLUDE_SUBAGENTS=1 indexes the whole run, and =0 skips them."}}]}</script>
 </head>
@@ -50,7 +50,7 @@
 <a href="commands.html">CLI reference</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
-<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
 <a href="forgetting.html">Why agents forget</a>
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="lost-context.html">Lost context</a>
@@ -62,6 +62,10 @@
 <a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
 <a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="claude-code-memory-md-limit.html">MEMORY.md 200-line limit</a>
+<a href="claude-code-memory-hooks.html">Claude Code memory hooks</a>
+<a href="codex-memories-config.html">Codex memories &amp; config</a>
+<a href="cursor-mcp-memory.html">Cursor MCP memory</a>
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>

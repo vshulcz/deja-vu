@@ -28,15 +28,14 @@
 <link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
 <link rel="stylesheet" href="../../assets/site.css">
 <meta name="author" content="vshulcz">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:160">
 <meta name="theme-color" content="#0d0b16">
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
 <link rel="apple-touch-icon" href="../../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Файл state.vscdb в Cursor слишком большой: чем он забит и как безопасно уменьшить", "description": "База Cursor state.vscdb на 30–125 ГБ: два read-only запроса sqlite3, чтобы найти тяжёлые чаты, безопасно освободить место на диске и сохранить историю в deja.", "url": "https://vshulcz.github.io/deja-vu/ru/guide/cursor-state-vscdb-too-large.html", "inLanguage": "ru", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/ru/guide/cursor-state-vscdb-too-large.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-01", "dateModified": "2026-11-01"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Файл state.vscdb в Cursor слишком большой: чем он забит и как безопасно уменьшить", "description": "База Cursor state.vscdb на 30–125 ГБ: два read-only запроса sqlite3, чтобы найти тяжёлые чаты, безопасно освободить место на диске и сохранить историю в deja.", "url": "https://vshulcz.github.io/deja-vu/ru/guide/cursor-state-vscdb-too-large.html", "inLanguage": "ru", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/ru/guide/cursor-state-vscdb-too-large.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-01", "dateModified": "2026-11-17"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "state.vscdb в Cursor слишком большой", "item": "https://vshulcz.github.io/deja-vu/ru/guide/cursor-state-vscdb-too-large.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Почему state.vscdb в Cursor разрастается до десятков гигабайт?", "acceptedAnswer": {"@type": "Answer", "text": "В таблице cursorDiskKV хранятся все чаты: строки composerData:<id> для каждого чата, bubbleId:<chat>:<bubble> для сообщений, а также чекпоинты и блобы агента. Несколько длинных агентских сессий обычно занимают большую часть файла."}}, {"@type": "Question", "name": "Как уменьшить state.vscdb без потери истории чатов?", "acceptedAnswer": {"@type": "Answer", "text": "Сначала проиндексируйте чаты через deja-vu (deja index), чтобы они остались доступны для локального поиска. Затем удалите устаревшие резервные копии state.vscdb.backup, удалите самые тяжёлые чаты через интерфейс Cursor и выполните GC Agent KV Blobs."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -78,12 +77,12 @@
 
 <h2>Узнать, какие чаты занимают место (без риска для Cursor)</h2>
 <p>Закройте Cursor или выполняйте запросы с флагом <code>-readonly</code>:</p>
-<pre>sqlite3 -readonly state.vscdb "
+<pre data-nosnippet>sqlite3 -readonly state.vscdb "
 SELECT substr(key, 1, instr(key, ':') - 1) AS kind, count(*),
        round(sum(length(CAST(value AS BLOB))) / 1e9, 2) AS gb
 FROM cursorDiskKV GROUP BY kind ORDER BY gb DESC;"</pre>
 <p>Топ-15 самых тяжёлых чатов:</p>
-<pre>sqlite3 -readonly state.vscdb "
+<pre data-nosnippet>sqlite3 -readonly state.vscdb "
 SELECT substr(key, 10, 36) AS chat, count(*) AS messages,
        round(sum(length(CAST(value AS BLOB))) / 1e6) AS mb
 FROM cursorDiskKV WHERE key LIKE 'bubbleId:%'

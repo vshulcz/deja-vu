@@ -21,7 +21,7 @@
 <link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 <meta name="author" content="vshulcz">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:160">
 <meta name="theme-color" content="#0d0b16">
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
@@ -35,9 +35,8 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Cursor state.vscdb too large: shrink it safely, and what you lose", "description": "Why Cursor's state.vscdb and state.vscdb.backup hit 10–125 GB, why deleting it wipes every chat, and step-by-step SQLite commands to shrink it safely.", "url": "https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-29", "dateModified": "2026-11-12"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Cursor state.vscdb too large: shrink it safely, and what you lose", "description": "Why Cursor's state.vscdb and state.vscdb.backup hit 10–125 GB, why deleting it wipes every chat, and step-by-step SQLite commands to shrink it safely.", "url": "https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-29", "dateModified": "2026-11-17"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Cursor chat history", "item": "https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html"}]}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why is Cursor's state.vscdb so large?","acceptedAnswer":{"@type":"Answer","text":"It holds every chat: one composerData row per chat, one bubbleId row per message, plus the agent's checkpoint and blob rows. Long agent chats are usually most of it; a query over cursorDiskKV grouped by chat shows which."}},{"@type":"Question","name":"How do I shrink state.vscdb without losing chats?","acceptedAnswer":{"@type":"Answer","text":"Delete the biggest chats from Cursor after exporting the ones you need, then compact, which needs free disk on the order of the database's size. To keep deleted chats searchable, index them with deja-vu first; a chat in its index stays searchable after it leaves state.vscdb."}},{"@type":"Question","name":"Is it safe to delete state.vscdb?","acceptedAnswer":{"@type":"Answer","text":"Only with Cursor quit, and it removes every chat along with the other state stored there. Move state.vscdb, -wal and -shm aside rather than deleting them, so the old file is still there if something is missed."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -51,7 +50,7 @@
 <a href="commands.html">CLI reference</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
-<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
 <a href="forgetting.html">Why agents forget</a>
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="lost-context.html">Lost context</a>
@@ -63,6 +62,10 @@
 <a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
 <a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="claude-code-memory-md-limit.html">MEMORY.md 200-line limit</a>
+<a href="claude-code-memory-hooks.html">Claude Code memory hooks</a>
+<a href="codex-memories-config.html">Codex memories &amp; config</a>
+<a href="cursor-mcp-memory.html">Cursor MCP memory</a>
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
@@ -207,18 +210,18 @@
 <h2 id="find-what-is-big-without-touching-cursor">Find what is big, without touching Cursor</h2>
 <p>Quit Cursor and copy the file, or read it in place with <code>-readonly</code>. Both queries scan the whole table, so on a 50 GB database expect a few minutes.</p>
 <p>Which kind of row holds the space:</p>
-<pre>sqlite3 -readonly state.vscdb "
+<pre data-nosnippet>sqlite3 -readonly state.vscdb "
 SELECT substr(key, 1, instr(key, ':') - 1) AS kind, count(*),
        round(sum(length(CAST(value AS BLOB))) / 1e9, 2) AS gb
 FROM cursorDiskKV GROUP BY kind ORDER BY gb DESC;"</pre>
 <p>Which chats hold it:</p>
-<pre>sqlite3 -readonly state.vscdb "
+<pre data-nosnippet>sqlite3 -readonly state.vscdb "
 SELECT substr(key, 10, 36) AS chat, count(*) AS messages,
        round(sum(length(CAST(value AS BLOB))) / 1e6) AS mb
 FROM cursorDiskKV WHERE key LIKE 'bubbleId:%'
 GROUP BY chat ORDER BY mb DESC LIMIT 15;"</pre>
 <p>And the name of one of them, to find it in Cursor's chat list:</p>
-<pre>sqlite3 -readonly state.vscdb "
+<pre data-nosnippet>sqlite3 -readonly state.vscdb "
 SELECT json_extract(value, '$.name') FROM cursorDiskKV
 WHERE key = 'composerData:&lt;chat id&gt;';"</pre>
 <p>The usual finding is a handful of long agent chats holding most of the file, not thousands of small ones.</p>

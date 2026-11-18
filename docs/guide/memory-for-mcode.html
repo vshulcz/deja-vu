@@ -34,7 +34,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to MiniMax Code", "description": "How to give MiniMax Code recall over every coding agent's sessions on the machine — the MCP server in mcp.json, and a plugin with the skill and the hooks.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-mcode.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-mcode.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-09", "dateModified": "2026-11-15"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to MiniMax Code", "description": "How to give MiniMax Code recall over every coding agent's sessions on the machine — the MCP server in mcp.json, and a plugin with the skill and the hooks.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-mcode.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-mcode.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-09", "dateModified": "2026-11-16"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Memory for MiniMax Code (mcode)","item":"https://vshulcz.github.io/deja-vu/guide/memory-for-mcode.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I give MiniMax Code memory of past sessions?","acceptedAnswer":{"@type":"Answer","text":"Run deja install mcode-auto. It writes the deja MCP server into ~/.minimax/mcp.json and a plugin under ~/.minimax/plugins/deja with the deja-history skill and the hooks."}},{"@type":"Question","name":"Where are MiniMax Code sessions stored?","acceptedAnswer":{"@type":"Answer","text":"Under ~/.minimax/v2/sessions/YYYY/MM/DD/<session>/ as messages.jsonl beside manifest.json, which is what deja indexes. DEJA_MCODE_ROOT overrides the root."}},{"@type":"Question","name":"Does deja need sqlite3 to read MiniMax Code?","acceptedAnswer":{"@type":"Answer","text":"Only for the workspace a session ran in, which the runtime keeps in its SQLite database. The transcripts read without it."}}]}</script>
 </head>
@@ -50,7 +50,7 @@
 <a href="commands.html">CLI reference</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
-<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
 <a href="forgetting.html">Why agents forget</a>
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="lost-context.html">Lost context</a>
@@ -62,6 +62,10 @@
 <a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
 <a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="claude-code-memory-md-limit.html">MEMORY.md 200-line limit</a>
+<a href="claude-code-memory-hooks.html">Claude Code memory hooks</a>
+<a href="codex-memories-config.html">Codex memories &amp; config</a>
+<a href="cursor-mcp-memory.html">Cursor MCP memory</a>
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>

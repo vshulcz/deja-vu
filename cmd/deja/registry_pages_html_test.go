@@ -78,8 +78,20 @@ func TestRegistryPagesAreBuiltAndListed(t *testing.T) {
 			if !strings.Contains(page, "<article>") || !strings.Contains(page, "<aside>") {
 				t.Error("the page is not in the site's document layout, so it renders as overlapping columns")
 			}
-			if !strings.Contains(string(sitemap), "/registry/"+id+".html") {
-				t.Errorf("%s.html is not in the sitemap, so nothing will crawl it", id)
+			if id == "README" {
+				if !strings.Contains(page, `<meta name="robots" content="index,follow`) {
+					t.Errorf("%s is missing index,follow robots directive", id)
+				}
+				if !strings.Contains(string(sitemap), "/registry/"+id+".html") {
+					t.Errorf("%s.html is not in the sitemap, so nothing will crawl it", id)
+				}
+			} else {
+				if !strings.Contains(page, `<meta name="robots" content="noindex,follow">`) {
+					t.Errorf("%s.html should carry noindex,follow so format specs do not crowd the sitemap", id)
+				}
+				if strings.Contains(string(sitemap), "/registry/"+id+".html") {
+					t.Errorf("%s.html carries noindex,follow and must not appear in docs/sitemap.xml", id)
+				}
 			}
 		})
 	}

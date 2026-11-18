@@ -32,7 +32,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Hermes", "description": "Hermes already searches its own sessions and keeps MEMORY.md. deja adds the other forty-seven agents on the machine: a plugin on pre_llm_call, the MCP tools, and a skill you can install straight from GitHub.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-02", "dateModified": "2026-11-15"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Hermes", "description": "Hermes already searches its own sessions and keeps MEMORY.md. deja adds the other forty-seven agents on the machine: a plugin on pre_llm_call, the MCP tools, and a skill you can install straight from GitHub.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-02", "dateModified": "2026-11-16"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for Hermes", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Hermes remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "Yes — its own. Hermes keeps sessions in a SQLite store per profile, searches them with FTS5 and summarises them for cross-session recall, and keeps MEMORY.md and USER.md. What it does not see is what you did in Claude Code, Codex, Cursor or any of the other agents on the same machine."}}, {"@type": "Question", "name": "How do I add deja to Hermes?", "acceptedAnswer": {"@type": "Answer", "text": "deja install hermes-auto writes the MCP server and a plugin under ~/.hermes/plugins/deja that answers pre_llm_call, appending matching history to the user message so the system prompt stays byte-identical and provider caching survives; it also enables the plugin and adds a /deja command. Or install only the skill: hermes skills install vshulcz/deja-vu/skills/deja-search."}}, {"@type": "Question", "name": "Can Hermes see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "With deja, yes: the index covers the transcripts of forty-eight agents on the machine, Hermes included, and history from before deja was installed."}}]}</script>
 </head>
@@ -48,7 +48,7 @@
 <a href="commands.html">CLI reference</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
-<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
 <a href="forgetting.html">Why agents forget</a>
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="lost-context.html">Lost context</a>
@@ -60,6 +60,10 @@
 <a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
 <a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="claude-code-memory-md-limit.html">MEMORY.md 200-line limit</a>
+<a href="claude-code-memory-hooks.html">Claude Code memory hooks</a>
+<a href="codex-memories-config.html">Codex memories &amp; config</a>
+<a href="cursor-mcp-memory.html">Cursor MCP memory</a>
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>

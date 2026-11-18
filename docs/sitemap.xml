@@ -1,72 +1,72 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://vshulcz.github.io/deja-vu/</loc><lastmod>2026-11-15</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/</loc><lastmod>2026-11-17</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/getting-started.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/forgetting.html</loc><lastmod>2026-09-27</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html</loc><lastmod>2026-09-27</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html</loc><lastmod>2026-11-12</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/after-compaction.html</loc><lastmod>2026-10-07</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html</loc><lastmod>2026-10-24</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/switching-agents.html</loc><lastmod>2026-10-14</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html</loc><lastmod>2026-11-01</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/claude-code-usage-limit-handoff.html</loc><lastmod>2026-11-10</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/recover-overwritten-files.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/export-conversations.html</loc><lastmod>2026-10-12</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html</loc><lastmod>2026-10-21</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/token-cost.html</loc><lastmod>2026-10-28</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/rules-files.html</loc><lastmod>2026-09-28</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/one-rules-file.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/auditing-agents.html</loc><lastmod>2026-11-05</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/find-a-session.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/find-a-session.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/codex-history.html</loc><lastmod>2026-11-02</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html</loc><lastmod>2026-10-22</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html</loc><lastmod>2026-11-09</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-devin.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-roo.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-prime.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-crush.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-cursor.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-copilot.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-copilot-chat.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-amp.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-kiro.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-kilocode.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-cherrystudio.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-aider.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-antigravity.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-commandcode.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-kimchi.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-omp.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-reasonix.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-senpi.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-zcode.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-windsurf.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-trae.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-codebuddy.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-junie.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-jetbrains.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-mcode.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-muse.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-devin.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-roo.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-prime.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-crush.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-cursor.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-copilot.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-copilot-chat.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-amp.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-kiro.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-kilocode.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-cherrystudio.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-aider.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-antigravity.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-commandcode.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-kimchi.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-omp.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-reasonix.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-senpi.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-zcode.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-windsurf.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-trae.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-codebuddy.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-junie.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-jetbrains.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-mcode.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-muse.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/lost-context.html</loc><lastmod>2026-11-14</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/context-window-full.html</loc><lastmod>2026-10-12</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/resume-a-session.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.9</priority></url>
@@ -75,141 +75,63 @@
   <url><loc>https://vshulcz.github.io/deja-vu/guide/commands.html</loc><lastmod>2026-11-12</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/harnesses.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/privacy.html</loc><lastmod>2026-11-01</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/benchmarks.html</loc><lastmod>2026-10-28</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/compare.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/day-zero.html</loc><lastmod>2026-11-04</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/benchmarks.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/compare.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/day-zero.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/registry/README.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/aider.html</loc><lastmod>2026-11-01</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/antigravity.html</loc><lastmod>2026-10-09</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/claude-code.html</loc><lastmod>2026-10-19</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/cline.html</loc><lastmod>2026-11-01</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/codex.html</loc><lastmod>2026-10-02</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/copilot.html</loc><lastmod>2026-10-18</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/cursor.html</loc><lastmod>2026-10-25</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/gemini.html</loc><lastmod>2026-11-01</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/goose.html</loc><lastmod>2026-10-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/grok.html</loc><lastmod>2026-10-18</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/hermes.html</loc><lastmod>2026-10-19</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/kimi.html</loc><lastmod>2026-11-01</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/openclaw.html</loc><lastmod>2026-10-19</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/opencode.html</loc><lastmod>2026-10-28</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/pi.html</loc><lastmod>2026-10-18</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/qwen.html</loc><lastmod>2026-10-25</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/roo.html</loc><lastmod>2026-10-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/zed.html</loc><lastmod>2026-10-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/deepseek.html</loc><lastmod>2026-10-09</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/omp.html</loc><lastmod>2026-10-09</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/prime.html</loc><lastmod>2026-10-09</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html</loc><lastmod>2026-11-01</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html</loc><lastmod>2026-11-05</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html</loc><lastmod>2026-11-05</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/card/</loc><lastmod>2026-11-01</lastmod><changefreq>yearly</changefreq><priority>0.5</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/view/</loc><lastmod>2026-11-01</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/amp.html</loc><lastmod>2026-10-26</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/copilot-chat.html</loc><lastmod>2026-10-22</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/continue.html</loc><lastmod>2026-10-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/crush.html</loc><lastmod>2026-10-22</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-claude-code.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-codex.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-cursor.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html</loc><lastmod>2026-11-09</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-trae-sessions.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-codebuddy-sessions.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-antigravity-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html</loc><lastmod>2026-11-12</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-copilot-cli-session-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-opencode-session-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-kilo-code-task-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-kiro-session-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-kimi-code-session-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-commandcode-session-history.html</loc><lastmod>2026-11-10</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-junie-session-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-goose-session-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-amp-thread-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-continue-session-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-pi-session-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-crush-session-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-hermes-session-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-cherrystudio-session-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-codewhale-session-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-aider-chat-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-openclaw-session-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-grok-session-history.html</loc><lastmod>2026-11-09</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-senpi-session-history.html</loc><lastmod>2026-11-10</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-devin-session-history.html</loc><lastmod>2026-11-12</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-claude-code.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-codex.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-cursor.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/credentials-in-transcripts.html</loc><lastmod>2026-10-24</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html</loc><lastmod>2026-11-12</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/kilocode.html</loc><lastmod>2026-10-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/cherrystudio.html</loc><lastmod>2026-10-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/kiro.html</loc><lastmod>2026-10-18</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/muse.html</loc><lastmod>2026-10-19</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/commandcode.html</loc><lastmod>2026-10-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/kimchi.html</loc><lastmod>2026-10-18</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/senpi.html</loc><lastmod>2026-10-02</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/zcode.html</loc><lastmod>2026-10-09</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/gjc.html</loc><lastmod>2026-10-18</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/codex-history.html</loc><lastmod>2026-11-05</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/delete-codex-sessions.html</loc><lastmod>2026-11-05</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/delete-cursor-chat-history.html</loc><lastmod>2026-11-05</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/delete-codex-sessions.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/delete-cursor-chat-history.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/codex-resume-session.html</loc><lastmod>2026-11-05</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/no-conversation-found-claude-code.html</loc><lastmod>2026-11-05</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/context-window-full.html</loc><lastmod>2026-11-05</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html</loc><lastmod>2026-11-05</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/privacy.html</loc><lastmod>2026-11-05</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/find-a-session.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/delete-old-claude-sessions.html</loc><lastmod>2026-11-05</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/resume-a-session.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/delete-old-claude-sessions.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/resume-a-session.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/recover-a-deleted-session.html</loc><lastmod>2026-11-05</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html</loc><lastmod>2026-11-05</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/codebuddy.html</loc><lastmod>2026-10-19</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/codewhale.html</loc><lastmod>2026-10-22</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/reasonix.html</loc><lastmod>2026-10-22</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/trae.html</loc><lastmod>2026-10-08</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-roo-task-history.html</loc><lastmod>2026-11-03</lastmod></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-zed-thread-history.html</loc><lastmod>2026-11-03</lastmod></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-windsurf-cascade-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-qwen-code-chat-history.html</loc><lastmod>2026-11-03</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/jetbrains.html</loc><lastmod>2026-10-08</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/junie.html</loc><lastmod>2026-10-08</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/devin.html</loc><lastmod>2026-10-08</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/windsurf.html</loc><lastmod>2026-10-14</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/mcode.html</loc><lastmod>2026-10-23</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/ru/guide/getting-started.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/ru/guide/session-files-on-disk.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/ru/guide/cursor-state-vscdb-too-large.html</loc><lastmod>2026-11-01</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/ru/guide/delete-cursor-chat-history.html</loc><lastmod>2026-11-01</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/ru/guide/getting-started.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/ru/guide/session-files-on-disk.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/ru/guide/cursor-state-vscdb-too-large.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/ru/guide/delete-cursor-chat-history.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/ru/guide/codex-history.html</loc><lastmod>2026-11-01</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/ru/guide/does-my-agent-remember.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/ru/guide/does-my-agent-remember.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/repo-memory.html</loc><lastmod>2026-11-12</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html</loc><lastmod>2026-11-09</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html</loc><lastmod>2026-11-05</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/claude-mem-alternative.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/cursor-state-vscdb-too-large.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/claude-mem-alternative.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/repo-memory.html</loc><lastmod>2026-11-05</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html</loc><lastmod>2026-11-09</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-dsh-session-history.html</loc><lastmod>2026-11-12</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-mimo.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-omnigent.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-orca.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-mimo-session-history.html</loc><lastmod>2026-11-14</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-omnigent-session-history.html</loc><lastmod>2026-11-14</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-orca-session-history.html</loc><lastmod>2026-11-14</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/mimo.html</loc><lastmod>2026-11-14</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/omnigent.html</loc><lastmod>2026-11-14</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/orca.html</loc><lastmod>2026-11-14</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/clawcode.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-claw-code.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-oh-my-claudecode.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-herdr.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-cmux.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/registry/codearts.html</loc><lastmod>2026-11-15</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-mimo.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-omnigent.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-orca.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-claw-code.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-oh-my-claudecode.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-herdr.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/memory-for-cmux.html</loc><lastmod>2026-11-16</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/claude-code-memory-md-limit.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/claude-code-memory-hooks.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/codex-memories-config.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/cursor-mcp-memory.html</loc><lastmod>2026-11-17</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
 </urlset>

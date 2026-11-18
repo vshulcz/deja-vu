@@ -6,18 +6,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Delete Crush session history — deja-vu</title>
 <meta name="description" content="Crush keeps a crush.db SQLite store inside each project's .crush directory. Find every store via projects.json and remove one session or a project's history.">
-<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-crush-session-history.html">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Delete Crush session history">
 <meta property="og:description" content="Crush keeps a crush.db SQLite store inside each project's .crush directory. Find every store via projects.json and remove one session or a project's history.">
-<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-crush-session-history.html">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
 <link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 <meta name="author" content="vshulcz">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:160">
 <meta name="theme-color" content="#0d0b16">
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
@@ -31,9 +31,8 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Crush session history", "description": "Crush keeps a crush.db SQLite store inside each project's .crush directory. Find every store via projects.json and remove one session or a project's history.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-crush-session-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-crush-session-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-01", "dateModified": "2026-11-03"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Crush session history", "description": "Crush keeps a crush.db SQLite store inside each project's .crush directory. Find every store via projects.json and remove one session or a project's history.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-crush-session-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-crush-session-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-01", "dateModified": "2026-11-17"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Crush session history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-crush-session-history.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does Crush store its session history?", "acceptedAnswer": {"@type": "Answer", "text": "Beside the project rather than in one central database: <project>/.crush/crush.db by default. Every project store Crush has opened is listed in ${XDG_DATA_HOME:-~/.local/share}/crush/projects.json (or via crush projects)."}}, {"@type": "Question", "name": "How do I delete a project's Crush history?", "acceptedAnswer": {"@type": "Answer", "text": "Close Crush in that project and remove <project>/.crush/crush.db along with any crush.db-wal and crush.db-shm files beside it. Your global configuration in ~/.config/crush/crush.json is untouched."}}, {"@type": "Question", "name": "Do I need to clean up projects.json after deleting a project's .crush directory?", "acceptedAnswer": {"@type": "Answer", "text": "No. Both Crush and deja skip entries in ${XDG_DATA_HOME:-~/.local/share}/crush/projects.json whose data_dir or crush.db no longer exists on disk."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -47,7 +46,7 @@
 <a href="commands.html">CLI reference</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
-<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
 <a href="forgetting.html">Why agents forget</a>
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="lost-context.html">Lost context</a>
@@ -59,6 +58,10 @@
 <a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
 <a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="claude-code-memory-md-limit.html">MEMORY.md 200-line limit</a>
+<a href="claude-code-memory-hooks.html">Claude Code memory hooks</a>
+<a href="codex-memories-config.html">Codex memories &amp; config</a>
+<a href="cursor-mcp-memory.html">Cursor MCP memory</a>
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
@@ -197,7 +200,7 @@ ${XDG_DATA_HOME:-~/.local/share}/crush/projects.json</pre>
 
 <h2>How to delete one session</h2>
 <p>In Crush's interactive TUI session picker, highlight the session and press <kbd>Delete</kbd> (or <kbd>d</kbd>) to remove it directly. From the command line, close Crush in that project first — <code>crush.db</code> is live state the TUI owns while running — and remove the session's messages, any subagent child sessions, and the session row itself:</p>
-<pre>sqlite3 .crush/crush.db "
+<pre data-nosnippet>sqlite3 .crush/crush.db "
   DELETE FROM messages WHERE session_id = '&lt;session-id&gt;'
     OR session_id IN (SELECT id FROM sessions WHERE parent_session_id = '&lt;session-id&gt;');
   DELETE FROM sessions WHERE id = '&lt;session-id&gt;' OR parent_session_id = '&lt;session-id&gt;';
@@ -207,7 +210,7 @@ ${XDG_DATA_HOME:-~/.local/share}/crush/projects.json</pre>
 
 <h2>How to delete a project's history</h2>
 <p>With Crush closed, removing <code>crush.db</code> (and any WAL sidecars beside it) clears every session recorded in that project:</p>
-<pre>rm -f .crush/crush.db .crush/crush.db-wal .crush/crush.db-shm</pre>
+<pre data-nosnippet>rm -f .crush/crush.db .crush/crush.db-wal .crush/crush.db-shm</pre>
 <p>Beside the database, <code>.crush/</code> holds only an auto-generated <code>.gitignore</code> file that keeps <code>crush.db</code> out of version control; if you remove the whole directory, Crush recreates it on the next launch, and both Crush and deja skip stale entries in <code>projects.json</code> whose directories no longer exist. Your global configuration, provider keys and MCP servers live in <code>~/.config/crush/crush.json</code>, and custom commands live in <code>~/.config/crush/commands/</code>, so removing a project's <code>.crush/crush.db</code> leaves them untouched. To clear every project's history across the machine, check the paths in <code>${XDG_DATA_HOME:-~/.local/share}/crush/projects.json</code> and remove each <code>&lt;data_dir&gt;/crush.db</code>.</p>
 <p><code>deja delete</code> does not reach into a project's <code>crush.db</code>. When deja is installed, <code>deja forget &lt;id&gt;</code> drops a session from deja's own index and leaves a tombstone so the next scan does not re-import it.</p>
 

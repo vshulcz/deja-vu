@@ -28,15 +28,14 @@
 <link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
 <link rel="stylesheet" href="../../assets/site.css">
 <meta name="author" content="vshulcz">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:160">
 <meta name="theme-color" content="#0d0b16">
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
 <link rel="apple-touch-icon" href="../../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "怎么删掉 Claude Code 的旧会话", "description": "按时间删除 Claude Code 会话：find 命令、cleanupPeriodDays 设置、一份旧会话在磁盘上到底占多少，以及删掉之后失去什么。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/delete-old-claude-sessions.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/delete-old-claude-sessions.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-15", "dateModified": "2026-11-05"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "怎么删掉 Claude Code 的旧会话", "description": "按时间删除 Claude Code 会话：find 命令、cleanupPeriodDays 设置、一份旧会话在磁盘上到底占多少，以及删掉之后失去什么。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/delete-old-claude-sessions.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/delete-old-claude-sessions.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-15", "dateModified": "2026-11-17"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "怎么删掉 Claude Code 的旧会话", "item": "https://vshulcz.github.io/deja-vu/zh/guide/delete-old-claude-sessions.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "怎么删掉 Claude Code 的旧会话？", "acceptedAnswer": {"@type": "Answer", "text": "按时间删，用 find：find ~/.claude/projects -name '*.jsonl' -mtime +30 -delete 会删掉所有最后写入时间超过 30 天的会话记录。先不带 -delete 跑一遍，看看会删哪些。"}}, {"@type": "Question", "name": "Claude Code 会归档旧会话吗？", "acceptedAnswer": {"@type": "Answer", "text": "不会。没有归档，没有回收站，也没有垃圾桶。claude --resume 里的列表是每次读 ~/.claude/projects 现生成的，所以列表里少了一次会话，就是磁盘上少了一个文件。"}}, {"@type": "Question", "name": "Claude Code 能自动删除旧会话吗？", "acceptedAnswer": {"@type": "Answer", "text": "能。~/.claude/settings.json 里的 cleanupPeriodDays 就是保留天数，超过这个天数的会话记录会被删除。默认是 30，调大就能保留得更久。"}}, {"@type": "Question", "name": "删掉旧会话能腾出很多磁盘空间吗？", "acceptedAnswer": {"@type": "Answer", "text": "通常不能。在一台有 1,320 份会话记录、共 2.73 GB 的机器上，超过 30 天的 368 个文件只占 0.11 GB，约百分之四；最大的十个会话占了 2.36 GB，约百分之八十六。"}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -86,7 +85,7 @@
 
 <h2>按时间删</h2>
 <p>一条命令。建议先不带 <code>-delete</code> 跑一遍，看看它会动哪些文件。</p>
-<pre># 会删哪些：所有最后写入时间超过 30 天的会话记录
+<pre data-nosnippet># 会删哪些：所有最后写入时间超过 30 天的会话记录
 find ~/.claude/projects -name '*.jsonl' -mtime +30
 
 # 一共多大

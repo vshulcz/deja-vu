@@ -6,18 +6,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Delete Hermes session history — deja-vu</title>
 <meta name="description" content="Hermes stores its conversations in ~/.hermes/state.db and profile state.db files. Remove one session with hermes sessions delete or clear the database cleanly.">
-<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-hermes-session-history.html">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Delete Hermes session history">
 <meta property="og:description" content="Hermes stores its conversations in ~/.hermes/state.db and profile state.db files. Remove one session with hermes sessions delete or clear the database cleanly.">
-<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-hermes-session-history.html">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
 <link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 <meta name="author" content="vshulcz">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:160">
 <meta name="theme-color" content="#0d0b16">
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
@@ -31,9 +31,8 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Hermes session history", "description": "Hermes stores its conversations in ~/.hermes/state.db and profile state.db files. Remove one session with hermes sessions delete or clear the database cleanly.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-hermes-session-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-hermes-session-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-01", "dateModified": "2026-11-03"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Hermes session history", "description": "Hermes stores its conversations in ~/.hermes/state.db and profile state.db files. Remove one session with hermes sessions delete or clear the database cleanly.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-hermes-session-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-hermes-session-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-01", "dateModified": "2026-11-17"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Hermes session history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-hermes-session-history.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does Hermes store its session history?", "acceptedAnswer": {"@type": "Answer", "text": "In ${HERMES_HOME:-~/.hermes}/state.db on Hermes 0.17 and newer, and in ~/.hermes/profiles/<profile>/state.db when using named profiles or older builds. Both are SQLite databases holding the sessions and messages tables."}}, {"@type": "Question", "name": "How do I delete one Hermes session?", "acceptedAnswer": {"@type": "Answer", "text": "Run hermes sessions delete <id> (or hermes -p <profile> sessions delete <id> for a profile store). To reclaim disk space in state.db afterward, run sqlite3 ~/.hermes/state.db 'VACUUM;' with Hermes closed."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -47,7 +46,7 @@
 <a href="commands.html">CLI reference</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
-<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
 <a href="forgetting.html">Why agents forget</a>
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="lost-context.html">Lost context</a>
@@ -59,6 +58,10 @@
 <a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
 <a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="claude-code-memory-md-limit.html">MEMORY.md 200-line limit</a>
+<a href="claude-code-memory-hooks.html">Claude Code memory hooks</a>
+<a href="codex-memories-config.html">Codex memories &amp; config</a>
+<a href="cursor-mcp-memory.html">Cursor MCP memory</a>
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
@@ -202,14 +205,14 @@ hermes sessions delete &lt;session-id&gt;</pre>
 <pre>hermes -p &lt;profile&gt; sessions list
 hermes -p &lt;profile&gt; sessions delete &lt;session-id&gt;</pre>
 <p>Deleting rows in SQLite frees their pages inside <code>state.db</code> for future sessions without shrinking the file on disk. To reclaim the disk space immediately, close Hermes and run <code>VACUUM</code>:</p>
-<pre>sqlite3 "${HERMES_HOME:-$HOME/.hermes}/state.db" "VACUUM;"</pre>
+<pre data-nosnippet>sqlite3 "${HERMES_HOME:-$HOME/.hermes}/state.db" "VACUUM;"</pre>
 
 <h2>How to delete all of it</h2>
 <p>With Hermes closed, removing <code>state.db</code> (and any <code>-wal</code> or <code>-shm</code> files beside it) clears every session in the default store:</p>
-<pre>cd "${HERMES_HOME:-$HOME/.hermes}"
+<pre data-nosnippet>cd "${HERMES_HOME:-$HOME/.hermes}"
 rm -f state.db state.db-wal state.db-shm</pre>
 <p>To clear every named profile's history as well:</p>
-<pre>rm -f "${HERMES_HOME:-$HOME/.hermes}"/profiles/*/state.db*</pre>
+<pre data-nosnippet>rm -f "${HERMES_HOME:-$HOME/.hermes}"/profiles/*/state.db*</pre>
 <p>Removing <code>state.db</code> does not touch <code>config.yaml</code>, your installed plugins under <code>~/.hermes/plugins/</code>, or the curated notes in <code>MEMORY.md</code>. <code>deja delete</code> refuses Hermes sessions rather than editing <code>state.db</code>; use <code>hermes sessions delete</code> for the source store and <code>deja forget &lt;id&gt;</code> to drop a session from deja's index.</p>
 
 <h2>What you lose</h2>

@@ -6,18 +6,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Delete Cherry Studio session history — deja-vu</title>
 <meta name="description" content="Cherry Studio keeps Claude, pi and dsh transcripts under Data/Agents. Delete the session files by hand, and run deja index first so they stay searchable.">
-<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-cherrystudio-session-history.html">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Delete Cherry Studio session history">
 <meta property="og:description" content="Cherry Studio keeps Claude, pi and dsh transcripts under Data/Agents. Delete the session files by hand, and run deja index first so they stay searchable.">
-<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-cherrystudio-session-history.html">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
 <link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 <meta name="author" content="vshulcz">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:160">
 <meta name="theme-color" content="#0d0b16">
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
@@ -31,9 +31,8 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Cherry Studio session history", "description": "Cherry Studio keeps Claude, pi and dsh transcripts under Data/Agents. Delete the session files by hand, and run deja index first so they stay searchable.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-cherrystudio-session-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-cherrystudio-session-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-03", "dateModified": "2026-11-03"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Cherry Studio session history", "description": "Cherry Studio keeps Claude, pi and dsh transcripts under Data/Agents. Delete the session files by hand, and run deja index first so they stay searchable.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-cherrystudio-session-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-cherrystudio-session-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-03", "dateModified": "2026-11-17"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Cherry Studio session history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-cherrystudio-session-history.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does Cherry Studio store session history?", "acceptedAnswer": {"@type": "Answer", "text": "Under CherryStudio/Data/Agents in the app data directory: ~/Library/Application Support/CherryStudio on macOS, ${XDG_CONFIG_HOME:-~/.config}/CherryStudio on Linux, and %APPDATA%/CherryStudio on Windows. Claude transcripts are Data/Agents/.claude/projects/<workspace>/<session>.jsonl, pi transcripts are flat files in Data/Agents/.pi/sessions, and dsh sessions are directories under Data/Agents/.dsh/sessions. Installs from before Data/Agents also keep .claude/projects directly under CherryStudio. A data directory moved in the app's settings is listed in ~/.cherrystudio/boot-config.json under app.user_data_path."}}, {"@type": "Question", "name": "How do I delete a Cherry Studio session?", "acceptedAnswer": {"@type": "Answer", "text": "Close Cherry Studio, then remove that session's JSONL file, or the whole session-<id> directory for a dsh session. Run deja index first so the conversation stays searchable after the file is gone. deja delete refuses a Cherry Studio id."}}, {"@type": "Question", "name": "Does deja delete remove Cherry Studio sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It refuses them: Cherry Studio sessions can't be deleted yet, because deja has not checked how the app lists them. Remove the transcript files yourself. deja forget --session <id> drops deja's own copy when you want that gone too."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -47,7 +46,7 @@
 <a href="commands.html">CLI reference</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
-<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
 <a href="forgetting.html">Why agents forget</a>
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="lost-context.html">Lost context</a>
@@ -59,6 +58,10 @@
 <a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
 <a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="claude-code-memory-md-limit.html">MEMORY.md 200-line limit</a>
+<a href="claude-code-memory-hooks.html">Claude Code memory hooks</a>
+<a href="codex-memories-config.html">Codex memories &amp; config</a>
+<a href="cursor-mcp-memory.html">Cursor MCP memory</a>
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
@@ -218,7 +221,7 @@ jq -r '.["app.user_data_path"] | to_entries[] | .value' ~/.cherrystudio/boot-con
 
 <h2>How to delete one session</h2>
 <p>Close Cherry Studio first, so a running agent cannot append to the file you are about to remove. Then delete that session's own path. On macOS:</p>
-<pre>base="$HOME/Library/Application Support/CherryStudio"
+<pre data-nosnippet>base="$HOME/Library/Application Support/CherryStudio"
 
 # one Claude session
 rm "$base/Data/Agents/.claude/projects/&lt;workspace&gt;/&lt;session&gt;.jsonl"
@@ -236,7 +239,7 @@ rm -r "$base/Data/Agents/.dsh/sessions/&lt;workspace&gt;/session-&lt;id&gt;"</pr
 
 <h2>How to delete all of it</h2>
 <p>With Cherry Studio closed, removing the three session trees clears every transcript and leaves the app's settings in place. On macOS:</p>
-<pre>base="$HOME/Library/Application Support/CherryStudio"
+<pre data-nosnippet>base="$HOME/Library/Application Support/CherryStudio"
 rm -r "$base/Data/Agents/.claude/projects" \
       "$base/Data/Agents/.pi/sessions" \
       "$base/Data/Agents/.dsh/sessions" \

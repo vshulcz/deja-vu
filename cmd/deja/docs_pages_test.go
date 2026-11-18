@@ -52,11 +52,16 @@ func TestGuidePagesShareTheirNavigation(t *testing.T) {
 		if n := strings.Count(page, `aria-current="page"`); n != 1 {
 			t.Errorf("%s marks %d sidebar entries as current, want exactly one", name, n)
 		}
-		if !strings.Contains(string(sitemap), "guide/"+name) {
-			t.Errorf("%s is not in docs/sitemap.xml, so it is a page nobody is sent to", name)
-		}
-		if !strings.Contains(page, `<link rel="canonical"`) {
+		selfCanonical := `<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/` + name + `">`
+		loc := `<loc>https://vshulcz.github.io/deja-vu/guide/` + name + `</loc>`
+		inSitemap := strings.Contains(string(sitemap), loc)
+		switch {
+		case !strings.Contains(page, `<link rel="canonical"`):
 			t.Errorf("%s has no canonical link", name)
+		case strings.Contains(page, selfCanonical) && !inSitemap:
+			t.Errorf("%s is not in docs/sitemap.xml, so it is a page nobody is sent to", name)
+		case !strings.Contains(page, selfCanonical) && inSitemap:
+			t.Errorf("%s is canonicalized elsewhere and must not be listed in docs/sitemap.xml", name)
 		}
 		for _, m := range link.FindAllStringSubmatch(page, -1) {
 			if !known[m[1]] {

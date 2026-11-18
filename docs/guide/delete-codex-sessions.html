@@ -20,7 +20,7 @@
 <link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 <meta name="author" content="vshulcz">
-<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:160">
 <meta name="theme-color" content="#0d0b16">
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
@@ -34,9 +34,8 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete Codex CLI sessions, and what you lose", "description": "How to delete or purge Codex CLI sessions: codex delete <id>, codex archive, wiping ~/.codex/sessions and archived_sessions, and keeping history.jsonl.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-15", "dateModified": "2026-11-09"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete Codex CLI sessions, and what you lose", "description": "How to delete or purge Codex CLI sessions: codex delete <id>, codex archive, wiping ~/.codex/sessions and archived_sessions, and keeping history.jsonl.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-15", "dateModified": "2026-11-17"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Codex sessions", "item": "https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How do I delete a Codex CLI session?", "acceptedAnswer": {"@type": "Answer", "text": "Run codex delete with its id, or delete its rollout file under ~/.codex/sessions/YYYY/MM/DD/; rollouts older than a week are compressed to rollout-*.jsonl.zst. The sessions directory is dated, so one day's work is one directory, and rm -rf ~/.codex/sessions removes every session. Prompt history is a separate file, ~/.codex/history.jsonl, and survives that."}}, {"@type": "Question", "name": "Where does Codex CLI store its sessions?", "acceptedAnswer": {"@type": "Answer", "text": "Under ${CODEX_HOME:-~/.codex}: rollouts at sessions/YYYY/MM/DD/rollout-*.jsonl as append-only JSONL, and prompt history at history.jsonl. Codex inside Xcode uses ~/Library/Developer/Xcode/CodingAssistant/codex instead."}}, {"@type": "Question", "name": "Does deleting a Codex rollout remove the prompt from history?", "acceptedAnswer": {"@type": "Answer", "text": "No. history.jsonl holds your prompts independently of the rollouts, with no assistant replies and no project metadata, so a prompt can survive the session it belongs to. Delete both if you want it gone."}}, {"@type": "Question", "name": "Does Codex CLI delete old sessions by itself?", "acceptedAnswer": {"@type": "Answer", "text": "Nothing sweeps them on a schedule the way Claude Code's cleanupPeriodDays does; the rollout files stay until you remove them."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -50,7 +49,7 @@
 <a href="commands.html">CLI reference</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
-<details class="grpfold"><summary>Why agents forget <span class="n">13</span></summary>
+<details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
 <a href="forgetting.html">Why agents forget</a>
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="lost-context.html">Lost context</a>
@@ -62,6 +61,10 @@
 <a href="claude-code-usage-limit-handoff.html">When usage limits hit</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
 <a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="claude-code-memory-md-limit.html">MEMORY.md 200-line limit</a>
+<a href="claude-code-memory-hooks.html">Claude Code memory hooks</a>
+<a href="codex-memories-config.html">Codex memories &amp; config</a>
+<a href="cursor-mcp-memory.html">Cursor MCP memory</a>
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
@@ -196,7 +199,7 @@
 
 <h2 id="how-to-delete-codex-sessions">How to delete or purge Codex sessions</h2>
 <p>Unlike Claude Code's <code>claude project purge</code>, Codex CLI has no <code>codex purge</code> command for a whole directory. Current Codex has a command for one session, <code>codex delete &lt;id&gt;</code>, and <code>codex archive &lt;id&gt;</code> to hide one without deleting it. Beyond that the sessions are files. The path is dated, so a day of work is a directory, and a rollout older than a week has been compressed to <code>.jsonl.zst</code>, which a pattern ending in <code>.jsonl</code> does not match.</p>
-<pre># what is there, newest first
+<pre data-nosnippet># what is there, newest first
 ls -t ~/.codex/sessions/*/*/*/rollout-*.jsonl* | head
 
 # one session
