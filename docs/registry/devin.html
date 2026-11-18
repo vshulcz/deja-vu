@@ -39,7 +39,7 @@
 <h1>Devin CLI</h1>
 <ul>
 <li><strong>ID</strong>: <code>devin</code></li>
-<li><strong>Store</strong>: <code>&lt;data&gt;/devin/cli/sessions.db</code> — <code>~/.local/share/devin/cli/sessions.db</code> on Linux and macOS (verified on both; <code>XDG_DATA_HOME</code> honoured); <code>%LOCALAPPDATA%\devin\cli\sessions.db</code> on Windows is the platform convention the binary&#39;s own strings name — unverified there — with <code>cli_sessions.db</code> beside it holding the pre-rename copy</li>
+<li><strong>Store</strong>: <code>&lt;data&gt;/devin/cli/sessions.db</code> — <code>~/.local/share/devin/cli/sessions.db</code> on Linux and macOS (verified on both; <code>XDG_DATA_HOME</code> honoured); <code>%APPDATA%\devin\cli\sessions.db</code> on Windows (verified on 3000.14.30821; <code>%LOCALAPPDATA%\devin\cli</code> holds only the installed binary and tools) — with <code>cli_sessions.db</code> beside it holding the pre-rename copy</li>
 <li><strong>Summaries</strong>: <code>&lt;data&gt;/devin/summaries/&lt;session_id&gt;.md</code></li>
 <li><strong>Read override</strong>: <code>DEJA_DEVIN_DB</code> replaces the store path</li>
 <li><strong>Format</strong>: SQLite, two tables per conversation — <code>sessions</code> for the row, <code>message_nodes</code> for the turns — plus <code>prompt_history</code> for the inline shell commands run between turns</li>
@@ -64,11 +64,10 @@
 <p><code>prompt_history.is_shell = 1</code> rows are the commands the user ran between turns.</p>
 <p><code>devin --resume &lt;id&gt;</code> takes the sessions row&#39;s id and finds the session in the</p>
 <p>one global store; the recorded <code>working_directory</code> is where it ran.</p>
-<p><code>deja install devin</code> writes <code>~/.config/devin/mcp_config.json</code> (user scope;</p>
-<p>project scope is <code>.devin/mcp_config.json</code>) and the shared</p>
+<p><code>deja install devin</code> writes <code>~/.config/devin/mcp_config.json</code> (<code>%APPDATA%\devin\mcp_config.json</code> on Windows, matching <code>devin mcp add --scope user</code>; project scope is <code>.devin/mcp_config.json</code>) and the shared</p>
 <p><code>~/.agents/skills/deja-history/SKILL.md</code>, which Devin&#39;s own docs list among</p>
 <p>its skill directories. <code>deja install devin-auto</code> additionally writes Claude-</p>
-<p>shaped hooks into the <code>&#34;hooks&#34;</code> key of <code>~/.config/devin/config.json</code>:</p>
+<p>shaped hooks into the <code>&#34;hooks&#34;</code> key of <code>~/.config/devin/config.json</code> (<code>%APPDATA%\devin\config.json</code> on Windows):</p>
 <p>SessionStart and PostCompaction run <code>hook-context</code>, UserPromptSubmit runs</p>
 <p><code>hook-prompt</code>, PostToolUse runs <code>hook-tool</code> (matcher `exec|edit|write|</p>
 <p>apply_patch|notebook_edit<code>) and </code>hook-tool-after` (matcher</p>
@@ -85,7 +84,7 @@
 <p>digest and the end-of-session marker may be CLI-only; `deja install</p>
 <p>devin-auto` stays the recommended path. Where both are present the plugin&#39;s</p>
 <p>hooks see the wiring in <code>~/.config/devin/config.json</code> and stand down.</p>
-<p><strong>Last verified:</strong> 2026-10-07 (Devin CLI 3000.11.3)</p>
+<p><strong>Last verified:</strong> 2026-11-18 (Windows paths on Devin CLI 3000.14.30821; store format and hooks on 3000.11.3)</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li><strong><code>additionalContext</code> under PreToolUse is silently dropped.</strong> Devin accepts</li>

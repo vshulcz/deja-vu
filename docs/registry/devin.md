@@ -1,7 +1,7 @@
 # Devin CLI
 
 - **ID**: `devin`
-- **Store**: `<data>/devin/cli/sessions.db` — `~/.local/share/devin/cli/sessions.db` on Linux and macOS (verified on both; `XDG_DATA_HOME` honoured); `%LOCALAPPDATA%\devin\cli\sessions.db` on Windows is the platform convention the binary's own strings name — unverified there — with `cli_sessions.db` beside it holding the pre-rename copy
+- **Store**: `<data>/devin/cli/sessions.db` — `~/.local/share/devin/cli/sessions.db` on Linux and macOS (verified on both; `XDG_DATA_HOME` honoured); `%APPDATA%\devin\cli\sessions.db` on Windows (verified on 3000.14.30821; `%LOCALAPPDATA%\devin\cli` holds only the installed binary and tools) — with `cli_sessions.db` beside it holding the pre-rename copy
 - **Summaries**: `<data>/devin/summaries/<session_id>.md`
 - **Read override**: `DEJA_DEVIN_DB` replaces the store path
 - **Format**: SQLite, two tables per conversation — `sessions` for the row, `message_nodes` for the turns — plus `prompt_history` for the inline shell commands run between turns
@@ -29,11 +29,10 @@ A `system` row without the flag is context something injected — a hook's
 `devin --resume <id>` takes the sessions row's id and finds the session in the
 one global store; the recorded `working_directory` is where it ran.
 
-`deja install devin` writes `~/.config/devin/mcp_config.json` (user scope;
-project scope is `.devin/mcp_config.json`) and the shared
+`deja install devin` writes `~/.config/devin/mcp_config.json` (`%APPDATA%\devin\mcp_config.json` on Windows, matching `devin mcp add --scope user`; project scope is `.devin/mcp_config.json`) and the shared
 `~/.agents/skills/deja-history/SKILL.md`, which Devin's own docs list among
 its skill directories. `deja install devin-auto` additionally writes Claude-
-shaped hooks into the `"hooks"` key of `~/.config/devin/config.json`:
+shaped hooks into the `"hooks"` key of `~/.config/devin/config.json` (`%APPDATA%\devin\config.json` on Windows):
 SessionStart and PostCompaction run `hook-context`, UserPromptSubmit runs
 `hook-prompt`, PostToolUse runs `hook-tool` (matcher `exec|edit|write|
 apply_patch|notebook_edit`) and `hook-tool-after` (matcher
@@ -52,7 +51,7 @@ digest and the end-of-session marker may be CLI-only; `deja install
 devin-auto` stays the recommended path. Where both are present the plugin's
 hooks see the wiring in `~/.config/devin/config.json` and stand down.
 
-**Last verified:** 2026-10-07 (Devin CLI 3000.11.3)
+**Last verified:** 2026-11-18 (Windows paths on Devin CLI 3000.14.30821; store format and hooks on 3000.11.3)
 
 ## Known quirks and drift
 
