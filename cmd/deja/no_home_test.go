@@ -185,3 +185,33 @@ func TestDoctorDeepDoesNotTakeALockItCannotHold(t *testing.T) {
 		t.Errorf("doctor --deep wrote into the working directory: %v", left)
 	}
 }
+
+// A headless setup with HOME unset but XDG_CACHE_HOME and XDG_CONFIG_HOME set
+// to absolute paths should pass homelessRefusal and report its unbuilt index
+// under XDG_CACHE_HOME rather than treating the empty cache dir as unmounted.
+func TestXDGCacheHomeWithoutHomeOrExistingIndex(t *testing.T) {
+	xdgCache := t.TempDir()
+	xdgConfig := t.TempDir()
+	for _, k := range []string{"HOME", "USERPROFILE", "DEJA_INDEX_DIR"} {
+		t.Setenv(k, "")
+	}
+	t.Setenv("XDG_CACHE_HOME", xdgCache)
+	t.Setenv("XDG_CONFIG_HOME", xdgConfig)
+
+	if stop, err := homelessRefusal("search"); stop || err != nil {
+		t.Fatalf("homelessRefusal(search) with XDG_CACHE_HOME & XDG_CONFIG_HOME = (%v, %v), want (false, nil)", stop, err)
+	}
+
+	var out strings.Builder
+	wantDir := filepath.Join(xdgCache, "deja", "index.db")
+	if err := runDoctor(&out, []string{"--offline"}, offlineLookup, wantDir); err != nil {
+		t.Fatalf("runDoctor failed: %v", err)
+	}
+	s := out.String()
+	if !strings.Contains(s, wantDir) {
+		t.Errorf("doctor output did not mention %s:\n%s", wantDir, s)
+	}
+	if !strings.Contains(s, "status   not built") {
+		t.Errorf("doctor misreported empty XDG_CACHE_HOME dir as unmounted:\n%s", s)
+	}
+}

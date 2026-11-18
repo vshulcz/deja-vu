@@ -25,6 +25,7 @@ func TestMain(m *testing.M) {
 		// developer who has it set would otherwise have the suite write into
 		// their real ~/.config/deja.
 		"XDG_CONFIG_HOME": filepath.Join(root, "config"),
+		"XDG_CACHE_HOME":  "",
 		// Notes resolve via XDG_DATA_HOME, then APPDATA on Windows, then
 		// DEJA_NOTES_FILE — none of which HOME can reach. Without these the
 		// suite appended fixture notes to the developer's real store and then

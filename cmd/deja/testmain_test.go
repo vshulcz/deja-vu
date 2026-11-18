@@ -40,6 +40,7 @@ func TestMain(m *testing.M) {
 		"AIDER_READ":              "",
 		"AIDER_GIT":               "",
 		"XDG_CONFIG_HOME":         "",
+		"XDG_CACHE_HOME":          "",
 		"XDG_DATA_HOME":           "",
 		"APPDATA":                 filepath.Join(root, "AppData", "Roaming"),
 		"LOCALAPPDATA":            filepath.Join(root, "AppData", "Local"),

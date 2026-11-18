@@ -1140,6 +1140,9 @@ func freshHomePath(p string) bool {
 	if underHome(a) != a {
 		return true
 	}
+	if xdg := os.Getenv("XDG_CACHE_HOME"); filepath.IsAbs(xdg) && filepath.Clean(a) == filepath.Clean(xdg) {
+		return true
+	}
 	entries, err := os.ReadDir(a)
 	return err == nil && len(entries) > 0
 }
