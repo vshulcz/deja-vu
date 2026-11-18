@@ -566,6 +566,14 @@ func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD stri
 				}
 			}
 		}
+		// The VS Code extension wraps every real input in an IDE-context
+		// envelope; only the '## My request:' body is the person's words
+		// (codexStripIdeSetupPreamble). After the event-stream role inference
+		// so both streams unwrap the same way; an empty result drops a
+		// context-only wrapper through the txt != "" guards below.
+		if role == "user" && txt != "" {
+			txt = codexUserText(payload["content"], txt)
+		}
 		// Collected rather than appended: a rollout that also carries roled
 		// response_items has each turn twice, and the two copies differ by
 		// microseconds so the ingest de-duplicator never collapses them.
@@ -607,6 +615,71 @@ func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD stri
 	}
 	resolveHomeOrEmptyProject(&s)
 	return []model.Session{s}, err
+}
+
+// The VS Code extension wraps every real input in a fixed two-part envelope:
+//
+//	# Context from my IDE setup:
+//	## Active file: src/main.cpp   (sometimes absent)
+//	## Open tabs:
+//	- a.cpp: src/a.cpp
+//	## My request:
+//	<the words the person actually typed>
+//
+// Only the request body is the person's words. Stored whole, the envelope
+// becomes the prompt and the session title. Measured on a real store of 19
+// rollouts / 716 wrapped messages (Nwflower/dsh-chat-import#114): 58 of the
+// envelopes carry no '## Active file:' line, request bodies sometimes bring
+// their own '##' headings (pasted PR templates), and some rollouts are CRLF.
+// A wrapper with no request section carries nothing the person said and is
+// dropped; text that does not start with the envelope comes back unchanged.
+var codexIdeSetupPrefix = "# context from my ide setup:"
+
+// Go's '$' matches before '\n' only; JS multiline '$' also matched before
+// '\r', which is how the reference converter tolerated CRLF rollouts. The
+// trailing class eats the '\r' explicitly instead.
+var codexMyRequestRe = regexp.MustCompile(`(?i)^[ \t]*##[ \t]*my request[ \t]*:[ \t\r]*$`)
+
+func codexStripIdeSetupPreamble(text string) string {
+	if !strings.HasPrefix(strings.ToLower(text), codexIdeSetupPrefix) {
+		return text
+	}
+	pos := 0
+	for _, line := range strings.SplitAfter(text, "\n") {
+		if codexMyRequestRe.MatchString(strings.TrimSuffix(line, "\n")) {
+			return strings.TrimSpace(text[pos+len(line):])
+		}
+		pos += len(line)
+	}
+	return ""
+}
+
+// codexUserText unwraps the IDE envelope from a user message's content. Blocks
+// unwrap one by one so a mixed message — an annotation block beside a wrapped
+// request — keeps both: joined first, the annotation header would hide the
+// envelope from the prefix check and the whole wrapper would be stored as the
+// person's words. joined is the textFromContent result used when the content
+// is not a block array (plain strings, event-stream fallbacks).
+func codexUserText(content any, joined string) string {
+	blocks, ok := content.([]any)
+	if !ok {
+		return codexStripIdeSetupPreamble(joined)
+	}
+	parts := make([]string, 0, len(blocks))
+	for _, it := range blocks {
+		m, ok := it.(map[string]any)
+		if !ok {
+			continue
+		}
+		s, _ := m["text"].(string)
+		if s == "" {
+			s, _ = m["content"].(string)
+		}
+		if s = codexStripIdeSetupPreamble(s); s != "" {
+			parts = append(parts, s)
+		}
+	}
+	return strings.Join(parts, "\n")
 }
 
 func codexApplySessionMeta(s *model.Session, payload map[string]any, cwd, modelProvider *string) {
