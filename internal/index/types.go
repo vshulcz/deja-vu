@@ -665,10 +665,14 @@ func (r SearchResult) IsStrict(s model.Session) bool {
 }
 
 // DefaultDir is the index directory: DEJA_INDEX_DIR, or
+// $XDG_CACHE_HOME/deja/index.db when XDG_CACHE_HOME is absolute, or
 // ~/.cache/deja/index.db.
 func DefaultDir() string {
 	if v := os.Getenv("DEJA_INDEX_DIR"); v != "" {
 		return v
+	}
+	if base := os.Getenv("XDG_CACHE_HOME"); filepath.IsAbs(base) {
+		return filepath.Join(base, "deja", "index.db")
 	}
 	h, _ := os.UserHomeDir()
 	return filepath.Join(h, ".cache", "deja", "index.db")
