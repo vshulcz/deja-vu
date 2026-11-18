@@ -56,3 +56,31 @@ func TestTheAnswerLineDoesNotQuoteAPlanAsAnOutcome(t *testing.T) {
 		t.Errorf("the outcome was not attached: %q", got)
 	}
 }
+
+func TestAnswerAfterUsesTurnSynthesisAfterEditsInsteadOfOpeningPledge(t *testing.T) {
+	msgs := make([]model.Message, 0, 25)
+	msgs = append(msgs,
+		model.Message{Role: "user", Text: "Please fix AdminReadonlyField URL resolution when current_app is nested."},
+		model.Message{Role: "assistant", Text: "I'll help you fix this bug! Let me start by exploring the repository layout."},
+	)
+	for range 20 {
+		msgs = append(msgs, model.Message{Role: "files", Text: "/repo/contrib/admin/helpers.py"})
+	}
+	msgs = append(msgs,
+		model.Message{Role: "edit", Text: "/repo/contrib/admin/helpers.py\nget_admin_url"},
+		model.Message{Role: "command", Text: "pytest -q → exit 0"},
+		model.Message{
+			Role: "assistant",
+			Text: "## Problem\nAdmin URLs inside custom sites ignored the active admin namespace.\n\n" +
+				"## Root Cause\nAdminReadonlyField.get_admin_url() failed to pass self.model_admin.admin_site.name as current_app.\n\n" +
+				"## The Fix\nUpdated get_admin_url() to supply current_app to reverse().",
+		},
+	)
+	got := AnswerAfter(msgs, 0)
+	if !strings.Contains(got, "AdminReadonlyField.get_admin_url") {
+		t.Fatalf("expected turn synthesis root cause, got %q", got)
+	}
+	if strings.Contains(got, "I'll help you") || strings.Contains(got, "Let me start by") {
+		t.Fatalf("expected opening helper chatter skipped, got %q", got)
+	}
+}

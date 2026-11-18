@@ -599,6 +599,7 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 			weighted float64
 			center   string
 			dump     bool
+			user     bool
 		}
 		best := make([]msgScore, 0, 8)
 		found := make([]bool, len(terms))
@@ -629,7 +630,8 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 			if distinct > 0 {
 				hit.Count++
 				best = append(best, msgScore{mi, distinct, weighted, center,
-					m.Role == roleToolOutput && isDataDump(m.Text)})
+					m.Role == roleToolOutput && isDataDump(m.Text),
+					m.Role == "user"})
 			}
 		}
 		for _, b := range best {
@@ -643,12 +645,67 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 			if best[i].dump != best[j].dump {
 				return !best[i].dump
 			}
+			diff := best[i].weighted - best[j].weighted
+			if diff < 0 {
+				diff = -diff
+			}
+			if diff <= 1e-6 && best[i].user != best[j].user {
+				return best[i].user
+			}
 			return best[i].weighted > best[j].weighted
 		})
-		for i := 0; i < len(best) && i < 2; i++ {
-			if sn := snippet(s.Messages[best[i].idx].Text, best[i].center, nil); sn != "" {
+		var picked []int
+		used := make([]bool, len(best))
+		hasUser := false
+		maxIdx := -1
+		addPick := func(bi int) {
+			picked = append(picked, bi)
+			used[bi] = true
+			if best[bi].user {
+				hasUser = true
+			}
+			if best[bi].idx > maxIdx {
+				maxIdx = best[bi].idx
+			}
+		}
+		if len(best) > 0 {
+			addPick(0)
+		}
+		// Respect the 2-snippet per-session cap while surfacing a user turn or later high-weight turn.
+		if len(best) > 1 {
+			choice := -1
+			if !hasUser {
+				for bi := range best {
+					if !used[bi] && best[bi].user && best[bi].weighted >= best[0].weighted*0.35 {
+						choice = bi
+						break
+					}
+				}
+			}
+			if choice < 0 {
+				for bi := range best {
+					if !used[bi] && best[bi].idx > maxIdx && best[bi].weighted >= best[0].weighted*0.75 {
+						choice = bi
+						break
+					}
+				}
+			}
+			if choice < 0 {
+				for bi := range best {
+					if !used[bi] {
+						choice = bi
+						break
+					}
+				}
+			}
+			if choice >= 0 {
+				addPick(choice)
+			}
+		}
+		for _, bi := range picked {
+			if sn := snippet(s.Messages[best[bi].idx].Text, best[bi].center, nil); sn != "" {
 				hit.Snippets = append(hit.Snippets, sn)
-				hit.quoted = append(hit.quoted, s.Messages[best[i].idx].Text)
+				hit.quoted = append(hit.quoted, s.Messages[best[bi].idx].Text)
 			}
 		}
 		hit.Score = float64(len(ss) - rank)

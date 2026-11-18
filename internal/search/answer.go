@@ -8,6 +8,10 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
+func isOpeningChatter(s string) bool {
+	return digest.AnnouncesPlan(s) || digest.IsCelebratoryBoilerplate(s)
+}
+
 // AnswerAfter returns the assistant reply that followed a matched user turn,
 // trimmed to the part worth carrying.
 //
@@ -19,6 +23,30 @@ import (
 // returns only the messages that matched, so the reply does not exist in memory
 // at scoring time and has to be read back from the index.
 func AnswerAfter(messages []model.Message, i int) string {
+	turnEnd := len(messages)
+	for k := i + 1; k < len(messages); k++ {
+		if messages[k].Role == "user" {
+			// The user spoke again; there is no further reply to attach, and
+			// reaching past them would attach someone else's.
+			turnEnd = k
+			break
+		}
+	}
+	sawEditOrPass := false
+	for k := i + 1; k < turnEnd; k++ {
+		m := messages[k]
+		if m.Role == "edit" || m.Role == "wrote" || (m.Role == "command" && strings.Contains(m.Text, "→ exit 0")) {
+			sawEditOrPass = true
+			break
+		}
+	}
+	if sawEditOrPass {
+		if concls := digest.SubstantialConclusions(model.Session{Messages: messages[i:turnEnd]}, answerCap, 1); len(concls) > 0 {
+			if c := strings.TrimSpace(withoutOwnCredit(concls[0])); c != "" && !isOpeningChatter(c) {
+				return clip(c)
+			}
+		}
+	}
 	// A reply that records an outcome wins over an earlier one that does not.
 	// DecisionText never comes back empty for a reply with words in it — it
 	// falls through to the opening — so taking the first non-empty answer
@@ -29,13 +57,8 @@ func AnswerAfter(messages []model.Message, i int) string {
 	// where a plan led a block, on the line an agent reads as the answer.
 	first := ""
 	assistantsSeen := 0
-	for j := i + 1; j < len(messages) && j <= i+16 && assistantsSeen < 4; j++ {
+	for j := i + 1; j < turnEnd && j <= i+16 && assistantsSeen < 4; j++ {
 		m := messages[j]
-		if m.Role == "user" {
-			// The user spoke again; there is no further reply to attach, and
-			// reaching past them would attach someone else's.
-			break
-		}
 		if m.Role != "assistant" {
 			continue
 		}
@@ -47,10 +70,13 @@ func AnswerAfter(messages []model.Message, i int) string {
 			return text
 		}
 		if cand := DecisionText(reply); cand != "" {
-			if first == "" || (digest.AnnouncesPlan(first) && !digest.AnnouncesPlan(cand)) {
+			if first == "" || (isOpeningChatter(first) && !isOpeningChatter(cand)) {
 				first = cand
 			}
 		}
+	}
+	if first != "" && digest.IsCelebratoryBoilerplate(first) {
+		return ""
 	}
 	return first
 }
@@ -120,12 +146,18 @@ func decisionSentence(text string) (string, bool) {
 	if text == "" {
 		return "", false
 	}
+	if cleaned := strings.TrimSpace(digest.StripAssistantBoilerplate(text)); cleaned != "" {
+		text = cleaned
+	}
 	sentences := splitSentences(text)
 	low := make([]string, len(sentences))
 	for i, s := range sentences {
 		low[i] = lower(s)
 	}
 	for i, s := range low {
+		if digest.IsCelebratoryBoilerplate(sentences[i]) || (digest.AnnouncesPlan(sentences[i]) && !digest.CarriesDecision(sentences[i])) {
+			continue
+		}
 		if carriesDecisionSentence(s) {
 			{
 				out := sentences[i]

@@ -134,3 +134,36 @@ func TestEvClipAndUserRuleLines(t *testing.T) {
 		t.Errorf("evPersonLabel = %q", got)
 	}
 }
+
+func TestEvidenceRewriteSkipsDuplicateClippedProblemAndUnbackedUserReceipt(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	now := time.Now().UTC().Add(-time.Hour)
+	longPrompt := "Fix this issue based on manual config id-4012: " +
+		"Saving parent entity after setting primary key on child leads to data loss when non-numeric string key is updated late during save preparation."
+	concl := "In entity base preparation, update the foreign key attname before clearing cached values on save."
+	s := model.Session{
+		Harness: "claude",
+		ID:      "user-receipt-clip",
+		Project: "webapp",
+		Updated: now,
+		Messages: []model.Message{
+			{Role: "user", Text: longPrompt, Time: now},
+			{Role: "assistant", Text: concl, Time: now.Add(time.Minute)},
+		},
+	}
+	evidence.Build(dir, []model.Session{s}, nil)
+
+	clippedMidProblem := "Saving parent entity after setting primary key on child leads to data loss…"
+	out := evidenceRewrite(s, dir, []string{concl}, true, clippedMidProblem)
+	joined := strings.Join(out, "\n")
+	if strings.Contains(joined, evidence.LabelUser) {
+		t.Fatalf("expected duplicate User receipt suppressed when problem already covers it, got:\n%s", joined)
+	}
+	if !strings.Contains(joined, evidence.LabelModel+concl) {
+		t.Fatalf("expected Model conclusion preserved, got:\n%s", joined)
+	}
+	if !skipMatchesEvidence(evidence.Norm(evidence.LabelUser+longPrompt[:105]+"…"), clippedMidProblem) {
+		t.Fatalf("expected skipMatchesEvidence to match differently clipped prefix")
+	}
+}

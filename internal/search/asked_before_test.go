@@ -84,3 +84,18 @@ func TestAskedBeforeSkipsTheHostsOwnLines(t *testing.T) {
 		t.Fatalf("the person's question with a reminder appended: %q", got)
 	}
 }
+
+func TestAskedBeforeSkipsDeclarativeStatementsWithoutQuestion(t *testing.T) {
+	decl := askedSession("I actually redeemed a coupon on coffee creamer last Sunday")
+	if got := AskedBefore(decl, []string{"redeemed", "coupon", "coffee", "creamer"}); got != "" {
+		t.Fatalf("declarative past statement falsely matched as repeated question: %q", got)
+	}
+	req := askedSession("I need help redeeming a coupon on coffee creamer")
+	if got := AskedBefore(req, []string{"redeeming", "coupon", "coffee", "creamer"}); got == "" {
+		t.Fatal("expected request statement to match AskedBefore")
+	}
+	q := askedSession("Where can I redeem a coupon on coffee creamer?")
+	if got := AskedBefore(q, []string{"redeem", "coupon", "coffee", "creamer"}); got == "" {
+		t.Fatal("expected explicit question to match AskedBefore")
+	}
+}

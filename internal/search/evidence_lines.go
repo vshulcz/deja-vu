@@ -303,6 +303,7 @@ func evidenceRewrite(s model.Session, dir string, lines []string, assumeModel bo
 			rs[i].label = "Edit: "
 		}
 	}
+	hasProblem := slices.ContainsFunc(skip, func(sk string) bool { return strings.TrimSpace(sk) != "" })
 	var out []string
 	seen := map[string]bool{}
 	add := func(l string) {
@@ -311,7 +312,7 @@ func evidenceRewrite(s model.Session, dir string, lines []string, assumeModel bo
 			return
 		}
 		for _, sk := range skip {
-			if sk != "" && strings.Contains(k, evidence.Norm(sk)) {
+			if skipMatchesEvidence(k, sk) {
 				return
 			}
 		}
@@ -321,16 +322,19 @@ func evidenceRewrite(s model.Session, dir string, lines []string, assumeModel bo
 	for _, r := range rs {
 		switch {
 		case len(r.backed) > 0:
-			for _, b := range r.backed {
-				if isBoilerplateToolOutput(b) {
-					continue
+			onlyUserBacked := !slices.ContainsFunc(r.backed, func(b string) bool { return !strings.HasPrefix(b, evidence.LabelUser) })
+			if !onlyUserBacked || !assumeModel || !hasProblem {
+				for _, b := range r.backed {
+					if isBoilerplateToolOutput(b) {
+						continue
+					}
+					add(b)
 				}
-				add(b)
 			}
 			// Backed by the person's words alone, the record says nothing the
 			// model did, and the line keeps the unbacked label.
 			label := evidence.LabelModelSaid
-			if !slices.ContainsFunc(r.backed, func(b string) bool { return !strings.HasPrefix(b, evidence.LabelUser) }) {
+			if onlyUserBacked {
 				label = evidence.LabelModel
 			}
 			add(label + strings.TrimPrefix(strings.TrimSpace(r.line), "→ "))
@@ -430,6 +434,26 @@ func evClip(s string, n int) string {
 		return string(r[:n]) + "…"
 	}
 	return s
+}
+
+func skipMatchesEvidence(k, sk string) bool {
+	skNorm := strings.TrimSpace(strings.TrimSuffix(strings.TrimSuffix(evidence.Norm(sk), "…"), "..."))
+	if skNorm == "" {
+		return false
+	}
+	if strings.Contains(k, skNorm) {
+		return true
+	}
+	if len(skNorm) > 48 {
+		cut := 48
+		for cut > 0 && (skNorm[cut]&0xC0) == 0x80 {
+			cut--
+		}
+		if cut > 0 && strings.Contains(k, skNorm[:cut]) {
+			return true
+		}
+	}
+	return false
 }
 
 // userRuleLines writes the rules found for s in the caller's project, each

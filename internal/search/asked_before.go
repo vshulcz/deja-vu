@@ -53,7 +53,7 @@ func AskedBefore(s model.Session, terms []string) string {
 		// is still the question, so the envelope comes off rather than the
 		// message being skipped.
 		text := digest.StripHarnessBlocks(m.Text)
-		if text == "" || digest.IsCompactionSummary(text) {
+		if text == "" || digest.IsCompactionSummary(text) || !isQuestionOrRequest(text) {
 			continue
 		}
 		past := prompt.Terms(text)
@@ -97,3 +97,35 @@ func firstSentence(text string) string {
 }
 
 func isRuneStart(b byte) bool { return b&0xC0 != 0x80 }
+
+// isQuestionOrRequest reports whether text reads as a question or request
+// rather than a declarative statement of fact. Quoting "I redeemed a coupon
+// last Sunday" under "this was asked here before" misstates a past event as a
+// repeated question.
+func isQuestionOrRequest(text string) bool {
+	head := firstSentence(text)
+	if strings.ContainsAny(head, "?？") {
+		return true
+	}
+	low := strings.ToLower(strings.TrimSpace(head))
+	for _, req := range []string{
+		"i want ", "i need ", "i'd like ", "i would like ", "i'm trying ", "i am trying ",
+		"we want ", "we need ", "we're trying ", "we are trying ",
+		"я хочу ", "мне нужно ", "мне надо ", "нам нужно ",
+	} {
+		if strings.HasPrefix(low, req) {
+			return true
+		}
+	}
+	for _, decl := range []string{
+		"i ", "i'm ", "i've ", "i'd ", "we ", "we're ", "we've ",
+		"my ", "our ", "actually ", "actually,", "yesterday ", "yesterday,",
+		"today ", "today,", "recently ", "recently,", "last ", "by the way",
+		"я ", "мы ", "мой ", "моя ", "мои ", "наш ", "вчера ", "сегодня ", "недавно ", "кстати",
+	} {
+		if strings.HasPrefix(low, decl) {
+			return false
+		}
+	}
+	return true
+}
