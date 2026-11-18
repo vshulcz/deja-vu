@@ -32,14 +32,14 @@ func TestCompactingPostingsMatchWholeMap(t *testing.T) {
 			// An overlay-only word survives through carried records. A base
 			// bucket containing only a replaced record must disappear.
 			ov := overlayPath(filepath.Join(bdir, bucket("twhy")+".bin"), 1)
-			if err := writeBucket(ov, map[string][]posting{"twalrus": data["twhy"]}); err != nil {
+			if err = writeBucket(ov, map[string][]posting{"twalrus": data["twhy"]}); err != nil {
 				t.Fatal(err)
 			}
 			data, err = readBucket(filepath.Join(bdir, bucket("ts007")+".bin"))
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := writeBucket(filepath.Join(bdir, bucket("txdeleted")+".bin"), map[string][]posting{"txdeleted": data["ts007"]}); err != nil {
+			if err = writeBucket(filepath.Join(bdir, bucket("txdeleted")+".bin"), map[string][]posting{"txdeleted": data["ts007"]}); err != nil {
 				t.Fatal(err)
 			}
 			old.BucketFiles = countBucketFiles(bdir)
@@ -55,15 +55,15 @@ func TestCompactingPostingsMatchWholeMap(t *testing.T) {
 				"why": {"walrus", "quokka", "ledgerfresh", "xdeleted", "qqabsent", "zabsent"},
 			}
 			if tc != "no neighbours" {
-				if err := writeGobAtomic(cooccurPath(inc), neighbours); err != nil {
+				if err = writeGobAtomic(cooccurPath(inc), neighbours); err != nil {
 					t.Fatal(err)
 				}
-			} else if err := os.Remove(cooccurPath(inc)); err != nil && !os.IsNotExist(err) {
+			} else if err = os.Remove(cooccurPath(inc)); err != nil && !os.IsNotExist(err) {
 				t.Fatal(err)
 			}
 			switch tc {
 			case "missing":
-				if err := os.Remove(ov); err != nil {
+				if err = os.Remove(ov); err != nil {
 					t.Fatal(err)
 				}
 			case "bad base", "bad overlay":
@@ -71,23 +71,23 @@ func TestCompactingPostingsMatchWholeMap(t *testing.T) {
 				if tc == "bad base" {
 					p = filepath.Join(bdir, bucket("twhy")+".bin")
 				}
-				if err := os.WriteFile(p, []byte("not a bucket"), 0o600); err != nil {
+				if err = os.WriteFile(p, []byte("not a bucket"), 0o600); err != nil {
 					t.Fatal(err)
 				}
 			}
 			backup := t.TempDir()
-			if err := os.Mkdir(filepath.Join(backup, "buckets"), 0o700); err != nil {
+			if err = os.Mkdir(filepath.Join(backup, "buckets"), 0o700); err != nil {
 				t.Fatal(err)
 			}
 			for rel := range indexFiles(t, inc) {
 				if rel != "records.bin" && rel != "cooccur.gob" && filepath.Dir(rel) != "buckets" {
 					continue
 				}
-				b, err := os.ReadFile(filepath.Join(inc, rel))
-				if err != nil {
-					t.Fatal(err)
+				b, rerr := os.ReadFile(filepath.Join(inc, rel))
+				if rerr != nil {
+					t.Fatal(rerr)
 				}
-				if err := os.WriteFile(filepath.Join(backup, rel), b, 0o600); err != nil {
+				if err = os.WriteFile(filepath.Join(backup, rel), b, 0o600); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -112,7 +112,7 @@ func TestCompactingPostingsMatchWholeMap(t *testing.T) {
 			t.Cleanup(func() { appendReplacing = wasAppend })
 			compactBucketsHeld.Store(0)
 			compactBucketsPeak.Store(0)
-			if err := rp.run(nil); err != nil {
+			if err = rp.run(nil); err != nil {
 				t.Fatal(err)
 			}
 			if rp.appending || !rp.swapped || len(rp.buckets) == 0 {
@@ -137,7 +137,7 @@ func TestCompactingPostingsMatchWholeMap(t *testing.T) {
 			}
 			mergePostings(want, rp.buckets)
 			ref := t.TempDir()
-			if err := writeBucketsConcurrent(ref, want); err != nil {
+			if err = writeBucketsConcurrent(ref, want); err != nil {
 				t.Fatal(err)
 			}
 			assertBucketFilesEqual(t, filepath.Join(inc, "buckets"), ref)
@@ -151,7 +151,7 @@ func TestCompactingPostingsMatchWholeMap(t *testing.T) {
 			// Ask the same path for its result before commit scrubs the map,
 			// and hold its progress count to the whole-map writer's count.
 			staged := t.TempDir()
-			if err := os.Mkdir(filepath.Join(staged, "buckets"), 0o700); err != nil {
+			if err = os.Mkdir(filepath.Join(staged, "buckets"), 0o700); err != nil {
 				t.Fatal(err)
 			}
 			copyPass := *rp
@@ -175,12 +175,12 @@ func TestCompactingPostingsMatchWholeMap(t *testing.T) {
 			if tc == "whole" {
 				// A write failure must not be mistaken for a damaged input.
 				blocked := t.TempDir()
-				if err := os.WriteFile(filepath.Join(blocked, "buckets"), nil, 0o600); err != nil {
+				if err = os.WriteFile(filepath.Join(blocked, "buckets"), nil, 0o600); err != nil {
 					t.Fatal(err)
 				}
 				copyPass.tmp = blocked
 				passKeyed.Store(0)
-				if _, err := copyPass.writeCompactedPostings(); err == nil {
+				if _, werr := copyPass.writeCompactedPostings(); werr == nil {
 					t.Fatal("writing through a regular file succeeded")
 				}
 				if got := passKeyed.Load(); got != 0 {
