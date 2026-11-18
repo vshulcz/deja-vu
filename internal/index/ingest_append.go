@@ -30,7 +30,7 @@ func resumeOffset(old FileState) int64 {
 	return old.SafeSize
 }
 
-func appendIncremental(dir, harness, scope string, old Manifest, files map[string]FileState, changed map[string]FileState) (filesTouched, messages, unreadable int, err error) {
+func appendPrepared(dir, harness, scope string, old Manifest, files, changed map[string]FileState, ready map[string]splitRead) (filesTouched, messages, unreadable int, err error) {
 	// This pass's counts, like the two full paths: an incremental that nobody
 	// read between builds otherwise reported its own colliding ids plus the
 	// ones before it (#1850).
@@ -114,7 +114,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	sort.SliceStable(order, func(i, j int) bool { return !isCodexHistory(order[i]) && isCodexHistory(order[j]) })
 	for _, p := range order {
 		of, known := old.Files[p]
-		ss, ok := readAppended(harness, p, of, known, &m, changed)
+		ss, ok := readAppended(harness, p, of, known, &m, changed, ready)
 		if !ok {
 			continue
 		}
@@ -248,12 +248,16 @@ func refreshAppendedSidecars(dir string, m Manifest, appended []model.Session, r
 // readAppended reads what p holds past the last pass, or whole when the index
 // has never read it. A file it cannot take this pass is set back in m.Files to
 // what the index held, and ok is false.
-func readAppended(harness, p string, of FileState, known bool, m *Manifest, changed map[string]FileState) (ss []model.Session, ok bool) {
+func readAppended(harness, p string, of FileState, known bool, m *Manifest, changed map[string]FileState, ready map[string]splitRead) (ss []model.Session, ok bool) {
 	var parseErr error
 	if known {
 		// Appended to from where the last pass stopped, which a rewrite
 		// moves: the next pass decides how to read it.
-		ss, parseErr = parseAppendedFile(harness, p, of, false)
+		if r, read := ready[p]; read {
+			ss, parseErr = r.sessions, r.err
+		} else {
+			ss, parseErr = parseAppendedFile(harness, p, of, false)
+		}
 		if parseErr == nil && !readAsWalked(p, changed[p]) {
 			parseErr = errChangedWhileRead
 		}

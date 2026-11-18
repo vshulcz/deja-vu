@@ -31,13 +31,13 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 }
 
 func updateIndexOnce(dir, harness, scope string, files map[string]FileState, force bool, progress io.Writer) error {
-	return updateIndexPass(dir, harness, scope, files, force, true, progress)
+	return updateIndexPass(dir, harness, scope, files, force, true, progress, nil)
 }
 
 // updateIndexPass is one pass. split lets it append what it can and hand the
 // rest to a second pass; that second pass replaces without splitting again, so
 // a file the append path keeps retrying cannot loop it.
-func updateIndexPass(dir, harness, scope string, files map[string]FileState, force, split bool, progress io.Writer) error {
+func updateIndexPass(dir, harness, scope string, files map[string]FileState, force, split bool, progress io.Writer, prepared *splitReads) error {
 	// The walk as it came in: the pass below writes the kept files into files,
 	// and a second pass handed that map would take them for files put back.
 	var walked map[string]FileState
@@ -53,6 +53,11 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// (#1861).
 	evicted.Store(0)
 	beginPass()
+	var readAhead map[string]splitRead
+	if prepared != nil && len(prepared.restFiles) > 0 {
+		readAhead = prepared.restFiles
+		sources.DiagRestore(prepared.diag)
+	}
 	passesRunning.Add(1)
 	defer func() {
 		if passesRunning.Add(-1) == 0 {
@@ -133,19 +138,23 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	takenFrom := sharedTakeovers(dir, harness, old, changed, files)
 	if len(removed) == 0 && !rewritten && !handover && !promptLogTakeover(changed, old.Files, old.Sessions) && takenFrom == nil {
 		if canAppendIncremental(changed, old.Files) {
-			return appendPass(dir, harness, scope, old, files, changed, true, progress, kept, unseen)
+			return appendPass(dir, harness, scope, old, files, changed, true, progress, kept, unseen, nil)
 		}
 		// Decided per file: the appendable ones are appended, and the pass
 		// after it, over the same walk, replaces only the rest (#5324).
 		if appendable, rest := splitAppendable(changed, old.Files, old.Sessions); split && len(appendable) > 0 && len(rest) > 0 {
-			if passErr := appendPass(dir, harness, scope, old, withoutRest(files, rest, old.Files), appendable, false, progress, kept, unseen); passErr != nil {
-				return passErr
+			ready, overlap := prepareSplit(harness, old, appendable, rest)
+			if !overlap {
+				if passErr := appendPass(dir, harness, scope, old, withoutRest(files, rest, old.Files), appendable, false, progress, kept, unseen, ready.appendFiles); passErr != nil {
+					return passErr
+				}
+				return updateIndexPass(dir, harness, scope, walked, false, false, progress, ready)
 			}
-			return updateIndexPass(dir, harness, scope, walked, false, false, progress)
+			readAhead = ready.restFiles
 		}
 	}
 	rp := &replacePass{dir: dir, harness: harness, scope: scope, progress: progress, old: old, files: files, changed: changed,
-		removed: removed, kept: kept, unseen: unseen, newlyKept: newlyKept, sharedBy: sharedBy}
+		removed: removed, kept: kept, unseen: unseen, newlyKept: newlyKept, sharedBy: sharedBy, readAhead: readAhead}
 	return rp.run(takenFrom)
 }
 
@@ -456,8 +465,8 @@ func writeQuietPass(dir string, old Manifest, files map[string]FileState, newlyK
 
 // appendPass appends changed to the index in place, or rebuilds it when the log
 // turns out damaged. last says this is the pass's last step.
-func appendPass(dir, harness, scope string, old Manifest, files, changed map[string]FileState, last bool, progress io.Writer, kept, unseen map[string]bool) error {
-	filesTouched, messages, unreadable, appendErr := appendIncremental(dir, harness, scope, old, files, changed)
+func appendPass(dir, harness, scope string, old Manifest, files, changed map[string]FileState, last bool, progress io.Writer, kept, unseen map[string]bool, ready map[string]splitRead) error {
+	filesTouched, messages, unreadable, appendErr := appendPrepared(dir, harness, scope, old, files, changed, ready)
 	if IsCorrupt(appendErr) {
 		if progress != nil {
 			fmt.Fprintf(progress, "deja: %s (%v), rebuilding ...\n", damagedOrOutdated(appendErr), appendErr)
