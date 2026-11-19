@@ -230,9 +230,14 @@ func parseClawCodeJSONL(path string, offset int64) ([]model.Session, error) {
 				curTS = ts
 			}
 		case "message":
+			if mod, _ := m["model"].(string); mod != "" {
+				s.SetModel(str(m["provider"]), mod)
+			}
 			msgMap, _ := m["message"].(map[string]any)
 			if msgMap == nil {
 				msgMap = m
+			} else {
+				applyUsageMap(&s, m)
 			}
 			appendClawMessage(&s, msgMap, curTS, exits)
 		default:
@@ -268,6 +273,10 @@ func applyClawMeta(s *model.Session, m map[string]any) time.Time {
 	if id, _ := m["session_id"].(string); id != "" {
 		s.ID = id
 	}
+	if mod, _ := m["model"].(string); mod != "" {
+		s.SetModel(str(m["provider"]), mod)
+	}
+	applyUsageMap(s, m)
 	if ws, _ := m["workspace_root"].(string); ws != "" {
 		s.Project = projectName(ws)
 	}
@@ -330,6 +339,15 @@ func appendClawMessage(s *model.Session, msg map[string]any, ts time.Time, exits
 			s.Messages = append(s.Messages, model.Message{Role: "user", Text: text, Time: ts})
 		}
 	case "assistant":
+		if id := str(msg["model"]); id != "" {
+			s.SetModel(str(msg["provider"]), id)
+		}
+		for _, k := range []string{"usage", "tokens", "token_usage"} {
+			if u, ok := msg[k].(map[string]any); ok && len(u) > 0 {
+				applyUsageMap(s, u)
+				break
+			}
+		}
 		if text != "" {
 			s.Touch(ts)
 			s.Messages = append(s.Messages, model.Message{Role: "assistant", Text: text, Time: ts})
@@ -345,6 +363,24 @@ func appendClawMessage(s *model.Session, msg map[string]any, ts time.Time, exits
 	}
 
 	if len(blocks) > 0 {
+		for _, it := range blocks {
+			b, ok := it.(map[string]any)
+			if !ok {
+				continue
+			}
+			switch b["type"] {
+			case "tool_use":
+				if name := str(b["name"]); name != "" {
+					s.AddToolCall(name, false)
+				}
+			case "tool_result":
+				code, hasCode := clawCodeResultStatus(b)
+				isErr, _ := b["is_error"].(bool)
+				if isErr || (hasCode && code != 0) {
+					s.ToolErrors++
+				}
+			}
+		}
 		joinResultExits(s.Messages, start, blocks, clawCodeDialect, exits, clawCodeExitCode)
 		if IndexToolOutput() {
 			for _, it := range blocks {
@@ -500,11 +536,10 @@ func clawCodeResultStatus(result map[string]any) (int, bool) {
 	return 0, false
 }
 
-// clawCodeExitCode reports non-zero command exits for session framing while
-// leaving clean exits unannotated.
+// clawCodeExitCode reports an explicit command exit status (including 0 when
+// the result carries one cleanly) while leaving ambiguous runs unannotated.
 func clawCodeExitCode(result map[string]any) (int, bool) {
-	code, ok := clawCodeResultStatus(result)
-	return code, ok && code != 0
+	return clawCodeResultStatus(result)
 }
 
 func decodeJSONObject(raw string) map[string]any {

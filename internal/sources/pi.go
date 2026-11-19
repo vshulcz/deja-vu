@@ -106,6 +106,16 @@ func (r *piReader) line(m map[string]any) {
 		if cwd, _ := m["cwd"].(string); cwd != "" {
 			r.cwd = cwd
 		}
+	case "model_change":
+		t := parseTimeAny(m["timestamp"])
+		if r.copied(t) {
+			return
+		}
+		if id := str(m["modelId"]); id != "" {
+			s.SetModel(str(m["provider"]), id)
+		} else if id := str(m["model"]); id != "" {
+			s.SetModel(str(m["provider"]), id)
+		}
 	case "compaction", "branch_summary":
 		// pi writes a compaction, and the summary of a branch it left, as
 		// top-level entries with the text under summary (session-manager
@@ -170,6 +180,12 @@ func (r *piReader) line(m map[string]any) {
 		}
 		switch role {
 		case "assistant":
+			if id := str(msg["model"]); id != "" {
+				s.SetModel(str(msg["provider"]), id)
+			}
+			if u, ok := msg["usage"].(map[string]any); ok {
+				applyUsageMap(s, u)
+			}
 			r.toolCalls(msg["content"], t)
 		case "toolResult":
 			r.toolResult(msg, t)

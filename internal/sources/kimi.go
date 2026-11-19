@@ -411,6 +411,9 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 			}
 			s.Messages = nil
 			s.Started, s.Updated = time.Time{}, time.Time{}
+			s.Tokens = nil
+			s.ToolCalls = nil
+			s.ToolErrors = 0
 			w.pending.Reset()
 			w.pendingTime = nil
 			clear(w.shellAt)
@@ -498,6 +501,9 @@ func (w *kimiWire) appendMessage(m map[string]any) {
 		w.btw = true
 		w.s.Messages = nil
 		w.s.Started, w.s.Updated = time.Time{}, time.Time{}
+		w.s.Tokens = nil
+		w.s.ToolCalls = nil
+		w.s.ToolErrors = 0
 		w.pending.Reset()
 		w.pendingTime = nil
 		clear(w.shellAt)
@@ -513,6 +519,12 @@ func (w *kimiWire) appendMessage(m map[string]any) {
 		// last record is a hook's output ended when that arrived.
 		w.s.Touch(parseTimeAny(m["time"]))
 		return
+	}
+	if mod := str(msg["model"]); mod != "" {
+		w.s.SetModel(str(msg["provider"]), mod)
+	}
+	if u, ok := msg["usage"].(map[string]any); ok {
+		applyUsageMap(w.s, u)
 	}
 	if role == "assistant" {
 		// Non-streamed assistant records exist in older protocols;
@@ -536,6 +548,14 @@ func (w *kimiWire) loopEvent(m map[string]any) {
 	e, _ := m["event"].(map[string]any)
 	if e == nil {
 		return
+	}
+	if mod := str(e["model"]); mod != "" {
+		w.s.SetModel(str(e["provider"]), mod)
+	}
+	if u, ok := e["usage"].(map[string]any); ok {
+		applyUsageMap(w.s, u)
+	} else if u, ok := e["tokenUsage"].(map[string]any); ok {
+		applyUsageMap(w.s, u)
 	}
 	switch e["type"] {
 	case "step.begin":
@@ -569,6 +589,9 @@ func (w *kimiWire) loopEvent(m map[string]any) {
 		if !ok {
 			return
 		}
+		if name, _ := e["name"].(string); name != "" && e["args"] != nil {
+			w.s.AddToolCall(name, false)
+		}
 		id, _ := e["toolCallId"].(string)
 		// An id seen again belongs to this call now, recorded or not.
 		delete(w.shellAt, id)
@@ -587,9 +610,14 @@ func (w *kimiWire) loopEvent(m map[string]any) {
 		// isError. The error ones are kept on purpose: the error a
 		// command hit is exactly what a later search reaches for.
 		r, _ := e["result"].(map[string]any)
+		code := kimiExitCode(r)
+		isErr, _ := r["isError"].(bool)
+		if isErr || code > 0 {
+			w.s.ToolErrors++
+		}
 		id, _ := e["toolCallId"].(string)
 		if i, ok := w.shellAt[id]; ok {
-			if code := kimiExitCode(r); code > 0 {
+			if code > 0 {
 				w.s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
 			}
 			delete(w.shellAt, id)

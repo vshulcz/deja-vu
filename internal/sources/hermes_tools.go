@@ -184,6 +184,9 @@ func (h *hermesSession) calls(raw string, t time.Time) {
 		if len(blocks) == 0 {
 			continue
 		}
+		if bm, ok := blocks[0].(map[string]any); ok {
+			h.s.AddToolCall(str(bm["name"]), false)
+		}
 		var records []model.Message
 		if IndexToolPaths() {
 			if p := toolPathsIn(blocks, hermesDialect); p != "" {
@@ -239,8 +242,12 @@ func (h *hermesSession) result(txt, tool, callID string, t time.Time) {
 	if strings.HasPrefix(txt, "{") {
 		var res map[string]any
 		if json.Unmarshal([]byte(txt), &res) == nil {
-			if code, ok := res["exit_code"]; ok {
-				h.exit(callID, exitCode(code))
+			code, hasExit := anyExitCode(res["exit_code"])
+			if hasExit {
+				h.exit(callID, code)
+			}
+			if (hasExit && code > 0) || (!hasExit && strings.TrimSpace(str(res["error"])) != "") {
+				h.s.ToolErrors++
 			}
 			txt = hermesResultText(res)
 		}
@@ -255,7 +262,7 @@ func (h *hermesSession) result(txt, tool, callID string, t time.Time) {
 func (h *hermesSession) exit(callID string, code int) {
 	// Other negative codes are a process killed by a signal after it started
 	// (tools/environments/base.py); it ran, and the marker reads digits only.
-	if code == 0 || callID == "" || (code < 0 && code != -1) {
+	if callID == "" || (code < 0 && code != -1) {
 		return
 	}
 	for _, i := range h.commandAt[callID] {
@@ -267,7 +274,9 @@ func (h *hermesSession) exit(callID string, code int) {
 			h.dropped = true
 			continue
 		}
-		h.s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
+		if !strings.Contains(h.s.Messages[i].Text, "  → exit ") {
+			h.s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
+		}
 	}
 	delete(h.commandAt, callID)
 }

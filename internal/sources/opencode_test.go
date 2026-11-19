@@ -1419,16 +1419,15 @@ insert into part values('p3','m1','{"type":"tool","tool":"read","state":{"input"
 			outs = append(outs, m.Text)
 		}
 	}
-	// A failure carries its status; a success does not — saying "exit 0" on
-	// every passing run is noise, and zero is the default reading.
+	// Both failure and explicit exit 0 carry their recorded status.
 	if len(cmds) != 2 {
 		t.Fatalf("commands = %v", cmds)
 	}
 	if !strings.Contains(cmds[0], "→ exit 1") {
 		t.Errorf("a non-zero exit belongs on the command: %q", cmds[0])
 	}
-	if strings.Contains(cmds[1], "exit") {
-		t.Errorf("a successful run needs no annotation: %q", cmds[1])
+	if !strings.HasSuffix(cmds[1], "  → exit 0") {
+		t.Errorf("an explicit clean exit belongs on the command: %q", cmds[1])
 	}
 	// The output of a command is indexed; the body of a file read is not —
 	// file contents are 119 MB against 49 MB of command output on a real store.

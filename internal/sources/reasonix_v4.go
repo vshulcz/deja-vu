@@ -246,15 +246,18 @@ func reasonixV4ContentRoot(dir string, m reasonixV4Manifest) string {
 // reasonixV4Message is the part of provider.Message deja reads
 // (internal/provider/provider.go:46-112).
 type reasonixV4Message struct {
-	Role          string `json:"role"`
-	ID            string `json:"id"`
-	Origin        string `json:"origin"`
-	Content       any    `json:"content"`
-	RawContent    string `json:"raw_content"`
-	ToolCalls     any    `json:"tool_calls"`
-	ToolCallID    string `json:"tool_call_id"`
-	CreatedAt     int64  `json:"createdAt"`
-	LocalOnly     bool   `json:"local_only"`
+	Role          string         `json:"role"`
+	ID            string         `json:"id"`
+	Origin        string         `json:"origin"`
+	Model         string         `json:"model"`
+	Provider      string         `json:"provider"`
+	Usage         map[string]any `json:"usage"`
+	Content       any            `json:"content"`
+	RawContent    string         `json:"raw_content"`
+	ToolCalls     any            `json:"tool_calls"`
+	ToolCallID    string         `json:"tool_call_id"`
+	CreatedAt     int64          `json:"createdAt"`
+	LocalOnly     bool           `json:"local_only"`
 	ToolExecution *struct {
 		ExitCode *int `json:"exitCode"`
 	} `json:"tool_execution"`
@@ -452,9 +455,22 @@ func ParseReasonixV4(path string) ([]model.Session, error) {
 			if msg.Role != "assistant" {
 				continue
 			}
+			if msg.Model != "" {
+				s.SetModel(msg.Provider, msg.Model)
+			}
+			if len(msg.Usage) > 0 {
+				applyUsageMap(&s, msg.Usage)
+			}
 			ranges.note(msg.ToolCalls)
 			calls, _ := msg.ToolCalls.([]any)
 			for _, c := range calls {
+				if name, _ := mapGet(c, "name").(string); name != "" {
+					s.AddToolCall(name, false)
+				} else if fn, ok := mapGet(c, "function").(map[string]any); ok {
+					if name, _ := fn["name"].(string); name != "" {
+						s.AddToolCall(name, false)
+					}
+				}
 				callID, _ := mapGet(c, "id").(string)
 				for _, rec := range reasonixWorkRecords([]any{c}, ts) {
 					if rec.Role == RoleCommand && callID != "" {
@@ -469,12 +485,16 @@ func ParseReasonixV4(path string) ([]model.Session, error) {
 				s.Touch(ts)
 				s.Messages = append(s.Messages, rec)
 			}
-			// A non-zero exit rides on the command, the way opencode's does.
-			if ex := msg.ToolExecution; ex != nil && ex.ExitCode != nil && *ex.ExitCode > 0 {
-				for _, i := range commandAt[msg.ToolCallID] {
-					s.Messages[i].Text += fmt.Sprintf("  → exit %d", *ex.ExitCode)
+			if ex := msg.ToolExecution; ex != nil && ex.ExitCode != nil {
+				if *ex.ExitCode != 0 {
+					s.ToolErrors++
 				}
-				delete(commandAt, msg.ToolCallID)
+				if *ex.ExitCode >= 0 {
+					for _, i := range commandAt[msg.ToolCallID] {
+						s.Messages[i].Text += fmt.Sprintf("  → exit %d", *ex.ExitCode)
+					}
+					delete(commandAt, msg.ToolCallID)
+				}
 			}
 			if text != "" && IndexToolOutput() {
 				s.Touch(ts)

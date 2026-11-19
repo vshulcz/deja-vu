@@ -145,9 +145,37 @@ func commandCodeMessage(s *model.Session, m map[string]any, exits commandExits) 
 	if role != "user" && role != "assistant" {
 		return
 	}
+	if role == "assistant" {
+		if id := firstNonEmptyStr(str(msg["model"]), str(m["model"])); id != "" {
+			s.SetModel(firstNonEmptyStr(str(msg["provider"]), str(m["provider"])), id)
+		}
+		for _, cand := range []any{msg["usage"], m["usage"], msg["tokens"], m["tokens"], msg["token_usage"], m["token_usage"]} {
+			if u, ok := cand.(map[string]any); ok && len(u) > 0 {
+				applyUsageMap(s, u)
+				break
+			}
+		}
+	}
 	t := parseTimeAny(m["timestamp"])
 	s.Touch(t)
 	content := msg["content"]
+	if items, ok := content.([]any); ok {
+		for _, it := range items {
+			b, _ := it.(map[string]any)
+			switch b["type"] {
+			case "tool_use":
+				if name := str(b["name"]); name != "" {
+					s.AddToolCall(name, false)
+				}
+			case "tool_result":
+				code, hasCode := commandCodeExitCode(b)
+				isErr, _ := b["is_error"].(bool)
+				if isErr || (hasCode && code != 0) {
+					s.ToolErrors++
+				}
+			}
+		}
+	}
 	txt, toolOut := textFromContentKind(content)
 	if toolOut {
 		role = RoleToolOutput
@@ -179,38 +207,53 @@ func commandCodeMessage(s *model.Session, m map[string]any, exits commandExits) 
 	}
 }
 
-// commandCodeExitCode reads the status Command Code opens a failed command's
-// result with: "Exit code: N", or "Exit code: N (<meaning>)" for a code it
-// knows, such as grep's 1 (formatShellCommandResult). A clean run has no such
-// line, and no result carries is_error (#4539).
+// commandCodeExitCode reads the status Command Code opens a command's result
+// with: "Exit code: N", or "Exit code: N (<meaning>)". Bare output without
+// that header keeps no synthetic exit code.
 func commandCodeExitCode(result map[string]any) (int, bool) {
 	line := firstLine(contentText(result["content"]))
 	if at := strings.Index(line, " ("); at > 0 && strings.HasSuffix(line, ")") {
 		line = line[:at]
 	}
-	code, ok := statusCode(line, "Exit code: ", "")
-	return code, ok && code != 0
+	return statusCode(line, "Exit code: ", "")
 }
 
-// commandCodeExitResumes is the #4443 rule for Command Code's v3 envelopes: a
-// tail holding the failed result of a call stored already is read whole, or
-// the call never gets its exit; a clean one is let go.
-var commandCodeExitResumes = resumesUnlessAnswering(`"tool_`, func(m map[string]any) ([]string, string) {
+// commandCodeExitResumes is the #4443/#5527 rule for Command Code's v3
+// envelopes: a tail holding an exit-bearing result of a command call stored
+// before offset triggers a whole-file read so the command gets its exit code.
+var commandCodeExitResumes = resumesUnlessSettling(`"tool_`, func(m map[string]any) (calls, failed, clean []string) {
 	msg, _ := m["message"].(map[string]any)
 	items, _ := msg["content"].([]any)
-	var calls []string
 	for _, it := range items {
 		p, _ := it.(map[string]any)
 		switch p["type"] {
 		case "tool_use":
-			calls = append(calls, str(p["id"]))
+			if id := str(p["id"]); id != "" {
+				calls = append(calls, id)
+			}
 		case "tool_result":
-			if _, failed := commandCodeExitCode(p); failed && str(p["tool_use_id"]) != "" {
-				return calls, str(p["tool_use_id"])
+			id := str(p["tool_use_id"])
+			if id == "" {
+				continue
+			}
+			if code, ok := commandCodeExitCode(p); ok {
+				if code != 0 {
+					failed = append(failed, id)
+				} else {
+					clean = append(clean, id)
+				}
 			}
 		}
 	}
-	return calls, ""
+	return calls, failed, clean
+}, func(line []byte) []string {
+	msg, _ := decodeJSONLine(line)["message"].(map[string]any)
+	cmds := commandCallsIn(msg["content"], commandCodeDialect)
+	ids := make([]string, 0, len(cmds))
+	for _, c := range cmds {
+		ids = append(ids, c.ID)
+	}
+	return ids
 })
 
 // commandCodeProject names the project from the header's cwd when it has one;

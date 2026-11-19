@@ -306,13 +306,17 @@ func (p FixPair) MachineFact() bool {
 	if p.Candidate || p.Command == "" || (!p.Repaired && !p.Substitute) {
 		return false
 	}
-	low := strings.ToLower(p.Error)
+	return isShellOrEnvError(p.Error)
+}
+
+func isShellOrEnvError(errLine string) bool {
+	low := strings.ToLower(errLine)
 	for _, phrase := range envPhrases {
 		if strings.Contains(low, phrase) {
 			return true
 		}
 	}
-	return IsShellDiagnostic(p.Error)
+	return IsShellDiagnostic(errLine)
 }
 
 // repetitionConfirms reports whether a second sighting is evidence for this
@@ -497,15 +501,41 @@ func outputFailed(ms []model.Message, cmd int) bool {
 // A session that printed an error without running anything — a build step the
 // harness ran itself — has none, and gets "".
 func commandBefore(ms []model.Message, i int) string {
+	outputs := 1
 	for k := i - 1; k >= 0 && k >= i-fixOutputWindow; k-- {
 		if ms[k].Role == roleCommand {
-			return strings.TrimSpace(firstLineOf(ms[k].Text))
+			if outputs > 1 && !commandBatchCovers(ms, k, outputs) && !commandFailed(ms[k].Text) && !outputReadsAsFailure(ms[k+1].Text) {
+				return ""
+			}
+			return strings.TrimSpace(withoutExitStatus(firstLineOf(ms[k].Text)))
 		}
 		if ms[k].Role != roleToolOutput {
 			return ""
 		}
+		outputs++
 	}
 	return ""
+}
+
+// commandBatchCovers reports whether the command block ending at k holds at
+// least outputs commands, as in a batch turn that logs every tool call before
+// any of their outputs.
+func commandBatchCovers(ms []model.Message, k, outputs int) bool {
+	cmds := 0
+	for ; k >= 0; k-- {
+		if ms[k].Role == roleCommand {
+			cmds++
+			if cmds >= outputs {
+				return true
+			}
+			continue
+		}
+		if ms[k].Role == "files" || ms[k].Role == roleEdit {
+			continue
+		}
+		return false
+	}
+	return false
 }
 
 // fixPairsIn mines one session.
@@ -549,7 +579,7 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 			if ms[j].Role != roleCommand {
 				continue
 			}
-			cmd := strings.TrimSpace(firstLineOf(ms[j].Text))
+			cmd := strings.TrimSpace(withoutExitStatus(firstLineOf(ms[j].Text)))
 			if cmd == "" || len(cmd) > fixCommandMax || opensMoreInput(cmd) {
 				// A heredoc or pasted script right after the error is not the
 				// remedy; keep scanning the window for the real one-liner two
@@ -619,6 +649,9 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 			if editVerifiedByCommand(env, edited, cmd) {
 				editVerified = true
 				break
+			}
+			if failedCmd != "" && normalizeCommand(failedCmd) == normalizeCommand(cmd) {
+				continue
 			}
 			if !repaired && !substituted && investigationCommand(cmd) {
 				continue

@@ -227,6 +227,21 @@ func parseQwenScan(path string, scan func(func(map[string]any)) error) ([]model.
 					role = typ
 				}
 			}
+			if role == "assistant" {
+				modelName, _ := m["model"].(string)
+				if modelName == "" {
+					modelName, _ = msg["model"].(string)
+				}
+				if modelName != "" {
+					s.SetModel("", modelName)
+				}
+				for _, cand := range []any{m["usageMetadata"], msg["usageMetadata"], m["usage"], msg["usage"], m["tokens"], msg["tokens"]} {
+					if u, ok := cand.(map[string]any); ok && len(u) > 0 {
+						applyUsageMap(&s, u)
+						break
+					}
+				}
+			}
 			text = qwenText(msg["parts"])
 		}
 		if text != "" {
@@ -236,6 +251,7 @@ func parseQwenScan(path string, scan func(func(map[string]any)) error) ([]model.
 		// functionResponse rather than text, so qwenText walked past it and
 		// the commands a session ran were reachable from nothing.
 		if msg, ok := m["message"].(map[string]any); ok {
+			qwenCountToolCalls(&s, msg["parts"])
 			start := len(s.Messages)
 			s.Messages = append(s.Messages, qwenWorkRecords(msg["parts"], t)...)
 			qwenNoteShellCalls(&s, msg["parts"], start, shellAt)
@@ -341,9 +357,24 @@ func qwenNoteShellCalls(s *model.Session, parts any, start int, shellAt map[stri
 	}
 }
 
-// qwenNoteExits appends a non-zero exit to the command a functionResponse
-// among parts answers. Qwen writes Gemini's footer: "Exit Code: 128" after
-// the output, under `error` when the call failed.
+// qwenCountToolCalls records every tool invocation in parts.
+func qwenCountToolCalls(s *model.Session, parts any) {
+	items, _ := parts.([]any)
+	for _, part := range items {
+		p, _ := part.(map[string]any)
+		call, ok := p["functionCall"].(map[string]any)
+		if !ok {
+			continue
+		}
+		if name, _ := call["name"].(string); name != "" {
+			s.AddToolCall(name, false)
+		}
+	}
+}
+
+// qwenNoteExits counts tool errors and stamps command exit codes for each
+// functionResponse among parts. Qwen writes Gemini's footer: "Exit Code: 0" or
+// "Exit Code: 128" after output, or under `error` when the call failed.
 func qwenNoteExits(s *model.Session, parts any, shellAt map[string]int) {
 	items, _ := parts.([]any)
 	for _, part := range items {
@@ -352,19 +383,23 @@ func qwenNoteExits(s *model.Session, parts any, shellAt map[string]int) {
 		if !ok {
 			continue
 		}
+		r, _ := resp["response"].(map[string]any)
+		out, _ := r["output"].(string)
+		errOut, _ := r["error"].(string)
+		code, hasExit := geminiExitCodeKnown(out)
+		if !hasExit {
+			code, hasExit = geminiExitCodeKnown(errOut)
+		}
+		errTrim := strings.TrimSpace(errOut)
+		if (hasExit && code != 0) || (errTrim != "" && errTrim != "(none)") {
+			s.ToolErrors++
+		}
 		id, _ := resp["id"].(string)
 		i, ok := shellAt[id]
 		if !ok {
 			continue
 		}
-		r, _ := resp["response"].(map[string]any)
-		out, _ := r["output"].(string)
-		code := geminiExitCode(out)
-		if code == 0 {
-			errOut, _ := r["error"].(string)
-			code = geminiExitCode(errOut)
-		}
-		if code > 0 {
+		if hasExit && code >= 0 && !strings.Contains(s.Messages[i].Text, "  → exit ") {
 			s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
 		}
 		delete(shellAt, id)

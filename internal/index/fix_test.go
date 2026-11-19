@@ -4,7 +4,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 )
@@ -218,17 +217,11 @@ func TestFixPairsDropARemedyThatIsTheFailure(t *testing.T) {
 	dir := t.TempDir()
 	buildFixes(dir, []model.Session{s}, func(m model.Session) string { return m.Harness + ":" + m.ID })
 
-	stored := ReadFixes(dir)
-	if len(stored) == 0 {
-		t.Skip("nothing mined from the fixture; the miner's own rules changed")
+	if got := FixesFor(dir, "fatal: not a repository (or any of the parent directories)", 3, nil); len(got) != 0 {
+		t.Fatalf("served a remedy that is the failing command: ran %q after %q", got[0].Command, got[0].Failed)
 	}
-	for _, p := range stored {
-		if !strings.Contains(p.Error, "not a repository") {
-			continue
-		}
-		if got := FixesFor(dir, p.Error, 3, nil); len(got) != 0 {
-			t.Fatalf("served a remedy that is the failing command: ran %q after %q", got[0].Command, got[0].Failed)
-		}
+	if !remedyIsTheFailure(FixPair{Failed: "$ " + cmd + "  → exit 128", Command: "$ " + cmd}) {
+		t.Fatal("remedyIsTheFailure stopped catching stored identical remedies")
 	}
 
 	// The control: the same shape with the command actually corrected is still
@@ -250,6 +243,60 @@ func TestFixPairsDropARemedyThatIsTheFailure(t *testing.T) {
 	}
 	if got := FixesFor(dir2, kept[0].Error, 3, nil); len(got) == 0 {
 		t.Fatal("a corrected command is the remedy this surface is for, and it was dropped")
+	}
+
+	// Explicit clean exit on the retry (now emitted across harnesses) still drops identical retries.
+	sExit0 := model.Session{
+		Harness: "claude", ID: "s3",
+		Messages: []model.Message{
+			{Role: roleCommand, Text: "$ " + cmd + "  → exit 128", Time: now},
+			{Role: roleToolOutput, Text: "fatal: not a repository (or any of the parent directories)", Time: now.Add(time.Second)},
+			{Role: roleCommand, Text: "$ " + cmd + "  → exit 0", Time: now.Add(2 * time.Second)},
+			{Role: roleToolOutput, Text: "M internal/index/fixpair.go", Time: now.Add(3 * time.Second)},
+		},
+	}
+	dirExit0 := t.TempDir()
+	buildFixes(dirExit0, []model.Session{sExit0}, func(m model.Session) string { return m.Harness + ":" + m.ID })
+	if got := FixesFor(dirExit0, "fatal: not a repository (or any of the parent directories)", 3, nil); len(got) != 0 {
+		t.Fatalf("served identical retry with exit 0: %+v", got)
+	}
+
+	// Unstamped retries (e.g. kimi) are also dropped.
+	sUnstamped := model.Session{
+		Harness: "kimi", ID: "s4",
+		Messages: []model.Message{
+			{Role: roleCommand, Text: "$ " + cmd, Time: now},
+			{Role: roleToolOutput, Text: "fatal: not a repository (or any of the parent directories)", Time: now.Add(time.Second)},
+			{Role: roleCommand, Text: "$ " + cmd, Time: now.Add(2 * time.Second)},
+			{Role: roleToolOutput, Text: "M internal/index/fixpair.go", Time: now.Add(3 * time.Second)},
+		},
+	}
+	dirUnstamped := t.TempDir()
+	buildFixes(dirUnstamped, []model.Session{sUnstamped}, func(m model.Session) string { return m.Harness + ":" + m.ID })
+	if got := FixesFor(dirUnstamped, "fatal: not a repository (or any of the parent directories)", 3, nil); len(got) != 0 {
+		t.Fatalf("served identical unstamped retry: %+v", got)
+	}
+
+	// Consecutive uncommanded env errors solved by the same generic command keep remedies for both errors.
+	sEnv := model.Session{
+		Harness: "claude", ID: "s5", Project: "p",
+		Messages: []model.Message{
+			{Role: roleToolOutput, Text: "ModuleNotFoundError: No module named 'alpha'", Time: now},
+			{Role: roleCommand, Text: "$ uv sync  → exit 0", Time: now.Add(time.Minute)},
+			{Role: roleToolOutput, Text: "ok", Time: now.Add(2 * time.Minute)},
+			{Role: roleToolOutput, Text: "ModuleNotFoundError: No module named 'beta'", Time: now.Add(3 * time.Minute)},
+			{Role: roleCommand, Text: "$ uv sync  → exit 0", Time: now.Add(4 * time.Minute)},
+			{Role: roleToolOutput, Text: "ok", Time: now.Add(5 * time.Minute)},
+		},
+	}
+	dirEnv := t.TempDir()
+	buildFixes(dirEnv, []model.Session{sEnv, sEnv}, func(m model.Session) string { return m.Harness + ":" + m.ID })
+	sigs := map[uint64]bool{}
+	for _, p := range ReadFixes(dirEnv) {
+		sigs[p.Sig] = true
+	}
+	if len(sigs) != 2 {
+		t.Fatalf("env generic remedy kept for %d error(s), want 2", len(sigs))
 	}
 }
 
@@ -306,5 +353,96 @@ func TestShellOnlySigsAndTheSameFailingCommand(t *testing.T) {
 	}
 	if IsShellDiagnostic("") || IsShellDiagnostic("psql: error: connection refused") {
 		t.Error("IsShellDiagnostic matched non-shell output")
+	}
+}
+
+func TestFixPairMiningStripsExitMarkersAcrossSessions(t *testing.T) {
+	if repairedVariant("$ go test ./...  → exit 1", "$ go test ./...  → exit 0") {
+		t.Fatal("repairedVariant treated identical commands with different exit markers as a repair")
+	}
+
+	now := time.Now().UTC()
+	sessions := []model.Session{
+		{
+			Harness: "claude", ID: "s1",
+			Messages: []model.Message{
+				{Role: roleCommand, Text: "$ psql -c 'select 1'  → exit 2", Time: now},
+				{Role: roleToolOutput, Text: "psql: error: connection refused", Time: now.Add(time.Second)},
+				{Role: roleCommand, Text: "$ brew services start postgresql  → exit 0", Time: now.Add(2 * time.Second)},
+				{Role: roleToolOutput, Text: "Successfully started postgresql", Time: now.Add(3 * time.Second)},
+			},
+		},
+		{
+			Harness: "kimi", ID: "s2",
+			Messages: []model.Message{
+				{Role: roleCommand, Text: "$ psql -c 'select 1'", Time: now.Add(time.Minute)},
+				{Role: roleToolOutput, Text: "psql: error: connection refused", Time: now.Add(time.Minute + time.Second)},
+				{Role: roleCommand, Text: "$ brew services start postgresql", Time: now.Add(time.Minute + 2*time.Second)},
+				{Role: roleToolOutput, Text: "Successfully started postgresql", Time: now.Add(time.Minute + 3*time.Second)},
+			},
+		},
+	}
+	dir := t.TempDir()
+	buildFixes(dir, sessions, func(m model.Session) string { return m.Harness + ":" + m.ID })
+
+	stored := FixesFor(dir, "psql: error: connection refused", 5, nil)
+	if len(stored) != 1 {
+		t.Fatalf("fixes = %d, want 1 deduplicated confirmed pair: %+v", len(stored), stored)
+	}
+	if stored[0].Command != "$ brew services start postgresql" {
+		t.Errorf("stored Command = %q, want stripped of exit marker", stored[0].Command)
+	}
+	if stored[0].Candidate {
+		t.Errorf("cross-harness pair with exit 0 in first session stayed Candidate: %+v", stored[0])
+	}
+}
+
+func TestRepairedPairAnswersSharedSecondaryLineOnlyWhenActionable(t *testing.T) {
+	now := time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC)
+
+	pipMsgs := []model.Message{
+		{Role: roleCommand, Text: "$ pip3 install vllm==0.6.3  → exit 1", Time: now},
+		{Role: roleToolOutput, Text: "ERROR: Could not find a version that satisfies the requirement vllm==0.6.3 (from versions: none)\nERROR: No matching distribution found for vllm==0.6.3", Time: now.Add(time.Second)},
+		{Role: roleCommand, Text: "$ pip3 install --index-url https://mirror.example.internal/simple vllm==0.6.3  → exit 0", Time: now.Add(2 * time.Second)},
+		{Role: roleToolOutput, Text: "Successfully installed vllm-0.6.3", Time: now.Add(3 * time.Second)},
+	}
+	pipDir := t.TempDir()
+	buildFixes(pipDir, []model.Session{{Harness: "claude", ID: "pip-1", Messages: pipMsgs}}, func(s model.Session) string {
+		return s.Harness + ":" + s.ID
+	})
+	pipGot := FixesFor(pipDir, "ERROR: No matching distribution found for vllm==0.6.3", 3, nil)
+	if len(pipGot) == 0 || pipGot[0].Command != "$ pip3 install --index-url https://mirror.example.internal/simple vllm==0.6.3" {
+		t.Fatalf("pip secondary line = %+v, want mirror install", pipGot)
+	}
+
+	testMsgs := []model.Message{
+		{Role: roleCommand, Text: "$ go test -run TestAlphaFailure ./pkg/svc  → exit 1", Time: now},
+		{Role: roleToolOutput, Text: "--- FAIL: TestAlphaFailure (0.01s)\npkg/svc: permission denied", Time: now.Add(time.Second)},
+		{Role: roleCommand, Text: "$ go test -run TestAlphaFailure -v ./pkg/svc  → exit 0", Time: now.Add(2 * time.Second)},
+		{Role: roleToolOutput, Text: "PASS", Time: now.Add(3 * time.Second)},
+	}
+	testDir := t.TempDir()
+	buildFixes(testDir, []model.Session{{Harness: "claude", ID: "go-1", Messages: testMsgs}}, func(s model.Session) string {
+		return s.Harness + ":" + s.ID
+	})
+	if testGot := FixesFor(testDir, "pkg/svc: permission denied", 3, nil); len(testGot) != 0 {
+		t.Fatalf("test-flag tweak answered secondary error line: %+v", testGot)
+	}
+
+	shellMsgs := []model.Message{
+		{Role: roleCommand, Text: "$ timeout 30 deploy-tool stage-west  → exit 127", Time: now},
+		{Role: roleToolOutput, Text: "zsh:1: command not found: timeout\ndeploy-tool: permission denied: stage-west", Time: now.Add(time.Second)},
+		{Role: roleCommand, Text: "$ deploy-tool stage-west  → exit 0", Time: now.Add(2 * time.Second)},
+		{Role: roleToolOutput, Text: "deployed stage-west", Time: now.Add(3 * time.Second)},
+	}
+	shellDir := t.TempDir()
+	buildFixes(shellDir, []model.Session{{Harness: "claude", ID: "sh-1", Messages: shellMsgs}}, func(s model.Session) string {
+		return s.Harness + ":" + s.ID
+	})
+	if shellGot := FixesFor(shellDir, "deploy-tool: permission denied: stage-west", 3, nil); len(shellGot) != 0 {
+		t.Fatalf("shell repair answered non-shell secondary line without matching command: %+v", shellGot)
+	}
+	if cmdGot := FixesForCommand(shellDir, "timeout 30 deploy-tool stage-west", "deploy-tool: permission denied: stage-west", 3, nil); len(cmdGot) == 0 || cmdGot[0].Command != "$ deploy-tool stage-west" {
+		t.Fatalf("FixesForCommand sameFailingCommand = %+v, want $ deploy-tool stage-west", cmdGot)
 	}
 }

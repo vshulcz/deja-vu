@@ -749,7 +749,7 @@ func TestHermesToolCallsBecomeWorkRecords(t *testing.T) {
 		by[m.Role] = append(by[m.Role], m.Text)
 	}
 	want := map[string][]string{
-		RoleCommand:    {"$ go test ./...", "$ make build  → exit 1"},
+		RoleCommand:    {"$ go test ./...  → exit 0", "$ make build  → exit 1"},
 		RoleFiles:      {"/tmp/proj/retry.py", "/tmp/proj/retry.py", "/tmp/proj/a.py"},
 		RoleEdit:       {"/tmp/proj/retry.py\nraise NotImplementedError", "/tmp/proj/a.py\nold_value = compute_the_old_way()"},
 		RoleToolOutput: {"notes.txt", "SyntaxError: bad"},
@@ -827,7 +827,7 @@ func TestHermesCommandThatNeverRanIsNoCommand(t *testing.T) {
 		 ('s','assistant','',NULL,'[{"id":"c2","type":"function","function":{"name":"terminal","arguments":"{\"command\": \"make build\"}"}}]',NULL,1785000003.0),
 		 ('s','tool','{"output": "ok", "exit_code": 0, "error": null}','c2',NULL,'terminal',1785000004.0);`)
 	by := hermesRoles(t, db)
-	if got := strings.Join(by[RoleCommand], "|"); got != "$ make build" {
+	if got := strings.Join(by[RoleCommand], "|"); got != "$ make build  → exit 0" {
 		t.Errorf("commands = %q, want only the one that ran", by[RoleCommand])
 	}
 	if !strings.Contains(strings.Join(by[RoleToolOutput], "|"), "Command denied") {
@@ -967,7 +967,7 @@ func TestHermesRepeatedCallIDKeepsBothRuns(t *testing.T) {
 		 ('s','assistant','',NULL,`+call+`,NULL,1785000010.0),
 		 ('s','tool','{"output": "ok  example/pool 0.2s", "exit_code": 0}','call_3f1a2b4c5d6e',NULL,'terminal',1785000011.0);`)
 	by := hermesRoles(t, db)
-	if got := strings.Join(by[RoleCommand], "|"); got != "$ go test ./...  → exit 1|$ go test ./..." {
+	if got := strings.Join(by[RoleCommand], "|"); got != "$ go test ./...  → exit 1|$ go test ./...  → exit 0" {
 		t.Errorf("commands = %q", by[RoleCommand])
 	}
 	if got := strings.Join(by[RoleToolOutput], "|"); got != "FAIL pool_test.go:12|ok  example/pool 0.2s" {
@@ -1091,7 +1091,7 @@ func TestHermesRepeatAfterCompactionIsKept(t *testing.T) {
 	if got := strings.Join(by["assistant"], "|"); got != "still failing" {
 		t.Errorf("assistant = %q", by["assistant"])
 	}
-	if got := strings.Join(by[RoleCommand], "|"); got != "$ go test ./...  → exit 1|$ go test ./..." {
+	if got := strings.Join(by[RoleCommand], "|"); got != "$ go test ./...  → exit 1|$ go test ./...  → exit 0" {
 		t.Errorf("commands = %q", by[RoleCommand])
 	}
 	if got := strings.Join(by[RoleToolOutput], "|"); got != "FAIL pool_test.go:12|ok  example/pool 0.2s" {
@@ -1221,7 +1221,7 @@ func TestHermesRerunAfterEmptyTail(t *testing.T) {
 		 ('s','assistant','',NULL,`+call+`,NULL,200.0,1,0),
 		 ('s','tool','{"output": "ok  example/pool 0.2s", "exit_code": 0}','call_3f1a2b4c5d6e',NULL,'terminal',201.0,1,0);`)
 	by := hermesRoles(t, db)
-	if got := strings.Join(by[RoleCommand], "|"); got != "$ go test ./...  → exit 1|$ go test ./..." {
+	if got := strings.Join(by[RoleCommand], "|"); got != "$ go test ./...  → exit 1|$ go test ./...  → exit 0" {
 		t.Errorf("commands = %q", by[RoleCommand])
 	}
 	if got := strings.Join(by[RoleToolOutput], "|"); got != "FAIL pool_test.go:12|ok  example/pool 0.2s" {

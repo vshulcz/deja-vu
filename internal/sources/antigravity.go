@@ -343,16 +343,22 @@ func parseAntigravityWithOffset(path string, offset int64, scan func(func(map[st
 		}
 		var calls []model.Message
 		if role == "assistant" {
+			antigravityTelemetry(&s, m)
 			var c string
 			calls, c = antigravityToolCalls(m["tool_calls"], t)
 			if cwd == "" {
 				cwd = c
 			}
-			if calls, _ := m["tool_calls"].([]any); len(calls) > 0 {
+			if rawCalls, _ := m["tool_calls"].([]any); len(rawCalls) > 0 {
+				for _, tc := range rawCalls {
+					if cm, _ := tc.(map[string]any); cm != nil {
+						s.AddToolCall(str(cm["name"]), false)
+					}
+				}
 				// A planner row's steps follow it before the next row: a
 				// write still waiting here is one whose step failed.
 				clear(pendingWrites)
-				antigravityNoteWrites(m["tool_calls"], pendingWrites)
+				antigravityNoteWrites(rawCalls, pendingWrites)
 			}
 		}
 		text, _ := m["content"].(string)
@@ -388,7 +394,7 @@ func parseAntigravityWithOffset(path string, offset int64, scan func(func(map[st
 		// only the source made shell dumps into assistant speech: 333 of 369
 		// MODEL rows on this machine, 90%, ranked as things the agent said.
 		if role == "assistant" {
-			if str(m["status"]) == "ERROR" && strings.Contains(text, "Encountered error in tool execution: tool call denied") {
+			if antigravityToolCallDenied(str(m["status"]), text) {
 				s.Messages, running, asked = antigravityDropDeniedCall(s.Messages, running, asked)
 				return
 			}
@@ -405,8 +411,16 @@ func parseAntigravityWithOffset(path string, offset int64, scan func(func(map[st
 				}
 				s.Messages = append(s.Messages, rec)
 			}
+			stepFailed := false
 			if code, ok := antigravityExitCode(str(m["type"]), text); ok {
+				if code != 0 {
+					s.ToolErrors++
+					stepFailed = true
+				}
 				running = antigravityStampExit(s.Messages, running, asked, own, antigravityField(text, "Task Description:"), code)
+			}
+			if !stepFailed && str(m["status"]) == "ERROR" && str(m["type"]) != "COMMAND_STATUS" {
+				s.ToolErrors++
 			}
 			if str(m["type"]) == "CODE_ACTION" && str(m["status"]) == "DONE" {
 				s.Messages = append(s.Messages, antigravityTakeWrite(text, step, pendingWrites, t)...)
@@ -452,7 +466,7 @@ func antigravityResumes(path string, offset int64) bool {
 			return
 		}
 		text := capParsedMessage(str(m["content"]))
-		if str(m["status"]) == "ERROR" && strings.Contains(text, "Encountered error in tool execution: tool call denied") {
+		if antigravityToolCallDenied(str(m["status"]), text) {
 			ok = false
 			return
 		}
@@ -463,6 +477,47 @@ func antigravityResumes(path string, offset int64) bool {
 		}
 	})
 	return ok
+}
+
+func antigravityToolCallDenied(status, text string) bool {
+	return status == "ERROR" && (strings.Contains(text, "Encountered error in tool execution: tool call denied") || strings.Contains(text, "Encountered error in step execution: tool call denied"))
+}
+
+func antigravityTelemetry(s *model.Session, m map[string]any) {
+	extract := func(src map[string]any) {
+		if src == nil {
+			return
+		}
+		switch mv := src["model"].(type) {
+		case string:
+			if mv != "" {
+				s.SetModel("", mv)
+			}
+		case map[string]any:
+			prov := str(mv["provider"])
+			id := str(mv["id"])
+			if id == "" {
+				id = str(mv["model"])
+			}
+			if id == "" {
+				id = str(mv["model_id"])
+			}
+			s.SetModel(prov, id)
+		}
+		if mn := str(src["model_name"]); mn != "" {
+			s.SetModel("", mn)
+		}
+		for _, k := range []string{"usage", "usage_metadata", "usageMetadata", "token_usage"} {
+			if u, _ := src[k].(map[string]any); u != nil {
+				applyUsageMap(s, u)
+				break
+			}
+		}
+	}
+	extract(m)
+	if meta, _ := m["metadata"].(map[string]any); meta != nil {
+		extract(meta)
+	}
 }
 
 // seedAntigravityBefore populates fromCalls, pendingWrites, cwd, and started
@@ -567,7 +622,16 @@ func antigravityDropDeniedCall(msgs []model.Message, running []int, asked int) (
 }
 
 func antigravityResolveProject(s *model.Session, path, cwd, subWorkspace, parent string, fromOffset bool) {
+	if !fromOffset {
+		if p := projectFromPaths(s.Messages); !isHomeOrEmptyProject(p) {
+			s.Project = p
+			return
+		}
+	}
 	if !isHomeOrEmptyProject(s.Project) {
+		if fromOffset && projectFromPaths(s.Messages) == "" {
+			s.ProjectFromDir = true
+		}
 		return
 	}
 	if p := antigravityProjectFromFiles(s.Messages); p != "" {
@@ -756,13 +820,17 @@ func antigravityExitCode(kind, text string) (int, bool) {
 	}
 	for line := range strings.SplitSeq(text, "\n") {
 		line = strings.TrimSpace(line)
-		// The header ends where the output starts, "Output:" or the
-		// Stdout:/Stderr: pair; a line in the output is not the status.
-		if line == "Output:" || strings.HasPrefix(line, "Stdout:") || strings.HasPrefix(line, "Stderr:") {
+		// The header ends where the output starts, "Output:", "Command output:",
+		// or the Stdout:/Stderr: pair; a line in the output is not the status.
+		if line == "Output:" || line == "Command output:" || strings.HasPrefix(line, "Stdout:") || strings.HasPrefix(line, "Stderr:") {
 			break
 		}
-		if code, ok := statusCode(line, "The command exited with code ", "."); ok {
-			return code, true
+		for _, prefix := range []string{"The command exited with code ", "Command exited with code "} {
+			for _, suffix := range []string{".", ""} {
+				if code, ok := statusCode(line, prefix, suffix); ok {
+					return code, true
+				}
+			}
 		}
 		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
 			if _, rest, ok := strings.Cut(line, "exit="); ok {
@@ -776,7 +844,7 @@ func antigravityExitCode(kind, text string) (int, bool) {
 				if num == "-1" {
 					return 1, true
 				}
-				if code, ok := statusCode(num, "", ""); ok && code != 0 {
+				if code, ok := statusCode(num, "", ""); ok {
 					return code, true
 				}
 			}
@@ -1116,6 +1184,7 @@ func antigravityBody(text string) string {
 // from any `--project` query — and the workspace was sitting in plain JSON in
 // a directory deja already walks, no protobuf involved.
 func antigravityProject(id string) string {
+	fallback := ""
 	for _, root := range AntigravityRoots() {
 		p := filepath.Join(root, "cache", "conversation_metadata.json")
 		b, err := os.ReadFile(p)
@@ -1132,13 +1201,25 @@ func antigravityProject(id string) string {
 		if json.Unmarshal(b, &doc) != nil {
 			continue
 		}
-		for key, c := range doc.Conversations {
-			if !strings.HasPrefix(key, id) && !strings.HasPrefix(id, key) {
-				continue
+		keys := make([]string, 0, len(doc.Conversations))
+		for key := range doc.Conversations {
+			if strings.HasPrefix(key, id) || strings.HasPrefix(id, key) {
+				keys = append(keys, key)
 			}
-			for _, uri := range c.Summary.WorkspaceURIs {
-				if w, ok := fileURIPath(uri); ok {
-					return projectName(w)
+		}
+		slices.Sort(keys)
+		for _, key := range keys {
+			for _, uri := range doc.Conversations[key].Summary.WorkspaceURIs {
+				w, ok := fileURIPath(uri)
+				if !ok {
+					continue
+				}
+				proj := projectName(w)
+				if !isHomeOrEmptyProject(proj) {
+					return proj
+				}
+				if fallback == "" && proj != "" && proj != "-" {
+					fallback = proj
 				}
 			}
 		}
@@ -1156,14 +1237,28 @@ func antigravityProject(id string) string {
 		if json.Unmarshal(b, &byWorkspace) != nil {
 			continue
 		}
+		workspaces := make([]string, 0, len(byWorkspace))
 		for workspace, conv := range byWorkspace {
 			if workspace == "" {
 				continue
 			}
 			if strings.HasPrefix(conv, id) || strings.HasPrefix(id, conv) {
-				return projectName(workspace)
+				workspaces = append(workspaces, workspace)
 			}
 		}
+		slices.Sort(workspaces)
+		for _, workspace := range workspaces {
+			proj := projectName(workspace)
+			if !isHomeOrEmptyProject(proj) {
+				return proj
+			}
+			if fallback == "" && proj != "" && proj != "-" {
+				fallback = proj
+			}
+		}
+	}
+	if fallback != "" {
+		return fallback
 	}
 	return "-"
 }
