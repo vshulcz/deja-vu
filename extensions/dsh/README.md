@@ -2,9 +2,9 @@
 
 English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/zh.md) | [繁體中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/zh-TW.md) | [日本語](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/ja.md) | [한국어](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/ko.md) | [Español](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/es.md) | [Português](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/pt.md) | [Français](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/fr.md) | [Deutsch](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/de.md) | [Русский](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/ru.md) | [Türkçe](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/tr.md) | [हिन्दी](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/hi.md)
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=social)](https://github.com/vshulcz/deja-vu)
 
-Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S) · [Full documentation](../../README.md) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/)
+Part of **[★ vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S) · [Full documentation](../../README.md) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/)
 
 DeepSeek Harness (and DSH Desktop, `anywhere-labs/dsh-desktop`, which bundles the `dsh` runtime and web UI) can already search its own sessions — that is what the built-in
 `session-query` subsystem does. This plugin answers the other question: what you
