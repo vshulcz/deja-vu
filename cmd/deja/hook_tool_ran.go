@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -227,8 +228,12 @@ func coChangeCompanionIn(cwd, path string, metas []index.SessionMeta) (string, i
 	companionCounts := map[string]int{}
 	companionDisplay := map[string]string{}
 	focused := 0
-	tree := orientRepoTree(cwd)
-	checkDisk := tree.exists(orientPath(path, cwd)) || tree.exists(targetBase)
+	var tree repoFileTree
+	checkDisk := false
+	if !policy.SourceHintsOff() {
+		tree = orientRepoTree(cwd)
+		checkDisk = tree.exists(orientPath(path, cwd)) || tree.exists(targetBase)
+	}
 	for _, m := range metas {
 		key := m.Key()
 		if counted[key] {
@@ -341,7 +346,7 @@ func isAmbiguousCoChangeBase(low string) bool {
 // by scanning sibling test files in the same directory across Go, Python,
 // TS/JS, and Rust when session history has no prior verification command.
 func siblingTestLineFor(cwd, path string, editSymbols []string) string {
-	if path == "" || len(editSymbols) == 0 {
+	if policy.SourceHintsOff() || path == "" || len(editSymbols) == 0 {
 		return ""
 	}
 	diskPath := path

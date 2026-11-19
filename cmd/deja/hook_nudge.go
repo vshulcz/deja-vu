@@ -14,6 +14,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -63,72 +64,163 @@ func joinPromptAdvisories(parts ...string) string {
 // promptDirectContext performs live correction capture into .deja/memory.jsonl
 // and returns any high-precision repo-memory guardrail or verified error fix
 // matching the user's prompt.
-func promptDirectContext(dir, cwd, sessionID, asked string, prevAssistant ...string) string {
-	return promptDirectContextIn(dir, cwd, sessionID, asked, false, nil, prevAssistant...)
+func promptDirectContext(dir, cwd, sessionID, asked string) string {
+	return promptDirectContextIn(dir, cwd, sessionID, asked, false, nil)
 }
 
-func promptDirectContextIn(dir, cwd, sessionID, asked string, readOnly bool, skip map[string]bool, prevAssistant ...string) string {
-	if strings.TrimSpace(asked) == "" || digest.IsAgentArtifact(asked) {
-		return ""
+type promptAdvisoryItem struct {
+	line   string
+	tokens []string
+}
+
+func joinAdvisoryItems(items []promptAdvisoryItem) string {
+	lines := make([]string, 0, len(items))
+	for _, it := range items {
+		if it.line != "" {
+			lines = append(lines, it.line)
+		}
 	}
-	if !readOnly {
-		autoRecordPromptCorrection(cwd, sessionID, asked)
+	return strings.Join(lines, "\n")
+}
+
+func nonEmptyTokens(toks ...string) []string {
+	var out []string
+	for _, tok := range toks {
+		if tok != "" {
+			out = append(out, tok)
+		}
 	}
+	return out
+}
+
+func filterFreshPromptAdvisories(items []promptAdvisoryItem, latestSeen map[string]bool) ([]promptAdvisoryItem, []string) {
+	kept := make([]promptAdvisoryItem, 0, len(items))
+	var freshToks []string
+	seenTok := map[string]bool{}
+	for _, it := range items {
+		dup := false
+		for _, tok := range it.tokens {
+			if tok != "" && latestSeen[tok] {
+				dup = true
+				break
+			}
+		}
+		if dup {
+			continue
+		}
+		kept = append(kept, it)
+		for _, tok := range it.tokens {
+			if tok != "" && !seenTok[tok] {
+				seenTok[tok] = true
+				freshToks = append(freshToks, tok)
+			}
+		}
+	}
+	return kept, freshToks
+}
+
+func promptDirectContextIn(dir, cwd, sessionID, asked string, readOnly bool, skip map[string]bool) string {
 	var seen map[string]bool
 	if !readOnly {
 		seen = alreadyInjected(dir, sessionID)
 	}
-	var lines []string
-	var tokens []string
+	items := collectPromptDirectAdvisories(dir, cwd, sessionID, asked, readOnly, seen, skip)
+	if !readOnly && sessionID != "" {
+		if _, tokens := filterFreshPromptAdvisories(items, nil); len(tokens) > 0 {
+			rememberInjectedIDs(dir, sessionID, tokens...)
+		}
+	}
+	return joinAdvisoryItems(items)
+}
+
+func collectPromptDirectAdvisories(dir, cwd, sessionID, asked string, readOnly bool, seen, skip map[string]bool, prevAssistant ...string) []promptAdvisoryItem {
+	if strings.TrimSpace(asked) == "" || digest.IsAgentArtifact(asked) {
+		return nil
+	}
+	if !readOnly {
+		autoRecordPromptCorrection(cwd, sessionID, asked)
+	}
+	var items []promptAdvisoryItem
 	if srLine, srTok := sessionStandingRuleLine(dir, cwd, sessionID, asked, seen, prevAssistant...); srLine != "" {
-		lines = append(lines, srLine)
-		tokens = append(tokens, srTok)
+		items = append(items, promptAdvisoryItem{line: srLine, tokens: nonEmptyTokens(srTok)})
 	}
 	if rmLine, rmTok := promptRepoMemoryLine(cwd, asked, seen); rmLine != "" {
-		lines = append(lines, rmLine)
-		tokens = append(tokens, rmTok)
+		items = append(items, promptAdvisoryItem{line: rmLine, tokens: nonEmptyTokens(rmTok)})
 	}
 	if fxLine, fxTok := promptErrorFixLine(dir, cwd, asked, seen); fxLine != "" {
-		lines = append(lines, fxLine)
-		tokens = append(tokens, fxTok)
+		items = append(items, promptAdvisoryItem{line: fxLine, tokens: nonEmptyTokens(fxTok)})
 	}
 	namedSourceFile := false
 	if fbLine, fbToks := promptFileBriefLineIn(dir, cwd, asked, seen, skip); fbLine != "" {
-		lines = append(lines, fbLine)
-		tokens = append(tokens, fbToks...)
+		items = append(items, promptAdvisoryItem{line: fbLine, tokens: nonEmptyTokens(fbToks...)})
 		if head, _, _ := strings.Cut(fbLine, " — "); isLocalizableSourcePath(head, filepath.Base(head)) {
 			namedSourceFile = true
 		}
 	}
-	if len(lines) < 4 {
+	if len(items) < 4 {
 		sbLine, sbTok := promptSymbolBriefLine(cwd, asked, seen)
-		joined := strings.Join(lines, "\n")
+		joined := joinAdvisoryItems(items)
 		if sbLine != "" && (!namedSourceFile || lineAddsNewTargetPath(joined, sbLine)) {
 			if nudgeHasLocalizedGuidance(joined) && textHasLiveTestRecipe(joined) {
 				sbLine = dropLiveTestRecipeSuffix(sbLine)
 			}
-			lines = append(lines, sbLine)
-			tokens = append(tokens, sbTok)
+			items = append(items, promptAdvisoryItem{line: sbLine, tokens: nonEmptyTokens(sbTok)})
 		}
 	}
-	if len(lines) < 5 {
+	if len(items) < 5 {
 		if locLine, locToks := promptTaskTargetsLine(dir, cwd, asked, seen, skip); locLine != "" {
-			joined := strings.Join(lines, "\n")
+			joined := joinAdvisoryItems(items)
 			if !symbolBriefAlreadyCoversTarget(joined, locLine) && lineAddsNewTargetPath(joined, locLine) {
 				if nudgeHasLocalizedGuidance(joined) {
 					locLine = compactTargetSupplementLineWithPrefix(joined, locLine, "likely target: ", 3)
 				}
 				if locLine != "" {
-					lines = append(lines, locLine)
-					tokens = append(tokens, locToks...)
+					items = append(items, promptAdvisoryItem{line: locLine, tokens: nonEmptyTokens(locToks...)})
 				}
 			}
 		}
 	}
-	if !readOnly && sessionID != "" && len(tokens) > 0 {
-		rememberInjectedIDs(dir, sessionID, tokens...)
+	return items
+}
+
+func emitCommittedNudgeOnly(
+	dir, cwd, sessionID, asked string,
+	items []promptAdvisoryItem,
+	failNudge string,
+	ranked []model.Session,
+	matched, strong []int,
+	skip map[string]bool,
+	tryConsensus, plain bool,
+	stdout io.Writer,
+) error {
+	if len(items) == 0 && failNudge == "" && !tryConsensus {
+		return nil
 	}
-	return strings.Join(lines, "\n")
+	var rcLine, rcTok string
+	if tryConsensus && len(ranked) > 0 {
+		snapSeen := alreadyInjected(dir, sessionID)
+		rcLine, rcTok = rankedTouchedConsensusLineForPrompt(dir, cwd, asked, ranked, matched, strong, snapSeen, skip)
+	}
+	if len(items) == 0 && failNudge == "" && rcLine == "" {
+		return nil
+	}
+	releaseSeenLock, _ := holdHookseenLock(dir)
+	latest := alreadyInjected(dir, sessionID)
+	kept, freshToks := filterFreshPromptAdvisories(items, latest)
+	nudge := joinPromptAdvisories(joinAdvisoryItems(kept), failNudge)
+	if tryConsensus && rcLine != "" && (rcTok == "" || !latest[rcTok]) && lineAddsNewTargetPath(nudge, rcLine) {
+		if compact := compactTargetSupplementLine(nudge, rcLine); compact != "" {
+			nudge = joinPromptAdvisories(nudge, compact)
+			if rcTok != "" {
+				freshToks = append(freshToks, rcTok)
+			}
+		}
+	}
+	if sessionID != "" && len(freshToks) > 0 {
+		rememberInjectedIDs(dir, sessionID, freshToks...)
+	}
+	releaseSeenLock()
+	return emitNudgeOnly(stdout, plain, nudge)
 }
 
 func dropLiveTestRecipeSuffix(s string) string {
@@ -151,7 +243,25 @@ func dropLiveTestRecipeSuffix(s string) string {
 // file, giving the agent exact file:line, signature, and sibling test target at
 // Turn 0 without a grep/locate round-trip.
 func promptSymbolBriefLine(cwd, asked string, seen map[string]bool) (string, string) {
-	if cwd == "" || !policy.Load().Allows(policy.ActivationAuto, "") {
+	if cwd == "" || policy.SourceHintsOff() || !policy.Load().Allows(policy.ActivationAuto, "") {
+		return "", ""
+	}
+	checked := map[string]bool{}
+	type candToken struct {
+		tok   string
+		low   string
+		order int
+	}
+	var eligible []candToken
+	for i, tok := range identifierTokens(asked) {
+		low := strings.ToLower(tok)
+		if len(low) < 6 || checked[low] || !isSymbolLikeCaseOrUnderscore(tok) || isCommonKeyword(low) {
+			continue
+		}
+		checked[low] = true
+		eligible = append(eligible, candToken{tok: tok, low: low, order: i})
+	}
+	if len(eligible) == 0 {
 		return "", ""
 	}
 	pol := policy.Load()
@@ -164,31 +274,24 @@ func promptSymbolBriefLine(cwd, asked string, seen map[string]bool) (string, str
 		line  int
 		sig   string
 	}
-	checked := map[string]bool{}
 	var cands []symbolCand
-	toks := identifierTokens(asked)
-	useIdx := idx.numFiles > 0 && idx.numFiles < 2000
-	for i, tok := range toks {
-		low := strings.ToLower(tok)
-		if len(low) < 6 || checked[low] || !isSymbolLikeCaseOrUnderscore(tok) || isCommonKeyword(low) {
-			continue
-		}
-		checked[low] = true
+	useIdx := idx.numFiles > 0 || idx.capped
+	for _, item := range eligible {
 		if useIdx {
-			df := idx.declDF[low]
+			df := idx.declDF[item.low]
 			if df == 0 || df > 3 {
 				continue
 			}
-			loc, ok := idx.firstDecl[low]
+			loc, ok := idx.firstDecl[item.low]
 			if !ok || loc.rel == "" || loc.sig == "" {
 				continue
 			}
-			cands = append(cands, symbolCand{tok: tok, df: df, order: i, rel: loc.rel, line: loc.line, sig: loc.sig})
+			cands = append(cands, symbolCand{tok: item.tok, df: df, order: item.order, rel: loc.rel, line: loc.line, sig: loc.sig})
 			continue
 		}
-		rel, lineNo, sig := findSymbolDeclarationInRepo(cwd, tok)
+		rel, lineNo, sig := findSymbolDeclarationInRepo(cwd, item.tok)
 		if rel != "" && sig != "" {
-			cands = append(cands, symbolCand{tok: tok, df: 1, order: i, rel: rel, line: lineNo, sig: sig})
+			cands = append(cands, symbolCand{tok: item.tok, df: 1, order: item.order, rel: rel, line: lineNo, sig: sig})
 		}
 	}
 	sort.SliceStable(cands, func(i, j int) bool {
@@ -303,7 +406,12 @@ func promptFileBriefLineIn(dir, cwd, asked string, seen, skip map[string]bool) (
 	if cwd == "" {
 		return "", nil
 	}
-	tree := orientRepoTree(cwd)
+	getTree := sync.OnceValue(func() repoFileTree {
+		if policy.SourceHintsOff() {
+			return repoFileTree{}
+		}
+		return orientRepoTree(cwd)
+	})
 	projects := sync.OnceValue(func() []string { return cachedProjectNameCandidates(cwd) })
 	pol := policy.Load()
 	seenFiles := map[string]bool{}
@@ -317,8 +425,11 @@ func promptFileBriefLineIn(dir, cwd, asked string, seen, skip map[string]bool) (
 		if tok == "" || !looksLikePromptFileRef(tok) {
 			continue
 		}
+		cleanTok := filepath.ToSlash(filepath.Clean(tok))
 		rel := tok
-		if resolved := tree.resolveRel(tok); resolved != "" {
+		if cleanTok != "." && !filepath.IsAbs(tok) && !strings.HasPrefix(cleanTok, "../") && fileThere(filepath.Join(cwd, cleanTok)) {
+			rel = cleanTok
+		} else if resolved := getTree().resolveRel(tok); resolved != "" {
 			rel = resolved
 		} else if !fileThere(filepath.Join(cwd, tok)) {
 			continue
@@ -347,7 +458,7 @@ func promptFileBriefLineIn(dir, cwd, asked string, seen, skip map[string]bool) (
 			co = coupledCommitGuardForFiles(cwd, []string{rel})
 		}
 		ran := fileHookRanLineFor(dir, rel, inScope)
-		if ran == "" {
+		if ran == "" && !policy.SourceHintsOff() {
 			_, fileSyms := fileHookSymbols(cwd, rel, "")
 			ran = siblingTestLineFor(cwd, rel, fileSyms)
 		}
@@ -377,11 +488,18 @@ func promptFileBriefLineIn(dir, cwd, asked string, seen, skip map[string]bool) (
 // queries `deja recall` with a symbol name, file reference, compiler diagnostic,
 // or failing test output, giving all 44 agents live repo facts even with zero history.
 func liveRecallBrief(dir, cwd, query string) string {
+	return liveRecallBriefScoped(dir, cwd, "", 0, query)
+}
+
+func liveRecallBriefScoped(dir, cwd, project string, offset int, query string) string {
+	if policy.SourceHintsOff() || offset > 0 {
+		return ""
+	}
 	if cwd == "" {
 		cwd = howCwd()
 	}
 	query = strings.TrimSpace(query)
-	if cwd == "" || query == "" {
+	if cwd == "" || query == "" || looksLikeSessionID(query) || !cwdMatchesRecallProject(cwd, project) {
 		return ""
 	}
 	pol := policy.Load()
@@ -409,6 +527,28 @@ func liveRecallBrief(dir, cwd, query string) string {
 		return ""
 	}
 	return "live repo brief: " + strings.Join(parts, " — ")
+}
+
+func cwdMatchesRecallProject(cwd, project string) bool {
+	project = strings.TrimSpace(project)
+	if project == "" {
+		return true
+	}
+	if cwd == "" {
+		return false
+	}
+	if index.ProjectInScopeStrict(cwd, project) || index.ProjectInScopeStrict(project, cwd) {
+		return true
+	}
+	if !strings.ContainsAny(project, `/\:`) {
+		if strings.EqualFold(filepath.Base(filepath.Clean(cwd)), project) {
+			return true
+		}
+		if root := safeScanRoot(cwd); root != "" && strings.EqualFold(filepath.Base(filepath.Clean(root)), project) {
+			return true
+		}
+	}
+	return false
 }
 
 func looksLikePromptFileRef(tok string) bool {

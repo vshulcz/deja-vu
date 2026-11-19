@@ -209,3 +209,41 @@ func TestRepoOriginPolicyAndDiagnose(t *testing.T) {
 		t.Fatalf("Diagnose on repo origin: exists=%v unknown=%v err=%v", exists, unknown, err)
 	}
 }
+
+func TestSourceHintsOptOutAndDiagnose(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "policy.json")
+	t.Setenv("DEJA_POLICY_FILE", path)
+	t.Setenv(NoSourceHintsEnv, "")
+
+	if SourceHintsOff() {
+		t.Fatal("default policy must leave source hints enabled")
+	}
+	if err := os.WriteFile(path, []byte(`{"source_hints":false}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if !SourceHintsOff() {
+		t.Fatal(`expected "source_hints": false to disable source hints`)
+	}
+	if exists, unknown, err := Diagnose(); !exists || err != nil || len(unknown) != 0 {
+		t.Fatalf("Diagnose with source_hints: exists=%v unknown=%v err=%v", exists, unknown, err)
+	}
+
+	// Env override re-enables for one invocation.
+	t.Setenv(NoSourceHintsEnv, "0")
+	if SourceHintsOff() {
+		t.Fatal("DEJA_NO_SOURCE_HINTS=0 must override policy source_hints=false")
+	}
+
+	// True in policy file, disabled via env.
+	if err := os.WriteFile(path, []byte(`{"source_hints":true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if SourceHintsOff() {
+		t.Fatal(`expected "source_hints": true to keep source hints enabled`)
+	}
+	t.Setenv(NoSourceHintsEnv, "1")
+	if !SourceHintsOff() {
+		t.Fatal("DEJA_NO_SOURCE_HINTS=1 must disable source hints")
+	}
+}

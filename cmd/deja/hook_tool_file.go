@@ -1350,7 +1350,7 @@ func fileHookSymbols(cwd, path, editText string) ([]string, []string) {
 	}
 	var fileSyms []string
 	seenFile := map[string]bool{}
-	if diskPath != "" {
+	if diskPath != "" && !policy.SourceHintsOff() {
 		if info, err := os.Stat(diskPath); err == nil && !info.IsDir() && info.Size() <= 2<<20 {
 			if raw, err := os.ReadFile(diskPath); err == nil {
 				content := string(raw)
@@ -1768,7 +1768,7 @@ func changedDeclarationSymbols(cwd, path, editText string) []string {
 // crossFileCallersLine scans sibling and repository source files for external
 // call sites when an edit modifies an existing function or type signature.
 func crossFileCallersLine(cwd, path string, syms []string) string {
-	if path == "" || len(syms) == 0 {
+	if policy.SourceHintsOff() || path == "" || len(syms) == 0 {
 		return ""
 	}
 	diskPath := path
@@ -1909,27 +1909,14 @@ func firstCallLineInFile(cand, sym, needle string) int {
 // number, and declaration signature for sym inside the repository at cwd.
 func findSymbolDeclarationInRepo(cwd, sym string) (string, int, string) {
 	lowSym := strings.ToLower(strings.TrimSpace(sym))
-	if cwd == "" || len(lowSym) < 4 {
+	if cwd == "" || len(lowSym) < 4 || policy.SourceHintsOff() {
 		return "", 0, ""
 	}
-	if idx := loadRepoSymbolMap(cwd); idx.numFiles > 0 {
+	if idx := loadRepoSymbolMap(cwd); idx.numFiles > 0 || idx.capped {
 		if loc, ok := idx.firstDecl[lowSym]; ok {
 			return loc.rel, loc.line, loc.sig
 		}
-		if !idx.at.IsZero() && time.Since(idx.at) > 5*time.Millisecond {
-			if scanRoot := safeScanRoot(cwd); scanRoot != "" {
-				repoSymbolMapCache.Delete(scanRoot)
-				if fresh := loadRepoSymbolMap(cwd); fresh.numFiles > 0 {
-					if loc, ok := fresh.firstDecl[lowSym]; ok {
-						return loc.rel, loc.line, loc.sig
-					}
-					idx = fresh
-				}
-			}
-		}
-		if idx.numFiles < 2000 {
-			return "", 0, ""
-		}
+		return "", 0, ""
 	}
 	scanRoot := safeScanRoot(cwd)
 	if scanRoot == "" {
@@ -1990,7 +1977,7 @@ func findSymbolDeclarationInRepo(cwd, sym string) (string, int, string) {
 // testAssertionLiteralLine warns when an edit replaces or removes a string
 // literal that a sibling test file asserts on.
 func testAssertionLiteralLine(cwd, path, oldStr, newStr string) string {
-	if path == "" || oldStr == "" || newStr == "" || oldStr == newStr {
+	if policy.SourceHintsOff() || path == "" || oldStr == "" || newStr == "" || oldStr == newStr {
 		return ""
 	}
 	if isTestFilePath(path) {
@@ -2635,6 +2622,9 @@ type pkgDecl struct {
 }
 
 func hallucinatedPkgSymbolLine(cwd, path, oldStr, newStr string) string {
+	if policy.SourceHintsOff() {
+		return ""
+	}
 	if line := hallucinatedLocalImportLine(cwd, path, oldStr, newStr); line != "" {
 		return line
 	}
@@ -2856,7 +2846,7 @@ const (
 // on disk and points the agent to either the file's real path in the
 // repository or existing sibling files sharing the same stem in that directory.
 func missingFileHintLine(cwd, path, toolName string) string {
-	if cwd == "" || path == "" || isFileCreationTool(toolName) {
+	if cwd == "" || path == "" || isFileCreationTool(toolName) || policy.SourceHintsOff() {
 		return ""
 	}
 	diskPath := path

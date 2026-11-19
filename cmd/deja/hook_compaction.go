@@ -509,6 +509,15 @@ func compactionFailureKey(sessionID string) string {
 // emitCompactionRecovery marks a packet delivered only after the write
 // succeeds, so a closed output pipe does not consume the next recovery.
 func emitCompactionRecovery(dir, sessionID, cwd, event string, shape hookToolShape, stdout io.Writer) (bool, error) {
+	if _, packet := compactionRecovery(dir, sessionID, cwd); packet == "" {
+		return false, nil
+	}
+	releaseSeenLock, _ := holdHookseenLock(dir)
+	defer releaseSeenLock()
+	return emitCompactionRecoveryLocked(dir, sessionID, cwd, event, shape, stdout)
+}
+
+func emitCompactionRecoveryLocked(dir, sessionID, cwd, event string, shape hookToolShape, stdout io.Writer) (bool, error) {
 	state, packet := compactionRecovery(dir, sessionID, cwd)
 	if packet == "" {
 		return false, nil

@@ -355,9 +355,6 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	// session id, so what this hook writes down is how recall knows not to
 	// answer with the transcript being written (#3945, #3965).
 	markSessionLive(dir, input.SessionID)
-	unlockSeen, _ := holdHookseenLock(dir)
-	releaseSeenLock := sync.OnceFunc(unlockSeen)
-	defer releaseSeenLock()
 	measureCompactionRecovery(dir, input)
 	// A ZCode compaction in the middle of a turn shows up at the next tool.
 	if !postToolEvent(input.HookEventName) {
@@ -368,7 +365,10 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 		event = "PostToolUse"
 	}
 	if isDejaMCPToolCall(input.ToolName) {
-		if staged := popStagedMCPToolResult(dir, raw); staged != "" {
+		releaseSeenLock, _ := holdHookseenLock(dir)
+		staged := popStagedMCPToolResult(dir, raw)
+		releaseSeenLock()
+		if staged != "" {
 			var resp sessionStartHookResponse
 			resp.HookSpecificOutput.HookEventName = event
 			resp.HookSpecificOutput.AdditionalContext = staged
@@ -397,8 +397,7 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 			requestWarmup(dir)
 			return nil
 		}
-		// Spawn recall runs the prompt hook, which takes this same lock.
-		releaseSeenLock()
+		// Spawn recall runs the prompt hook, which handles its own commit lock.
 		return runHookSpawn(dir, input, raw, stdout)
 	}
 	// Never build or repair from here. This runs inside an action the user is
@@ -435,17 +434,30 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 			input.SessionID = "anon-tool:default"
 		}
 	}
-	injected := alreadyInjected(dir, input.SessionID)
-	used := func(line string) bool { return injected["tool:"+shortHash(dedupeFact(line))] }
-	line := toolHookLineSkipping(dir, hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)), input, used)
+	cwd := hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots))
+	var line string
+	for range 3 {
+		injected := alreadyInjected(dir, input.SessionID)
+		used := func(candidate string) bool { return injected["tool:"+shortHash(dedupeFact(candidate))] }
+		candidate := toolHookLineSkipping(dir, cwd, input, used)
+		if candidate == "" {
+			return nil
+		}
+		token := "tool:" + shortHash(dedupeFact(candidate))
+		releaseSeenLock, _ := holdHookseenLock(dir)
+		latest := alreadyInjected(dir, input.SessionID)
+		if latest[token] {
+			releaseSeenLock()
+			continue
+		}
+		rememberInjectedIDs(dir, input.SessionID, token)
+		releaseSeenLock()
+		line = candidate
+		break
+	}
 	if line == "" {
 		return nil
 	}
-	token := "tool:" + shortHash(dedupeFact(line))
-	if injected[token] {
-		return nil
-	}
-	rememberInjectedIDs(dir, input.SessionID, token)
 	line = truncateToolLine(line, toolHookMaxBytes)
 	out := frameRecall(line)
 	// Record the injection so deja's most frequent surface is not invisible to

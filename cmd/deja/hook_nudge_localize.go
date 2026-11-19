@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"io/fs"
 	"math"
 	"os"
@@ -85,13 +86,23 @@ type repoSymbolMap struct {
 	firstDecl  map[string]symbolDeclLoc
 	dirMtimes  map[string]int64
 	fileMtimes map[string]int64
+	fileSizes  map[string]int64
 	numFiles   int
+	capped     bool
 }
 
-var repoSymbolMapCache sync.Map
+var (
+	repoSymbolMapCache                   sync.Map
+	maxRepoSymbolFileBytes               int64 = 256 << 10
+	repoSymbolScanMaxFiles                     = 2000
+	repoSymbolScanMaxBytes               int64 = 16 << 20
+	repoSymbolScanBudget                       = 2 * time.Second
+	repoSymbolScanMinFilesBeforeDeadline       = 256
+	repoSymbolScanHook                   func(string)
+)
 
 func repoSymbolMapFresh(cached repoSymbolMap) bool {
-	if cached.at.IsZero() || time.Since(cached.at) >= 2*time.Second || len(cached.dirMtimes) == 0 {
+	if cached.at.IsZero() || time.Since(cached.at) >= 5*time.Second || len(cached.dirMtimes) == 0 {
 		return false
 	}
 	for p, mt := range cached.dirMtimes {
@@ -105,12 +116,15 @@ func repoSymbolMapFresh(cached repoSymbolMap) bool {
 		if err != nil || fi.ModTime().UnixNano() != mt {
 			return false
 		}
+		if sz, ok := cached.fileSizes[p]; ok && fi.Size() != sz {
+			return false
+		}
 	}
 	return true
 }
 
 func loadRepoSymbolMap(cwd string) repoSymbolMap {
-	if cwd == "" {
+	if cwd == "" || policy.SourceHintsOff() {
 		return repoSymbolMap{}
 	}
 	scanRoot := safeScanRoot(cwd)
@@ -127,7 +141,6 @@ func loadRepoSymbolMap(cwd string) repoSymbolMap {
 		return repoSymbolMap{}
 	}
 	idx := repoSymbolMap{
-		at:         time.Now(),
 		byStem:     map[string][]string{},
 		byDir:      map[string]int{},
 		stemDF:     map[string]int{},
@@ -137,7 +150,10 @@ func loadRepoSymbolMap(cwd string) repoSymbolMap {
 		firstDecl:  map[string]symbolDeclLoc{},
 		dirMtimes:  map[string]int64{},
 		fileMtimes: map[string]int64{},
+		fileSizes:  map[string]int64{},
 	}
+	scanStart := time.Now()
+	var bytesRead int64
 	_ = filepath.WalkDir(scanRoot, func(p string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return nil //nolint:nilerr // unreadable paths skipped during best-effort walk
@@ -152,36 +168,64 @@ func loadRepoSymbolMap(cwd string) repoSymbolMap {
 			}
 			return nil
 		}
-		if len(idx.files) >= 2000 {
+		if len(idx.files) >= repoSymbolScanMaxFiles {
+			idx.capped = true
 			return filepath.SkipAll
 		}
-		if len(idx.files) < 64 {
-			if info, infoErr := d.Info(); infoErr == nil {
-				idx.fileMtimes[p] = info.ModTime().UnixNano()
-			}
+		if repoSymbolScanMaxBytes > 0 && bytesRead >= repoSymbolScanMaxBytes {
+			idx.capped = true
+			return filepath.SkipAll
 		}
-		indexWalkedRepoFile(cwd, scanRoot, p, d, &idx)
+		if repoSymbolScanBudget > 0 && len(idx.files) >= repoSymbolScanMinFilesBeforeDeadline && time.Since(scanStart) >= repoSymbolScanBudget {
+			idx.capped = true
+			return filepath.SkipAll
+		}
+		if !indexWalkedRepoFileBounded(cwd, scanRoot, p, d, &idx, &bytesRead) {
+			return filepath.SkipAll
+		}
 		return nil
 	})
 	idx.numFiles = len(idx.files)
 	if idx.numFiles > 64 {
 		idx.fileMtimes = nil
+		idx.fileSizes = nil
 	}
+	idx.at = time.Now()
 	repoSymbolMapCache.Store(scanRoot, idx)
 	return idx
 }
 
-func indexWalkedRepoFile(cwd, scanRoot, p string, d fs.DirEntry, idx *repoSymbolMap) {
-	if !isLocalizableSourcePath(p, d.Name()) {
+func ensureRepoFileByRel(cwd string, qWords map[string]bool, symIdx *repoSymbolMap, byRel *map[string]repoFileEntry) {
+	if policy.SourceHintsOff() || len(qWords) == 0 || *byRel != nil || symIdx.numFiles != 0 {
 		return
+	}
+	*symIdx = loadRepoSymbolMap(cwd)
+	*byRel = buildRepoFileByRel(*symIdx)
+}
+
+func indexWalkedRepoFileBounded(cwd, scanRoot, p string, d fs.DirEntry, idx *repoSymbolMap, bytesRead *int64) bool {
+	if !isLocalizableSourcePath(p, d.Name()) {
+		return true
 	}
 	rel, err := filepath.Rel(cwd, p)
 	if err != nil || strings.HasPrefix(rel, "..") {
 		r2, err2 := filepath.Rel(scanRoot, p)
 		if err2 != nil || strings.HasPrefix(r2, "..") {
-			return
+			return true
 		}
 		rel = r2
+	}
+	info, infoErr := d.Info()
+	if len(idx.files) < 64 && infoErr == nil {
+		idx.fileMtimes[p] = info.ModTime().UnixNano()
+		idx.fileSizes[p] = info.Size()
+	}
+	maxFile := maxRepoSymbolFileBytes
+	if infoErr == nil && info.Mode().IsRegular() && info.Size() >= 0 && (maxFile <= 0 || info.Size() <= maxFile) {
+		if repoSymbolScanMaxBytes > 0 && bytesRead != nil && *bytesRead+info.Size() > repoSymbolScanMaxBytes {
+			idx.capped = true
+			return false
+		}
 	}
 	rel = filepath.ToSlash(rel)
 	ext := filepath.Ext(d.Name())
@@ -205,10 +249,17 @@ func indexWalkedRepoFile(cwd, scanRoot, p string, d fs.DirEntry, idx *repoSymbol
 		addIndexedStructWord(w, entry.stemWords, seenStruct)
 	}
 	addIndexedStructWord(pkg, nil, seenStruct)
-	if raw, err := os.ReadFile(p); err == nil && len(raw) <= 256<<10 {
-		content := string(raw)
-		indexRepoFileDecls(rel, content, &entry, seenStruct, idx.firstDecl)
-		indexFileBodyWords(content, entry.bodyWords, seenBody)
+	if infoErr == nil && info.Mode().IsRegular() && info.Size() >= 0 && (maxFile <= 0 || info.Size() <= maxFile) {
+		if repoSymbolScanHook != nil {
+			repoSymbolScanHook(p)
+		}
+		if content, n, ok := readBoundedRepoSource(p, maxFile); ok {
+			if bytesRead != nil {
+				*bytesRead += n
+			}
+			indexRepoFileDecls(rel, content, &entry, seenStruct, idx.firstDecl)
+			indexFileBodyWords(content, entry.bodyWords, seenBody)
+		}
 	}
 	idx.files = append(idx.files, entry)
 	idx.byStem[stem] = append(idx.byStem[stem], rel)
@@ -225,6 +276,28 @@ func indexWalkedRepoFile(cwd, scanRoot, p string, d fs.DirEntry, idx *repoSymbol
 	for w := range seenBody {
 		idx.bodyDF[w]++
 	}
+	return true
+}
+
+func readBoundedRepoSource(p string, maxFile int64) (string, int64, bool) {
+	f, err := os.Open(p)
+	if err != nil {
+		return "", 0, false
+	}
+	defer f.Close()
+	var r io.Reader = f
+	if maxFile > 0 {
+		r = io.LimitReader(f, maxFile+1)
+	}
+	raw, err := io.ReadAll(r)
+	if err != nil {
+		return "", 0, false
+	}
+	n := int64(len(raw))
+	if maxFile > 0 && n > maxFile {
+		return "", n, false
+	}
+	return string(raw), n, true
 }
 
 func addIndexedStructWord(w string, target, seenStruct map[string]bool) {
@@ -568,11 +641,7 @@ func nonASCIIStemVariants(words []string) []string {
 // identifiers, and historical prompt-to-edit correlations onto live repository
 // source files and their verified test recipes at Turn 0.
 func promptTaskTargetsLine(dir, cwd, asked string, seen, skip map[string]bool) (string, []string) {
-	if cwd == "" || !policy.Load().Allows(policy.ActivationAuto, "") {
-		return "", nil
-	}
-	idx := loadRepoSymbolMap(cwd)
-	if idx.numFiles == 0 {
+	if cwd == "" || policy.SourceHintsOff() || !policy.Load().Allows(policy.ActivationAuto, "") {
 		return "", nil
 	}
 	asked = strings.TrimSpace(digest.StripHarnessBlocks(asked))
@@ -581,6 +650,13 @@ func promptTaskTargetsLine(dir, cwd, asked string, seen, skip map[string]bool) (
 	}
 	focused, codeSpans, quotedPhrases := focusTaskPrompt(asked)
 	words := append(extractPromptASCIIWords(focused), extractPromptCrossScriptASCIIWords(focused)...)
+	if len(words) == 0 && len(codeSpans) == 0 && len(quotedPhrases) == 0 {
+		return "", nil
+	}
+	idx := loadRepoSymbolMap(cwd)
+	if idx.numFiles == 0 {
+		return "", nil
+	}
 	explicitDirFiles := matchExplicitSmallRepoDirs(focused, words, &idx)
 	phraseFiles := matchAdjacentStemPhrases(&idx, words)
 	matchedFiles := appendUniqueRel(explicitDirFiles, phraseFiles...)
@@ -2918,7 +2994,7 @@ func filterAndRankTouchedTargetsWithDF(
 	if len(resolved) <= 1 {
 		return resolved, true
 	}
-	if len(qWords) > 0 && *byRel == nil && symIdx.numFiles == 0 {
+	if !policy.SourceHintsOff() && len(qWords) > 0 && *byRel == nil && symIdx.numFiles == 0 {
 		*symIdx = loadRepoSymbolMap(cwd)
 		*byRel = buildRepoFileByRel(*symIdx)
 	}
@@ -3125,7 +3201,7 @@ func sessionActionMapLineForPrompt(dir, cwd, asked string, ss []model.Session, s
 	qWords := extractTargetQueryWords(cwd, asked)
 	var idx repoSymbolMap
 	var byRel map[string]repoFileEntry
-	if len(qWords) > 0 {
+	if !policy.SourceHintsOff() && len(qWords) > 0 {
 		idx = loadRepoSymbolMap(cwd)
 		byRel = buildRepoFileByRel(idx)
 	}
@@ -3254,10 +3330,7 @@ func rankedTouchedConsensusLineForPrompt(dir, cwd, asked string, ranked []model.
 	}
 	var cands []cand
 	if contributingSessions >= 2 {
-		if len(qWords) > 0 && byRel == nil && symIdx.numFiles == 0 {
-			symIdx = loadRepoSymbolMap(cwd)
-			byRel = buildRepoFileByRel(symIdx)
-		}
+		ensureRepoFileByRel(cwd, qWords, &symIdx, &byRel)
 		for rel, t := range counts {
 			if fileSessionDF[rel] > hubFileCap && !fileMatchesQueryWords(byRel, rel, qWords) {
 				continue
@@ -3362,10 +3435,7 @@ func singleStrongSessionTouchedLineWithDF(dir, cwd, asked string, ranked []model
 			continue
 		}
 		if allowTwoTermLeaf {
-			if len(qWords) > 0 && byRel == nil && symIdx.numFiles == 0 {
-				symIdx = loadRepoSymbolMap(cwd)
-				byRel = buildRepoFileByRel(symIdx)
-			}
+			ensureRepoFileByRel(cwd, qWords, &symIdx, &byRel)
 			if !allowTwoTermLeafMatch(asked, qWords, touched0, fileSessionDF, byRel, hubFileCap) {
 				continue
 			}

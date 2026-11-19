@@ -207,10 +207,13 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 		return nil
 	}
 	token := "fix:" + shortHash(line)
+	releaseSeenLock, _ := holdHookseenLock(dir)
 	if alreadyInjected(dir, input.SessionID)[token] {
+		releaseSeenLock()
 		return nil
 	}
 	rememberInjectedIDs(dir, input.SessionID, token)
+	releaseSeenLock()
 	payload := frameRecall(truncateToolLine(line, toolAfterMaxBytes))
 	// The receiving session too: this is the repair delivered at the failure,
 	// the surface with the best evidence behind it, and it was the one that
@@ -593,7 +596,7 @@ func fixPairLineFor(dir, cwd, command, output string) string {
 // cited in test failure output across Go, Python, TS/JS, and Rust so the agent
 // sees the failing assertion immediately without a Read round-trip.
 func failingTestSourceLine(cwd, output string, pol policy.Policy) string {
-	if cwd == "" || output == "" || !pol.Allows(policy.ActivationAuto, "") {
+	if cwd == "" || output == "" || pol.SourceHintsDisabled() || policy.SourceHintsOff() || !pol.Allows(policy.ActivationAuto, "") {
 		return ""
 	}
 	if !strings.Contains(output, "FAIL") && !strings.Contains(output, "AssertionError") && !strings.Contains(output, "panicked at ") && !strings.Contains(output, "Traceback (most recent call last):") {
@@ -848,6 +851,9 @@ func findFailingTestSUTTarget(scanRoot string, lines []string, targetLineNo int)
 }
 
 func locateFailingFileInScanRoot(scanRoot, filePart, defaultDisk, defaultRel string) (string, string) {
+	if policy.SourceHintsOff() {
+		return defaultDisk, defaultRel
+	}
 	diskPath := defaultDisk
 	rel := defaultRel
 	_ = filepath.WalkDir(scanRoot, func(p string, d os.DirEntry, walkErr error) error {
@@ -876,7 +882,7 @@ func locateFailingFileInScanRoot(scanRoot, filePart, defaultDisk, defaultRel str
 // symbol-mismatch errors (undefined symbol, wrong argument count/types) and
 // resolves the symbol's live declaration signature in the repository.
 func compilerSymbolSignatureLine(cwd, output string, pol policy.Policy) string {
-	if cwd == "" || output == "" || !pol.Allows(policy.ActivationAuto, "") {
+	if cwd == "" || output == "" || pol.SourceHintsDisabled() || policy.SourceHintsOff() || !pol.Allows(policy.ActivationAuto, "") {
 		return ""
 	}
 	if line := attributeErrorSignatureLine(cwd, output); line != "" {
@@ -970,7 +976,7 @@ func lastDotIdent(prefix string) string {
 }
 
 func findQualifiedMemberSignatureInRepo(cwd, qualifier, member string) (string, int, string) {
-	if cwd == "" || len(qualifier) < 2 || len(member) < 2 {
+	if policy.SourceHintsOff() || cwd == "" || len(qualifier) < 2 || len(member) < 2 {
 		return "", 0, ""
 	}
 	for _, isMod := range []bool{false, true} {
@@ -985,6 +991,9 @@ func findQualifiedMemberSignatureInRepo(cwd, qualifier, member string) (string, 
 }
 
 func findTSMethodByNameInRepo(cwd, member string, excludeTestFiles bool) (string, int, string) {
+	if policy.SourceHintsOff() {
+		return "", 0, ""
+	}
 	scanRoot := safeScanRoot(cwd)
 	if scanRoot == "" || len(member) < 4 {
 		return "", 0, ""
@@ -1293,7 +1302,7 @@ func extractCallSiteTargets(output string) []failingTestTarget {
 }
 
 func callErrorSourceSignatureLine(cwd, output string) string {
-	if !looksLikeCallError(output) {
+	if policy.SourceHintsOff() || !looksLikeCallError(output) {
 		return ""
 	}
 	targets := extractCallSiteTargets(output)
@@ -1570,6 +1579,9 @@ func lookupTypeMemberHint(cwd, typeName, missingAttr string, isModule bool) stri
 }
 
 func collectTypeMembersInRepo(cwd, typeName string, isModule bool) (defRel string, defLine int, members []repoMemberDecl) {
+	if policy.SourceHintsOff() {
+		return "", 0, nil
+	}
 	scanRoot := safeScanRoot(cwd)
 	if scanRoot == "" {
 		return "", 0, nil
@@ -2066,6 +2078,9 @@ func braceDelta(s string) int {
 }
 
 func nearMissSymbolSignatureLine(cwd, missingSym, modHint string) string {
+	if policy.SourceHintsOff() {
+		return ""
+	}
 	scanRoot := safeScanRoot(cwd)
 	if scanRoot == "" || len(missingSym) < 4 {
 		return ""

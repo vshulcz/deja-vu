@@ -46,7 +46,13 @@ func emitAskedHandoff(dir string, input promptHookInput, asked, cwd string, plai
 	body := "deja: this prompt names " + src.Harness + " session " + digest.Short(src.ID) +
 		"; its state, packaged so this session can continue it:\n\n" +
 		handoffPrompt(digest.Handoff(src, handoffPromptBudget))
+	releaseSeenLock, _ := holdHookseenLock(dir)
+	if alreadyInjected(dir, input.SessionID)[hookseenKey(key)] {
+		releaseSeenLock()
+		return false
+	}
 	rememberInjectedIDs(dir, input.SessionID, hookseenKey(key))
+	releaseSeenLock()
 	usage.RecordDigestFrom(dir, usage.KindHandoff, frameRecall(body), input.SessionID, 1,
 		rawSize([]model.Session{src}), nil, sessionProjects([]model.Session{src}), sessionIDs([]model.Session{src}))
 	_ = emitNudgeOnly(stdout, plain, body)
