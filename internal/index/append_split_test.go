@@ -343,12 +343,12 @@ func TestATornTailAndNewFileStillAppendTheGrownTranscript(t *testing.T) {
 	}
 	var bigOffsets []int64
 	tbl := tablesFromManifest(before)
-	if err := eachStoredRecord(filepath.Join(dir, "records.bin"), tbl, func(off int64, payload []byte) error {
-		r, err := decodeRecord(payload, tbl)
-		if err == nil && r.SourcePath == big {
+	if err = eachStoredRecord(filepath.Join(dir, "records.bin"), tbl, func(off int64, payload []byte) error {
+		r, decErr := decodeRecord(payload, tbl)
+		if decErr == nil && r.SourcePath == big {
 			bigOffsets = append(bigOffsets, off)
 		}
-		return err
+		return decErr
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -360,7 +360,7 @@ func TestATornTailAndNewFileStillAppendTheGrownTranscript(t *testing.T) {
 	appendTo(t, big, claudeLine("s-big", "2026-01-02T05:00:00Z", "one new turn on the big session"))
 	write(t, filepath.Join(claude, "p", "new.jsonl"), claudeLine("s-new", "2026-01-02T05:00:01Z", "a new session starts"))
 	var progress bytes.Buffer
-	if err := Ensure(dir, "", false, &progress); err != nil {
+	if err = Ensure(dir, "", false, &progress); err != nil {
 		t.Fatal(err)
 	}
 	got := progress.String()
