@@ -60,23 +60,7 @@ func howScreenCommand(s string) string {
 // `2>&1 | tail ...`) that agents append to cap stdout, so `go test ./... 2>&1 | tail -50`
 // and `golangci-lint run | head -40` group with the canonical command.
 func stripViewerPipe(cmd string) string {
-	idx := strings.LastIndex(cmd, "|")
-	if idx <= 0 || strings.Contains(cmd[idx:], "||") {
-		return cmd
-	}
-	rhs := strings.ToLower(strings.TrimSpace(cmd[idx+1:]))
-	if !strings.HasPrefix(rhs, "head ") && rhs != "head" && !strings.HasPrefix(rhs, "tail ") && rhs != "tail" {
-		return cmd
-	}
-	if strings.ContainsAny(rhs, "|;&><") {
-		return cmd
-	}
-	lhs := strings.TrimSpace(cmd[:idx])
-	lhs = strings.TrimSpace(strings.TrimSuffix(lhs, "2>&1"))
-	if lhs == "" || strings.TrimSpace(lhs) == "$" {
-		return cmd
-	}
-	return lhs
+	return index.StripViewerPipe(cmd)
 }
 
 type howEntry struct {
@@ -99,6 +83,11 @@ type howEntry struct {
 // ordinary; a command deja has no outcome for is most of the store.
 func (e howEntry) failedEveryTime() bool {
 	return e.Outcomes > 0 && e.Outcomes == e.Runs && e.Failures == e.Outcomes
+}
+
+// highFailRate reports whether at least half of recorded outcomes failed.
+func (e howEntry) highFailRate() bool {
+	return index.HighFailRate(e.Outcomes, e.Failures)
 }
 
 // failureNote is what the count line says about a command that never once
@@ -416,16 +405,16 @@ func howEntriesWithFallback(dir string, terms []string, projects []string, widen
 		// Without the outcome codex and opencode append: "$ make test  → exit
 		// 2" is the same command as "$ make test", and counting them apart put
 		// one command on two rows of this screen (#2590).
-		line := strings.TrimSpace(firstCommandLine(r.Text))
-		cmd, code, hasExit := index.CommandExitOutcome(line)
-		cmd = stripViewerPipe(cmd)
+		rawBody, code, hasExit := index.CommandExitOutcome(strings.TrimRight(r.Text, " \t\r\n"))
+		line := strings.TrimSpace(firstCommandLine(rawBody))
+		cmd := index.CanonicalRecurringCommand(line)
 		// Measured on the form the screen prints, as it always was: the whole
 		// command is what the row groups and the JSON hands over, and a long
 		// one-liner is still a row.
 		if cmd == "" || (len(cmd) > howCommandMax && len(howScreenCommand(cmd)) > howCommandMax) {
 			return
 		}
-		low := strings.ToLower(cmd)
+		low := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(cmd, "$ ")))
 		for _, t := range lowTerms {
 			if !commandMentions(low, t) {
 				return
@@ -466,6 +455,9 @@ func howEntriesWithFallback(dir string, terms []string, projects []string, widen
 		if fi, fj := out[i].failedEveryTime(), out[j].failedEveryTime(); fi != fj {
 			return !fi
 		}
+		if hi, hj := out[i].highFailRate(), out[j].highFailRate(); hi != hj {
+			return !hi
+		}
 		if direct != nil {
 			if di, dj := direct[out[i].Command], direct[out[j].Command]; di != dj {
 				return di
@@ -489,22 +481,26 @@ func howDirectMatch(cmd string, terms []string) bool {
 	if len(terms) == 0 {
 		return true
 	}
-	head := strings.TrimSpace(cmd)
+	head := strings.TrimPrefix(strings.TrimSpace(cmd), "$ ")
 	for {
+		head = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(head), "$ "))
 		low := strings.ToLower(head)
-		if !strings.HasPrefix(low, "cd ") {
+		if !strings.HasPrefix(low, "cd ") &&
+			!strings.HasPrefix(low, "export ") &&
+			!strings.HasPrefix(low, "source ") &&
+			!strings.HasPrefix(low, ". ") {
 			break
 		}
 		andIdx := strings.Index(head, "&&")
 		semiIdx := strings.IndexByte(head, ';')
+		if andIdx < 0 && semiIdx < 0 {
+			break
+		}
 		switch {
 		case andIdx >= 0 && (semiIdx < 0 || andIdx < semiIdx):
 			head = strings.TrimSpace(head[andIdx+2:])
 		case semiIdx >= 0:
 			head = strings.TrimSpace(head[semiIdx+1:])
-		}
-		if andIdx < 0 && semiIdx < 0 {
-			break
 		}
 	}
 	if idx := strings.Index(head, "&&"); idx >= 0 {

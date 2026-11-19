@@ -39,7 +39,8 @@ const (
 	orientPathMax = 80
 	// orientCommandMax is where a line stops being a command and starts being a
 	// paragraph the reader skips.
-	orientCommandMax = 72
+	orientCommandMax    = 72
+	orientEnvCommandMax = 120
 	// What the session-start digest shows, which is less than the mode does:
 	// it arrives in every session whether or not it is wanted.
 	orientDigestCommands = 3
@@ -261,19 +262,59 @@ func orientRecentCommand(last, newest time.Time) bool {
 }
 
 func filterAndSortOrientCmds(cmds []howEntry) []howEntry {
+	mergedByBody := make(map[string]*howEntry, len(cmds))
+	order := make([]string, 0, len(cmds))
+	for _, e := range cmds {
+		body := orientCommandBody(e.Command)
+		if body == "" || orientEphemeralCommand(body) {
+			continue
+		}
+		cur := mergedByBody[body]
+		if cur == nil {
+			sessions := make(map[string]bool, len(e.Sessions))
+			for s := range e.Sessions {
+				sessions[s] = true
+			}
+			cp := e
+			cp.Command = body
+			cp.Sessions = sessions
+			mergedByBody[body] = &cp
+			order = append(order, body)
+			continue
+		}
+		cur.Runs += e.Runs
+		cur.Outcomes += e.Outcomes
+		cur.Failures += e.Failures
+		if e.Failures > 0 {
+			if e.MixedExit || (cur.ExitCode != 0 && cur.ExitCode != e.ExitCode) {
+				cur.MixedExit = true
+			}
+			if cur.ExitCode == 0 {
+				cur.ExitCode = e.ExitCode
+			}
+		}
+		for s := range e.Sessions {
+			cur.Sessions[s] = true
+		}
+		if e.Last.After(cur.Last) {
+			cur.Last = e.Last
+		}
+	}
 	filteredCmds := cmds[:0]
 	var newestLast time.Time
-	for _, e := range cmds {
-		if !orientEphemeralCommand(orientCommand(e.Command)) {
-			filteredCmds = append(filteredCmds, e)
-			if e.Last.After(newestLast) {
-				newestLast = e.Last
-			}
+	for _, body := range order {
+		e := *mergedByBody[body]
+		if index.HighFailRate(e.Outcomes, e.Failures) {
+			continue
+		}
+		filteredCmds = append(filteredCmds, e)
+		if e.Last.After(newestLast) {
+			newestLast = e.Last
 		}
 	}
 	cmds = filteredCmds
 	sort.SliceStable(cmds, func(i, j int) bool {
-		ci, cj := orientCommand(cmds[i].Command), orientCommand(cmds[j].Command)
+		ci, cj := orientCommandBody(cmds[i].Command), orientCommandBody(cmds[j].Command)
 		si, sj := orientSuiteVerifyCommand(ci), orientSuiteVerifyCommand(cj)
 		if si != sj {
 			return si
@@ -308,11 +349,9 @@ func filterAndSortOrientCmds(cmds []howEntry) []howEntry {
 	return dedupCmds
 }
 
-// orientCommand is the command without the way one machine reached it. Half
-// these lines start "cd /Users/<name>/…; " because that is how an agent runs a
-// command from somewhere else, and the prefix is both the longest part of the
-// line and the part that means nothing to the reader.
-func orientCommand(cmd string) string {
+// orientCommandBody strips prompt markers, leading directory changes, and
+// trailing viewer pipes without truncating the command line.
+func orientCommandBody(cmd string) string {
 	cmd = strings.TrimPrefix(strings.TrimSpace(cmd), "$ ")
 	for {
 		low := strings.ToLower(cmd)
@@ -325,11 +364,66 @@ func orientCommand(cmd string) string {
 		}
 		cmd = strings.TrimSpace(strings.TrimLeft(cmd[i+1:], "&; "))
 	}
-	cmd = stripViewerPipe(cmd)
-	if len(cmd) > orientCommandMax {
-		cmd = strings.TrimSpace(truncateToolLine(cmd, orientCommandMax)) + "…"
+	return stripViewerPipe(cmd)
+}
+
+func orientHasEnvPrefix(body string) bool {
+	s := strings.TrimSpace(body)
+	if s == "" {
+		return false
 	}
-	return cmd
+	low := strings.ToLower(s)
+	for _, p := range []string{"export ", "source ", ". ", "env "} {
+		if strings.HasPrefix(low, p) {
+			return true
+		}
+	}
+	fields := strings.Fields(s)
+	if len(fields) == 0 {
+		return false
+	}
+	if isValidEnvAssign(fields[0]) {
+		return true
+	}
+	for i := 0; i < len(fields) && i < 3; i++ {
+		fl := strings.ToLower(strings.ReplaceAll(fields[i], "\\", "/"))
+		if strings.Contains(fl, ".venv/") || strings.Contains(fl, "/venv/") {
+			return true
+		}
+	}
+	return false
+}
+
+func isValidEnvAssign(tok string) bool {
+	eq := strings.IndexByte(tok, '=')
+	if eq <= 0 {
+		return false
+	}
+	name := tok[:eq]
+	for i := range len(name) {
+		c := name[i]
+		ok := (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_' || (i > 0 && c >= '0' && c <= '9')
+		if !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// orientCommand is the command without the way one machine reached it. Half
+// these lines start "cd /Users/<name>/…; " because that is how an agent runs a
+// command from somewhere else, and the prefix is both the longest part of the
+// line and the part that means nothing to the reader.
+func orientCommand(cmd string) string {
+	body := orientCommandBody(cmd)
+	limit := orientCommandMax
+	if orientHasEnvPrefix(body) {
+		limit = orientEnvCommandMax
+	}
+	if len(body) > limit {
+		return strings.TrimSpace(truncateToolLine(body, limit)) + "…"
+	}
+	return body
 }
 
 // orientPath is the path as the reader's editor would name it: relative to the
@@ -617,33 +711,61 @@ type orientCommandUse struct {
 // command at all.
 func orientRecurringCommands(dir string, projects []string, activation string) []orientCommandUse {
 	pol := policy.Load()
-	var out []orientCommandUse
+	type orientCmdAcc struct {
+		text     string
+		sessions int
+		outcomes int
+		failures int
+		last     time.Time
+	}
+	merged := map[string]*orientCmdAcc{}
 	for _, cu := range index.ReadCommands(dir) {
 		n := 0
+		outcomes := 0
+		failures := 0
 		var last time.Time
 		for proj, use := range cu.ByProject {
 			if !howProjectMatches(proj, projects) || !pol.Allows(activation, proj) {
 				continue
 			}
 			n += use.Sessions
+			outcomes += use.Outcomes
+			failures += use.Failures
 			if use.Last.After(last) {
 				last = use.Last
 			}
 		}
-		if n < 2 {
+		if n == 0 {
 			continue
 		}
-		clean := orientCommand(cu.Command)
-		if orientEphemeralCommand(clean) {
+		body := orientCommandBody(cu.Command)
+		if body == "" || orientEphemeralCommand(body) {
+			continue
+		}
+		acc := merged[body]
+		if acc == nil {
+			acc = &orientCmdAcc{text: body}
+			merged[body] = acc
+		}
+		acc.sessions += n
+		acc.outcomes += outcomes
+		acc.failures += failures
+		if last.After(acc.last) {
+			acc.last = last
+		}
+	}
+	out := make([]orientCommandUse, 0, len(merged))
+	for body, acc := range merged {
+		if acc.sessions < 2 || index.HighFailRate(acc.outcomes, acc.failures) {
 			continue
 		}
 		out = append(out, orientCommandUse{
-			Text:        cu.Command,
-			Sessions:    n,
-			Last:        last,
-			SuiteVerify: orientSuiteVerifyCommand(clean),
-			Verify:      index.VerifyCommand(clean),
-			Inspect:     index.InspectionCommand(clean),
+			Text:        acc.text,
+			Sessions:    acc.sessions,
+			Last:        acc.last,
+			SuiteVerify: orientSuiteVerifyCommand(body),
+			Verify:      index.VerifyCommand(body),
+			Inspect:     index.InspectionCommand(body),
 		})
 	}
 	var newestLast time.Time
