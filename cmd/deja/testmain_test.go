@@ -101,6 +101,20 @@ func TestMain(m *testing.M) {
 		"COLORFGBG":       "",
 		"DEJA_THEME":      "",
 		"DEJA_TUI":        "",
+		// Active-harness environment variables read by `deja status` so tests
+		// running inside an agent session do not report the ambient host.
+		"ANTIGRAVITY_AGENT":      "",
+		"CLAUDECODE":             "",
+		"CLAUDE_CODE_ENTRYPOINT": "",
+		"CODEX_CI":               "",
+		"CODEX_MANAGED_BY_NPM":   "",
+		"CODEX_SANDBOX":          "",
+		"CODEX_THREAD_ID":        "",
+		"CURSOR_AGENT":           "",
+		"GEMINI_CLI":             "",
+		"KIMI_CLI":               "",
+		"OPENCODE":               "",
+		"QWEN_CODE":              "",
 		// Dates render in the reader's zone (#849) and fixtures write fixed
 		// instants, so seven tests went red at UTC-3, UTC-11 or UTC+14 (#5044).
 		// A test about zones sets time.Local itself.

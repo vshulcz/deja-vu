@@ -144,8 +144,19 @@ _deja_completion() {
         handoff)
             if [[ "$prev" == "--to" ]]; then
                 COMPREPLY=( $(compgen -W "%HANDOFF_TARGETS%" -- "$cur") )
+            elif [[ "$prev" == "--harness" ]]; then
+                COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
+            elif [[ "$prev" == "--project" ]]; then
+                COMPREPLY=()
             else
-                COMPREPLY=( $(compgen -W "--to --exec" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--to --project --harness --exec" -- "$cur") )
+            fi
+            ;;
+        status)
+            if [[ "$prev" == "--harness" ]]; then
+                COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
+            else
+                COMPREPLY=( $(compgen -W "--harness --json" -- "$cur") )
             fi
             ;;
         hook-context)
@@ -309,6 +320,17 @@ _deja_completion() {
                 COMPREPLY=( $(compgen -W "--project --all-projects --limit --json" -- "$cur") )
             fi
             ;;
+        trail)
+            if [[ "$prev" == "--harness" ]]; then
+                COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
+            elif [[ "$prev" == "--project" || "$prev" == "--limit" ]]; then
+                COMPREPLY=()
+            elif [[ "$cur" == -* ]]; then
+                COMPREPLY=( $(compgen -W "--project --all-projects --harness --limit --json" -- "$cur") )
+            else
+                COMPREPLY=( $(compgen -f -- "$cur") )
+            fi
+            ;;
         promote)
             if [[ "$prev" == "--state" ]]; then
                 COMPREPLY=( $(compgen -W "%NOTE_STATES%" -- "$cur") )
@@ -376,6 +398,7 @@ _deja() {
     'completion:generate shell completion'
     'ctx:print a compact context digest'
     'files:which files the work on a topic touched'
+    'trail:chronological timeline of sessions that touched a file'
     'fix:what was run after this error before'
     'friction:errors this machine keeps hitting across sessions'
     'secrets:credentials your agent transcripts are carrying'
@@ -386,6 +409,7 @@ _deja() {
     'delete:erase a session from its agent and from deja'
     'doctor:diagnose local stores and wiring'
     'audit:check local stores, retention risk, and wiring'
+    'status:report whether hooks or MCP are wired for this workspace'
     'promote:distill a session into a curated note'
     'rules:copy your rules file into every agent, or list your corrections'
     'repo:project memory committed in the repository'
@@ -460,7 +484,10 @@ _deja() {
       _arguments '--list[list tombstones]' '--dry-run[show changes without applying]' '--session=[session ID prefix]:session:' '--project=[project substring]:project:' '--before=[duration or date]:time:' '--unforget=[tombstone ID]:ID:' '--all-matches[act on every match]'
       ;;
     handoff)
-      _arguments '--to=[target agent]:agent:(%HANDOFF_TARGETS%)' '--exec[launch the target agent]' '1:session ID prefix:'
+      _arguments '--to=[target agent]:agent:(%HANDOFF_TARGETS%)' '--project=[filter by project]:project:' '--harness=[filter by harness]:harness:($harnesses)' '--exec[launch the target agent]' '1:session ID prefix:'
+      ;;
+    status)
+      _arguments '--harness=[scope wiring check to one harness]:harness:($harnesses)' '--json[print JSON]'
       ;;
     hook-context)
       _arguments '--plain[omit formatting]' '--once[one digest per session]' '--strict[skip low-confidence sessions]' '--copilot[answer in the Copilot CLI hook shape]' '--notes[only the notes meant for the person]' '--junie[answer in the Junie hook shape]' '--mcode[answer in the MCode hook shape]'
@@ -556,6 +583,9 @@ _deja() {
     files|how)
       _arguments '--project=[project name]:project:' '--all-projects[search every project, not just this one]' '--limit=[maximum results]:count:' '--json[print JSON]' '*:topic:'
       ;;
+    trail)
+      _arguments '--project=[project name]:project:' '--all-projects[search every project, not just this one]' '--harness=[filter by harness]:harness:($harnesses)' '--limit=[maximum results]:count:' '--json[print JSON]' '1:path:_files'
+      ;;
     promote)
       if [[ "$words[CURRENT-1]" == "--state" ]]; then
         _values 'state' %NOTE_STATES%
@@ -639,6 +669,8 @@ complete -c deja -n '__fish_seen_subcommand_from doctor' -l offline
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l deep
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l all
 complete -c deja -n '__fish_seen_subcommand_from audit' -l json
+complete -c deja -n '__fish_seen_subcommand_from status' -l harness -r -a '%HARNESSES%'
+complete -c deja -n '__fish_seen_subcommand_from status' -l json
 complete -c deja -n '__fish_seen_subcommand_from delete' -l dry-run -d 'List the files, remove nothing'
 complete -c deja -n '__fish_seen_subcommand_from delete' -l yes -d 'Do not ask'
 complete -c deja -n '__fish_seen_subcommand_from mcp' -l context-search -d 'Serve only context_search'
@@ -651,6 +683,8 @@ complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_sub
 complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l unforget -r
 complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l all-matches
 complete -c deja -n '__fish_seen_subcommand_from handoff' -l to -r -a '%HANDOFF_TARGETS%'
+complete -c deja -n '__fish_seen_subcommand_from handoff' -l project -r
+complete -c deja -n '__fish_seen_subcommand_from handoff' -l harness -r -a '%HARNESSES%'
 complete -c deja -n '__fish_seen_subcommand_from handoff' -l exec
 complete -c deja -n '__fish_seen_subcommand_from hook-context' -l plain
 complete -c deja -n '__fish_seen_subcommand_from hook-context' -l once
@@ -746,6 +780,12 @@ complete -c deja -n '__fish_seen_subcommand_from files how' -l project -x
 complete -c deja -n '__fish_seen_subcommand_from files how' -l all-projects -d 'Search every project, not just this one'
 complete -c deja -n '__fish_seen_subcommand_from files how' -l limit -x
 complete -c deja -n '__fish_seen_subcommand_from files how' -l json
+complete -c deja -n '__fish_seen_subcommand_from trail' -l project -r
+complete -c deja -n '__fish_seen_subcommand_from trail' -l all-projects -d 'Search every project, not just this one'
+complete -c deja -n '__fish_seen_subcommand_from trail' -l harness -r -a '%HARNESSES%'
+complete -c deja -n '__fish_seen_subcommand_from trail' -l limit -r
+complete -c deja -n '__fish_seen_subcommand_from trail' -l json
+complete -c deja -n '__fish_seen_subcommand_from trail' -F
 complete -c deja -n '__fish_seen_subcommand_from promote' -l state -x -a '%NOTE_STATES%' -d 'Mark the note'
 complete -c deja -n '__fish_seen_subcommand_from promote' -l note -x -d 'The note text'
 complete -c deja -n '__fish_seen_subcommand_from promote' -l tag -x -d 'Tag the note, repeatable'
@@ -827,7 +867,13 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
             }
             'handoff' {
                 if ($previous -eq '--to') { $handoffTargets }
-                else { @('--to', '--exec') }
+                elseif ($previous -eq '--harness') { $harnesses }
+                elseif ($previous -eq '--project') { @() }
+                else { @('--to', '--project', '--harness', '--exec') }
+            }
+            'status' {
+                if ($previous -eq '--harness') { $harnesses }
+                else { @('--harness', '--json') }
             }
             'hook-context' { @('--plain', '--once', '--strict', '--copilot', '--notes', '--junie', '--mcode') }
             'hook-prompt' { @('--plain', '--copilot', '--strict', '--mcode') }
@@ -906,6 +952,11 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 if ($previous -in @('--project', '--limit')) { @() }
                 else { @('--project', '--all-projects', '--limit', '--json') }
             }
+            'trail' {
+                if ($previous -eq '--harness') { $harnesses }
+                elseif ($previous -in @('--project', '--limit')) { @() }
+                else { @('--project', '--all-projects', '--harness', '--limit', '--json') }
+            }
             'promote' {
                 if ($previous -eq '--state') { $noteStates }
                 elseif ($previous -in @('--note', '--tag', '--to')) { @() }
@@ -956,7 +1007,7 @@ func completionCommands() []string {
 		"files", "fix", "forget", "friction", "handoff", "help", "how", "index",
 		"install", "last", "log", "mcp", "origin", "promote", "recall", "recap", "remember", "repo", "restore",
 		"resume", "review", "rules", "search", "secrets", "share", "shell", "show", "sources", "stats",
-		"statusline", "sync", "tests", "uninstall", "update", "version", "view",
+		"status", "statusline", "sync", "tests", "trail", "uninstall", "update", "version", "view",
 		"warmup", "wip",
 	}
 }

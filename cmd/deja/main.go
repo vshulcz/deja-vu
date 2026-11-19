@@ -118,7 +118,7 @@ var worksWithNoHome = map[string]bool{
 	"version": true, "--version": true, "-version": true,
 	"help": true, "--help": true, "-h": true,
 	"completion": true, "shell": true, "update": true,
-	"doctor": true, "sources": true,
+	"doctor": true, "sources": true, "status": true,
 	"install": true, "uninstall": true,
 }
 
@@ -306,6 +306,7 @@ var commands = map[string]command{
 	"hook-refresh":    func(dir string, _ []string) error { runHookRefresh(dir); return nil },
 	"view":            runView,
 	"audit":           func(dir string, rest []string) error { return runAudit(dir, rest, os.Stdout) },
+	"status":          func(dir string, rest []string) error { return runStatus(dir, rest, os.Stdout) },
 	"install":         func(dir string, rest []string) error { return runInstall(dir, rest, false) },
 	"uninstall":       func(dir string, rest []string) error { return runInstall(dir, rest, true) },
 	"update":          func(_ string, rest []string) error { return runUpdate(rest, os.Stdout) },
@@ -313,6 +314,7 @@ var commands = map[string]command{
 	"resume":          func(dir string, rest []string) error { return runResume(dir, rest, os.Stdout) },
 	"handoff":         func(dir string, rest []string) error { return runHandoff(dir, rest, os.Stdout) },
 	"files":           func(dir string, rest []string) error { return runFiles(dir, rest, os.Stdout) },
+	"trail":           func(dir string, rest []string) error { return runTrail(dir, rest, os.Stdout) },
 	"restore":         func(dir string, rest []string) error { return runRestore(dir, rest, os.Stdout) },
 	"friction":        func(dir string, rest []string) error { return runFriction(dir, rest, os.Stdout) },
 	"secrets":         func(dir string, rest []string) error { return runSecrets(dir, rest, os.Stdout) },
