@@ -104,12 +104,14 @@ func (st wiringState) opencodeNeedsRefresh() bool {
 	if v2 && !strings.Contains(js, "HOOK_DEADLINE") {
 		return true
 	}
-	v1TUI := opencodeTUIFileGenerated(filepath.Join(dir, "plugins", "deja-status.tsx"))
-	v2TUI := opencodeTUIFileGenerated(filepath.Join(dir, "plugins", "deja-status", "tui.tsx"))
-	if v2 && (!v2TUI || v1TUI) {
+	v1Path := filepath.Join(dir, "plugins", "deja-status.tsx")
+	v2Path := filepath.Join(dir, "plugins", "deja-status", "tui.tsx")
+	v1TUI := opencodeTUIFileGenerated(v1Path)
+	v2TUI := opencodeTUIFileGenerated(v2Path)
+	if v2 && (!opencodeTUIFileCurrent(v2Path, "onSizeChange") || v1TUI) {
 		return true
 	}
-	if !v2 && (!v1TUI || v2TUI) {
+	if !v2 && (!opencodeTUIFileCurrent(v1Path, "fitSegments") || v2TUI) {
 		return true
 	}
 	if !v2 && (fileExists(filepath.Join(dir, "cli.json")) || fileExists(filepath.Join(dir, "service.json"))) {
@@ -119,6 +121,15 @@ func (st wiringState) opencodeNeedsRefresh() bool {
 		return opencodePluginShapeStale(js)
 	}
 	return false
+}
+
+func opencodeTUIFileCurrent(path, marker string) bool {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	text := string(b)
+	return strings.Contains(headLines(text, 3), opencodeTUIMarker) && strings.Contains(text, marker)
 }
 
 // wiringWrittenExe is the path this run wrote into configs, when the repair

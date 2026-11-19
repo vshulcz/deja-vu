@@ -35,6 +35,7 @@ and bounded-memory indexing across split batches and `remineFixes`.
 - MCP recall triggers proactively, excludes unstamped asking sessions, and `deja doctor` handles dead launchers and keeps `live_rules.jsonl` group-writable in shared indexes (#6045, #6056, #6067).
 - Hooks scope the `.hookseen` lock to the current commit, add a `source-hints` opt-out, guard non-repo roots with edit/traceback recovery, dedupe anonymous tool calls, and measure Antigravity compactions (#6049, #6054, #6085).
 - `DefaultDir` honors absolute `XDG_CACHE_HOME`, Windows Devin reads `sessions.db` from `APPDATA`, `deja rules sync` updates Hermes profile `SOUL.md` files, and `day0bench` deduplicates identical sessions across haystacks (#6050, #6064, #6083, #6084).
+- OpenCode, Kilo CLI, and MiMo-Code TUI status plugins fit whole segments to the remaining footer width, yield when the session sidebar is open, and stay clear of built-in MCP, plugin, and shortcut hints (#6092).
 
 ## [0.24.2] - 2026-11-12
 
@@ -2847,7 +2848,8 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.24.2...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.24.3...HEAD
+[0.24.3]: https://github.com/vshulcz/deja-vu/compare/v0.24.2...v0.24.3
 [0.24.2]: https://github.com/vshulcz/deja-vu/compare/v0.24.1...v0.24.2
 [0.24.1]: https://github.com/vshulcz/deja-vu/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/vshulcz/deja-vu/compare/v0.23.4...v0.24.0
