@@ -8,13 +8,13 @@
     "url": "https://github.com/vshulcz/deja-vu",
     "source": "github"
   },
-  "version": "0.24.2",
+  "version": "0.24.3",
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/vshulcz/deja-vu/releases/download/v0.24.2/deja-vu_0.24.2_registry.mcpb",
+      "identifier": "https://github.com/vshulcz/deja-vu/releases/download/v0.24.3/deja-vu_0.24.3_registry.mcpb",
       "fileSha256": "c7ecd0b634c69aa48d1ad7b1b4131d06a19427dc6f67f855be12dfc5810bb5ed",
-      "version": "0.24.2",
+      "version": "0.24.3",
       "transport": {
         "type": "stdio"
       }
