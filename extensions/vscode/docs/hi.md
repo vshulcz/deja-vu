@@ -6,7 +6,7 @@
 
 **आपके कोडिंग एजेंट्स उन समस्याओं को बार-बार डीबग करना बंद कर देते हैं जिन्हें आप पहले ही सुलझा चुके हैं।**
 
-[deja-vu](https://github.com/vshulcz/deja-vu) उन सेशन ट्रांसक्रिप्ट्स को लोकल स्तर पर इंडेक्स करता है जिन्हें Claude Code, Cursor, Codex, Windsurf, Copilot Chat, OpenCode, Cline, Roo Code और 40 अन्य कोडिंग एजेंट्स पहले ही डिस्क पर लिख चुके हैं — एक Go बाइनरी में, बिना LLM और बिना बैकग्राउंड डेमन के।
+[deja-vu](https://github.com/vshulcz/deja-vu) उन सेशन ट्रांसक्रिप्ट्स को लोकल स्तर पर इंडेक्स करता है जिन्हें Claude Code, Cursor, Codex, Windsurf, Copilot Chat, OpenCode, Cline, Roo Code और 41 अन्य कोडिंग एजेंट्स पहले ही डिस्क पर लिख चुके हैं — एक Go बाइनरी में, बिना LLM और बिना बैकग्राउंड डेमन के।
 
 **[★ GitHub पर स्टार करें](https://github.com/vshulcz/deja-vu)** · **[दस्तावेज़](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[बेंचमार्क](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
@@ -36,7 +36,7 @@ code --install-extension vshulcz.deja-status
 |---|---|
 | LongMemEval-S रिट्रीवल सटीकता (470 साफ़ प्रश्न) | **97.2% R@5**, **88.9% hit@1** (MemPalace 96.6%, agentmemory 95.2%) |
 | दोहराए गए रेपो काम पर टोकन लागत | **58% कम टोकन** — agentmemory से आधे (`52,815` बनाम बिना मेमोरी `103,443`, 11 युग्मित रन) |
-| इन-प्रोसेस लेक्सिकल क्वेरी लेटेंसी | 48 कोडिंग एजेंट्स में माध्यिका **0.7–0.8 ms** |
+| इन-प्रोसेस लेक्सिकल क्वेरी लेटेंसी | 49 कोडिंग एजेंट्स में माध्यिका **0.7–0.8 ms** |
 | 19,195 वास्तविक सेशन की प्रारंभिक इंडेक्सिंग | **13.6 s**, कोई API कुंजी नहीं (7 में अगला: 72 s) |
 
 ## रेपो मेमोरी और एजेंट हैंडऑफ़

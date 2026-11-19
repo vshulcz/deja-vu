@@ -6,7 +6,7 @@
 
 **[deja-vu](https://github.com/vshulcz/deja-vu)** の一部（LongMemEval-S で **97.2% R@5** · 19,195 セッションを **13.6 秒**でインデックス · agentmemory の**半分のトークン**）· [ドキュメント](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [ライブデモ](https://vshulcz.github.io/deja-vu/view/) · [ベンチマーク](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) · **[★ GitHub でスター](https://github.com/vshulcz/deja-vu)**
 
-[deja](https://github.com/vshulcz/deja-vu) は Claude Code、Codex、Cursor、opencode など計 48 のエージェントがディスクへ残すセッションファイルをインデックス化して回答します。この拡張機能はそのインデックスを Zed のエージェントパネルへ context server として提供し、deja 導入前の履歴も含めて過去の作業を検索できるようにします。
+[deja](https://github.com/vshulcz/deja-vu) は Claude Code、Codex、Cursor、opencode など計 49 のエージェントがディスクへ残すセッションファイルをインデックス化して回答します。この拡張機能はそのインデックスを Zed のエージェントパネルへ context server として提供し、deja 導入前の履歴も含めて過去の作業を検索できるようにします。
 
 ![deja-vu デモ](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -49,7 +49,7 @@ Zed の拡張機能一覧からインストールします。初回利用時に 
 
 | 再現率 | トークン消費 | インデックス & 検索速度 |
 |---|---|---|
-| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1；MemPalace 公表値 96.6%、agentmemory 95.2%） | **トークン 58% 削減**（反復作業において agentmemory の**半分のトークン**） | 19,195 セッションを **13.6 秒**でインデックス / 48 種のエージェント横断で **0.7 ms** 検索（7 ツール中の次点 72 秒） |
+| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1；MemPalace 公表値 96.6%、agentmemory 95.2%） | **トークン 58% 削減**（反復作業において agentmemory の**半分のトークン**） | 19,195 セッションを **13.6 秒**でインデックス / 49 種のエージェント横断で **0.7 ms** 検索（7 ツール中の次点 72 秒） |
 
 ## リポジトリメモリとエージェント間の引き継ぎ
 

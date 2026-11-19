@@ -7,9 +7,9 @@
   </a>
 </p>
 
-<p align="center"><b>48 kodlama ajanı arasında paylaşılan yerel bellek, ajanlar arası görev devri ve kod kurtarma.</b></p>
+<p align="center"><b>49 kodlama ajanı arasında paylaşılan yerel bellek, ajanlar arası görev devri ve kod kurtarma.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes ve 41 ajan daha her oturumu zaten diske kaydediyor.<br>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes ve 42 ajan daha her oturumu zaten diske kaydediyor.<br>
 deja tüm geçmişi yerel olarak indeksler; böylece ajanlarınız <code>/compact</code> sonrasında bağlamı korur, <code>deja handoff</code> ile görevi devreder ve <code>deja restore</code> ile üzerine yazılmış kodu kurtarır — LLM yok, tek bir Go ikilisi.</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | Türkçe | <a href="README.hi.md">हिन्दी</a></p>
@@ -137,7 +137,7 @@ bağlıyken neyin indekslendiğini ve sırada hangi komutun çalıştırılacağ
 
 ## Ne kazandırıyor
 
-**Codex'te çözüldü, Claude hatırlıyor.** Kırk üç kodlama ajanı her konuşmayı yerel dosyalara yazıyor; deja
+**Codex'te çözüldü, Claude hatırlıyor.** Kırk dokuz kodlama ajanı her konuşmayı yerel dosyalara yazıyor; deja
 bu dosyaları hepsinin okuyabildiği bir bellek katmanına dönüştürüyor.
 
 | | |
@@ -266,7 +266,7 @@ Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Ro
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
 CodeArts Desktop ·
-TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed.
+Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed.
 
 Her birinin neyi desteklediği — MCP geri çağırma, otomatik geri çağırma, skill'ler, komutlar, resume, handoff —
 [İngilizce README'deki yetenek tablosunda](../../README.md#supported-harnesses). Özel depolama konumları `DEJA_*_ROOT`
@@ -369,7 +369,7 @@ Gerçek bir depoda ölçüldü: 2,419 oturum, 179k mesaj, 1.9 GB kayıt.
 | Özellik | `deja-vu` | `claude-mem` | `MemPalace` |
 | --- | --- | --- | --- |
 | Kurulum öncesi geçmiş ([sıfırıncı gün](https://vshulcz.github.io/deja-vu/guide/day-zero.html)) | Evet — mevcut transkriptleri indeksler (`36/100` hit@1) | Hayır — kurulumdan itibaren kaydeder (`0/100`) | Claude Code, Codex, Cursor (`16/100`) |
-| Paylaşılan ajanlar | 48 araç | 9 (kanca) | 3 (CLI) |
+| Paylaşılan ajanlar | 49 araç | 9 (kanca) | 3 (CLI) |
 | LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
 | Çalışma zamanı ve bağımlılıklar | 1 Go ikili dosyası | Bun çalışanı + SQLite + Chroma | Python + 300 MB gömme modeli |
 | LLM çağrısı / hesap gereksinimi | Yok | Gözlemci LLM çağrıları | Yok |

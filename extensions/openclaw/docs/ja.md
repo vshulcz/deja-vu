@@ -8,7 +8,7 @@
 
 ![deja-vu デモ](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-同じマシン上の他 47 種類のコーディングエージェント（Claude Code・Codex・Cursor・Gemini・Zed など）の履歴を [OpenClaw](https://openclaw.ai) へ接続するプラグインです。単一 Go バイナリ `deja` とローカル BM25 検索で完結し、LLM やクラウド API は使いません（`DEJA_OFFLINE=1` で日次リリースチェックも無効化できます）。
+同じマシン上の他 48 種類のコーディングエージェント（Claude Code・Codex・Cursor・Gemini・Zed など）の履歴を [OpenClaw](https://openclaw.ai) へ接続するプラグインです。単一 Go バイナリ `deja` とローカル BM25 検索で完結し、LLM やクラウド API は使いません（`DEJA_OFFLINE=1` で日次リリースチェックも無効化できます）。
 
 ## インストール
 
@@ -86,7 +86,7 @@ openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 
 | 再現率 | トークン消費 | インデックス & 検索速度 |
 |---|---|---|
-| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1；MemPalace 公表値 96.6%、agentmemory 95.2%） | **トークン 58% 削減**（反復作業において agentmemory の**半分のトークン**） | 19,195 セッションを **13.6 秒**でインデックス / 48 種のエージェント横断で **0.7 ms** 検索（7 ツール中の次点 72 秒） |
+| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1；MemPalace 公表値 96.6%、agentmemory 95.2%） | **トークン 58% 削減**（反復作業において agentmemory の**半分のトークン**） | 19,195 セッションを **13.6 秒**でインデックス / 49 種のエージェント横断で **0.7 ms** 検索（7 ツール中の次点 72 秒） |
 
 ## リポジトリメモリとエージェント間の引き継ぎ
 
@@ -96,6 +96,6 @@ openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 
 ## プライバシー
 
-インデックスは `~/.cache/deja/index.db`（`DEJA_INDEX_DIR` で変更可）に保管され、`sk-*`、`ghp_*`、`AKIA*`、`Bearer` 等を構築時に自動削除します。明示的な `deja embed` を使わない限り完全ローカルで動作し、`deja install --auto` で 48 ツール全体に一括導入できます。
+インデックスは `~/.cache/deja/index.db`（`DEJA_INDEX_DIR` で変更可）に保管され、`sk-*`、`ghp_*`、`AKIA*`、`Bearer` 等を構築時に自動削除します。明示的な `deja embed` を使わない限り完全ローカルで動作し、`deja install --auto` で 49 ツール全体に一括導入できます。
 
 [deja-vu](https://github.com/vshulcz/deja-vu) の一部です。MIT。役に立ちましたか？ [GitHub で deja-vu にスターを付ける](https://github.com/vshulcz/deja-vu)。

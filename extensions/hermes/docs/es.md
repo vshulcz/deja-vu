@@ -40,7 +40,7 @@ Nunca duplica los turnos de Hermes: Hermes ya los guarda y deja lee ese almacena
 
 | Recall | Tokens | Indexado y búsqueda |
 |---|---|---|
-| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas; MemPalace publica 96.6%, agentmemory 95.2%) | **58% menos tokens** (**la mitad de tokens** que agentmemory en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 48 agentes de programación (el siguiente de 7: 72 s) |
+| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas; MemPalace publica 96.6%, agentmemory 95.2%) | **58% menos tokens** (**la mitad de tokens** que agentmemory en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 49 agentes de programación (el siguiente de 7: 72 s) |
 
 ## Memoria de repositorio y relevo entre agentes
 

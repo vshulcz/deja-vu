@@ -6,7 +6,7 @@
 
 **Kodlama ajanlarınız zaten çözdüğünüz hataları baştan ayıklamayı bırakır.**
 
-[deja-vu](https://github.com/vshulcz/deja-vu), Claude Code, Cursor, Codex, Windsurf, Copilot Chat, OpenCode, Cline, Roo Code ve 40 diğer kodlama ajanının diske yazdığı oturum dökümlerini yerel olarak indeksler — tek Go ikilisiyle, LLM ve arka plan servisi olmadan.
+[deja-vu](https://github.com/vshulcz/deja-vu), Claude Code, Cursor, Codex, Windsurf, Copilot Chat, OpenCode, Cline, Roo Code ve 41 diğer kodlama ajanının diske yazdığı oturum dökümlerini yerel olarak indeksler — tek Go ikilisiyle, LLM ve arka plan servisi olmadan.
 
 **[★ GitHub'da yıldız ver](https://github.com/vshulcz/deja-vu)** · **[Belgeler](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[Ölçümler](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
@@ -36,7 +36,7 @@ code --install-extension vshulcz.deja-status
 |---|---|
 | LongMemEval-S erişim doğruluğu (470 temizlenmiş soru) | **%97.2 R@5**, **%88.9 hit@1** (MemPalace %96.6, agentmemory %95.2) |
 | Tekrarlanan depo görevlerinde token maliyeti | **%58 daha az token** — agentmemory'nin yarısı (`52,815` vs soğuk başlangıçta `103,443`, 11 eşli koşu) |
-| Süreç içi sözlüksel sorgu gecikmesi | 48 kodlama ajanı genelinde ortanca **0.7–0.8 ms** |
+| Süreç içi sözlüksel sorgu gecikmesi | 49 kodlama ajanı genelinde ortanca **0.7–0.8 ms** |
 | 19,195 gerçek oturumun ilk indeksleme süresi | **13.6 sn**, API anahtarsız (7 araçtan sonraki: 72 sn) |
 
 ## Depo belleği ve ajanlar arası devir (`handoff`)

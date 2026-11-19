@@ -8,7 +8,7 @@
 
 ![deja-vu 데모](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-> [Magpie](https://github.com/yetone/magpie)를 거치는 모든 요청에 같은 머신의 다른 47개 코딩 에이전트(Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes 등) 세션 기록을 자동으로 보강합니다.
+> [Magpie](https://github.com/yetone/magpie)를 거치는 모든 요청에 같은 머신의 다른 48개 코딩 에이전트(Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes 등) 세션 기록을 자동으로 보강합니다.
 
 Magpie의 OpenAI(`chat`, `responses`), Anthropic(`anthropic`), Gemini(`gemini`) 프로토콜 전체에서 단일 Go 바이너리 `deja`가 로컬 BM25 색인을 조회합니다. 별도의 LLM이나 클라우드 임베딩 없이 동작하며, `DEJA_OFFLINE=1`로 일일 버전 확인도 끌 수 있습니다.
 
@@ -18,7 +18,7 @@ Magpie의 OpenAI(`chat`, `responses`), Anthropic(`anthropic`), Gemini(`gemini`) 
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-`@vshulcz/deja-vu`, `brew install deja-vu`, 또는 공식 `install.sh` 스크립트로 `deja`를 설치한 뒤 `deja index`로 색인을 생성해야 합니다. 48개 코딩 에이전트 전체에 `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff` 도구를 연결하려면:
+`@vshulcz/deja-vu`, `brew install deja-vu`, 또는 공식 `install.sh` 스크립트로 `deja`를 설치한 뒤 `deja index`로 색인을 생성해야 합니다. 49개 코딩 에이전트 전체에 `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff` 도구를 연결하려면:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
@@ -50,7 +50,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 | 재현율 (Recall) | 토큰 사용량 | 인덱싱 & 조회 속도 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1; MemPalace 공개치 96.6%, agentmemory 95.2%) | **토큰 58% 절감** (반복 저장소 작업에서 agentmemory 대비 **절반의 토큰**) | 19,195개 세션 **13.6초** 인덱싱 / 48개 코딩 에이전트 통합 **0.7 ms** 조회 (비교군 7종 중 2위 72초) |
+| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1; MemPalace 공개치 96.6%, agentmemory 95.2%) | **토큰 58% 절감** (반복 저장소 작업에서 agentmemory 대비 **절반의 토큰**) | 19,195개 세션 **13.6초** 인덱싱 / 49개 코딩 에이전트 통합 **0.7 ms** 조회 (비교군 7종 중 2위 72초) |
 
 ## 저장소 메모리 및 에이전트 간 핸드오프
 

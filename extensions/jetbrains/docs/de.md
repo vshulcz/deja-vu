@@ -14,7 +14,7 @@ Lokale agentenübergreifende Session-Suche, KI-Zeilen-Blame und Handoff für Int
 ## Funktionen
 
 - **Statusleisten-Widget**: Zeigt Live-Statistiken von `deja statusline` für das aktive Projekt rechts in der IDE-Statusleiste. Ein Klick öffnet das `deja-vu`-Aktionsmenü.
-- **KI-Sessions durchsuchen (`Tools → deja-vu → Search AI Sessions...`)**: Durchsucht lokale Sessions aller 48 unterstützten Coding-Agents (`deja search --json`) und öffnet das gewählte Protokoll in einem schreibgeschützten Markdown-Tab.
+- **KI-Sessions durchsuchen (`Tools → deja-vu → Search AI Sessions...`)**: Durchsucht lokale Sessions aller 49 unterstützten Coding-Agents (`deja search --json`) und öffnet das gewählte Protokoll in einem schreibgeschützten Markdown-Tab.
 - **Letzte KI-Sessions (`Tools → deja-vu → Recent AI Sessions`)**: Listet die 50 jüngsten Sessions auf dem Rechner (`deja last 50 --json`) mit Schnellsuche auf.
 - **AI Blame für aktuelle Zeile (Kontextmenü / `Tools → deja-vu → AI Blame Current Line`)**: Führt `deja blame <file>:<line> --json` (mit Fallback auf `<file>`) aus und öffnet die KI-Session, die die Zeile unter dem Cursor geschrieben oder geändert hat.
 - **Agenten-Handoff kopieren (`Tools → deja-vu → Copy Cross-Agent Handoff`)**: Führt `deja handoff` im Projektstamm aus, kopiert die Zusammenfassung in die Zwischenablage und öffnet sie in einem schreibgeschützten Markdown-Tab.
@@ -54,7 +54,7 @@ Das installierbare Archiv liegt anschließend unter `build/distributions/`.
 
 | Recall | Tokens | Indexierung & Suche |
 |---|---|---|
-| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen; MemPalace veröffentlicht 96.6%, agentmemory 95.2%) | **58% weniger Tokens** (**halb so viele Tokens** wie agentmemory bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 48 Coding-Agents hinweg (Nächstbester von 7: 72 s) |
+| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen; MemPalace veröffentlicht 96.6%, agentmemory 95.2%) | **58% weniger Tokens** (**halb so viele Tokens** wie agentmemory bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 49 Coding-Agents hinweg (Nächstbester von 7: 72 s) |
 
 ## Repository-Gedächtnis & Agenten-Übergabe
 

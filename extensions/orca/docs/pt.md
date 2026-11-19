@@ -2,7 +2,7 @@
 
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | Português | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-Plugin `trusted-worker` do Orca v2 para `deja` — traz memória de sessões entre 48 ferramentas de codificação com IA (Claude Code, Codex, Cursor, opencode, Gemini CLI, Orca e outras), incluindo sessões gravadas antes da instalação do `deja`.
+Plugin `trusted-worker` do Orca v2 para `deja` — traz memória de sessões entre 49 ferramentas de codificação com IA (Claude Code, Codex, Cursor, opencode, Gemini CLI, Orca e outras), incluindo sessões gravadas antes da instalação do `deja`.
 
 ![Demonstração do deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -36,7 +36,7 @@ Quando `deja install orca-auto` já gravou o hook nativo `UserPromptSubmit` no `
 
 | Recall | Tokens | Indexação e busca |
 |---|---|---|
-| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas; MemPalace publica 96.6%, agentmemory 95.2%) | **58% menos tokens** (**metade dos tokens** do agentmemory em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 48 agentes de código (próximo de 7: 72 s) |
+| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas; MemPalace publica 96.6%, agentmemory 95.2%) | **58% menos tokens** (**metade dos tokens** do agentmemory em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 49 agentes de código (próximo de 7: 72 s) |
 
 ## Memória do repositório e handoff entre agentes
 

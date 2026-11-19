@@ -8,7 +8,7 @@
 
 ![deja-vu 데모](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-[pi](https://github.com/badlogic/pi-mono)에 같은 머신의 다른 47개 코딩 에이전트(Claude Code, Codex, Cursor, Gemini, OpenClaw, Hermes 등) 세션 기록을 로컬 공유 메모리로 연결해 주는 확장입니다. 단일 Go 바이너리 `deja`가 로컬에서 직접 BM25 인덱스를 만들므로 별도 LLM, 임베딩 모델, API 키가 필요하지 않으며, 사용자가 직접 실행하는 업데이트·동기화 명령과 `DEJA_OFFLINE=1`로 끌 수 있는 일일 버전 확인 외에는 네트워크를 사용하지 않습니다.
+[pi](https://github.com/badlogic/pi-mono)에 같은 머신의 다른 48개 코딩 에이전트(Claude Code, Codex, Cursor, Gemini, OpenClaw, Hermes 등) 세션 기록을 로컬 공유 메모리로 연결해 주는 확장입니다. 단일 Go 바이너리 `deja`가 로컬에서 직접 BM25 인덱스를 만들므로 별도 LLM, 임베딩 모델, API 키가 필요하지 않으며, 사용자가 직접 실행하는 업데이트·동기화 명령과 `DEJA_OFFLINE=1`로 끌 수 있는 일일 버전 확인 외에는 네트워크를 사용하지 않습니다.
 
 ## 설치
 
@@ -47,7 +47,7 @@ brew install deja-vu
 
 | 재현율 (Recall) | 토큰 사용량 | 인덱싱 & 조회 속도 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1; MemPalace 공개치 96.6%, agentmemory 95.2%) | **토큰 58% 절감** (반복 저장소 작업에서 agentmemory 대비 **절반의 토큰**) | 19,195개 세션 **13.6초** 인덱싱 / 48개 코딩 에이전트 통합 **0.7 ms** 조회 (비교군 7종 중 2위 72초) |
+| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1; MemPalace 공개치 96.6%, agentmemory 95.2%) | **토큰 58% 절감** (반복 저장소 작업에서 agentmemory 대비 **절반의 토큰**) | 19,195개 세션 **13.6초** 인덱싱 / 49개 코딩 에이전트 통합 **0.7 ms** 조회 (비교군 7종 중 2위 72초) |
 
 ## 저장소 메모리 및 에이전트 간 핸드오프
 
@@ -57,7 +57,7 @@ git을 통해 `.deja/memory.jsonl`에 검증된 프로젝트 결정 사항과 �
 
 ## 개인정보 보호
 
-인덱스는 `~/.cache/deja/index.db`(`DEJA_INDEX_DIR`로 변경 가능)에 저장되며 인덱싱 시 `sk-*`, `ghp_*`, `AKIA*`, `Bearer` 등의 자격 증명을 자동으로 마스킹합니다. 사용자가 직접 `deja embed`로 외부 임베딩을 설정하지 않는 한 검색과 인덱싱은 로컬에서만 실행됩니다. 48개 전체 에이전트 연동(`recall`, `fix`, `blame`, `handoff`)은 `deja install --auto`로 설정할 수 있습니다.
+인덱스는 `~/.cache/deja/index.db`(`DEJA_INDEX_DIR`로 변경 가능)에 저장되며 인덱싱 시 `sk-*`, `ghp_*`, `AKIA*`, `Bearer` 등의 자격 증명을 자동으로 마스킹합니다. 사용자가 직접 `deja embed`로 외부 임베딩을 설정하지 않는 한 검색과 인덱싱은 로컬에서만 실행됩니다. 49개 전체 에이전트 연동(`recall`, `fix`, `blame`, `handoff`)은 `deja install --auto`로 설정할 수 있습니다.
 
 ## 라이선스
 

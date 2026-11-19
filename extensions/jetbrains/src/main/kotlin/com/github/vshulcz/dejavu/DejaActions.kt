@@ -103,7 +103,7 @@ class DejaSearchAction : DumbAwareAction() {
         if (!DejaUi.ensureBinaryOrNotify(project)) return
         val query = Messages.showInputDialog(
             project,
-            "Search local sessions across 48 AI coding agents:",
+            "Search local sessions across 49 AI coding agents:",
             "deja-vu: Search AI Sessions",
             null,
         )?.trim() ?: return

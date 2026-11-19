@@ -2,7 +2,7 @@
 
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | Türkçe | [हिन्दी](hi.md)
 
-`deja` için Orca v2 `trusted-worker` eklentisi — `deja` kurulmadan önce kaydedilmiş olanlar dahil 48 yapay zeka kodlama aracından (Claude Code, Codex, Cursor, opencode, Gemini CLI, Orca ve diğerleri) gelen oturum belleğini Orca içine taşır.
+`deja` için Orca v2 `trusted-worker` eklentisi — `deja` kurulmadan önce kaydedilmiş olanlar dahil 49 yapay zeka kodlama aracından (Claude Code, Codex, Cursor, opencode, Gemini CLI, Orca ve diğerleri) gelen oturum belleğini Orca içine taşır.
 
 ![deja-vu demosu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -36,7 +36,7 @@ deja install orca-auto
 
 | İsabet (Recall) | Token | İndeksleme ve sorgu |
 |---|---|---|
-| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1; MemPalace %96.6, agentmemory %95.2 yayımlar) | **%58 daha az token** (tekrarlanan depo işlerinde agentmemory'nin **yarısı kadar token**) | 19,195 oturumu **13.6 sn**'de indeksler / 48 kodlama ajanı genelinde **0.7 ms** sorgu süresi (7 araçtan sonraki: 72 sn) |
+| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1; MemPalace %96.6, agentmemory %95.2 yayımlar) | **%58 daha az token** (tekrarlanan depo işlerinde agentmemory'nin **yarısı kadar token**) | 19,195 oturumu **13.6 sn**'de indeksler / 49 kodlama ajanı genelinde **0.7 ms** sorgu süresi (7 araçtan sonraki: 72 sn) |
 
 ## Depo belleği ve ajanlar arası devir (`handoff`)
 

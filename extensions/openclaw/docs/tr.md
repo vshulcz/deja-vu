@@ -8,7 +8,7 @@
 
 ![deja-vu demosu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Makinenizdeki diğer 47 kodlama ajanının (Claude Code, Codex, Cursor, Gemini, Zed vb.) geçmişini [OpenClaw](https://openclaw.ai) içine getirir. Tek Go ikilisi `deja` ve yerel BM25 ile LLM olmadan çalışır (`DEJA_OFFLINE=1` günlük sürüm kontrolünü kapatır).
+Makinenizdeki diğer 48 kodlama ajanının (Claude Code, Codex, Cursor, Gemini, Zed vb.) geçmişini [OpenClaw](https://openclaw.ai) içine getirir. Tek Go ikilisi `deja` ve yerel BM25 ile LLM olmadan çalışır (`DEJA_OFFLINE=1` günlük sürüm kontrolünü kapatır).
 
 ## Kurulum
 
@@ -86,7 +86,7 @@ openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 
 | İsabet (Recall) | Token | İndeksleme ve sorgu |
 |---|---|---|
-| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1; MemPalace %96.6, agentmemory %95.2 yayımlar) | **%58 daha az token** (tekrarlanan depo işlerinde agentmemory'nin **yarısı kadar token**) | 19,195 oturumu **13.6 sn**'de indeksler / 48 kodlama ajanı genelinde **0.7 ms** sorgu süresi (7 araçtan sonraki: 72 sn) |
+| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1; MemPalace %96.6, agentmemory %95.2 yayımlar) | **%58 daha az token** (tekrarlanan depo işlerinde agentmemory'nin **yarısı kadar token**) | 19,195 oturumu **13.6 sn**'de indeksler / 49 kodlama ajanı genelinde **0.7 ms** sorgu süresi (7 araçtan sonraki: 72 sn) |
 
 ## Depo belleği ve ajanlar arası devir (`handoff`)
 
@@ -96,6 +96,6 @@ Görevin ortasında araç mı değiştiriyorsunuz? `deja handoff --to <agent>` �
 
 ## Gizlilik
 
-Dizin `~/.cache/deja/index.db` yolundadır (`DEJA_INDEX_DIR`), `sk-*`, `ghp_*`, `AKIA*` ve `Bearer` dizinlemede gizlenir. `deja embed` kullanılmadığı sürece ağa veri gönderilmez. 48 kodlama ajanının tamamını tek adımda bağlamak için `deja install --auto` çalıştırın.
+Dizin `~/.cache/deja/index.db` yolundadır (`DEJA_INDEX_DIR`), `sk-*`, `ghp_*`, `AKIA*` ve `Bearer` dizinlemede gizlenir. `deja embed` kullanılmadığı sürece ağa veri gönderilmez. 49 kodlama ajanının tamamını tek adımda bağlamak için `deja install --auto` çalıştırın.
 
 [deja-vu](https://github.com/vshulcz/deja-vu) parçasıdır. MIT. İşinize yaradı mı? [GitHub'da deja-vu'ya yıldız verin](https://github.com/vshulcz/deja-vu).

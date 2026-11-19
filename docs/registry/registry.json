@@ -3516,6 +3516,121 @@
       }
     },
     {
+      "id": "qoder",
+      "store_paths": [
+        "${DEJA_QODER_ROOT:-~/.qoder}/projects/*/*.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/qoder/projects/-workspace-registry-demo/registry-qoder.jsonl"
+      ],
+      "parser_source": "internal/sources/qoder.go",
+      "last_verified": "2026-11-10",
+      "display_name": "Qoder",
+      "capabilities": {
+        "mcp": false,
+        "auto": false,
+        "skill": false,
+        "command": false,
+        "resume": false,
+        "handoff": "paste",
+        "prereq": "none"
+      },
+      "gaps": {
+        "mcp": {
+          "state": "unknown",
+          "why": "The Qoder CLI ships an MCP client but deja has no install target for it yet, so recall reaches Qoder only once history has been indexed by this reader; the settings file and its server key have not been verified.",
+          "source": "https://docs.qoder.com/"
+        },
+        "auto": {
+          "state": "unknown",
+          "why": "Qoder CLI hook events (session start, prompt submit, tool use) have not been verified, so deja installs no auto-recall wiring and the reader alone is what reaches Qoder today.",
+          "source": "https://docs.qoder.com/"
+        },
+        "skill": {
+          "state": "unknown",
+          "why": "Whether the Qoder CLI loads named skills from a directory has not been verified, so deja does not write its history skill there; nothing is installed and no command is claimed.",
+          "source": "https://docs.qoder.com/"
+        },
+        "command": {
+          "state": "unknown",
+          "why": "The Qoder CLI slash-command surface has not been verified, so deja installs no /deja command for it and recall is reachable only through the indexed reader.",
+          "source": "https://docs.qoder.com/"
+        },
+        "resume": {
+          "state": "unknown",
+          "why": "No Qoder CLI command that reopens a session by id has been verified, so deja cannot hand a session back and handoff falls back to paste.",
+          "source": "https://docs.qoder.com/"
+        }
+      },
+      "surfaces": {
+        "digest": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "prompt": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "pre_tool": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "failure": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "compaction_reset": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "compaction_capture": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "compaction_packet": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "mcp": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "handoff": {
+          "status": "partial",
+          "proof": "stand",
+          "note": "paste-only: no Qoder command reopens a session by id, so a handoff lands as text the user pastes in"
+        },
+        "session_end": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "rules": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "statusline": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "reader-only in this change; no deja hook/MCP wiring for Qoder verified yet"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
+      }
+    },
+    {
       "id": "qwen",
       "store_paths": [
         "${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl"

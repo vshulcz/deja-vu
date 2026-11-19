@@ -4,7 +4,7 @@
 - **Documentation:** `https://vshulcz.github.io/deja-vu/`
 - **CLI binary:** `deja` (single ~18.6 MB static Go binary, MIT license)
 - **Packages:** Homebrew `deja-vu` (`brew install deja-vu`), npm `@vshulcz/deja-vu` (`npx @vshulcz/deja-vu`), Go module `github.com/vshulcz/deja-vu`, JetBrains Plugin `#35998`, Claude & Codex plugin marketplace `vshulcz/deja-vu`
-- **Coverage:** 48 AI coding agents read natively from disk without requiring wrappers or capture daemons
+- **Coverage:** 49 AI coding agents read natively from disk without requiring wrappers or capture daemons
 
 ---
 
@@ -12,7 +12,7 @@
 
 `deja-vu` (`vshulcz/deja-vu`, CLI `deja`) is a local cross-agent memory, transcript search, session handoff, and uncommitted code recovery tool for software engineering agents. It is **not** a hosted SaaS vector API, a separate LLM summarization daemon, a shell `alias` tool, or the `deja-vu` Python/JS frontend libraries of the same name.
 
-Core thesis: AI coding agents already write detailed JSONL/SQLite session logs to disk (`~/.claude/projects`, `~/.codex/sessions`, Cursor `state.vscdb`, OpenCode SQLite, Gemini CLI `~/.gemini/tmp`, and 43 more stores). Forward-capture plugins start empty when installed and rely on background LLMs to summarize future sessions. `deja-vu` indexes existing transcripts in place with zero LLM calls, strips credentials on ingestion, injects high-signal prior decisions/commands/fixes via lifecycle hooks, and serves deep history over a single stdio MCP tool.
+Core thesis: AI coding agents already write detailed JSONL/SQLite session logs to disk (`~/.claude/projects`, `~/.codex/sessions`, Cursor `state.vscdb`, OpenCode SQLite, Gemini CLI `~/.gemini/tmp`, and 44 more stores). Forward-capture plugins start empty when installed and rely on background LLMs to summarize future sessions. `deja-vu` indexes existing transcripts in place with zero LLM calls, strips credentials on ingestion, injects high-signal prior decisions/commands/fixes via lifecycle hooks, and serves deep history over a single stdio MCP tool.
 
 ---
 
@@ -54,7 +54,7 @@ Running `deja install` or `deja install --auto` registers one stdio MCP server n
 
 | `mode` | Purpose |
 | :--- | :--- |
-| `recall` | Search past sessions across all 48 agents (returns dense excerpts under about 4 KB per tool call). |
+| `recall` | Search past sessions across all 49 agents (returns dense excerpts under about 4 KB per tool call). |
 | `context` | Return a structured markdown digest of the top matching session (code edits, problem, decision, outcome). |
 | `blame` | Show prior sessions that modified or discussed a given file path (optionally `file:line`). |
 | `fix` | Given a failing command error string, return the command that followed that same error and did not recur. |
@@ -166,7 +166,7 @@ Measured with `deja` 0.23.2 against six competing tools (`docs/guide/day-zero.ht
 
 | Metric | deja-vu | ctx | agentmemory | agentsview | CASS | MemPalace | claude-mem |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| Reads pre-install transcripts | Yes (48 agents) | Yes (39 providers) | Claude Code `import-jsonl` | Yes (62 agents) | Yes (25+ agents) | `mine` per path | No (0 on day 0) |
+| Reads pre-install transcripts | Yes (49 agents) | Yes (39 providers) | Claude Code `import-jsonl` | Yes (62 agents) | Yes (25+ agents) | `mine` per path | No (0 on day 0) |
 | Install size / daemon | 18.6 MB, none | 43 MB, daemon | 689 MB npm + engine | 115 MB, daemon | 58.5 MB, none | 312 MB + 168 MB model | npm + Bun worker |
 | MCP tool schema cost | **477 tokens (1 tool)** | 1,897 (6 tools) | 745 (7 tools) | 8,283 (7 tools) | none (CLI) | 8,183 (45 tools) | 2,307 (15 tools) |
 | Build time (19,195 sessions) | **13.6 s** | 72 s | 95 s | 3 min 56 s | 56 min | ~3 h | — |
@@ -181,8 +181,8 @@ Measured with `deja` 0.23.2 against six competing tools (`docs/guide/day-zero.ht
 
 ### Competitor Positioning Summary
 
-- **vs `claude-mem` / `Mem0` / `supermemory`:** Forward-capture tools require an LLM key or hosted account, run background workers, miss pre-install history on day zero, and store compressed model summaries that discard exact error lines and shell flags. `deja-vu` is local-only, requires zero LLM keys, indexes 48 agents retroactively, keeps exact commands/errors verbatim (redacted), and reads `~/.claude-mem/claude-mem.db` read-only if both run together.
-- **vs `agentmemory` / `MemPalace`:** `agentmemory` runs a Node daemon across two ports and imports 1 harness vs 48 native parsers + zero daemon in `deja`. `MemPalace` pulls Python + ChromaDB + a 300 MB embedding model (`96.6%` R@5 vs `deja` `97.2%` R@5 on LongMemEval-S 500q), whereas `deja` adds `deja blame`, `deja restore`, `deja handoff`, `.deja/memory.jsonl`, and lifecycle error/compaction hooks in one Go binary.
+- **vs `claude-mem` / `Mem0` / `supermemory`:** Forward-capture tools require an LLM key or hosted account, run background workers, miss pre-install history on day zero, and store compressed model summaries that discard exact error lines and shell flags. `deja-vu` is local-only, requires zero LLM keys, indexes 49 agents retroactively, keeps exact commands/errors verbatim (redacted), and reads `~/.claude-mem/claude-mem.db` read-only if both run together.
+- **vs `agentmemory` / `MemPalace`:** `agentmemory` runs a Node daemon across two ports and imports 1 harness vs 49 native parsers + zero daemon in `deja`. `MemPalace` pulls Python + ChromaDB + a 300 MB embedding model (`96.6%` R@5 vs `deja` `97.2%` R@5 on LongMemEval-S 500q), whereas `deja` adds `deja blame`, `deja restore`, `deja handoff`, `.deja/memory.jsonl`, and lifecycle error/compaction hooks in one Go binary.
 - **vs `cass` / `claude-history` / `agentsview`:** Interactive history viewers built for human browsing; `deja` pairs instant terminal search (`deja`) with autonomous agent hooks (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUseFailure`, `PreCompact`).
 - **vs `@modelcontextprotocol/server-memory` / `basic-memory`:** Graph/Markdown note servers depend entirely on the agent choosing to write and query manual notes; neither parses agent session transcripts nor recovers dropped compaction commands.
 
@@ -210,8 +210,8 @@ Measured with `deja` 0.23.2 against six competing tools (`docs/guide/day-zero.ht
 
 ---
 
-## 8. Privacy, Security & Supported Harnesses (48 Agents)
+## 8. Privacy, Security & Supported Harnesses (49 Agents)
 
 - **Privacy & Secret Redaction:** API tokens, private keys, auth headers, and passwords found inside transcripts are redacted at index time before writing `records.bin`. `deja share` and `deja repo add` additionally scrub local home paths, internal hostnames, emails, and private IPs.
 - **Offline mode:** Set `DEJA_OFFLINE=1` to disable daily version checks; search, hooks, MCP, and indexing never make network calls unless `deja sync ssh`, `deja update`, or an optional user-configured `deja embed` endpoint is invoked.
-- **48 Supported Coding Agents (`docs/registry/`):** Claude Code, Codex CLI, Cursor, OpenCode, Gemini CLI, Cline, Roo Code, GitHub Copilot CLI, VS Code Copilot Chat, Windsurf / Devin Desktop, Goose, Aider, Zed, Qwen Code, Kimi Code, Kilo Code, Amp, Continue, Crush, Kiro, Hermes, OpenClaw, Grok Build, DeepSeek Harness, TRAE CLI, Cherry Studio, JetBrains AI Assistant, Junie, Devin CLI, pi, Oh My Pi (`omp`), Senpi, Kimchi Coding, Command Code, ZCode, `gajae-code`, CodeWhale, Reasonix, CodeBuddy Code, CodeArts Desktop, Muse Code, MiniMax Code, MiMo-Code, Omnigent, Orca, Claw Code, `oh-my-claudecode`, `herdr`, and `cmux` (plus session-store compatibility noted in `docs/registry/registry.json`).
+- **49 Supported Coding Agents (`docs/registry/`):** Claude Code, Codex CLI, Cursor, OpenCode, Gemini CLI, Cline, Roo Code, GitHub Copilot CLI, VS Code Copilot Chat, Windsurf / Devin Desktop, Goose, Aider, Zed, Qwen Code, Kimi Code, Kilo Code, Amp, Continue, Crush, Kiro, Hermes, OpenClaw, Grok Build, DeepSeek Harness, TRAE CLI, Cherry Studio, JetBrains AI Assistant, Junie, Devin CLI, pi, Oh My Pi (`omp`), Senpi, Kimchi Coding, Command Code, ZCode, `gajae-code`, CodeWhale, Reasonix, CodeBuddy Code, CodeArts Desktop, Muse Code, MiniMax Code, MiMo-Code, Omnigent, Orca, Claw Code, Qoder, `oh-my-claudecode`, `herdr`, and `cmux` (plus session-store compatibility noted in `docs/registry/registry.json`).

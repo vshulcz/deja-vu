@@ -7,9 +7,9 @@
   </a>
 </p>
 
-<p align="center"><b>48개 코딩 에이전트를 아우르는 로컬 공유 기억, 에이전트 간 작업 인계, 코드 복구.</b></p>
+<p align="center"><b>49개 코딩 에이전트를 아우르는 로컬 공유 기억, 에이전트 간 작업 인계, 코드 복구.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes 등 48개 에이전트는 이미 모든 세션을 디스크에 저장합니다.<br>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes 등 49개 에이전트는 이미 모든 세션을 디스크에 저장합니다.<br>
 deja는 그 기록을 로컬에서 색인해 <code>/compact</code> 이후에도 컨텍스트를 유지하고, <code>deja handoff</code>로 작업을 인계하며, <code>deja restore</code>로 덮어쓴 코드를 복구합니다 — LLM 없이 단일 Go 바이너리로.</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | 한국어 | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -135,7 +135,7 @@ skill은 이미 설치된 `deja` 바이너리를 호출하며, 자체 바이너�
 
 ## 무엇을 얻나
 
-**Codex에서 해결하면 Claude가 기억합니다.** 마흔여덟 개의 코딩 에이전트가 모든 대화를 로컬 파일에 쓰고,
+**Codex에서 해결하면 Claude가 기억합니다.** 마흔아홉 개의 코딩 에이전트가 모든 대화를 로컬 파일에 쓰고,
 deja는 그 파일들을 모두가 읽을 수 있는 하나의 기억 계층으로 바꿉니다.
 
 | | |
@@ -259,7 +259,7 @@ Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Ro
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
 CodeArts Desktop ·
-TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed.
+Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed.
 
 각 도구가 MCP 회상, 자동 회상, skill, 명령, resume, handoff 중 무엇을 지원하는지는
 [영문 README의 기능 표](../../README.md#supported-harnesses)에 있습니다. 저장 위치를 바꿨다면 `DEJA_*_ROOT`
@@ -360,7 +360,7 @@ deja bench read       # 데이터베이스 기반 저장소를 읽는 비용과,
 | 기능 | `deja-vu` | `claude-mem` | `MemPalace` |
 | --- | --- | --- | --- |
 | 설치 이전 기록 ([day zero](https://vshulcz.github.io/deja-vu/guide/day-zero.html)) | 지원 — 기존 트랜스크립트 인덱싱 (`36/100` hit@1) | 미지원 — 설치 시점부터 기록 (`0/100`) | Claude Code, Codex, Cursor (`16/100`) |
-| 공유 에이전트 | 48개 하네스 | 9개 (훅) | 3개 (CLI) |
+| 공유 에이전트 | 49개 하네스 | 9개 (훅) | 3개 (CLI) |
 | LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
 | 런타임과 의존성 | Go 단일 바이너리 1개 | Bun 워커 + SQLite + Chroma | Python + 300 MB 임베딩 모델 |
 | LLM 호출 / 계정 필요 | 없음 | Observer LLM 호출 | 없음 |

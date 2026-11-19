@@ -16,7 +16,7 @@ It carries deja's MCP server, the `deja-history` skill, always-on guidance in
 `deja install antigravity-auto` writes, packaged as a native Antigravity plugin.
 
 [deja](https://github.com/vshulcz/deja-vu) indexes the session transcripts
-forty-eight coding agents already write to disk, including sessions from before
+forty-nine coding agents already write to disk, including sessions from before
 it was installed, and answers from them locally: BM25 over the transcripts, no
 model and no embeddings, credentials redacted as the index is built.
 
@@ -36,7 +36,7 @@ is recalled twice.
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (**88.9% hit@1** on the 470-question cleaned set; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 48 coding agents (next of 7 tools: 72 s) |
+| **97.2% R@5** on LongMemEval-S (**88.9% hit@1** on the 470-question cleaned set; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents (next of 7 tools: 72 s) |
 
 ## Repository memory & handoff
 

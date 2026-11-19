@@ -7,9 +7,9 @@
   </a>
 </p>
 
-<p align="center"><b>跨 48 个编程智能体的本地共享记忆、跨智能体交接与代码恢复。</b></p>
+<p align="center"><b>跨 49 个编程智能体的本地共享记忆、跨智能体交接与代码恢复。</b></p>
 
-<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 41 个智能体本来就把每次会话写在磁盘上。<br>
+<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 42 个智能体本来就把每次会话写在磁盘上。<br>
 deja 在本地索引全部历史，让智能体跨 <code>/compact</code> 保住上下文、用 <code>deja handoff</code> 中途换智能体接着做、用 <code>deja restore</code> 找回被覆盖的代码——无需 LLM，单个 Go 二进制。</p>
 
 <p align="center"><a href="../../README.md">English</a> | 简体中文 | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -135,7 +135,7 @@ skill 调用的是上面装好的 `deja` 二进制，自己不带。
 
 ## 能得到什么
 
-**在 Codex 里解决，Claude 记得。** 四十八个编程智能体把每一次对话都写进本地文件，
+**在 Codex 里解决，Claude 记得。** 四十九个编程智能体把每一次对话都写进本地文件，
 deja 把这些文件变成一层它们都能读的记忆。
 
 | | |
@@ -243,7 +243,7 @@ Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Ro
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
 CodeArts Desktop ·
-TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed。
+Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed。
 
 每个工具分别支持 MCP 召回、自动召回、技能、命令、resume 和 handoff 中的哪些，见
 [英文 README 的能力矩阵](../../README.md#supported-harnesses)。自定义存储位置通过 `DEJA_*_ROOT`
@@ -342,7 +342,7 @@ deja bench read       # 读取一个数据库存储的代价，以及一个超�
 | 能力 | `deja-vu` | `claude-mem` | `MemPalace` |
 | --- | --- | --- | --- |
 | 安装前的历史记录（[第零天](https://vshulcz.github.io/deja-vu/guide/day-zero.html)） | 是 — 索引已有的会话转录（`36/100` hit@1） | 否 — 仅从安装后开始记录（`0/100`） | Claude Code、Codex、Cursor（`16/100`） |
-| 共享范围 | 48 款工具 | 9 款（hooks） | 3 款（CLI） |
+| 共享范围 | 49 款工具 | 9 款（hooks） | 3 款（CLI） |
 | LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
 | 运行时与依赖 | 1 个 Go 二进制 | Bun worker + SQLite + Chroma | Python + 300 MB 向量模型 |
 | LLM 调用 / 账号要求 | 无 | Observer LLM 调用 | 无 |

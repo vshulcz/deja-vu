@@ -8,7 +8,7 @@ Parte do **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** no Lon
 
 ![Demonstração do deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Memória local para o [opencode](https://opencode.ai) compartilhando o histórico de outros 47 agentes de programação no mesmo computador (Claude Code, Codex, Cursor, Gemini, Hermes, Zed e mais). Usa o binário Go único `deja` com índice BM25 local, sem LLMs (`DEJA_OFFLINE=1` desativa a checagem diária).
+Memória local para o [opencode](https://opencode.ai) compartilhando o histórico de outros 48 agentes de programação no mesmo computador (Claude Code, Codex, Cursor, Gemini, Hermes, Zed e mais). Usa o binário Go único `deja` com índice BM25 local, sem LLMs (`DEJA_OFFLINE=1` desativa a checagem diária).
 
 ## Instalação
 
@@ -54,7 +54,7 @@ Adicione ao `opencode.ai/config.json`:
 - `tools`: registra as 6 ferramentas (padrão `true`).
 - `bin`: caminho customizado para `deja`.
 
-Para configurar os 8 modos MCP (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) em todas as 48 ferramentas, execute `deja install --auto` (saiba mais em [trocar de agente sem perder contexto](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)).
+Para configurar os 8 modos MCP (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) em todas as 49 ferramentas, execute `deja install --auto` (saiba mais em [trocar de agente sem perder contexto](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)).
 
 ## Qual binário é usado
 
@@ -68,7 +68,7 @@ Para configurar os 8 modos MCP (`recall`, `fix`, `blame`, `how`, `orient`, `cont
 
 | Recall | Tokens | Indexação e busca |
 |---|---|---|
-| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas; MemPalace publica 96.6%, agentmemory 95.2%) | **58% menos tokens** (**metade dos tokens** do agentmemory em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 48 agentes de código (próximo de 7: 72 s) |
+| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas; MemPalace publica 96.6%, agentmemory 95.2%) | **58% menos tokens** (**metade dos tokens** do agentmemory em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 49 agentes de código (próximo de 7: 72 s) |
 
 ## Memória do repositório e handoff entre agentes
 

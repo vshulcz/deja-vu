@@ -14,7 +14,7 @@
 ## 功能特色
 
 - **狀態列小工具**：在 IDE 狀態列右側即時顯示目前專案的 `deja statusline` 統計資訊，點擊即可開啟 `deja-vu` 操作彈窗。
-- **搜尋 AI 會話（`Tools → deja-vu → Search AI Sessions...`）**：跨全部 48 款支援的程式設計代理檢索本地會話（`deja search --json`），並在唯讀 Markdown 編輯器分頁中開啟所選會話紀錄。
+- **搜尋 AI 會話（`Tools → deja-vu → Search AI Sessions...`）**：跨全部 49 款支援的程式設計代理檢索本地會話（`deja search --json`），並在唯讀 Markdown 編輯器分頁中開啟所選會話紀錄。
 - **最近 AI 會話（`Tools → deja-vu → Recent AI Sessions`）**：列出本機最近 50 筆會話（`deja last 50 --json`），支援即時快速篩選。
 - **AI 目前行溯源（編輯器右鍵選單 / `Tools → deja-vu → AI Blame Current Line`）**：執行 `deja blame <file>:<line> --json`（若無精確行紀錄則退回 `<file>`），開啟撰寫或修改游標所在行的 AI 會話。
 - **複製跨代理接力摘要（`Tools → deja-vu → Copy Cross-Agent Handoff`）**：在專案根目錄執行 `deja handoff`，將摘要複製到系統剪貼簿並在唯讀 Markdown 分頁中開啟。
@@ -54,7 +54,7 @@ cd extensions/jetbrains
 
 | 召回率 | Token 用量 | 索引與檢索耗時 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1；MemPalace 公布 96.6%，agentmemory 為 95.2%） | **token 減少 58%**（同儲存庫重複任務上 token 用量只有 agentmemory 的**一半**） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 48 個程式設計代理的檢索僅 **0.7 ms**（7 款對比工具中第二名 72 秒） |
+| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1；MemPalace 公布 96.6%，agentmemory 為 95.2%） | **token 減少 58%**（同儲存庫重複任務上 token 用量只有 agentmemory 的**一半**） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 49 個程式設計代理的檢索僅 **0.7 ms**（7 款對比工具中第二名 72 秒） |
 
 ## 儲存庫記憶與跨代理接力
 

@@ -35,7 +35,7 @@ import (
 // chat index in VS Code's own state, Aider keeps a project's whole history in
 // one file, Amp's threads live on its servers.
 var deletable = map[string]bool{
-	"claude": true, "codex": true, "gemini": true, "qwen": true, "copilot": true,
+	"claude": true, "codex": true, "gemini": true, "qwen": true, "qoder": true, "copilot": true,
 	"cline": true, "cursor": true, "kimi": true, "grok": true, "deepseek": true,
 	"pi": true, "senpi": true, "openclaw": true, "antigravity": true,
 }

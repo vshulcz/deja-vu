@@ -8,7 +8,7 @@
 
 ![deja-vu 데모](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-DeepSeek Harness(`dsh`)와 DSH Desktop(`anywhere-labs/dsh-desktop`)을 위한 `session-query` 플러그인입니다. DSH 대화 기록뿐 아니라 같은 머신의 다른 47개 코딩 에이전트(Claude Code, Codex, Cursor, Gemini, Hermes 등) 세션 기록까지 단일 Go 바이너리 `deja`와 로컬 BM25 색인으로 조회합니다(`DEJA_OFFLINE=1`로 일일 업데이트 확인 해제 가능).
+DeepSeek Harness(`dsh`)와 DSH Desktop(`anywhere-labs/dsh-desktop`)을 위한 `session-query` 플러그인입니다. DSH 대화 기록뿐 아니라 같은 머신의 다른 48개 코딩 에이전트(Claude Code, Codex, Cursor, Gemini, Hermes 등) 세션 기록까지 단일 Go 바이너리 `deja`와 로컬 BM25 색인으로 조회합니다(`DEJA_OFFLINE=1`로 일일 업데이트 확인 해제 가능).
 
 ## 설치
 
@@ -20,7 +20,7 @@ dsh plugin --profile web add dsh-deja
 dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 ```
 
-`deja`가 아직 없다면 `DEJA_BIN`을 지정하거나 아래 명령으로 48개 전체 에이전트 및 `$DSH_HOME/plugins/deja/`를 한 번에 구성합니다:
+`deja`가 아직 없다면 `DEJA_BIN`을 지정하거나 아래 명령으로 49개 전체 에이전트 및 `$DSH_HOME/plugins/deja/`를 한 번에 구성합니다:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -75,7 +75,7 @@ React 18 CDN 기반의 브라우저 테스트 파일 `extensions/dsh/test/search
 
 | 재현율 (Recall) | 토큰 사용량 | 인덱싱 & 조회 속도 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1; MemPalace 공개치 96.6%, agentmemory 95.2%) | **토큰 58% 절감** (반복 저장소 작업에서 agentmemory 대비 **절반의 토큰**) | 19,195개 세션 **13.6초** 인덱싱 / 48개 코딩 에이전트 통합 **0.7 ms** 조회 (비교군 7종 중 2위 72초) |
+| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1; MemPalace 공개치 96.6%, agentmemory 95.2%) | **토큰 58% 절감** (반복 저장소 작업에서 agentmemory 대비 **절반의 토큰**) | 19,195개 세션 **13.6초** 인덱싱 / 49개 코딩 에이전트 통합 **0.7 ms** 조회 (비교군 7종 중 2위 72초) |
 
 ## 저장소 메모리 및 에이전트 간 핸드오프
 

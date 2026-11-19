@@ -108,6 +108,7 @@ func hermeticEnv(t *testing.T) string {
 	t.Setenv("DEJA_ANTIGRAVITY_ROOT", filepath.Join(tmp, "antigravity"))
 	t.Setenv("DEJA_GROK_ROOT", filepath.Join(tmp, "grok"))
 	t.Setenv("DEJA_QWEN_ROOT", filepath.Join(tmp, "qwen"))
+	t.Setenv("DEJA_QODER_ROOT", filepath.Join(tmp, "qoder"))
 	t.Setenv("DEJA_COPILOT_ROOT", filepath.Join(tmp, "copilot"))
 	t.Setenv("COPILOT_HOME", "")
 	// Zed resolves its store through the platform data directory, which on

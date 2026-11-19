@@ -8,7 +8,7 @@
 
 ![Демонстрация deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Локальная память для [opencode](https://opencode.ai) по истории сессий ещё 47 кодинг-агентов (Claude Code, Codex, Cursor, Gemini, Hermes, Zed и др.). Работает на едином бинарнике `deja` и локальном BM25 без LLM (`DEJA_OFFLINE=1` отключает ежедневную проверку обновлений).
+Локальная память для [opencode](https://opencode.ai) по истории сессий ещё 48 кодинг-агентов (Claude Code, Codex, Cursor, Gemini, Hermes, Zed и др.). Работает на едином бинарнике `deja` и локальном BM25 без LLM (`DEJA_OFFLINE=1` отключает ежедневную проверку обновлений).
 
 ## Установка
 
@@ -54,7 +54,7 @@
 - `tools`: регистрировать ли шесть инструментов (`true` по умолчанию).
 - `bin`: явный путь к бинарнику `deja`.
 
-Чтобы настроить все 8 режимов MCP (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) сразу для всех 48 агентов, запустите `deja install --auto` ([смена агента без потери контекста](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)).
+Чтобы настроить все 8 режимов MCP (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) сразу для всех 49 агентов, запустите `deja install --auto` ([смена агента без потери контекста](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)).
 
 ## Выбор бинарника
 
@@ -68,7 +68,7 @@
 
 | Полнота (Recall) | Расход токенов | Индексация и поиск |
 |---|---|---|
-| **97.2% R@5** на LongMemEval-S (88.9% hit@1 на 470 вопросах; у MemPalace заявлено 96.6%, у agentmemory — 95.2%) | **на 58% меньше токенов** (**вдвое меньше токенов**, чем у agentmemory на повторных задачах) | **13.6 с** на индекс 19,195 сессий / **0.7 мс** на поиск по 48 кодинг-агентам (следующий из 7 инструментов: 72 с) |
+| **97.2% R@5** на LongMemEval-S (88.9% hit@1 на 470 вопросах; у MemPalace заявлено 96.6%, у agentmemory — 95.2%) | **на 58% меньше токенов** (**вдвое меньше токенов**, чем у agentmemory на повторных задачах) | **13.6 с** на индекс 19,195 сессий / **0.7 мс** на поиск по 49 кодинг-агентам (следующий из 7 инструментов: 72 с) |
 
 ## Память в репозитории и передача сессии (`handoff`)
 

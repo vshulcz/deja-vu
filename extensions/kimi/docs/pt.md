@@ -6,7 +6,7 @@
 
 Parte do **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** no LongMemEval-S · **13.6 s** para indexar 19,195 sessões · **metade dos tokens** do agentmemory) · [Documentação](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Demo ao vivo](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) · **[★ Dar estrela no GitHub](https://github.com/vshulcz/deja-vu)**
 
-O [deja](https://github.com/vshulcz/deja-vu) indexa os arquivos de sessão que os agentes de código já gravam em disco — Claude Code, Codex, Cursor, opencode e mais 44 — e responde a partir deles. Este plugin traz esse índice para o Kimi Code: o histórico relevante chega junto com o prompt, e o agente pode pesquisar por conta própria.
+O [deja](https://github.com/vshulcz/deja-vu) indexa os arquivos de sessão que os agentes de código já gravam em disco — Claude Code, Codex, Cursor, opencode e mais 45 — e responde a partir deles. Este plugin traz esse índice para o Kimi Code: o histórico relevante chega junto com o prompt, e o agente pode pesquisar por conta própria.
 
 ![Demonstração do deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -61,7 +61,7 @@ Duas coisas que ele não consegue enxergar: uma entrada MCP adicionada à mão c
 
 | Recall | Tokens | Indexação e busca |
 |---|---|---|
-| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas; MemPalace publica 96.6%, agentmemory 95.2%) | **58% menos tokens** (**metade dos tokens** do agentmemory em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 48 agentes de código (próximo de 7: 72 s) |
+| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas; MemPalace publica 96.6%, agentmemory 95.2%) | **58% menos tokens** (**metade dos tokens** do agentmemory em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 49 agentes de código (próximo de 7: 72 s) |
 
 ## Memória do repositório e handoff entre agentes
 

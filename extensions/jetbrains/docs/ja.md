@@ -5,7 +5,7 @@
 
 IntelliJ IDEA、GoLand、PyCharm、WebStorm、RustRover、CLion、PhpStorm、Rider（`2024.2+`）向けのローカル横断セッション検索、AI 行単位 blame、エージェント間引き継ぎプラグインです。
 
-[deja-vu](https://github.com/vshulcz/deja-vu) は、Claude Code、Codex、OpenCode、Cursor、Gemini CLI、Junie、GitHub Copilot、Aider、Windsurf など計 48 のコーディングエージェントがディスクに書き出すセッション記録を SQLite FTS5 でローカルインデックス化し、シークレットをマスクしたうえでクラウド不要で参照します。
+[deja-vu](https://github.com/vshulcz/deja-vu) は、Claude Code、Codex、OpenCode、Cursor、Gemini CLI、Junie、GitHub Copilot、Aider、Windsurf など計 49 のコーディングエージェントがディスクに書き出すセッション記録を SQLite FTS5 でローカルインデックス化し、シークレットをマスクしたうえでクラウド不要で参照します。
 
 **[★ GitHub で deja-vu にスターを付ける](https://github.com/vshulcz/deja-vu)** · **[ドキュメント](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[ベンチマーク](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
@@ -14,7 +14,7 @@ IntelliJ IDEA、GoLand、PyCharm、WebStorm、RustRover、CLion、PhpStorm、Rid
 ## 主な機能
 
 - **ステータスバーウィジェット**：現在開いているプロジェクトの `deja statusline` 統計を IDE ステータスバー右側にライブ表示します。クリックすると `deja-vu` アクションポップアップが開きます。
-- **AI セッション検索（`Tools → deja-vu → Search AI Sessions...`）**：対応する全 48 エージェントのローカルセッションを横断検索（`deja search --json`）し、選択した履歴を読み取り専用 Markdown タブで開きます。
+- **AI セッション検索（`Tools → deja-vu → Search AI Sessions...`）**：対応する全 49 エージェントのローカルセッションを横断検索（`deja search --json`）し、選択した履歴を読み取り専用 Markdown タブで開きます。
 - **最近の AI セッション（`Tools → deja-vu → Recent AI Sessions`）**：マシン上の直近 50 セッションを一覧表示（`deja last 50 --json`）し、インクリメンタル検索で絞り込めます。
 - **現在行の AI Blame（エディタ右クリックメニュー / `Tools → deja-vu → AI Blame Current Line`）**：`deja blame <file>:<line> --json`（該当行がなければ `<file>` にフォールバック）を実行し、カーソル行を書いた・変更した AI セッションを開きます。
 - **エージェント間ハンドオフのコピー（`Tools → deja-vu → Copy Cross-Agent Handoff`）**：プロジェクトルートで `deja handoff` を実行し、ダイジェストをクリップボードにコピーして読み取り専用 Markdown タブで表示します。
@@ -54,7 +54,7 @@ cd extensions/jetbrains
 
 | 再現率 | トークン消費 | インデックス & 検索速度 |
 |---|---|---|
-| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1；MemPalace 公表値 96.6%、agentmemory 95.2%） | **トークン 58% 削減**（反復作業において agentmemory の**半分のトークン**） | 19,195 セッションを **13.6 秒**でインデックス / 48 種のエージェント横断で **0.7 ms** 検索（7 ツール中の次点 72 秒） |
+| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1；MemPalace 公表値 96.6%、agentmemory 95.2%） | **トークン 58% 削減**（反復作業において agentmemory の**半分のトークン**） | 19,195 セッションを **13.6 秒**でインデックス / 49 種のエージェント横断で **0.7 ms** 検索（7 ツール中の次点 72 秒） |
 
 ## リポジトリメモリとエージェント間の引き継ぎ
 

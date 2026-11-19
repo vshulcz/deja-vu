@@ -7,9 +7,9 @@
   </a>
 </p>
 
-<p align="center"><b>Gemeinsames lokales Gedächtnis, Agenten-Übergabe und Code-Wiederherstellung für 48 Coding-Agents.</b></p>
+<p align="center"><b>Gemeinsames lokales Gedächtnis, Agenten-Übergabe und Code-Wiederherstellung für 49 Coding-Agents.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes und 41 weitere Agents speichern jede Session ohnehin auf der Platte.<br>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes und 42 weitere Agents speichern jede Session ohnehin auf der Platte.<br>
 deja indiziert alles lokal, damit deine Agents den Kontext über <code>/compact</code> hinweg behalten, Aufgaben per <code>deja handoff</code> übergeben und überschriebenen Code per <code>deja restore</code> wiederherstellen — ohne LLM, ein einziges Go-Binary.</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | Deutsch | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -274,7 +274,7 @@ Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Ro
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
 CodeArts Desktop ·
-TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed.
+Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed.
 
 Was jedes einzelne unterstützt — MCP-Recall, automatischer Recall, Skills, Befehle, Resume, Handoff — steht in
 der [Fähigkeitsmatrix im englischen README](../../README.md#supported-harnesses). Abweichende Speicherorte werden
@@ -379,7 +379,7 @@ Der Index ist inkrementell. Wächst eine Session-Datei, wird nur diese eine Date
 | Funktion | `deja-vu` | `claude-mem` | `MemPalace` |
 | --- | --- | --- | --- |
 | Verlauf vor Installation ([Tag Null](https://vshulcz.github.io/deja-vu/guide/day-zero.html)) | Ja — indiziert vorhandene Transkripte (`36/100` hit@1) | Nein — zeichnet ab Installation auf (`0/100`) | Claude Code, Codex, Cursor (`16/100`) |
-| Geteilte Agenten | 48 Harnesses | 9 (Hooks) | 3 (CLI) |
+| Geteilte Agenten | 49 Harnesses | 9 (Hooks) | 3 (CLI) |
 | LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
 | Laufzeit & Abhängigkeiten | 1 Go-Binary | Bun-Worker + SQLite + Chroma | Python + 300-MB-Embedding-Modell |
 | LLM-Aufrufe / Konto nötig | Keine | Observer-LLM-Aufrufe | Keine |

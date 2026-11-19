@@ -191,7 +191,7 @@
 <h1>Adding memory to Junie</h1>
 <p class="pagelede">MCP and Claude-schema hooks in <code>~/.junie</code>, with the digest on the first prompt<span class="mins" data-mins></span></p>
 
-<p>JetBrains' Junie — both the <code>junie</code> CLI and the agent AI Assistant runs in the IDE — records every session under <code>~/.junie/sessions</code> and opens the next one without it, or anything from the other forty-seven coding agents on the machine.</p>
+<p>JetBrains' Junie — both the <code>junie</code> CLI and the agent AI Assistant runs in the IDE — records every session under <code>~/.junie/sessions</code> and opens the next one without it, or anything from the other forty-eight coding agents on the machine.</p>
 <div class="term-shot"><img src="../assets/demo.gif" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier" loading="lazy"><p class="cap">same prompt before and after deja — local BM25 recall across past sessions on disk, zero LLM calls</p></div>
 
 <h2>What Junie already has</h2>
@@ -211,7 +211,7 @@
 <p>A project's own <code>.junie/config.json</code> hooks run beside these once the project is trusted.</p>
 
 <h2>The part that is not about this harness</h2>
-<p>The index covers every agent's transcripts on the machine — forty-eight of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code or Cursor answers a question asked in Junie. Indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+<p>The index covers every agent's transcripts on the machine — forty-nine of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code or Cursor answers a question asked in Junie. Indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
 
 <h2>Repository memory &amp; handoff</h2>
 <p>Share vetted project decisions and dead ends through git in <code>.deja/memory.jsonl</code> (<code>deja repo candidates</code>, <code>deja repo add &lt;id&gt;</code>). Entries are redacted on write, stored sorted with <code>merge=union</code> so parallel branches merge cleanly, and loaded for any teammate who clones the repository (<code>{"activations":{"auto":{"repo":false}}}</code> in the trust policy keeps them out of hooks). See <a href="repo-memory.html">repo memory</a>.</p>

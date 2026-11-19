@@ -63,7 +63,7 @@ A extensão registra um hook opcional `before_implement`. Ao rodar `/speckit.imp
 
 | Recall | Tokens | Indexação e busca |
 |---|---|---|
-| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas; MemPalace publica 96.6%, agentmemory 95.2%) | **58% menos tokens** (**metade dos tokens** do agentmemory em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 48 agentes de código (próximo de 7: 72 s) |
+| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas; MemPalace publica 96.6%, agentmemory 95.2%) | **58% menos tokens** (**metade dos tokens** do agentmemory em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 49 agentes de código (próximo de 7: 72 s) |
 
 ## Memória do repositório e handoff entre agentes
 
