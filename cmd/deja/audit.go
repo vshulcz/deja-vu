@@ -20,9 +20,13 @@ import (
 const defaultClaudeCleanupDays = 30
 
 type auditStoreRow struct {
-	Name  string `json:"name"`
-	Files int    `json:"files"`
-	Bytes int64  `json:"bytes"`
+	Name              string         `json:"name"`
+	Files             int            `json:"files"`
+	Bytes             int64          `json:"bytes"`
+	ExpiringFiles     int            `json:"expiring_files,omitempty"`
+	SecretFiles       int            `json:"secret_files,omitempty"`
+	SecretMatches     int            `json:"secret_matches,omitempty"`
+	CredentialClasses map[string]int `json:"credential_classes,omitempty"`
 }
 
 type auditClaudeRetention struct {
@@ -39,6 +43,10 @@ type auditReport struct {
 	Stores             []auditStoreRow      `json:"stores"`
 	TotalFiles         int                  `json:"total_files"`
 	TotalBytes         int64                `json:"total_bytes"`
+	SecretsScanned     bool                 `json:"secrets_scanned,omitempty"`
+	SecretFiles        int                  `json:"secret_files,omitempty"`
+	SecretMatches      int                  `json:"secret_matches,omitempty"`
+	CredentialClasses  map[string]int       `json:"credential_classes,omitempty"`
 	ClaudeRetention    auditClaudeRetention `json:"claude_retention"`
 	ClaudeMemDBPresent bool                 `json:"claude_mem_db_present"`
 	ClaudeMemDBBytes   int64                `json:"claude_mem_db_bytes,omitempty"`
@@ -52,35 +60,51 @@ var auditNow = time.Now
 
 func runAudit(dir string, args []string, stdout io.Writer) error {
 	jsonOut := false
+	scanSecrets := false
+	failOnSecrets := false
 	for _, a := range args {
 		switch a {
 		case "--json":
 			jsonOut = true
+		case "--secrets":
+			scanSecrets = true
+		case "--fail-on-secrets":
+			failOnSecrets = true
+			scanSecrets = true
 		default:
 			if strings.HasPrefix(a, "-") {
-				return fmt.Errorf("audit: unknown flag %q", a)
+				return unknownFlag("audit", a, auditFlags)
 			}
 			return fmt.Errorf("audit takes no positional arguments — got %q", a)
 		}
 	}
 
-	rep := collectAudit(dir, auditNow())
+	rep := collectAuditWithOptions(dir, auditNow(), scanSecrets)
 	rep.SchemaVersion = jsonout.Version
 	if jsonOut {
 		enc := json.NewEncoder(stdout)
 		enc.SetIndent("", "  ")
-		return enc.Encode(rep)
+		if err := enc.Encode(rep); err != nil {
+			return err
+		}
+		if failOnSecrets && rep.SecretMatches > 0 {
+			return fmt.Errorf("%w: %d unredacted credential(s) found", errAlreadySaid, rep.SecretMatches)
+		}
+		return nil
 	}
 	printAuditReport(stdout, rep)
-	if rep.TotalFiles >= 50 {
+	if rep.TotalFiles >= 50 && dir != "" && dirExists(dir) && (!failOnSecrets || rep.SecretMatches == 0) {
 		if tip := maybeStarTip(dir, 15); tip != "" {
 			fmt.Fprintln(os.Stderr, "\n"+strings.TrimSpace(tip))
 		}
 	}
+	if failOnSecrets && rep.SecretMatches > 0 {
+		return fmt.Errorf("%w: %d unredacted credential(s) found", errAlreadySaid, rep.SecretMatches)
+	}
 	return nil
 }
 
-func collectAudit(dir string, now time.Time) auditReport {
+func collectAuditWithOptions(dir string, now time.Time, scanSecrets bool) auditReport {
 	var rep auditReport
 	rep.Stores = []auditStoreRow{}
 	rep.WiredTargets = []string{}
@@ -167,28 +191,31 @@ func collectAudit(dir string, now time.Time) auditReport {
 		preservedDel int
 	)
 
-	// Keep index reads in a single goroutine while store scans run concurrently.
-	wg.Go(func() {
-		if n, err := index.SessionCount(dir); err == nil && n > 0 {
-			idxSessions = n
-			seenPaths := map[string]bool{}
-			_ = index.EachRecordOfRole(dir, index.RoleEdit, func(_ index.SessionMeta, r index.Record) {
-				if recorded, _, ok := strings.Cut(r.Text, "\n"); ok && recorded != "" {
-					seenPaths[recorded] = true
-				}
-			})
-			recoverFiles = len(seenPaths)
-		}
-		if !claudeSkipped {
-			if kept, err := index.KeptSince(dir, time.Unix(1, 0), now.Add(time.Second)); err == nil {
-				for _, k := range kept {
-					if k.Harness == "claude" {
-						preservedDel++
+	// Keep index reads in a single goroutine while store scans run concurrently,
+	// and never touch missing index directories during indexless audits.
+	if dir != "" && dirExists(dir) {
+		wg.Go(func() {
+			if n, err := index.SessionCount(dir); err == nil && n > 0 {
+				idxSessions = n
+				seenPaths := map[string]bool{}
+				_ = index.EachRecordOfRole(dir, index.RoleEdit, func(_ index.SessionMeta, r index.Record) {
+					if recorded, _, ok := strings.Cut(r.Text, "\n"); ok && recorded != "" {
+						seenPaths[recorded] = true
+					}
+				})
+				recoverFiles = len(seenPaths)
+			}
+			if !claudeSkipped {
+				if kept, err := index.KeptSince(dir, time.Unix(1, 0), now.Add(time.Second)); err == nil {
+					for _, k := range kept {
+						if k.Harness == "claude" {
+							preservedDel++
+						}
 					}
 				}
 			}
-		}
-	})
+		})
+	}
 
 	workers := min(nJobs, max(runtime.GOMAXPROCS(0), 4))
 	for range workers {
@@ -212,8 +239,10 @@ func collectAudit(dir string, now time.Time) auditReport {
 					},
 					ok: true,
 				}
-				if sp.name == "claude" {
+				if sp.name == "claude" || scanSecrets {
 					res.files = files
+				}
+				if sp.name == "claude" {
 					res.infos = infos
 				}
 				results[i] = res
@@ -235,7 +264,11 @@ func collectAudit(dir string, now time.Time) auditReport {
 	var (
 		claudeFiles []string
 		claudeInfos []os.FileInfo
+		storeFiles  map[string][]string
 	)
+	if scanSecrets {
+		storeFiles = make(map[string][]string, len(results))
+	}
 	for i, res := range results {
 		if !res.ok {
 			continue
@@ -243,6 +276,9 @@ func collectAudit(dir string, now time.Time) auditReport {
 		rep.Stores = append(rep.Stores, res.row)
 		rep.TotalFiles += res.row.Files
 		rep.TotalBytes += res.row.Bytes
+		if scanSecrets {
+			storeFiles[specs[i].name] = res.files
+		}
 		if specs[i].name == "claude" {
 			claudeFiles = res.files
 			claudeInfos = res.infos
@@ -256,6 +292,17 @@ func collectAudit(dir string, now time.Time) auditReport {
 	})
 
 	rep.ClaudeRetention = collectClaudeRetention(now, days, explicit, claudeSkipped, claudeFiles, claudeInfos, preservedDel)
+	if claudeAtRisk := rep.ClaudeRetention.PastPeriod + rep.ClaudeRetention.ExpiringIn7Days; claudeAtRisk > 0 {
+		for i := range rep.Stores {
+			if rep.Stores[i].Name == "claude" {
+				rep.Stores[i].ExpiringFiles = claudeAtRisk
+				break
+			}
+		}
+	}
+	if scanSecrets {
+		applyAuditSecretScan(&rep, storeFiles)
+	}
 	rep.IndexedSessions = idxSessions
 	rep.RecoverableFiles = recoverFiles
 
@@ -394,6 +441,28 @@ func printAuditReport(w io.Writer, rep auditReport) {
 	if rep.ClaudeMemDBPresent {
 		fmt.Fprintf(w, "migrate:  claude-mem.db detected (%s) — deja reads it directly without sign-in\n",
 			humanBytes(rep.ClaudeMemDBBytes))
+	}
+
+	if rep.SecretsScanned {
+		if rep.SecretMatches == 0 {
+			fmt.Fprintln(w, "secrets:  0 unredacted credentials found in raw transcripts")
+		} else {
+			matchWord := "match"
+			if rep.SecretMatches != 1 {
+				matchWord = "matches"
+			}
+			var storeParts []string
+			for _, s := range rep.Stores {
+				if s.SecretMatches > 0 {
+					storeParts = append(storeParts, fmt.Sprintf("%s (%d file%s)", s.Name, s.SecretFiles, pluralS(s.SecretFiles)))
+				}
+			}
+			fmt.Fprintf(w, "secrets:  %s unredacted %s across %s file%s (%s) — %s\n",
+				grouped(rep.SecretMatches), matchWord,
+				grouped(rep.SecretFiles), pluralS(rep.SecretFiles),
+				strings.Join(storeParts, ", "),
+				formatAuditClassSummary(rep.CredentialClasses))
+		}
 	}
 
 	if rep.IndexedSessions > 0 {

@@ -28,7 +28,7 @@ const releaseNoticeInterval = 24 * time.Hour
 // whose whole job is the upgrade: a second line there would only repeat them.
 // `-v` is not here: it is a search for "-v", not a version flag.
 var releaseNoticeSkips = map[string]bool{
-	"update": true, "doctor": true, "status": true, "version": true, "--version": true, "-version": true,
+	"update": true, "doctor": true, "audit": true, "status": true, "version": true, "--version": true, "-version": true,
 }
 
 // harnessRunCommand is a command an agent or its harness starts, never a

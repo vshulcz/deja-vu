@@ -118,7 +118,7 @@ var worksWithNoHome = map[string]bool{
 	"version": true, "--version": true, "-version": true,
 	"help": true, "--help": true, "-h": true,
 	"completion": true, "shell": true, "update": true,
-	"doctor": true, "sources": true, "status": true,
+	"doctor": true, "audit": true, "sources": true, "status": true,
 	"install": true, "uninstall": true,
 }
 

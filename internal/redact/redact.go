@@ -546,8 +546,15 @@ const pemBreak = `(?:[ \t]*\r?\n|(?:\\+r)?\\+n)[ \t]*`
 func TextKinds(s string, allow map[string]bool) (string, Counts) { return textPass(s, allow, true) }
 
 func textPass(s string, allow map[string]bool, fast bool) (string, Counts) {
-	counts := Counts{}
 	if Disabled() || s == "" {
+		return s, Counts{}
+	}
+	return scanPass(s, allow, fast)
+}
+
+func scanPass(s string, allow map[string]bool, fast bool) (string, Counts) {
+	counts := Counts{}
+	if s == "" {
 		return s, counts
 	}
 	p := kindPass{counts: counts, allow: allow}
