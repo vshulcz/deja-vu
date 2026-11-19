@@ -121,7 +121,7 @@ func TestSearchSubstringPostingsDirErrorAndEmptyAfterCut(t *testing.T) {
 	}
 }
 
-// appendIncremental's own defensive branches: a nil Sessions map must be
+// appendPrepared's own defensive branches: a nil Sessions map must be
 // initialized, and a changed path absent from old.Files (violating the
 // normal canAppendIncremental invariant, reachable only via this direct
 // same-package call) must be dropped from Files rather than panicking.
@@ -153,8 +153,8 @@ func TestAppendIncrementalDirectDefensiveBranches(t *testing.T) {
 	old := Manifest{Files: map[string]FileState{}, Sessions: nil}
 	changed := map[string]FileState{unknown: {Path: unknown, Size: 1}}
 	files := map[string]FileState{unknown: {Path: unknown, Size: 1}}
-	if _, _, _, err := appendIncremental(filepath.Join(tmp, "idx"), "", "", old, files, changed); err != nil {
-		t.Fatalf("appendIncremental defensive branches err=%v", err)
+	if _, _, _, err := appendPrepared(filepath.Join(tmp, "idx"), "", "", old, files, changed, nil); err != nil {
+		t.Fatalf("appendPrepared defensive branches err=%v", err)
 	}
 	if _, ok := files[unknown]; ok {
 		t.Fatalf("changed path absent from old.Files should have been dropped: %#v", files)

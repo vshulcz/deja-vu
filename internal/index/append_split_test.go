@@ -2,6 +2,7 @@ package index
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -9,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -314,4 +316,413 @@ func TestAMixedBatchOfDistinctSessionsSplitsAndMatchesRebuild(t *testing.T) {
 	}
 	sessionMatchesRebuild(t, dir, "claude", "s-a")
 	sessionMatchesRebuild(t, dir, "claude", "s-b")
+}
+
+// A new transcript beside a torn tail must not make a large, grown transcript
+// dead weight in records.bin (#6077).
+func TestATornTailAndNewFileStillAppendTheGrownTranscript(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	claude := os.Getenv("DEJA_CLAUDE_ROOT")
+	big := filepath.Join(claude, "p", "big.jsonl")
+	torn := filepath.Join(claude, "p", "torn.jsonl")
+	var body strings.Builder
+	for i := range 200 {
+		body.WriteString(claudeLine("s-big", fmt.Sprintf("2026-01-02T03:%02d:%02dZ", i/60, i%60), fmt.Sprintf("turn %d about the exporter retry loop", i)))
+	}
+	write(t, big, body.String())
+	full := claudeLine("s-torn", "2026-01-02T03:04:05Z", "the cache warms on boot")
+	write(t, torn, claudeLine("s-torn", "2026-01-02T03:04:00Z", "first turn")+full[:len(full)/2])
+	dir := filepath.Join(tmp, "idx")
+	indexPass(t, dir)
+	before, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f := before.Files[torn]; f.SafeSize >= f.Size || before.DeadBytes != 0 {
+		t.Fatalf("control: torn file = %+v, dead bytes = %d", f, before.DeadBytes)
+	}
+	var bigOffsets []int64
+	tbl := tablesFromManifest(before)
+	if err = eachStoredRecord(filepath.Join(dir, "records.bin"), tbl, func(off int64, payload []byte) error {
+		r, decErr := decodeRecord(payload, tbl)
+		if decErr == nil && r.SourcePath == big {
+			bigOffsets = append(bigOffsets, off)
+		}
+		return decErr
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(bigOffsets) != 200 {
+		t.Fatalf("control: big transcript has %d records, want 200", len(bigOffsets))
+	}
+
+	appendTo(t, torn, full[len(full)/2:])
+	appendTo(t, big, claudeLine("s-big", "2026-01-02T05:00:00Z", "one new turn on the big session"))
+	write(t, filepath.Join(claude, "p", "new.jsonl"), claudeLine("s-new", "2026-01-02T05:00:01Z", "a new session starts"))
+	var progress bytes.Buffer
+	if err = Ensure(dir, "", false, &progress); err != nil {
+		t.Fatal(err)
+	}
+	got := progress.String()
+	if !strings.Contains(got, "updated 1 file (1 new message)") {
+		t.Errorf("the 200-turn transcript was not appended: %q", got)
+	}
+	if !strings.Contains(got, replacementPassMarker+" 2 changed transcripts") {
+		t.Errorf("replacement should read only the torn and new files: %q", got)
+	}
+	after, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Only the torn file's first turn may be dead; none of big's 200 turns.
+	if len(after.DeadRecords) != 1 {
+		t.Errorf("dead records = %d, want only the torn file's old turn (dead bytes %d)", len(after.DeadRecords), after.DeadBytes)
+	}
+	for _, off := range bigOffsets {
+		if slices.Contains(after.DeadRecords, off) {
+			t.Fatalf("the 200-turn transcript has a dead record at %d", off)
+		}
+	}
+	t.Logf("progress: %q; dead bytes %d -> %d, none from the 200-turn transcript", got, before.DeadBytes, after.DeadBytes)
+	sessionMatchesRebuild(t, dir, "claude", "s-big")
+	sessionMatchesRebuild(t, dir, "claude", "s-torn")
+	sessionMatchesRebuild(t, dir, "claude", "s-new")
+}
+
+func TestANewFileSharingAnAppendedSessionKeepsTheBatchWhole(t *testing.T) {
+	for _, tc := range []struct {
+		name, initial, id string
+	}{
+		{"existing ID", claudeLine("s-grown", "2026-01-02T03:04:05Z", "alpha one"), "s-grown"},
+		// No earlier user/assistant line names this file's session, so the
+		// first such line can introduce an ID without preventing an append.
+		{"introduced tail ID", "{\"type\":\"summary\",\"summary\":\"waiting for the first prompt\"}\n", "s-tail"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := hermeticIndexEnv(t)
+			claude := os.Getenv("DEJA_CLAUDE_ROOT")
+			grown := filepath.Join(claude, "p", "grown.jsonl")
+			rewritten := filepath.Join(claude, "p", "rewritten.jsonl")
+			write(t, grown, tc.initial)
+			write(t, rewritten, claudeLine("s-other", "2026-01-02T03:04:05Z", "beta cache"))
+			dir := filepath.Join(tmp, "idx")
+			indexPass(t, dir)
+			before, err := readManifest(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.id == "s-tail" {
+				if _, ok := before.Sessions["claude:"+tc.id]; ok {
+					t.Fatal("control: tail ID already has a session row")
+				}
+				if _, ok := before.Empty["claude:"+tc.id]; ok {
+					t.Fatal("control: tail ID already has an empty row")
+				}
+			}
+			line := claudeLine(tc.id, "2026-01-02T04:00:00Z", "alpha three")
+			appendTo(t, grown, line)
+			write(t, rewritten, claudeLine("s-other", "2026-01-02T03:04:05Z", "beta queue"))
+			bumpMTime(t, rewritten)
+			write(t, filepath.Join(claude, "p", "new.jsonl"), line+claudeLine(tc.id, "2026-01-02T05:00:00Z", "charlie four"))
+			changed, _, _ := diffWalk(currentFiles(""), before.Files)
+			appendable, rest := splitAppendable(changed, before.Files, before.Sessions)
+			if _, ok := appendable[grown]; !ok || len(appendable) != 1 || len(rest) != 2 {
+				t.Fatalf("control: must reach the overlap guard with one append and two rest files: %v %v", appendable, rest)
+			}
+			var progress bytes.Buffer
+			if err := Ensure(dir, "", false, &progress); err != nil {
+				t.Fatal(err)
+			}
+			got := progress.String()
+			if strings.Contains(got, "updated") || !strings.Contains(got, replacementPassMarker+" 3 changed transcripts") {
+				t.Errorf("overlapping sessions must be replaced together: %q", got)
+			}
+			t.Logf("overlap guard: 1 append candidate, 2 rest files; progress: %q", got)
+			sessionMatchesRebuild(t, dir, "claude", tc.id)
+			sessionMatchesRebuild(t, dir, "claude", "s-other")
+		})
+	}
+}
+
+// A known file's torn first line has no row or Copies entry yet. Completing
+// it can reveal the same session as an append, just as a new file can.
+func TestAKnownFileWithoutARowSharingAnAppendKeepsTheBatchWhole(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	claude := os.Getenv("DEJA_CLAUDE_ROOT")
+	grown := filepath.Join(claude, "z", "s.jsonl")
+	torn := filepath.Join(claude, "a", "s.jsonl")
+	const command = "go test ./zzsplit"
+	full := `{"type":"assistant","sessionId":"s","timestamp":"2026-01-02T03:04:05Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"call1","name":"Bash","input":{"command":"` + command + `"}}]}}` + "\n"
+	write(t, grown, full)
+	write(t, torn, full[:len(full)/2])
+	dir := filepath.Join(tmp, "idx")
+	indexPass(t, dir)
+	before, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f, known := before.Files[torn]; !known || f.SafeSize >= f.Size {
+		t.Fatalf("control: torn file must be known and incomplete: %+v, known=%t", f, known)
+	}
+	for _, rows := range []map[string]SessionMeta{before.Sessions, before.Empty} {
+		for _, row := range rows {
+			if slices.Contains(sessionFiles(row), torn) {
+				t.Fatalf("control: a session row already names the torn file: %+v", row)
+			}
+		}
+	}
+	if row := before.Sessions["claude:s"]; row.Path != grown || len(row.Copies) != 0 || !row.RanCommand {
+		t.Fatalf("control: command must belong to the grown file alone: %+v", row)
+	}
+
+	appendTo(t, grown, claudeLine("s", "2026-01-02T04:00:00Z", "alpha three"))
+	appendTo(t, torn, full[len(full)/2:])
+	// A second session running the command makes it visible in ReadCommands,
+	// which lists only commands run in at least two distinct sessions.
+	write(t, filepath.Join(claude, "n", "new.jsonl"), strings.Replace(full, `"sessionId":"s"`, `"sessionId":"s-new"`, 1))
+	var progress bytes.Buffer
+	if err := Ensure(dir, "", false, &progress); err != nil {
+		t.Fatal(err)
+	}
+	if got := progress.String(); strings.Contains(got, "updated") || !strings.Contains(got, replacementPassMarker+" 3 changed transcripts") {
+		t.Errorf("overlapping sessions must be replaced together: %q", got)
+	}
+	if !commandsHold(dir, command) {
+		t.Error("the command disappeared after completing the known torn file")
+	}
+	sessionMatchesRebuild(t, dir, "claude", "s")
+	sessionMatchesRebuild(t, dir, "claude", "s-new")
+	sameCommandTables(t, dir)
+}
+
+// A row names the known rest file's old session, but its appended lines can
+// move the whole file to a session the append half touches.
+func TestAKnownFileChangingSessionToAnAppendKeepsTheBatchWhole(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	claude := os.Getenv("DEJA_CLAUDE_ROOT")
+	grown := filepath.Join(claude, "z", "s.jsonl")
+	changed := filepath.Join(claude, "a", "old.jsonl")
+	const command = "go test ./zzsplit"
+	full := `{"type":"assistant","sessionId":"s","timestamp":"2026-01-02T03:04:05Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"call1","name":"Bash","input":{"command":"` + command + `"}}]}}` + "\n"
+	write(t, grown, full)
+	write(t, changed, claudeLine("old", "2026-01-02T03:04:00Z", "first turn"))
+	dir := filepath.Join(tmp, "idx")
+	indexPass(t, dir)
+	before, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row := before.Sessions["claude:old"]; row.Path != changed || len(row.Copies) != 0 {
+		t.Fatalf("control: a row must name the known rest file: %+v", row)
+	}
+	if row := before.Sessions["claude:s"]; row.Path != grown || len(row.Copies) != 0 || !row.RanCommand {
+		t.Fatalf("control: command must belong to the grown file alone: %+v", row)
+	}
+
+	appendTo(t, grown, claudeLine("s", "2026-01-02T04:00:00Z", "alpha three"))
+	appendTo(t, changed, full)
+	// ReadCommands lists commands run in at least two distinct sessions.
+	write(t, filepath.Join(claude, "n", "new.jsonl"), strings.Replace(full, `"sessionId":"s"`, `"sessionId":"new"`, 1))
+	files, _, _ := diffWalk(currentFiles(""), before.Files)
+	appendable, rest := splitAppendable(files, before.Files, before.Sessions)
+	if _, ok := appendable[grown]; !ok || len(appendable) != 1 || len(rest) != 2 {
+		t.Fatalf("control: must reach the overlap guard with one append and two rest files: %v %v", appendable, rest)
+	}
+	if _, ok := rest[changed]; !ok {
+		t.Fatal("control: the changed session ID must send the known file to replacement")
+	}
+	var progress bytes.Buffer
+	if err := Ensure(dir, "", false, &progress); err != nil {
+		t.Fatal(err)
+	}
+	if got := progress.String(); strings.Contains(got, "updated") || !strings.Contains(got, replacementPassMarker+" 3 changed transcripts") {
+		t.Errorf("overlapping sessions must be replaced together: %q", got)
+	}
+	if !commandsHold(dir, command) {
+		t.Error("the command disappeared after the known file changed session ID")
+	}
+	for _, u := range ReadCommands(dir) {
+		if strings.TrimPrefix(u.Command, "$ ") == command && u.Sessions != 2 {
+			t.Errorf("command has %d sessions, want 2", u.Sessions)
+		}
+	}
+	for _, id := range []string{"old", "s", "new"} {
+		sessionMatchesRebuild(t, dir, "claude", id)
+	}
+	sameCommandTables(t, dir)
+}
+
+func TestSplitSessionKeysMustBeDisjoint(t *testing.T) {
+	s := model.Session{Harness: "codex", ID: "s"}
+	for _, tc := range []struct {
+		name               string
+		rows, empty        map[string]SessionMeta
+		appended, replaced []model.Session
+		overlap            bool
+	}{
+		{
+			name:     "disjoint old and parsed keys",
+			rows:     map[string]SessionMeta{"codex:a": {Path: "a"}, "codex:b": {Path: "b"}},
+			appended: []model.Session{s}, replaced: []model.Session{{Harness: "codex", ID: "t"}},
+		},
+		{
+			name:    "old row names both halves",
+			rows:    map[string]SessionMeta{"codex:s": {Path: "a", Copies: []string{"b"}}},
+			overlap: true,
+		},
+		{
+			name:     "old append row and parsed rest key",
+			rows:     map[string]SessionMeta{"codex:s": {Path: "a"}},
+			replaced: []model.Session{s}, overlap: true,
+		},
+		{
+			name:     "parsed append key and old rest row",
+			rows:     map[string]SessionMeta{"codex:s": {Path: "b"}},
+			appended: []model.Session{s}, overlap: true,
+		},
+		{
+			name:     "parsed keys in both halves",
+			appended: []model.Session{s}, replaced: []model.Session{s}, overlap: true,
+		},
+		{
+			name:     "empty append row and parsed rest key",
+			empty:    map[string]SessionMeta{"codex:s": {Path: "a"}},
+			replaced: []model.Session{s}, overlap: true,
+		},
+		{
+			name:     "parsed append key and empty rest row",
+			empty:    map[string]SessionMeta{"codex:s": {Path: "b"}},
+			appended: []model.Session{s}, overlap: true,
+		},
+		{
+			name:     "append copy beside a kept owner",
+			rows:     map[string]SessionMeta{"codex:s": {Path: "kept", Copies: []string{"a"}}},
+			replaced: []model.Session{s}, overlap: true,
+		},
+		{
+			name:     "rest copy beside a kept owner",
+			empty:    map[string]SessionMeta{"codex:s": {Path: "kept", Copies: []string{"b"}}},
+			appended: []model.Session{s}, overlap: true,
+		},
+		{
+			name:     "same ID in different harnesses",
+			rows:     map[string]SessionMeta{"claude:s": {Path: "b"}},
+			appended: []model.Session{s},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			old := Manifest{Sessions: tc.rows, Empty: tc.empty}
+			ready := &splitReads{
+				appendFiles: map[string]splitRead{"a": {sessions: tc.appended}},
+				restFiles:   map[string]splitRead{"b": {sessions: tc.replaced}},
+			}
+			if got := splitOverlaps(old, map[string]FileState{"a": {}}, map[string]FileState{"b": {}}, ready); got != tc.overlap {
+				t.Errorf("overlap = %t, want %t", got, tc.overlap)
+			}
+		})
+	}
+}
+
+// A rewritten history can lose a session that an appended rollout takes over.
+// Its old row must keep the two files in the same replacement pass.
+func TestACodexHistoryLosingAnAppendedSessionKeepsTheBatchWhole(t *testing.T) {
+	tmp := parityEnv(t, map[string]string{"DEJA_CODEX_ROOT": "codex", "DEJA_XCODE_CODEX_ROOT": "xcode-codex"})
+	t.Setenv("CODEX_HOME", "")
+	const s = "019a0000-0000-7000-8000-000000000001"
+	const other = "019a0000-0000-7000-8000-000000000002"
+	const fresh = "019a0000-0000-7000-8000-000000000003"
+	const prompt = "why does the exporter retry loop stall"
+	at := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
+	history := filepath.Join(tmp, "codex", "history.jsonl")
+	rollout := filepath.Join(tmp, "xcode-codex", "sessions", "rollout-"+s+".jsonl")
+	meta := func(id string) string {
+		return codexLine(at, "session_meta", map[string]any{"id": id, "cwd": "/w/app"})
+	}
+	message := codexLine(at, "response_item", map[string]any{"type": "message", "role": "user",
+		"content": []any{map[string]any{"type": "input_text", "text": prompt}}})
+	otherLine := codexHistoryLine(other, at, "why does the cache warm on boot")
+	write(t, history, codexHistoryLine(s, at, prompt)+otherLine)
+	write(t, rollout, meta(s))
+	dir := filepath.Join(tmp, "idx")
+	indexPass(t, dir)
+	before, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row := before.Sessions["codex:"+s]; row.Path != history || len(row.Copies) != 0 {
+		t.Fatalf("control: S must belong to history alone: %+v", row)
+	}
+	if _, known := before.Files[rollout]; !known {
+		t.Fatal("control: the metadata-only rollout must already be known")
+	}
+	write(t, history, otherLine)
+	appendTo(t, rollout, message)
+	write(t, filepath.Join(tmp, "xcode-codex", "sessions", "rollout-"+fresh+".jsonl"), meta(fresh)+message)
+	changed, _, _ := diffWalk(currentFiles(""), before.Files)
+	appendable, rest := splitAppendable(changed, before.Files, before.Sessions)
+	if _, ok := appendable[rollout]; !ok || len(appendable) != 1 || len(rest) != 2 {
+		t.Fatalf("control: must reach the overlap guard with one append and two rest files: %v %v", appendable, rest)
+	}
+	var progress bytes.Buffer
+	if err := Ensure(dir, "", false, &progress); err != nil {
+		t.Fatal(err)
+	}
+	if got := progress.String(); strings.Contains(got, "updated") || !strings.Contains(got, replacementPassMarker+" 3 changed transcripts") {
+		t.Errorf("history and its rollout must be replaced together: %q", got)
+	}
+	for _, id := range []string{s, other, fresh} {
+		sessionMatchesRebuild(t, dir, "codex", id)
+	}
+}
+
+// Early reads must carry their diagnostics to the half that records the file,
+// without losing or doubling counts when append writes its manifest first.
+func TestASplitWithANewFileKeepsItsReadAccounting(t *testing.T) {
+	for _, tc := range []struct {
+		name, id string
+		whole    bool
+	}{
+		{"distinct session", "s-new", false},
+		{"shares appended session", "s-grown", true},
+		{"shares replaced session", "s-other", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := hermeticIndexEnv(t)
+			claude := os.Getenv("DEJA_CLAUDE_ROOT")
+			grown := filepath.Join(claude, "p", "grown.jsonl")
+			rewritten := filepath.Join(claude, "p", "rewritten.jsonl")
+			fresh := filepath.Join(claude, "p", "new.jsonl")
+			write(t, grown, claudeLine("s-grown", "2026-01-02T03:04:05Z", "alpha one"))
+			write(t, rewritten, claudeLine("s-other", "2026-01-02T03:04:05Z", "beta cache"))
+			dir := filepath.Join(tmp, "idx")
+			indexPass(t, dir)
+			appendTo(t, grown, "{bad tail}\n"+claudeLine("s-grown", "2026-01-02T04:00:00Z", "alpha three"))
+			write(t, rewritten, claudeLine("s-other", "2026-01-02T03:04:05Z", "beta queue"))
+			bumpMTime(t, rewritten)
+			write(t, fresh, "{bad new}\n"+claudeLine(tc.id, "2026-01-02T05:00:00Z", "token ghp_abcdefghijklmnop0123456789QRSTUV"))
+			var progress bytes.Buffer
+			if err := Ensure(dir, "", false, &progress); err != nil {
+				t.Fatal(err)
+			}
+			if appended := strings.Contains(progress.String(), "updated 1 file"); appended == tc.whole {
+				t.Errorf("whole replacement = %t, progress: %q", tc.whole, progress.String())
+			}
+			m, err := readManifest(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, p := range []string{fresh, grown} {
+				if got := m.IngestFiles[p].Malformed; got != 1 {
+					t.Errorf("%s malformed lines = %d, want 1", filepath.Base(p), got)
+				}
+			}
+			if got := m.Files[fresh].Redactions; got != 1 {
+				t.Errorf("new file redactions = %d, want 1", got)
+			}
+			if ok, _ := UpToDate(dir, ""); !ok {
+				t.Error("early read's file state was not recorded")
+			}
+			sessionMatchesRebuild(t, dir, "claude", tc.id)
+		})
+	}
 }

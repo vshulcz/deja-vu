@@ -25,6 +25,7 @@ type replacePass struct {
 	removed, kept       map[string]bool
 	unseen, newlyKept   map[string]bool
 	sharedBy            map[string][]string
+	readAhead           map[string]splitRead
 
 	logTails     map[string]map[string]bool
 	keysFrom     map[string][]string
@@ -166,7 +167,11 @@ func (rp *replacePass) read(p string, f FileState) {
 		rp.diffs = append(rp.diffs, p)
 		return
 	}
-	ss, f, again, readErr := readSettled(p, f, func() ([]model.Session, error) { return parseChangedFile(rp.harness, p, rp.old.Files[p]) })
+	r, read := rp.readAhead[p]
+	if !read {
+		r.sessions, r.at, r.again, r.err = readSettled(p, f, func() ([]model.Session, error) { return parseChangedFile(rp.harness, p, rp.old.Files[p]) })
+	}
+	ss, f, again, readErr := r.sessions, r.at, r.again, r.err
 	if readErr != nil {
 		rp.skip(p, readErr)
 		return

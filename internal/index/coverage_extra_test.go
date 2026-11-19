@@ -1002,8 +1002,8 @@ func TestIndexErrorBranches(t *testing.T) {
 		t.Fatal(err)
 	}
 	old := Manifest{Files: map[string]FileState{changed: {Path: changed, Size: 0}}, Sessions: map[string]SessionMeta{}, Scope: ""}
-	if _, _, _, err := appendIncremental(filepath.Join(tmp, "missing-index"), "", "", old, old.Files, old.Files); err == nil {
-		t.Fatal("appendIncremental missing dir returned nil")
+	if _, _, _, err := appendPrepared(filepath.Join(tmp, "missing-index"), "", "", old, old.Files, old.Files, nil); err == nil {
+		t.Fatal("appendPrepared missing dir returned nil")
 	}
 	if got := canAppendIncremental(nil, nil); got {
 		t.Fatal("empty canAppendIncremental true")
