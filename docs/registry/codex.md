@@ -32,5 +32,6 @@ History entries map to one-message sessions with role `user` and project `histor
 - `history.jsonl` duplicates user prompts but lacks assistant responses and project metadata.
 - Reading a compressed rollout needs the `zstd` CLI; without it the store reports `zstd CLI not found` rather than quietly holding fewer sessions. A store of plain rollouts needs nothing.
 - Older records use `payload.message`; current records generally use structured `payload.content`.
+- Imported external-agent sessions (Codex Desktop) flatten the foreign tool calls into `[external_agent_tool_call:` / `[external_agent_tool_result` text envelopes inside assistant output_text; the parser restores them into tool calls, command lines, and tool outputs, and keeps an unclosed envelope or a result with no pending call in the prose rather than dropping it.
 
 **Last verified:** 2026-09-10

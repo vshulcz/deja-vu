@@ -586,6 +586,15 @@ func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD stri
 			}
 			return
 		}
+		// Codex Desktop imported external-agent sessions flatten the foreign
+		// tool calls into text envelopes inside assistant output_text. Split
+		// them back out (codexExternalAgentText): prose stays prose, calls and
+		// results become deja's tool shapes. Roled stream only — the event
+		// fallback keeps envelopes as prose rather than losing the session.
+		if role == "assistant" && txt != "" && strings.Contains(txt, "[external_agent_tool_") {
+			codexExternalAgentText(&s, txt, cwd, t)
+			return
+		}
 		if role != "" && txt != "" {
 			s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})
 		}
@@ -680,6 +689,248 @@ func codexUserText(content any, joined string) string {
 		}
 	}
 	return strings.Join(parts, "\n")
+}
+
+// Codex Desktop's "import an external agent session" flattens the foreign
+// tool calls into text envelopes inside assistant output_text blocks:
+//
+//	[external_agent_tool_call: <Name>]
+//	<payload>
+//	[/external_agent_tool_call]
+//	[external_agent_tool_result[: <marker>]]
+//	<body>
+//	[/external_agent_tool_result]
+//
+// Measured on a real store of 45 imported rollouts / 18,036 assistant
+// messages (Nwflower/dsh-chat-import, 2026-09): 7,690 calls, 7,689 results,
+// the only marker seen is `error` (638 of them), 14,477 blocks are
+// envelope-only, 776 mix envelopes with prose, and 102 carry several — so
+// the block is scanned line by line and cut into segments, never assumed to
+// be one envelope. Envelopes appear on the assistant side only. Calls carry
+// no call_id and results are not guaranteed to pair, so a result pairs with
+// the earliest unpaired call. Restoration invents nothing: payload keys are
+// kept verbatim (Codex itself flattens file_path to file and drops Edit/Write
+// bodies — nothing to restore them from), and an unclosed envelope, an
+// unrecognized payload, or an unknown marker stays in the prose rather than
+// being dropped silently.
+var (
+	codexExtCallHead   = regexp.MustCompile(`^\[external_agent_tool_call:\s*([^\]]*?)\s*\]$`)
+	codexExtCallTail   = "[/external_agent_tool_call]"
+	codexExtResultHead = regexp.MustCompile(`^\[external_agent_tool_result(?::\s*([^\]]*?))?\s*\]$`)
+	codexExtResultTail = "[/external_agent_tool_result]"
+	codexExtInputLine  = regexp.MustCompile(`^input:\s*([\s\S]*)$`)
+	codexExtKeyLine    = regexp.MustCompile(`^([A-Za-z_][A-Za-z0-9_-]*):(?:[ \t]([\s\S]*))?$`)
+)
+
+type codexExtSegment struct {
+	kind    string // "text", "call", or "result"
+	text    string // text segment, or the body of a result
+	name    string // call name
+	payload string // call payload body
+	raw     string // the raw envelope of a result, kept for orphans
+	isError bool   // result marker was `error`
+}
+
+func codexSplitExternalAgentEnvelopes(text string) ([]codexExtSegment, int) {
+	if !strings.Contains(text, "[external_agent_tool_") {
+		return []codexExtSegment{{kind: "text", text: text}}, 0
+	}
+	lines := strings.Split(text, "\n")
+	strip := func(l string) string { return strings.TrimSuffix(l, "\r") }
+	segments := []codexExtSegment{}
+	malformed := 0
+	var buf []string
+	flush := func() {
+		if t := strings.TrimSpace(strings.Join(buf, "\n")); t != "" {
+			segments = append(segments, codexExtSegment{kind: "text", text: t})
+		}
+		buf = nil
+	}
+	for i := 0; i < len(lines); i++ {
+		head := strings.TrimSpace(strip(lines[i]))
+		call := codexExtCallHead.FindStringSubmatch(head)
+		result := ([]string)(nil)
+		if call == nil {
+			result = codexExtResultHead.FindStringSubmatch(head)
+		}
+		if call == nil && result == nil {
+			buf = append(buf, lines[i])
+			continue
+		}
+		tail := codexExtResultTail
+		if call != nil {
+			tail = codexExtCallTail
+		}
+		end := -1
+		for j := i + 1; j < len(lines); j++ {
+			if strings.TrimSpace(strip(lines[j])) == tail {
+				end = j
+				break
+			}
+		}
+		if end == -1 {
+			// Unclosed: the whole envelope stays in the prose (content is not
+			// dropped), which is the loud part in deja's model.
+			malformed++
+			buf = append(buf, lines[i])
+			continue
+		}
+		bodyParts := make([]string, 0, end-i-1)
+		for j := i + 1; j < end; j++ {
+			bodyParts = append(bodyParts, strip(lines[j]))
+		}
+		body := strings.Join(bodyParts, "\n")
+		raw := head + "\n" + body + "\n" + tail
+		if call != nil {
+			name := strings.TrimSpace(call[1])
+			if name == "" {
+				malformed++
+				buf = append(buf, raw)
+			} else {
+				flush()
+				segments = append(segments, codexExtSegment{kind: "call", name: name, payload: body, raw: raw})
+			}
+		} else {
+			marker := strings.TrimSpace(result[1])
+			if marker != "" && !strings.EqualFold(marker, "error") {
+				malformed++
+			}
+			flush()
+			segments = append(segments, codexExtSegment{kind: "result", text: body,
+				isError: strings.EqualFold(marker, "error"), raw: raw})
+		}
+		i = end
+	}
+	flush()
+	return segments, malformed
+}
+
+// externalAgentArguments turns an envelope payload into tool arguments JSON.
+// Three shapes, all seen in the measured store: an `input: {…}` line (Codex
+// copies the foreign tool_use input verbatim, single- or multi-line JSON),
+// `key: value` lines (Bash's command, Read/Edit/Write's file — values may
+// span lines until the next key line), and anything else, which becomes
+// {"input": <原文>} and reports malformed rather than dropping the payload.
+// Key lines need an identifier followed by a colon, so a Windows path line
+// (`D:\…`) is never read as a key.
+func codexExternalAgentArguments(payload string) (string, bool) {
+	trimmed := strings.TrimSpace(payload)
+	if trimmed == "" {
+		return "{}", false
+	}
+	rawLines := strings.Split(trimmed, "\n")
+	lines := make([]string, len(rawLines))
+	for i, l := range rawLines {
+		lines[i] = strings.TrimSuffix(l, "\r")
+	}
+	if m := codexExtInputLine.FindStringSubmatch(lines[0]); m != nil {
+		candidate := strings.TrimSpace(strings.Join(append([]string{m[1]}, lines[1:]...), "\n"))
+		if codexJSONObjectText(candidate) {
+			return candidate, false
+		}
+	}
+	if pairs, ok := codexExternalAgentKeyValuePairs(lines); ok {
+		b, err := json.Marshal(pairs)
+		if err == nil {
+			return string(b), false
+		}
+	}
+	b, err := json.Marshal(map[string]string{"input": payload})
+	if err != nil {
+		// json.Marshal on a map of strings does not fail in practice; an
+		// empty argument leaves the call counted with no command line, which
+		// is the honest shape for a payload nothing could read.
+		return "", true
+	}
+	return string(b), true
+}
+
+// codexJSONObjectText reports whether the text parses as a JSON object or
+// array, the shapes usable as tool arguments verbatim; scalars do not count.
+func codexJSONObjectText(text string) bool {
+	var v any
+	if json.Unmarshal([]byte(text), &v) != nil {
+		return false
+	}
+	switch v.(type) {
+	case map[string]any, []any:
+		return true
+	}
+	return false
+}
+
+func codexExternalAgentKeyValuePairs(lines []string) (map[string]string, bool) {
+	out := map[string]string{}
+	key := ""
+	var value []string
+	commit := func() {
+		if key != "" {
+			out[key] = strings.TrimRight(strings.Join(value, "\n"), "\n")
+		}
+	}
+	for _, line := range lines {
+		m := codexExtKeyLine.FindStringSubmatch(line)
+		if m != nil {
+			commit()
+			key = m[1]
+			value = []string{}
+			if m[2] != "" {
+				value = append(value, m[2])
+			}
+			continue
+		}
+		if key == "" {
+			return nil, false
+		}
+		value = append(value, line)
+	}
+	commit()
+	if key == "" {
+		return nil, false
+	}
+	return out, true
+}
+
+// codexExternalAgentText splits one assistant message's envelope text into
+// deja's shapes, in order: prose stays assistant text; a call counts via
+// AddToolCall and a shell-style payload becomes a command line through
+// codexRecordCommand (the same gates as a native exec_command); a result
+// becomes a tool-output line, and an `error` marker bumps ToolErrors; a
+// result with no pending call keeps its raw envelope as assistant text.
+func codexExternalAgentText(s *model.Session, text, cwd string, t time.Time) {
+	segments, _ := codexSplitExternalAgentEnvelopes(text)
+	pending := 0
+	for _, seg := range segments {
+		switch seg.kind {
+		case "text":
+			s.Messages = append(s.Messages, model.Message{Role: "assistant", Text: seg.text, Time: t})
+		case "call":
+			s.AddToolCall(seg.name, false)
+			args, _ := codexExternalAgentArguments(seg.payload)
+			var in codexShellIn
+			if json.Unmarshal([]byte(args), &in) == nil && in.Cmd == "" {
+				in.Cmd = in.Command
+			}
+			if in.Cmd != "" {
+				codexRecordCommand(s, in, "", cwd, nil, t)
+			}
+			pending++
+		case "result":
+			if pending == 0 {
+				// No call to pair with: the raw envelope stays as assistant
+				// text so no content is lost.
+				s.Messages = append(s.Messages, model.Message{Role: "assistant", Text: seg.raw, Time: t})
+				continue
+			}
+			pending--
+			if out := strings.TrimSpace(seg.text); out != "" && IndexToolOutput() {
+				s.Messages = append(s.Messages, model.Message{Role: RoleToolOutput, Text: out, Time: t})
+			}
+			if seg.isError {
+				s.ToolErrors++
+			}
+		}
+	}
 }
 
 func codexApplySessionMeta(s *model.Session, payload map[string]any, cwd, modelProvider *string) {

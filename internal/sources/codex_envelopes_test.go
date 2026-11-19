@@ -9,7 +9,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-
 // Codex VS Code wraps every real input in an IDE-context envelope
 // ('# Context from my IDE setup:' … '## My request:'). Only the request body
 // is the person's words; the envelope itself must never become the prompt.
@@ -144,5 +143,121 @@ func TestCodexIdeSetupMixedBlocks(t *testing.T) {
 	want := "# Response annotations:\nEach item contains text selected from an earlier Codex response.\n<response-annotations>[{\"text\":\"这段要改\"}]</response-annotations>\n按批注改"
 	if len(got) != 1 || got[0] != want {
 		t.Fatalf("user texts = %#v, want %q", got, want)
+	}
+}
+
+// Codex Desktop's imported external-agent sessions flatten the foreign tool
+// calls into [external_agent_tool_call: …] / [external_agent_tool_result…]
+// text envelopes inside assistant output_text. The parser restores them into
+// deja's tool shapes; shapes below mirror the measured store in the reference
+// converter (45 rollouts / 18,036 assistant messages, Nwflower/dsh-chat-import).
+
+func codexAssistantTexts(s model.Session) []string {
+	var out []string
+	for _, m := range s.Messages {
+		if m.Role == "assistant" {
+			out = append(out, m.Text)
+		}
+	}
+	return out
+}
+
+func codexMessagesByRole(s model.Session, role string) []string {
+	var out []string
+	for _, m := range s.Messages {
+		if m.Role == role {
+			out = append(out, m.Text)
+		}
+	}
+	return out
+}
+
+func TestCodexExternalAgentCallAndResult(t *testing.T) {
+	s := codexParseLines(t, []string{
+		`{"timestamp":"2026-10-19T10:29:00.000Z","type":"session_meta","payload":{"session_id":"abc","cwd":"/w/app"}}`,
+		`{"timestamp":"2026-10-19T10:29:01.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"[external_agent_tool_call: Bash]\ncommand: go test ./...\n[/external_agent_tool_call]\n[external_agent_tool_result]\nok ./...\n[/external_agent_tool_result]"}]}}`,
+	})
+	if s.ToolCalls["Bash"] != 1 {
+		t.Fatalf("Bash tool call not counted: %#v", s.ToolCalls)
+	}
+	cmds := codexMessagesByRole(s, RoleCommand)
+	if len(cmds) != 1 || cmds[0] != "$ go test ./..." {
+		t.Fatalf("commands = %#v, want one shell line", cmds)
+	}
+	outs := codexMessagesByRole(s, RoleToolOutput)
+	if len(outs) != 1 || outs[0] != "ok ./..." {
+		t.Fatalf("tool outputs = %#v, want one result", outs)
+	}
+	if got := codexAssistantTexts(s); len(got) != 0 {
+		t.Fatalf("assistant prose leaked: %#v", got)
+	}
+	if s.ToolErrors != 0 {
+		t.Fatalf("ToolErrors = %d, want 0", s.ToolErrors)
+	}
+}
+
+func TestCodexExternalAgentMixedProseAndOrder(t *testing.T) {
+	// 776 of the measured blocks mix envelopes with prose, and 102 carry
+	// several: prose stays in place, calls and results keep their order.
+	s := codexParseLines(t, []string{
+		`{"timestamp":"2026-10-19T10:29:00.000Z","type":"session_meta","payload":{"session_id":"abc","cwd":"/w/app"}}`,
+		`{"timestamp":"2026-10-19T10:29:01.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"先看一下\n[external_agent_tool_call: Read]\nfile: src/main.go\n[/external_agent_tool_call]\n中间的话\n[external_agent_tool_call: Bash]\ncommand: go vet ./...\n[/external_agent_tool_call]\n[external_agent_tool_result]\nmain.go\n[/external_agent_tool_result]\n[external_agent_tool_result]\npackage main\n[/external_agent_tool_result]"}]}}`,
+	})
+	// FIFO: the first result (main.go) belongs to the Read, the second (the
+	// vet output) to the Bash — results keep their arrival order.
+	outs := codexMessagesByRole(s, RoleToolOutput)
+	if len(outs) != 2 || outs[0] != "main.go" || outs[1] != "package main" {
+		t.Fatalf("tool outputs = %#v", outs)
+	}
+	cmds := codexMessagesByRole(s, RoleCommand)
+	if len(cmds) != 1 || cmds[0] != "$ go vet ./..." {
+		t.Fatalf("commands = %#v, want the Bash call only", cmds)
+	}
+	prose := codexAssistantTexts(s)
+	if len(prose) != 2 || prose[0] != "先看一下" || prose[1] != "中间的话" {
+		t.Fatalf("assistant prose = %#v", prose)
+	}
+	if s.ToolCalls["Read"] != 1 || s.ToolCalls["Bash"] != 1 {
+		t.Fatalf("tool calls counted wrong: %#v", s.ToolCalls)
+	}
+}
+
+func TestCodexExternalAgentInputJSONAndError(t *testing.T) {
+	// `input: {…}` payload copied verbatim from the foreign tool_use, and an
+	// `error` result marker bumping ToolErrors (the only marker in the store).
+	s := codexParseLines(t, []string{
+		`{"timestamp":"2026-10-19T10:29:00.000Z","type":"session_meta","payload":{"session_id":"abc","cwd":"/w/app"}}`,
+		`{"timestamp":"2026-10-19T10:29:01.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"[external_agent_tool_call: Bash]\ninput: {\"command\":\"make test\"}\n[/external_agent_tool_call]\n[external_agent_tool_result: error]\nbuild failed\n[/external_agent_tool_result]"}]}}`,
+	})
+	cmds := codexMessagesByRole(s, RoleCommand)
+	if len(cmds) != 1 || cmds[0] != "$ make test" {
+		t.Fatalf("commands = %#v, want the input JSON command", cmds)
+	}
+	if s.ToolErrors != 1 {
+		t.Fatalf("ToolErrors = %d, want 1 from the error marker", s.ToolErrors)
+	}
+	outs := codexMessagesByRole(s, RoleToolOutput)
+	if len(outs) != 1 || outs[0] != "build failed" {
+		t.Fatalf("tool outputs = %#v", outs)
+	}
+}
+
+func TestCodexExternalAgentUnclosedAndOrphan(t *testing.T) {
+	// An unclosed envelope stays in the prose; a result with no pending call
+	// keeps its raw envelope as assistant text. Nothing is dropped silently.
+	s := codexParseLines(t, []string{
+		`{"timestamp":"2026-10-19T10:29:00.000Z","type":"session_meta","payload":{"session_id":"abc","cwd":"/w/app"}}`,
+		`{"timestamp":"2026-10-19T10:29:01.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"[external_agent_tool_call: Edit]\nfile: a.go\n[external_agent_tool_result]\n没配对的结果\n[/external_agent_tool_result]"}]}}`,
+	})
+	prose := codexAssistantTexts(s)
+	if len(prose) == 0 {
+		t.Fatalf("unclosed envelope lost from prose: %#v", s.Messages)
+	}
+	joined := strings.Join(prose, "\n---\n")
+	if !strings.Contains(joined, "[external_agent_tool_result]") || !strings.Contains(joined, "没配对的结果") {
+		t.Fatalf("orphan result envelope not kept: %#v", prose)
+	}
+	if _, counted := s.ToolCalls["Edit"]; counted {
+		t.Fatalf("unclosed call counted as a tool call: %#v", s.ToolCalls)
 	}
 }
