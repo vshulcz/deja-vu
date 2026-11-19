@@ -256,8 +256,13 @@ func compactionCandidatesByID(harness, id string) []compactionCandidate {
 // read where each store keeps it — the same places resume reads it from.
 func compactionSessionWorkspace(harness, path string, s model.Session) string {
 	switch harness {
-	case "pi", "gjc", "kimchi", "senpi", "omp", "openclaw", "cherrystudio":
+	case "pi", "gjc", "kimchi", "senpi", "omp", "openclaw":
 		return PiHeaderCwd(path)
+	case "cherrystudio":
+		if cwd := PiHeaderCwd(path); cwd != "" {
+			return cwd
+		}
+		return ClaudeSessionDir(path)
 	case "prime":
 		return PrimeSessionDir(path)
 	case "kimi":
@@ -285,7 +290,7 @@ func compactionSessionWorkspace(harness, path string, s model.Session) string {
 	case "trae", "codex":
 		_, cwd, _, _ := codexRolloutHead(path)
 		return cwd
-	case "claude":
+	case "claude", "qoder":
 		return ClaudeSessionDir(path)
 	case "mcode":
 		return McodeSessionWorkspace(s.ID)

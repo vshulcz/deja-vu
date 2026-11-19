@@ -116,6 +116,11 @@ func appendPrepared(dir, harness, scope string, old Manifest, files, changed map
 		of, known := old.Files[p]
 		ss, ok := readAppended(harness, p, of, known, &m, changed, ready)
 		if !ok {
+			if ready != nil {
+				r := ready[p]
+				r.deferred = true
+				ready[p] = r
+			}
 			continue
 		}
 		// Scrub before anything is derived from the text, as the other two paths

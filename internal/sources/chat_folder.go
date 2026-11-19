@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -15,15 +16,15 @@ import (
 // app's, whichever agent was run in it afterwards.
 var chatFolderName = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}$`)
 
-// ChatWorkspaceRoot is the workspace root a per-chat folder or a Claude Code
-// `.claude/worktrees/<name>` checkout sits in, so every session under it is
-// one project rather than one project each (#4735). ok is false for any other
-// directory.
+// ChatWorkspaceRoot is the workspace root a per-chat folder or a harness
+// `.<dir>/worktrees/<name>` checkout sits in (outside a home root), so every
+// session under it is one project rather than one project each (#4735). ok is
+// false for any other directory.
 func ChatWorkspaceRoot(cwd string) (string, bool) {
 	clean := strings.TrimRight(cwd, `/\`)
-	if w, dp := filepath.Dir(clean), filepath.Dir(filepath.Dir(clean)); filepath.Base(w) == "worktrees" && filepath.Base(dp) == ".claude" {
+	if w, dp := filepath.Dir(clean), filepath.Dir(filepath.Dir(clean)); filepath.Base(w) == "worktrees" && isWorktreeDotDir(filepath.Base(dp)) {
 		root := filepath.Dir(dp)
-		if root != "." && root != clean && filepath.Dir(root) != root {
+		if root != "." && root != clean && filepath.Dir(root) != root && !isHomeRootPath(root) {
 			return root, true
 		}
 	}
@@ -37,9 +38,9 @@ func ChatWorkspaceRoot(cwd string) (string, bool) {
 	return root, true
 }
 
-// dropChatFolder is segs without a trailing per-chat folder or `.claude/worktrees/<name>`.
+// dropChatFolder is segs without a trailing per-chat folder or `.<dir>/worktrees/<name>`.
 func dropChatFolder(segs []string) []string {
-	if n := len(segs); n >= 4 && segs[n-3] == ".claude" && segs[n-2] == "worktrees" && !isDriveSegment(segs[n-4]) {
+	if n := len(segs); n >= 4 && isWorktreeDotDir(segs[n-3]) && segs[n-2] == "worktrees" && !isDriveSegment(segs[n-4]) && !isHomeRootSegs(segs[:n-3]) {
 		return segs[:n-3]
 	}
 	if n := len(segs); n >= 2 && chatFolderName.MatchString(segs[n-1]) && !isDriveSegment(segs[n-2]) {
@@ -51,17 +52,37 @@ func dropChatFolder(segs []string) []string {
 // CollapseWorktreePath strips a Claude Code `.claude/worktrees/<name>` segment
 // from a checkout or file path so work done in a worktree maps back to the
 // repository path it belongs to.
+// CollapseWorktreePath rewrites `<root>/.<dir>/worktrees/<name>[/<rel>]`
+// (for non-git dot-dirs when `<root>` is not a home root) to `<root>[/<rel>]`
+// so worktree files stay tied to their repository across harnesses.
 func CollapseWorktreePath(p string) string {
-	for _, marker := range []string{"/.claude/worktrees/", `\.claude\worktrees\`} {
-		i := strings.Index(p, marker)
-		if i <= 0 {
+	start := 0
+	for start < len(p) {
+		rel := strings.Index(p[start:], "worktrees")
+		if rel < 0 {
+			return p
+		}
+		w := start + rel
+		start = w + len("worktrees")
+		if w < 3 || start >= len(p) {
 			continue
 		}
-		prefix := p[:i]
-		if prefix == "/" || prefix == `\` || isDriveSegment(prefix) {
+		if (p[w-1] != '/' && p[w-1] != '\\') || (p[start] != '/' && p[start] != '\\') {
 			continue
 		}
-		rest := p[i+len(marker):]
+		dotStart := strings.LastIndexAny(p[:w-1], `/\`)
+		if dotStart <= 0 {
+			continue
+		}
+		dotDir := p[dotStart+1 : w-1]
+		if !isWorktreeDotDir(dotDir) {
+			continue
+		}
+		prefix := p[:dotStart]
+		if prefix == "/" || prefix == `\` || isDriveSegment(prefix) || isHomeRootPath(prefix) {
+			continue
+		}
+		rest := p[start+1:]
 		if rest == "" {
 			continue
 		}
@@ -72,7 +93,59 @@ func CollapseWorktreePath(p string) string {
 		if sep == 0 {
 			continue
 		}
-		return prefix + rest[sep:]
+		p = prefix + rest[sep:]
+		start = len(prefix)
 	}
 	return p
+}
+
+func isWorktreeDotDir(seg string) bool {
+	if len(seg) < 2 || seg[0] != '.' || seg == ".." || seg == ".git" {
+		return false
+	}
+	for i := 1; i < len(seg); i++ {
+		c := seg[i]
+		isAlnum := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+		if !isAlnum && c != '-' && c != '_' && c != '.' {
+			return false
+		}
+	}
+	return true
+}
+
+func isHomeRootPath(p string) bool {
+	s := strings.TrimRight(strings.ReplaceAll(p, `\`, `/`), "/")
+	if s == "" {
+		return false
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		if h := strings.TrimRight(strings.ReplaceAll(home, `\`, `/`), "/"); h != "" && s == h {
+			return true
+		}
+	}
+	parts := strings.Split(strings.TrimPrefix(s, "/"), "/")
+	var segs []string
+	for _, part := range parts {
+		if part != "" {
+			segs = append(segs, part)
+		}
+	}
+	return isHomeRootSegs(segs)
+}
+
+func isHomeRootSegs(segs []string) bool {
+	for len(segs) > 0 && segs[0] == "" {
+		segs = segs[1:]
+	}
+	if len(segs) > 0 && isDriveSegment(segs[0]) {
+		segs = segs[1:]
+	}
+	switch len(segs) {
+	case 1:
+		return segs[0] == "root" || segs[0] == "~"
+	case 2:
+		return (strings.EqualFold(segs[0], "users") || strings.EqualFold(segs[0], "home")) && segs[1] != ""
+	default:
+		return false
+	}
 }

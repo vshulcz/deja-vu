@@ -1319,6 +1319,9 @@ func startingHarness(dir, id, transcript string) string {
 		return h.Harness
 	}
 	if transcript != "" {
+		if h := sources.CompactionTranscriptHarness(transcript); h != "" {
+			return h
+		}
 		if sources.IsCodeBuddyTranscript(transcript) {
 			return "codebuddy"
 		}

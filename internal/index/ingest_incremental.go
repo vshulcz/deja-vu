@@ -148,7 +148,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 				if passErr := appendPass(dir, harness, scope, old, withoutRest(files, rest, old.Files), appendable, false, progress, kept, unseen, ready.appendFiles); passErr != nil {
 					return passErr
 				}
-				return updateIndexPass(dir, harness, scope, walked, false, false, progress, ready)
+				return updateIndexPass(dir, harness, scope, withoutDeferred(walked, ready.appendFiles, old.Files), false, false, progress, ready)
 			}
 			readAhead = ready.restFiles
 		}

@@ -111,11 +111,8 @@ func antigravityRepoRootFromPath(workspace, raw string) string {
 	if p == "" || !filepath.IsAbs(p) {
 		return ""
 	}
-	slashed := filepath.ToSlash(p)
-	for _, skip := range []string{"/.gemini/", "/.claude/", "/.agents/", "/.codex/"} {
-		if strings.Contains(slashed, skip) {
-			return ""
-		}
+	if sources.IsAgentScratchPath(p) {
+		return ""
 	}
 	if workspace != "" {
 		cleanW := filepath.Clean(workspace)

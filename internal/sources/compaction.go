@@ -178,6 +178,7 @@ func ReadCompactionTranscript(path, nativeSessionID string) (CompactionTranscrip
 	if err != nil {
 		return CompactionTranscript{}, compactionStage("detect_harness", err)
 	}
+	harness = refineClaudeShapedHarness(path, harness)
 	calls, workspace, metricComplete, err := compactionToolCalls(harness, header, tail, tailOffset, nativeSessionID)
 	if err != nil {
 		return CompactionTranscript{}, compactionStage("scan_tool_calls", err)
@@ -382,12 +383,25 @@ func compactionHarness(header, tail []byte) (string, error) {
 	return "", ErrUnsupportedCompactionTranscript
 }
 
+func refineClaudeShapedHarness(path, harness string) string {
+	if harness == "claude" && path != "" {
+		if owner := CompactionTranscriptHarness(path); owner == "qoder" || owner == "cherrystudio" {
+			return owner
+		}
+	}
+	return harness
+}
+
 func parseCompactionSession(originalPath, harness, workspace string, data []byte) (model.Session, error) {
 	var sessions []model.Session
 	var err error
 	switch harness {
 	case "claude":
 		sessions, err = parseClaudeTypedWithScanner(originalPath, compactionByteScanner(data))
+	case "qoder":
+		sessions, err = parseClaudeTypedWithOptions(originalPath, compactionByteScanner(data), claudeParseOptions{Harness: "qoder"})
+	case "cherrystudio":
+		sessions, err = parseClaudeTypedWithOptions(originalPath, compactionByteScanner(data), claudeParseOptions{Harness: "cherrystudio", CollapseSnapshots: true})
 	case "codex":
 		sessions, err = parseCodexRolloutWithScanner(model.Session{
 			Harness: "codex", Project: filepath.Base(filepath.Dir(originalPath)), Path: originalPath,
@@ -427,7 +441,7 @@ func parseCompactionSession(originalPath, harness, workspace string, data []byte
 	switch {
 	case workspace != "":
 		s.Project = projectName(workspace)
-	case harness == "claude":
+	case harness == "claude" || harness == "qoder" || harness == "cherrystudio":
 		s.Project = claudeProjectNameFor(originalPath)
 	case s.Project == "" || s.Project == "-":
 		s.Project = filepath.Base(filepath.Dir(originalPath))
@@ -530,7 +544,7 @@ func scanCompactionToolLines(harness string, data []byte, base int64, nativeSess
 		var declaredWorkspace string
 		var err error
 		switch harness {
-		case "claude":
+		case "claude", "qoder", "cherrystudio":
 			got, declaredWorkspace, err = claudeCompactionToolCalls(line, start, end, nativeSessionID)
 		case "codex":
 			got, declaredWorkspace, err = codexCompactionToolCalls(line, start, end, nativeSessionID)
@@ -932,6 +946,7 @@ func transcriptHead(path, nativeSessionID, known string) (model.Session, error) 
 			harness, err := known, error(nil)
 			if harness == "" {
 				harness, err = compactionHarness(head, nil)
+				harness = refineClaudeShapedHarness(path, harness)
 				// A hook asking about a Qwen session reads its head too: a
 				// /branch's first prompts come before any build has seen
 				// it, and its digest led with its source.

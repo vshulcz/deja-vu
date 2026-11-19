@@ -104,6 +104,17 @@ func mcpClientHarnesses(name string) []string {
 			return rule.harnesses
 		}
 	}
+	names := sources.HarnessNames()
+	for _, h := range names {
+		if h != "deja" && norm == h {
+			return []string{h}
+		}
+	}
+	for _, h := range names {
+		if h != "deja" && strings.HasPrefix(norm, h+"-") {
+			return []string{h}
+		}
+	}
 	return nil
 }
 

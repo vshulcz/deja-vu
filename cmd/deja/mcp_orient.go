@@ -380,12 +380,13 @@ func resolveForeignWorktreeSuffix(p, cwd string) string {
 }
 
 func stripWorktreeSegment(p string) string {
+	if collapsed := sources.CollapseWorktreePath(p); collapsed != p {
+		return filepath.FromSlash(filepath.ToSlash(collapsed))
+	}
 	slash := filepath.ToSlash(p)
-	for _, marker := range []string{"/.claude/worktrees/", "/.git/worktrees/"} {
-		if before, rest, ok := strings.Cut(slash, marker); ok {
-			if _, after, ok := strings.Cut(rest, "/"); ok {
-				return filepath.FromSlash(before + "/" + after)
-			}
+	if before, rest, ok := strings.Cut(slash, "/.git/worktrees/"); ok {
+		if _, after, ok := strings.Cut(rest, "/"); ok {
+			return filepath.FromSlash(before + "/" + after)
 		}
 	}
 	return p
@@ -1010,9 +1011,11 @@ func orientEphemeralCommand(cmd string) bool {
 	if low == "" {
 		return true
 	}
+	if containsDotWorktrees(low) {
+		return true
+	}
 	for _, marker := range []string{
 		"/private/tmp/", "/tmp/", "/var/folders/",
-		".claude/worktrees/", ".git/worktrees/",
 		"zz_probe", "zz_hunt", "origin/hunt/",
 	} {
 		if strings.Contains(low, marker) {
@@ -1029,12 +1032,67 @@ func isOrientEphemeralFile(p string) bool {
 	if strings.HasPrefix(base, "zz_") || strings.HasSuffix(base, "_tmp_test.go") || strings.HasSuffix(base, "_tmp.go") {
 		return true
 	}
+	if sources.IsAgentScratchPath(slash) || containsDotProjectsOrJobs(low) {
+		return true
+	}
 	for _, marker := range []string{
 		"/private/tmp/", "/tmp/", "/var/folders/",
-		"/.git/", "/.deja/", "/deja-vu-loop/", "/.gemini/", "/.claude/projects/",
+		"/.git/", "/.deja/", "/deja-vu-loop/",
 	} {
 		if strings.Contains(low, marker) {
 			return true
+		}
+	}
+	return false
+}
+
+func containsDotWorktrees(low string) bool {
+	s := strings.ReplaceAll(low, `\`, `/`)
+	start := 0
+	for start < len(s) {
+		rel := strings.Index(s[start:], "/worktrees/")
+		if rel < 0 {
+			return false
+		}
+		w := start + rel
+		start = w + len("/worktrees/")
+		segStart := w - 1
+		for segStart >= 0 && !isWorktreeCmdBoundary(s[segStart]) {
+			segStart--
+		}
+		segStart++
+		if w-segStart > 1 && s[segStart] == '.' && s[segStart:w] != ".." {
+			return true
+		}
+	}
+	return false
+}
+
+func isWorktreeCmdBoundary(b byte) bool {
+	switch b {
+	case ' ', '\t', '\n', '/', '"', '\'', '=', '(':
+		return true
+	}
+	return false
+}
+
+func containsDotProjectsOrJobs(low string) bool {
+	for _, sub := range []string{"/projects/", "/jobs/"} {
+		start := 0
+		for start < len(low) {
+			rel := strings.Index(low[start:], sub)
+			if rel < 0 {
+				break
+			}
+			idx := start + rel
+			start = idx + len(sub)
+			prev := strings.LastIndexByte(low[:idx], '/')
+			if prev >= 0 && idx-prev > 2 && low[prev+1] == '.' {
+				seg := low[prev+1 : idx]
+				if seg != ".." && !strings.ContainsAny(seg, " \t") {
+					return true
+				}
+			}
 		}
 	}
 	return false

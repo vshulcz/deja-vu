@@ -671,27 +671,26 @@ func cleanRepoRelFile(root, raw string) string {
 	if p == "" {
 		return ""
 	}
-	slash := filepath.ToSlash(p)
-	for _, marker := range []string{"/.claude/worktrees/", "/.git/worktrees/"} {
-		if idx := strings.Index(slash, marker); idx >= 0 {
-			rest := slash[idx+len(marker):]
-			if _, after, ok := strings.Cut(rest, "/"); ok {
-				slash = after
-			}
+	collapsed := sources.CollapseWorktreePath(p)
+	slash := filepath.ToSlash(collapsed)
+	if before, rest, ok := strings.Cut(slash, "/.git/worktrees/"); ok {
+		if _, after, ok := strings.Cut(rest, "/"); ok {
+			slash = before + "/" + after
+			collapsed = filepath.FromSlash(slash)
 		}
 	}
 	rootSlash := strings.TrimSuffix(filepath.ToSlash(root), "/")
 	if after, ok := strings.CutPrefix(slash, rootSlash+"/"); ok {
 		slash = after
-	} else if filepath.IsAbs(p) {
-		rel, err := filepath.Rel(root, p)
+	} else if filepath.IsAbs(collapsed) {
+		rel, err := filepath.Rel(root, collapsed)
 		if err != nil || strings.HasPrefix(rel, "..") {
 			return ""
 		}
 		slash = filepath.ToSlash(rel)
 	}
 	slash = strings.TrimPrefix(slash, "./")
-	if slash == "" || slash == "." || strings.HasPrefix(slash, "/") || strings.HasPrefix(slash, "..") || strings.HasPrefix(slash, ".git/") || strings.HasPrefix(slash, ".deja/") || strings.HasPrefix(slash, ".claude/") || strings.HasPrefix(slash, "deja-vu-loop/") {
+	if slash == "" || slash == "." || strings.HasPrefix(slash, "/") || strings.HasPrefix(slash, "..") || strings.HasPrefix(slash, ".git/") || strings.HasPrefix(slash, ".deja/") || strings.HasPrefix(slash, "deja-vu-loop/") || sources.IsAgentScratchPath("/"+slash) {
 		return ""
 	}
 	if resolved := orientRepoTree(root).resolveRel(slash); resolved != "" {

@@ -34,38 +34,186 @@ func projectFromPaths(ms []model.Message) string {
 			continue
 		}
 		for p := range strings.SplitSeq(m.Text, "\n") {
-			p = CollapseWorktreePath(strings.TrimSpace(p))
-			if p == "" || !filepath.IsAbs(p) {
-				continue
+			if proj, ok := repoProjectForFile(p); ok {
+				counts[proj]++
+				total++
 			}
-			if agentScratch(p) {
-				continue
-			}
-			root := repoRoot(filepath.Dir(p))
-			if root == "" {
-				continue
-			}
-			proj := cwdProjectName(root)
-			if isHomeOrEmptyProject(proj) {
-				continue
-			}
-			counts[proj]++
-			total++
 		}
 	}
 	if total < 3 {
 		return "" // too little evidence to override anything
 	}
+	return majorityProject(counts, total)
+}
+
+func repoProjectForFile(p string) (string, bool) {
+	p = CollapseWorktreePath(strings.TrimSpace(p))
+	if p == "" || !filepath.IsAbs(p) || agentScratch(p) {
+		return "", false
+	}
+	root := repoRoot(filepath.Dir(p))
+	if root == "" {
+		return "", false
+	}
+	proj := cwdProjectName(root)
+	if isHomeOrEmptyProject(proj) {
+		return "", false
+	}
+	return proj, true
+}
+
+func majorityProject(counts map[string]int, total int) string {
 	best, n := "", 0
 	for r, c := range counts {
 		if c > n {
 			best, n = r, c
 		}
 	}
-	if float64(n) < 0.6*float64(total) {
+	if total == 0 || float64(n) < 0.6*float64(total) {
 		return ""
 	}
 	return best
+}
+
+func resolveFallbackProject(s *model.Session) {
+	if s == nil || s.Harness == "deja" || !isHomeOrEmptyProject(s.Project) {
+		return
+	}
+	if p := projectFromPaths(s.Messages); p != "" {
+		s.Project = p
+		s.ProjectFromDir = false
+		return
+	}
+	if p := handoffProject(s.Messages); p != "" {
+		s.Project = p
+		s.ProjectFromDir = false
+		return
+	}
+	if !hasRole(s.Messages, RoleFiles) {
+		if p := projectFromWorkRecords(s.Messages); p != "" {
+			s.Project = p
+			s.ProjectFromDir = false
+			return
+		}
+	}
+	if p := projectFromCommandCD(s.Messages); p != "" {
+		s.Project = p
+		s.ProjectFromDir = false
+	}
+}
+
+func hasRole(ms []model.Message, role string) bool {
+	for _, m := range ms {
+		if m.Role == role {
+			return true
+		}
+	}
+	return false
+}
+
+func projectFromWorkRecords(ms []model.Message) string {
+	counts := map[string]int{}
+	total := 0
+	for _, m := range ms {
+		if m.Role != RoleWrote && m.Role != RoleEdit {
+			continue
+		}
+		pathLine, _, _ := strings.Cut(m.Text, "\n")
+		if proj, ok := repoProjectForFile(pathLine); ok {
+			counts[proj]++
+			total++
+		}
+	}
+	return majorityProject(counts, total)
+}
+
+func projectFromCommandCD(ms []model.Message) string {
+	counts := map[string]int{}
+	total := 0
+	for _, m := range ms {
+		if m.Role != RoleCommand {
+			continue
+		}
+		cmd := strings.TrimSpace(strings.TrimPrefix(m.Text, "$ "))
+		rest, ok := strings.CutPrefix(cmd, "cd ")
+		if !ok {
+			continue
+		}
+		dir := parseCommandArgToken(rest)
+		if dir == "" {
+			continue
+		}
+		dir = CollapseWorktreePath(dir)
+		if !filepath.IsAbs(dir) || agentScratch(dir+string(filepath.Separator)) {
+			continue
+		}
+		root := repoRoot(dir)
+		if root == "" {
+			continue
+		}
+		proj := cwdProjectName(root)
+		if !isHomeOrEmptyProject(proj) {
+			counts[proj]++
+			total++
+		}
+	}
+	return majorityProject(counts, total)
+}
+
+func parseCommandArgToken(s string) string {
+	s = strings.TrimLeft(s, " \t")
+	if s == "" {
+		return ""
+	}
+	if q := s[0]; q == '\'' || q == '"' {
+		if end := strings.IndexByte(s[1:], q); end >= 0 {
+			return s[1 : 1+end]
+		}
+		return ""
+	}
+	end := strings.IndexAny(s, " \t\r\n;&|")
+	if end < 0 {
+		return s
+	}
+	return s[:end]
+}
+
+// IsAgentScratchPath reports whether p points into agent scratch, memory,
+// cache, or harness metadata directories rather than a user repository file.
+// Paths inside `.<dir>/worktrees/<name>` checkouts (excluding `.git`) have that
+// worktree prefix stripped before matching harness dot-directories.
+func IsAgentScratchPath(p string) bool {
+	s := stripWorktreeSegmentsForScratch(slashed(p))
+	for _, seg := range []string{
+		"/.claude/", "/.gemini/", "/.agents/", "/.codex/",
+		"/.qoder/", "/.cursor/", "/.windsurf/", "/.kiro/",
+		"/.roo/", "/.cline/", "/.zcode/", "/.codebuddy/", "/.trae/",
+		"/scratchpad/", "/tasks/", "/.cache/", "/claude-501/",
+	} {
+		if strings.Contains(s, seg) {
+			return true
+		}
+	}
+	return false
+}
+
+func stripWorktreeSegmentsForScratch(s string) string {
+	const needle = "/worktrees/"
+	for {
+		w := strings.Index(s, needle)
+		if w <= 0 {
+			return s
+		}
+		dotStart := strings.LastIndexByte(s[:w], '/')
+		if dotStart < 0 {
+			return s
+		}
+		if !isWorktreeDotDir(s[dotStart+1 : w]) {
+			// Skip past this non-dot worktrees segment so later matches still normalize.
+			return s[:w+len(needle)] + stripWorktreeSegmentsForScratch(s[w+len(needle):])
+		}
+		s = s[:dotStart] + s[w+len(needle)-1:]
+	}
 }
 
 // agentScratch drops the agent's own working area. A scratch clone under
@@ -77,13 +225,7 @@ func projectFromPaths(ms []model.Message) string {
 // of /tmp would be simpler and wrong: a repository can live there, and it is
 // still that person's project.
 func agentScratch(p string) bool {
-	p = strings.ReplaceAll(slashed(p), "/.claude/worktrees/", "/")
-	for _, seg := range []string{"/.claude/", "/.gemini/", "/.agents/", "/scratchpad/", "/tasks/", "/.cache/", "/claude-501/"} {
-		if strings.Contains(p, seg) {
-			return true
-		}
-	}
-	return false
+	return IsAgentScratchPath(p)
 }
 
 // IsHomeOrEmptyProject reports whether p names no project or only a user's

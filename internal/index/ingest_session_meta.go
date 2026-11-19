@@ -543,12 +543,14 @@ func sessionRowTitle(s model.Session) (string, bool) {
 // stored paths held no repository file at all for a session whose work was
 // entirely in one.
 func agentOwnedFile(p string) bool {
-	// A worktree Claude Code made for an isolated agent sits under .claude/
-	// and holds the repository's own source: the edits in it are the work,
-	// not the agent's bookkeeping. Only the .claude/ segment is forgiven;
-	// every other rule still applies inside it (#4164).
-	p = strings.ReplaceAll(p, "/.claude/worktrees/", "/")
-	for _, seg := range []string{"/scratchpad/", "/tasks/", "/.claude/", "/.gemini/", "/.agents/", "/.cache/", "/claude-501/", "/node_modules/", "/.git/"} {
+	// A worktree an agent made holds the repository's own source: the edits in
+	// it are the work, not the agent's bookkeeping. IsAgentScratchPath forgives
+	// non-git worktree prefixes while every other rule still applies (#4164).
+	p = sources.CollapseWorktreePath(p)
+	if sources.IsAgentScratchPath(p) {
+		return true
+	}
+	for _, seg := range []string{"/node_modules/", "/.git/"} {
 		if strings.Contains(p, seg) {
 			return true
 		}
@@ -878,7 +880,8 @@ func sessionFromMeta(meta SessionMeta) model.Session {
 // build sends the same — for Claude Code, a prompt still inside its
 // <pasted_content> wrapper.
 func carriedText(harness, role, text string) string {
-	if harness == "claude" && role == "user" {
+	_ = harness
+	if role == "user" {
 		return sources.UnwrapPastedContent(text)
 	}
 	return text
@@ -888,7 +891,7 @@ func carriedText(harness, role, text string) string {
 // inside its paste wrapper, so metaForSession derives it again from the
 // unwrapped turns.
 func retitleWrappedPaste(s *model.Session) {
-	if s.Harness == "claude" && strings.Contains(s.Title, "<pasted_content id=") {
+	if strings.Contains(s.Title, "<pasted_content id=") {
 		s.Title = ""
 		s.AgentTitle = false
 	}

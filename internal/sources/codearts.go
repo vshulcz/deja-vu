@@ -156,8 +156,9 @@ func parseCodeArtsFileFromOffset(path string, offset int64) ([]model.Session, er
 		}
 	}
 
+	exits := commandExits{}
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
-		codeartsLineInto(&s, m)
+		codeartsLineInto(&s, m, exits)
 	})
 	if len(s.Messages) == 0 {
 		return nil, err
@@ -171,37 +172,202 @@ func parseCodeArtsFileFromOffset(path string, offset int64) ([]model.Session, er
 // codeartsLineInto folds one JSONL record into s. The map form is what
 // scanJSONLFromOffset hands over; re-marshalling keeps the variant unpacking
 // in one place instead of hand-walking nested maps.
-func codeartsLineInto(s *model.Session, m map[string]any) {
-	raw, err := json.Marshal(m)
-	if err != nil {
+func codeartsLineInto(s *model.Session, m map[string]any, exits commandExits) {
+	role, blocks, results, speeches, t := codeartsDecodeParts(m)
+	if len(speeches) == 0 && len(blocks) == 0 && len(results) == 0 {
 		return
 	}
-	var line codeartsLine
-	if json.Unmarshal(raw, &line) != nil {
-		return
-	}
-	role := strings.ToLower(line.Role)
-	t := codeartsTime(line.Timestamp)
 	if !t.IsZero() {
 		s.Touch(t)
 	}
-	switch role {
-	case "user", "assistant":
-		// reasoning_content is the model thinking out loud; deja indexes only
-		// what was said (same rule as the deepseek and qwen readers).
-		for _, p := range codeartsParts(line.Content) {
-			if p.Text == nil || p.Text.Text == "" {
-				continue
-			}
-			s.Messages = append(s.Messages, model.Message{Role: role, Text: p.Text.Text, Time: t})
-		}
-	default:
-		// Tool calls and results are work records, not speech. deja's index
-		// keeps command/error text from other harnesses via RoleToolOutput;
-		// CodeArts ToolResult bodies are renderer output and are skipped here.
-		return
+	for _, txt := range speeches {
+		s.Messages = append(s.Messages, model.Message{Role: role, Text: capParsedMessage(txt), Time: t})
+	}
+	from := len(s.Messages)
+	s.Messages = append(s.Messages, dialectWorkRecords(blocks, results, flatRoleDialect, t)...)
+	if exits != nil {
+		joinResultExits(s.Messages, from, blocks, flatRoleDialect, exits, flatRoleResultExitCode)
 	}
 }
+
+func codeartsDecodeParts(m map[string]any) (role string, blocks []any, results []string, speeches []string, t time.Time) {
+	raw, err := json.Marshal(m)
+	if err != nil {
+		return "", nil, nil, nil, time.Time{}
+	}
+	var line codeartsLine
+	if json.Unmarshal(raw, &line) != nil {
+		return "", nil, nil, nil, time.Time{}
+	}
+	role = strings.ToLower(line.Role)
+	t = codeartsTime(line.Timestamp)
+	isSpeechRole := role == "user" || role == "assistant"
+	for _, p := range codeartsParts(line.Content) {
+		if p.Text != nil && p.Text.Text != "" {
+			if isSpeechRole {
+				b, r, sp, _ := unpackContentBlocks(p.Text.Text)
+				blocks = append(blocks, b...)
+				results = append(results, r...)
+				if sp != "" {
+					speeches = append(speeches, sp)
+				}
+			} else {
+				results = append(results, p.Text.Text)
+			}
+		}
+		if callBlock, ok := codeartsDecodeCall(p.ToolCall); ok {
+			blocks = append(blocks, callBlock)
+		}
+		if resBlock, body, ok := codeartsDecodeResult(p.ToolResult); ok {
+			blocks = append(blocks, resBlock)
+			if body != "" {
+				results = append(results, body)
+			}
+		}
+	}
+	return role, blocks, results, speeches, t
+}
+
+func codeartsDecodeCall(v any) (map[string]any, bool) {
+	cm, ok := v.(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	name, _ := cm["name"].(string)
+	if name == "" {
+		return nil, false
+	}
+	id := firstNonEmptyStr(str(cm["id"]), str(cm["tool_call_id"]), str(cm["tool_use_id"]))
+	in := codeartsArgMap(cm["input"])
+	if in == nil {
+		in = codeartsArgMap(cm["arguments"])
+	}
+	if in == nil {
+		in = codeartsArgMap(cm["parameters"])
+	}
+	out := map[string]any{
+		"type": "tool_use",
+		"name": name,
+	}
+	if id != "" {
+		out["id"] = id
+	}
+	if in != nil {
+		out["input"] = in
+	}
+	return out, true
+}
+
+func codeartsArgMap(v any) map[string]any {
+	switch x := v.(type) {
+	case map[string]any:
+		return x
+	case string:
+		var m map[string]any
+		if json.Unmarshal([]byte(strings.TrimSpace(x)), &m) == nil {
+			return m
+		}
+	}
+	return nil
+}
+
+func codeartsDecodeResult(v any) (map[string]any, string, bool) {
+	rm, ok := v.(map[string]any)
+	if !ok {
+		return nil, "", false
+	}
+	id := firstNonEmptyStr(str(rm["tool_call_id"]), str(rm["tool_use_id"]), str(rm["id"]))
+	body := codeartsResultBody(rm["result"])
+	if body == "" {
+		body = firstNonEmptyStr(contentText(rm["content"]), str(rm["output"]), str(rm["tool_output"]), str(rm["error"]))
+	}
+	tb := map[string]any{
+		"type":        "tool_result",
+		"tool_use_id": id,
+		"content":     body,
+	}
+	if bad, _ := rm["is_error"].(bool); bad {
+		tb["is_error"] = true
+	}
+	if code, ok := anyInt(rm["exit_code"]); ok {
+		tb["exit_code"] = code
+	} else if code, ok := anyInt(rm["exitCode"]); ok {
+		tb["exit_code"] = code
+	} else if resMap, ok := rm["result"].(map[string]any); ok {
+		if code, ok := anyInt(resMap["exit_code"]); ok {
+			tb["exit_code"] = code
+		} else if code, ok := anyInt(resMap["exitCode"]); ok {
+			tb["exit_code"] = code
+		}
+		if errStr, _ := resMap["error"].(string); errStr != "" {
+			tb["is_error"] = true
+		}
+	}
+	return tb, body, true
+}
+
+func codeartsResultBody(v any) string {
+	switch r := v.(type) {
+	case string:
+		return r
+	case map[string]any:
+		for _, k := range []string{"tool_output", "output", "content", "text", "error"} {
+			if s := contentText(r[k]); s != "" {
+				return s
+			}
+			if s, _ := r[k].(string); s != "" {
+				return s
+			}
+		}
+		stdout, _ := r["stdout"].(string)
+		stderr, _ := r["stderr"].(string)
+		switch {
+		case stdout != "" && stderr != "":
+			return stdout + "\n" + stderr
+		case stdout != "":
+			return stdout
+		default:
+			return stderr
+		}
+	}
+	return ""
+}
+
+var codeartsResumes = resumesUnlessSettling(`"Tool`, func(m map[string]any) (calls, failed, clean []string) {
+	_, blocks, _, _, _ := codeartsDecodeParts(m)
+	for _, it := range blocks {
+		p, _ := it.(map[string]any)
+		switch p["type"] {
+		case "tool_use":
+			if id := str(p["id"]); id != "" {
+				calls = append(calls, id)
+			}
+		case "tool_result":
+			id := str(p["tool_use_id"])
+			if id == "" {
+				continue
+			}
+			code, hasCode := flatRoleResultExitCode(p)
+			if id == inlineToolID || (hasCode && code != 0) {
+				failed = append(failed, id)
+			} else {
+				clean = append(clean, id)
+			}
+		}
+	}
+	return calls, failed, clean
+}, func(line []byte) []string {
+	m := decodeJSONLine(line)
+	if m == nil {
+		return nil
+	}
+	_, blocks, _, _, _ := codeartsDecodeParts(m)
+	var ids []string
+	for _, c := range commandCallsIn(blocks, flatRoleDialect) {
+		ids = append(ids, c.ID)
+	}
+	return ids
+})
 
 // LoadCodeArts is the cold load for the registry.
 func LoadCodeArts() []model.Session {

@@ -730,7 +730,9 @@ func normalizeEditedRef(p string) string {
 // agent harness hands its tools. Anchored on a boundary and on the separator
 // that follows, so a package path like ./internal/tmp/ and the word inside a
 // commit message are left alone.
-var ephemeralPathRE = regexp.MustCompile(`(^|[\s"'=(])(/tmp/|/var/folders/|/private/tmp/|\$TMPDIR/|\${TMPDIR}/)|/\.claude/jobs/[^/]+/tmp/`)
+var ephemeralPathRE = regexp.MustCompile(`(^|[\s"'=(])(/tmp/|/var/folders/|/private/tmp/|\$TMPDIR/|\${TMPDIR}/)|/\.[a-z0-9_-]+/jobs/[^/]+/tmp/`)
+
+var dotProjectsOrJobsRE = regexp.MustCompile(`/\.[a-z0-9_-]+/(projects|jobs)/`)
 
 // namesAnEphemeralPath reports whether the command reaches for a file that is
 // gone by the time deja would serve it.
@@ -750,8 +752,7 @@ func looksLikeEditedPath(p string) bool {
 		return false
 	}
 	slash := strings.ReplaceAll(p, "\\", "/")
-	if strings.Contains(slash, "/.claude/projects/") || strings.Contains(slash, "/.claude/jobs/") ||
-		strings.Contains(slash, "/.cache/") {
+	if sources.IsAgentScratchPath(slash) || dotProjectsOrJobsRE.MatchString(slash) {
 		return false
 	}
 	return !strings.ContainsAny(stripWindowsDrive(p), " \t\"'`$(){}[]=;:,*")

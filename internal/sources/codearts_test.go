@@ -70,15 +70,15 @@ func TestCodeArtsParse(t *testing.T) {
 	if s.Started.IsZero() || !s.Started.Equal(time.Date(2026, 10, 29, 21, 47, 28, 195777600, time.UTC)) {
 		t.Fatalf("started = %v", s.Started)
 	}
-	// 3 spoken messages: user, assistant, and the assistant's MultiPart Text.
-	// The ToolResult, ToolCall and reasoning_content are not speech; the
-	// malformed line is skipped rather than failing the whole file.
-	if len(s.Messages) != 3 {
-		t.Fatalf("got %d messages, want 3: %+v", len(s.Messages), s.Messages)
+	// 3 spoken messages plus m3's ToolResult body as RoleToolOutput; m4's empty
+	// ToolCall without input emits no spurious work record; malformed line skipped.
+	if len(s.Messages) != 4 {
+		t.Fatalf("got %d messages, want 4: %+v", len(s.Messages), s.Messages)
 	}
 	want := []struct{ role, text string }{
 		{"user", "把 onetab 拉到本地"},
 		{"assistant", "好的，开始拉取"},
+		{RoleToolOutput, "done"},
 		{"assistant", "拉取完成"},
 	}
 	for i, w := range want {
@@ -142,5 +142,56 @@ func TestCodeArtsLoad(t *testing.T) {
 	ss := LoadCodeArts()
 	if len(ss) != 1 || ss[0].Harness != "codearts" {
 		t.Fatalf("LoadCodeArts() = %+v, want one codearts session", ss)
+	}
+}
+
+func TestCodeArtsWorkRecordsAndExitJoin(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "2026-10-30-bucket", "ca-work-id")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "meta.json"), []byte(`{"session_id":"ca-work-id","working_directory":"/Users/alex/repo"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	history := "" +
+		`{"id":"m1","role":"User","content":{"SinglePart":{"Text":{"text":"fix retry loop"}}},"timestamp":"2026-10-30T10:00:00Z"}` + "\n" +
+		`{"id":"m2","role":"Assistant","content":{"MultiPart":[` +
+		`{"ToolCall":{"id":"c1","name":"Edit","input":{"file_path":"/Users/alex/repo/retry.go","old_string":"sleep(1)","new_string":"return backoffWithJitter(attempt, maxBackoffDuration)"}}},` +
+		`{"ToolCall":{"id":"c2","name":"write_file","input":{"path":"/Users/alex/repo/new.go","content":"func newRetryTransport(base http.RoundTripper) http.RoundTripper {\n"}}},` +
+		`{"ToolCall":{"id":"c3","name":"Bash","input":{"command":"go test ./..."}}}` +
+		`]},"timestamp":"2026-10-30T10:00:01Z"}` + "\n"
+	tail := `{"id":"m3","role":"Tool","content":{"MultiPart":[{"ToolResult":{"tool_call_id":"c3","exit_code":2,"result":{"tool_output":"FAIL retry_test.go"}}}]},"timestamp":"2026-10-30T10:00:02Z"}` + "\n"
+
+	p := filepath.Join(dir, "history.jsonl")
+	if err := os.WriteFile(p, []byte(history+tail), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := ParseCodeArtsFile(p)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("ParseCodeArtsFile = %+v, err=%v", ss, err)
+	}
+	byRole := map[string][]string{}
+	for _, msg := range ss[0].Messages {
+		byRole[msg.Role] = append(byRole[msg.Role], msg.Text)
+	}
+	if got := byRole[RoleFiles]; len(got) != 1 || got[0] != "/Users/alex/repo/retry.go\n/Users/alex/repo/new.go" {
+		t.Errorf("RoleFiles = %v", got)
+	}
+	if got := byRole[RoleEdit]; len(got) != 1 || got[0] != "/Users/alex/repo/retry.go\nsleep(1)" {
+		t.Errorf("RoleEdit = %v", got)
+	}
+	if got := byRole[RoleWrote]; len(got) != 2 {
+		t.Errorf("RoleWrote = %v, want 2 entries", got)
+	}
+	if got := byRole[RoleCommand]; len(got) != 1 || got[0] != "$ go test ./...  → exit 2" {
+		t.Errorf("RoleCommand = %v", got)
+	}
+	if got := byRole[RoleToolOutput]; len(got) != 1 || got[0] != "FAIL retry_test.go" {
+		t.Errorf("RoleToolOutput = %v", got)
+	}
+	// An appended ToolResult answering a call before offset must force a whole re-read.
+	if codeartsResumes(p, int64(len(history))) {
+		t.Error("codeartsResumes returned true when tail answers an earlier command call")
 	}
 }

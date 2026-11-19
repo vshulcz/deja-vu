@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -293,5 +294,46 @@ func TestMCPClientHarnessesMapping(t *testing.T) {
 		if got != tc.want {
 			t.Errorf("mcpClientHarnesses(%q) = %q, want %q", tc.client, got, tc.want)
 		}
+	}
+	for _, h := range sources.HarnessNames() {
+		if h == "deja" {
+			continue
+		}
+		for _, client := range []string{h, h + "-cli", h + "_code"} {
+			if got := mcpClientHarnesses(client); !slices.Contains(got, h) {
+				t.Errorf("mcpClientHarnesses(%q) = %v, want slice containing %q", client, got, h)
+			}
+		}
+	}
+}
+
+func TestStartingHarnessRecognisesQoderAndCherryStudio(t *testing.T) {
+	hermeticEnv(t)
+	idxDir := index.DefaultDir()
+
+	qRoot := t.TempDir()
+	t.Setenv("DEJA_QODER_ROOT", qRoot)
+	qFile := filepath.Join(qRoot, "projects", "-Users-alex-qproj", "q-1.jsonl")
+	if err := os.MkdirAll(filepath.Dir(qFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(qFile, []byte(`{"type":"user","sessionId":"q-1","message":{"role":"user","content":"hi"}}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := startingHarness(idxDir, "q-1", qFile); got != "qoder" {
+		t.Fatalf("startingHarness(qoder) = %q, want qoder", got)
+	}
+
+	cProjects := filepath.Join(t.TempDir(), "CherryStudio", "Data", "Agents", ".claude", "projects")
+	t.Setenv("DEJA_CHERRYSTUDIO_ROOTS", cProjects)
+	cFile := filepath.Join(cProjects, "-Users-alex-cproj", "cs-1.jsonl")
+	if err := os.MkdirAll(filepath.Dir(cFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cFile, []byte(`{"type":"user","sessionId":"cs-1","message":{"role":"user","content":"hi"}}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := startingHarness(idxDir, "cs-1", cFile); got != "cherrystudio" {
+		t.Fatalf("startingHarness(cherrystudio) = %q, want cherrystudio", got)
 	}
 }

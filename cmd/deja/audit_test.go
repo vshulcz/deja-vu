@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 func TestAuditReportsClaudeRetentionAndUnwiredNextStep(t *testing.T) {
@@ -580,5 +581,24 @@ func TestAuditPrintReportBranchesAndJSONFailOnSecrets(t *testing.T) {
 	}
 	if rep.SecretMatches == 0 {
 		t.Fatalf("expected SecretMatches > 0, got %+v", rep)
+	}
+}
+
+func TestAuditStoreSpecsCoversAllHarnesses(t *testing.T) {
+	specs := auditStoreSpecs()
+	byName := make(map[string]auditStoreSpec, len(specs))
+	for _, sp := range specs {
+		if sp.files == nil {
+			t.Errorf("auditStoreSpecs()[%q].files is nil", sp.name)
+		}
+		byName[sp.name] = sp
+	}
+	for _, h := range sources.HarnessNames() {
+		if h == "deja" {
+			continue
+		}
+		if _, ok := byName[h]; !ok {
+			t.Errorf("auditStoreSpecs() missing harness %q", h)
+		}
 	}
 }

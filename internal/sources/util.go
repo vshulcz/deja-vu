@@ -217,6 +217,19 @@ func unixGuess(n int64) time.Time {
 func textFromContentKind(v any) (string, bool) {
 	c, ok := v.([]any)
 	if !ok {
+		if s, isStr := v.(string); isStr {
+			if blk, isInline := parseInlineBlock(s); isInline {
+				switch blk.typ {
+				case "thinking", "tool_use":
+					return "", false
+				case "tool_result":
+					if !IndexToolOutput() {
+						return "", true
+					}
+					return blk.text, true
+				}
+			}
+		}
 		return textFromContent(v), false
 	}
 	var sawTool, sawSpeech bool
@@ -227,9 +240,23 @@ func textFromContentKind(v any) (string, bool) {
 			continue
 		}
 		typ, _ := m["type"].(string)
+		if typ == "thinking" || typ == "tool_use" {
+			continue
+		}
 		txt, _ := m["text"].(string)
 		if txt == "" {
 			txt = contentText(m["content"])
+		}
+		if (typ == "" || typ == "text") && txt != "" {
+			if blk, isInline := parseInlineBlock(txt); isInline {
+				switch blk.typ {
+				case "thinking", "tool_use":
+					continue
+				case "tool_result":
+					typ = "tool_result"
+					txt = blk.text
+				}
+			}
 		}
 		if typ == "tool_result" {
 			sawTool = true
@@ -280,23 +307,37 @@ func contentText(v any) string {
 func textFromContent(v any) string {
 	switch c := v.(type) {
 	case string:
-		return c
+		txt, _ := filterInlineSpeechText(c)
+		return txt
 	case []any:
 		var b strings.Builder
 		for _, it := range c {
-			if m, ok := it.(map[string]any); ok {
-				if txt, _ := m["text"].(string); txt != "" {
-					if b.Len() > 0 {
-						b.WriteByte('\n')
-					}
-					b.WriteString(txt)
-				} else if s, _ := m["content"].(string); s != "" {
-					if b.Len() > 0 {
-						b.WriteByte('\n')
-					}
-					b.WriteString(s)
+			m, ok := it.(map[string]any)
+			if !ok {
+				continue
+			}
+			typ, _ := m["type"].(string)
+			if typ == "thinking" || typ == "tool_use" {
+				continue
+			}
+			txt, _ := m["text"].(string)
+			if txt == "" {
+				txt, _ = m["content"].(string)
+			}
+			if txt == "" {
+				continue
+			}
+			if typ == "" || typ == "text" {
+				var keep bool
+				txt, keep = filterInlineSpeechText(txt)
+				if !keep {
+					continue
 				}
 			}
+			if b.Len() > 0 {
+				b.WriteByte('\n')
+			}
+			b.WriteString(txt)
 		}
 		return b.String()
 	}

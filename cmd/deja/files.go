@@ -603,9 +603,11 @@ func lowerAll(in []string) []string {
 // agent-specific on purpose: excluding all of /tmp also excludes a repository
 // someone happens to have checked out there.
 func isScratch(p string) bool {
-	p = strings.ReplaceAll(p, "/.claude/worktrees/", "/")
+	p = sources.CollapseWorktreePath(p)
+	if sources.IsAgentScratchPath(p) {
+		return true
+	}
 	for _, seg := range []string{
-		"/scratchpad/", "/tasks/", "/.claude/", "/.gemini/", "/.agents/", "/.cache/", "/claude-501/",
 		"/node_modules/", "/.git/", "/testdata/fixtures/",
 	} {
 		if strings.Contains(p, seg) {
