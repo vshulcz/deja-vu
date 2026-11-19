@@ -5,10 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -318,20 +315,17 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if len(ranked) == 0 {
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
-	ss, confident, worthDigest := sel.ss, sel.confident, sel.worthDigest
+	ss, confident, worthDigest, extraMatches := sel.ss, sel.confident, sel.worthDigest, sel.extraMatches
 	if len(ss) == 0 {
 		nudge = attachRankedConsensusFallback(dir, cwd, input.SessionID, asked, nudge, ranked, matched, strong, seen, skip, false)
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
+	ss = hydratePromptSessionsForDigest(dir, ss, cut)
 	// Of the two candidates, lead with the one that settled something about the
 	// question rather than the one that merely mentioned it. The benchmark has
 	// been applying this since the arm was written — and saying so in a comment
 	// that claimed the hook did the same — while the hook did not, so the
 	// concluded_session arm scored a behaviour the product never had.
-	// Of the two candidates, lead with the one that settled something about the
-	// question rather than the one that merely mentioned it. The benchmark has
-	// been applying this since the arm was written — and saying so in a comment
-	// that claimed the hook did the same — while the hook did not.
 	if len(names) > 0 || !projectMatchesAnyTerm(ss[0].Project, terms) {
 		ss = search.LeadWithConclusion(ss, terms)
 	}
@@ -370,13 +364,22 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		}
 	}
 	fullDigest := worthDigest
+	shown := ss
 	if worthDigest {
-		full, ok := promptDigestBodyIn(dir, cwd, input.SessionID, ss, confident, terms, idfOf, asked, nudge, rejectedWarning, ranked, matched, strong, skip)
-		if !ok {
+		full, shownDigest, ok := promptDigestBodyWithOverflowShown(dir, cwd, input.SessionID, ss, confident, terms, idfOf, asked, nudge, rejectedWarning, ranked, matched, strong, skip, extraMatches)
+		switch {
+		case ok:
+			body = full
+			if len(shownDigest) > 0 {
+				shown = shownDigest
+			}
+		case !confident:
+			fullDigest = false
+			body = buildWeakPromptPointerBody(dir, cwd, asked, ss, terms, nudge, ranked, matched, strong, seen, skip)
+		default:
 			nudge = attachRankedConsensusFallback(dir, cwd, input.SessionID, asked, nudge, ranked, matched, strong, seen, skip, false)
 			return emitNudgeOnly(stdout, plain, nudge)
 		}
-		body = full
 	} else {
 		body = buildWeakPromptPointerBody(dir, cwd, asked, ss, terms, nudge, ranked, matched, strong, seen, skip)
 	}
@@ -415,8 +418,8 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// Stamped, because the question is answered again once the window passes,
 	// where a block fingerprint holds for the life of the session.
 	rememberInjectedIDsFor(dir, input.SessionID, "", []string{askKey(terms)})
-	rememberInjectedFor(dir, input.SessionID, projectKey, ss)
-	return emitPromptBlock(stdout, dir, input.SessionID, out, ss, terms, unreadable, plain, showLine)
+	rememberInjectedFor(dir, input.SessionID, projectKey, shown)
+	return emitPromptBlock(stdout, dir, input.SessionID, out, shown, terms, unreadable, plain, showLine)
 }
 
 type promptRankSelection struct {
@@ -426,6 +429,65 @@ type promptRankSelection struct {
 	ss              []model.Session
 	confident       bool
 	worthDigest     bool
+	extraMatches    int
+}
+
+// hydratePromptSessionsForDigest reloads non-marathon candidate sessions with
+// edit, wrote, and command records intact so trajectory-verified conclusions
+// can be selected from real indexed stores (defaultServableRoles strips them).
+func hydratePromptSessionsForDigest(dir string, ss []model.Session, cut map[string]time.Time) []model.Session {
+	if len(ss) == 0 {
+		return ss
+	}
+	roles := map[string]bool{
+		"user":                 true,
+		"assistant":            true,
+		"tool":                 true,
+		sources.RoleToolOutput: true,
+		sources.RoleEdit:       true,
+		sources.RoleWrote:      true,
+		sources.RoleCommand:    true,
+	}
+	var ids []index.Identity
+	seen := make(map[string]bool, len(ss))
+	for _, s := range ss {
+		for _, m := range s.Messages {
+			if m.Role != "" {
+				roles[m.Role] = true
+			}
+		}
+		if s.Harness == "" || s.ID == "" || len(s.Messages) > dejaVuMaxMessages || s.Held > dejaVuMaxMessages {
+			continue
+		}
+		id := index.Identity{Harness: s.Harness, ID: s.ID}
+		if !seen[id.Key()] {
+			seen[id.Key()] = true
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) == 0 {
+		return ss
+	}
+	full, err := index.FindManyByIdentityInRoles(dir, ids, roles)
+	if err != nil || len(full) == 0 {
+		return ss
+	}
+	byKey := make(map[string]model.Session, len(full))
+	for _, f := range full {
+		if len(cut) > 0 {
+			f = cutSessionAt(f, cut)
+		}
+		if len(f.Messages) > 0 {
+			byKey[f.Key()] = f
+		}
+	}
+	out := slices.Clone(ss)
+	for i := range out {
+		if f, ok := byKey[out[i].Key()]; ok && len(f.Messages) >= len(out[i].Messages) {
+			out[i].Messages = f.Messages
+		}
+	}
+	return out
 }
 
 func selectPromptRankedCandidates(
@@ -458,26 +520,29 @@ func selectPromptRankedCandidates(
 	if len(ordered) > 0 {
 		leadTerms = ordered[:min(len(ordered), leadTermsKept)]
 	}
-	pk := &promptPicker{
-		pol:          policy.Load(),
-		terms:        terms,
-		orderedTerms: ordered,
-		asked:        asked,
-		idfOf:        idfOf,
-		topIDF:       index.TopIDF(dir),
-		self:         self,
-		leadTerms:    leadTerms,
-		unscoped:     len(names) == 0,
-		cwdPlain:     sources.PlainProjectName(cwd),
-		cwd:          cwd,
-		deadline:     promptStart.Add(promptSoftBudget),
-		ss:           make([]model.Session, 0, 2),
+	pk := &search.PromptPicker{
+		Pol:              policy.Load(),
+		Terms:            terms,
+		OrderedTerms:     ordered,
+		Asked:            asked,
+		IDFOf:            idfOf,
+		TopIDF:           index.TopIDF(dir),
+		Self:             self,
+		SelfProjectWords: selfProjectWordSet(cwd),
+		LeadTerms:        leadTerms,
+		Unscoped:         len(names) == 0,
+		CwdPlain:         sources.PlainProjectName(cwd),
+		Deadline:         promptStart.Add(promptSoftBudget),
+		MaxMessages:      dejaVuMaxMessages,
+		Focus:            focusSession,
+		DigestBudget:     digestBudget,
+		ProjectMatches:   projectMatchesAnyTerm,
 	}
-	pk.pick(ranked, matched, strong, naming)
+	pk.Pick(ranked, matched, strong, naming)
 	// One slot left and duplicates took the window: ask for a wider one. Skip
 	// the wider retry when the soft latency budget is already exhausted, and
 	// exclude the candidates already examined in the first pass (#5901).
-	if len(pk.ss) < 2 && pk.crowdedOut > 0 && time.Since(promptStart) < promptSoftBudget {
+	if len(pk.Picked()) < 2 && pk.CrowdedOut() > 0 && time.Since(promptStart) < promptSoftBudget {
 		widerSkip := make(map[string]bool, len(skip)+len(ranked))
 		for id := range skip {
 			widerSkip[id] = true
@@ -488,20 +553,47 @@ func selectPromptRankedCandidates(
 		wider, wmatched, wstrong, wnaming, _, werr := index.ProjectRelevantNamingCut(
 			dir, names, terms, prompt.Candidates*widerWindow, widerSkip, cut)
 		if werr == nil {
-			pk.pick(wider, wmatched, wstrong, wnaming)
+			pk.Pick(wider, wmatched, wstrong, wnaming)
+		}
+	}
+	if len(pk.Picked()) < 2 && time.Since(promptStart) < promptSoftBudget {
+		if left, right, ok := search.WhenClausePairTerms(pk.Asked, terms, idfOf); ok {
+			if other := pk.UncoveredWhenClause(left, right); len(other) > 0 {
+				clauseSkip := search.SkipWithPicked(skip, pk.Picked())
+				if oRanked, oMatched, oStrong, oNaming, oIDF, oErr := index.ProjectRelevantNamingCut(
+					dir, names, other, prompt.Candidates, clauseSkip, cut); oErr == nil {
+					pk.AddIDF(oIDF)
+					pk.Pick(oRanked, oMatched, oStrong, oNaming)
+				}
+			}
+		}
+	}
+	if len(pk.Picked()) == 1 && pk.HasScopedTarget() && time.Since(promptStart) < promptSoftBudget {
+		scopedNames := pk.ScopeFilterNames(names)
+		for _, subj := range pk.SpokenSubjectTerms(2.5) {
+			if len(pk.Picked()) >= 2 || time.Since(promptStart) >= promptSoftBudget {
+				break
+			}
+			subjSkip := search.SkipWithPicked(skip, pk.Picked())
+			if sRanked, sMatched, sStrong, sNaming, sIDF, sErr := index.ProjectRelevantNamingCut(
+				dir, scopedNames, []string{subj}, prompt.Candidates, subjSkip, cut); sErr == nil {
+				pk.AddIDF(sIDF)
+				pk.Pick(sRanked, sMatched, sStrong, sNaming)
+			}
 		}
 	}
 	if includeUnscopedNamed {
 		pickUnscopedNamedProjects(dir, pk, names, terms, skip, cut, promptStart, promptSoftBudget)
 	}
 	return promptRankSelection{
-		ranked:      ranked,
-		matched:     matched,
-		strong:      strong,
-		idfOf:       idfOf,
-		ss:          pk.ss,
-		confident:   pk.confident,
-		worthDigest: pk.worthDigest,
+		ranked:       ranked,
+		matched:      matched,
+		strong:       strong,
+		idfOf:        idfOf,
+		ss:           search.OrderDistinctDateUpdates(pk.TrimWeakThirdSession(), terms, pk.IDFOf),
+		confident:    pk.Confident(),
+		worthDigest:  pk.WorthDigest(),
+		extraMatches: pk.ExtraMatches(),
 	}
 }
 
@@ -786,10 +878,48 @@ func promptDigestBody(dir, sessionID string, ss []model.Session, confident bool,
 }
 
 func promptDigestBodyIn(dir, cwd, sessionID string, ss []model.Session, confident bool, terms []string, idfOf map[string]float64, asked, nudge, rejectedWarning string, ranked []model.Session, matched, strong []int, skip map[string]bool) (string, bool) {
-	return promptDigestBodyWithLead(dir, cwd, sessionID, !blockAlreadySentThisSession(dir, sessionID), ss, confident, terms, idfOf, asked, nudge, rejectedWarning, ranked, matched, strong, skip)
+	return promptDigestBodyWithOverflow(dir, cwd, sessionID, ss, confident, terms, idfOf, asked, nudge, rejectedWarning, ranked, matched, strong, skip, 0)
+}
+
+func promptDigestBodyWithOverflow(dir, cwd, sessionID string, ss []model.Session, confident bool, terms []string, idfOf map[string]float64, asked, nudge, rejectedWarning string, ranked []model.Session, matched, strong []int, skip map[string]bool, extraMatches int) (string, bool) {
+	body, _, ok := promptDigestBodyWithOverflowShown(dir, cwd, sessionID, ss, confident, terms, idfOf, asked, nudge, rejectedWarning, ranked, matched, strong, skip, extraMatches)
+	return body, ok
+}
+
+func promptDigestBodyWithOverflowShown(dir, cwd, sessionID string, ss []model.Session, confident bool, terms []string, idfOf map[string]float64, asked, nudge, rejectedWarning string, ranked []model.Session, matched, strong []int, skip map[string]bool, extraMatches int) (string, []model.Session, bool) {
+	return promptDigestBodyWithLeadAndOverflowShown(dir, cwd, sessionID, !blockAlreadySentThisSession(dir, sessionID), ss, confident, terms, idfOf, asked, nudge, rejectedWarning, ranked, matched, strong, skip, extraMatches)
 }
 
 func promptDigestBodyWithLead(dir, cwd, sessionID string, includeLead bool, ss []model.Session, confident bool, terms []string, idfOf map[string]float64, asked, nudge, rejectedWarning string, ranked []model.Session, matched, strong []int, skip map[string]bool) (string, bool) {
+	body, _, ok := promptDigestBodyWithLeadAndOverflowShown(dir, cwd, sessionID, includeLead, ss, confident, terms, idfOf, asked, nudge, rejectedWarning, ranked, matched, strong, skip, 0)
+	return body, ok
+}
+
+func digestCarriesPromptSubject(dir, digestText string, shown []model.Session, cwdProjects, terms []string, idfOf map[string]float64) bool {
+	named := namedLeadTerms(terms, idfOf, index.TopIDF(dir))
+	shownInCallerScope := len(shown) > 0 && len(cwdProjects) > 0 && slices.Contains(cwdProjects, shown[0].Project)
+	shownMatchesNamedProject := len(shown) > 0 && projectMatchesAnyTerm(shown[0].Project, terms)
+	if shownMatchesNamedProject && shownInCallerScope {
+		shownMatchesNamedProject = false
+	}
+	soleSubj := []string(nil)
+	if shownInCallerScope && len(search.NonGenericRareTerms(terms, idfOf, 0)) == 1 {
+		soleSubj = search.NonGenericRareTerms(terms, idfOf, max(mediumSalientIDFFloor, index.TopIDF(dir)-0.9))
+	}
+	switch {
+	case shownMatchesNamedProject:
+		return search.QuoteCarriesTerms(digestText, terms, 1)
+	case len(soleSubj) == 1:
+		return search.QuoteCarriesTerms(digestText, soleSubj, 1) || search.QuoteCarriesTerms(digestText, terms, min(2, len(terms)))
+	case len(named) == 1:
+		return search.QuoteCarriesTerms(digestText, named, 1) || search.QuoteCarriesTerms(digestText, terms, min(2, len(terms)))
+	default:
+		return search.QuoteCarriesTerms(digestText, terms, min(2, len(terms)))
+	}
+}
+
+func promptDigestBodyWithLeadAndOverflowShown(dir, cwd, sessionID string, includeLead bool, ss []model.Session, confident bool, terms []string, idfOf map[string]float64, asked, nudge, rejectedWarning string, ranked []model.Session, matched, strong []int, skip map[string]bool, extraMatches int) (string, []model.Session, bool) {
+	hadDistinct := len(ss) >= 2 && search.HasDistinctDate(ss)
 	cwdProjects := cachedProjectNameCandidates(cwd)
 	lead := ""
 	if includeLead {
@@ -799,7 +929,8 @@ func promptDigestBodyWithLead(dir, cwd, sessionID string, includeLead bool, ss [
 	// way of its own to tell "mm_status" from "decide", and the session
 	// that answers often says both — measured live, ten of the answers
 	// this hook newly returns open on the ordinary word.
-	budget := digestBudget(confident)
+	budget := digestBudget(confident || hadDistinct)
+	fullBudget := budget
 	if !includeLead {
 		budget = min(budget, max(190, 320-min(len(nudge), 130)))
 	} else if nudge != "" {
@@ -807,7 +938,7 @@ func promptDigestBodyWithLead(dir, cwd, sessionID string, includeLead bool, ss [
 	}
 	digestText, shown := search.AutoRecallDigestShowing(ss, budget, byIdentifying(terms, idfOf), asked)
 	if strings.TrimSpace(digestText) == "" {
-		return "", false
+		return "", nil, false
 	}
 	// The sessions passed on where their words were said, but the block is
 	// what the agent reads. When no line it quotes holds two of the question's
@@ -816,22 +947,17 @@ func promptDigestBodyWithLead(dir, cwd, sessionID string, includeLead bool, ss [
 	// word with it. When the question joins two rare subjects, the block must
 	// also cover them rather than answering a two-subject question with a
 	// session that only ever heard of one.
-	named := namedLeadTerms(terms, idfOf, index.TopIDF(dir))
-	shownMatchesNamedProject := len(shown) > 0 && projectMatchesAnyTerm(shown[0].Project, terms)
-	if shownMatchesNamedProject && len(cwdProjects) > 0 && slices.Contains(cwdProjects, shown[0].Project) {
-		shownMatchesNamedProject = false
-	}
-	switch {
-	case shownMatchesNamedProject:
-		if !search.QuoteCarriesTerms(digestText, terms, 1) {
-			return "", false
+	if !digestCarriesPromptSubject(dir, digestText, shown, cwdProjects, terms, idfOf) {
+		if budget < fullBudget {
+			fullText, fullShown := search.AutoRecallDigestShowing(ss, fullBudget, byIdentifying(terms, idfOf), asked)
+			if strings.TrimSpace(fullText) != "" && digestCarriesPromptSubject(dir, fullText, fullShown, cwdProjects, terms, idfOf) {
+				digestText, shown = fullText, fullShown
+			} else {
+				return "", nil, false
+			}
+		} else {
+			return "", nil, false
 		}
-	case len(named) == 1:
-		if !search.QuoteCarriesTerms(digestText, named, 1) && !search.QuoteCarriesTerms(digestText, terms, min(2, len(terms))) {
-			return "", false
-		}
-	case !search.QuoteCarriesTerms(digestText, terms, min(2, len(terms))):
-		return "", false
 	}
 	// The line the agent is asked to say names a session; it has to be one
 	// the digest shows. The top of the ranking is skipped when it has
@@ -846,46 +972,8 @@ func promptDigestBodyWithLead(dir, cwd, sessionID string, includeLead bool, ss [
 	}
 	actionLine := ""
 	al := sessionActionMapLineForPrompt(dir, cwd, asked, actionSources, skip)
-	var rc string
-	if len(ranked) > 0 {
-		rc, _ = rankedTouchedConsensusLineForPrompt(dir, cwd, asked, ranked, matched, strong, nil, skip)
-	}
-	if al == "" {
-		al = rc
-	} else if rc != "" {
-		alPaths := extractLeadTargetPaths(al)
-		rcPaths := extractLeadTargetPaths(rc)
-		if len(alPaths) < 3 && len(rcPaths) > 0 {
-			seenPath := make(map[string]bool, 3)
-			var merged []string
-			addPath := func(p string) {
-				if p == "" || seenPath[p] || len(merged) >= 3 {
-					return
-				}
-				seenPath[p] = true
-				merged = append(merged, p)
-			}
-			if len(alPaths) < 2 && strings.HasPrefix(rc, "files edited in related sessions:") {
-				for _, p := range rcPaths {
-					addPath(p)
-				}
-				for _, p := range alPaths {
-					addPath(p)
-				}
-			} else {
-				for _, p := range alPaths {
-					addPath(p)
-				}
-				for _, p := range rcPaths {
-					addPath(p)
-				}
-			}
-			if len(merged) > len(alPaths) {
-				if formatted := formatLocalizedTargetsLine(dir, cwd, "files edited there: ", merged, skip); formatted != "" {
-					al = formatted
-				}
-			}
-		}
+	if al == "" && len(ranked) > 0 && !nudgeHasLocalizedGuidance(nudge) {
+		al, _ = rankedTouchedConsensusLineForPrompt(dir, cwd, asked, ranked, matched, strong, nil, skip)
 	}
 	if al != "" && lineAddsNewTargetPath(nudge, al) {
 		if compact := compactTargetSupplementLine(nudge, al); compact != "" {
@@ -894,6 +982,16 @@ func promptDigestBodyWithLead(dir, cwd, sessionID string, includeLead bool, ss [
 			}
 			actionLine = compact + "\n"
 		}
+	}
+	unshown := 0
+	if len(shown) > 0 && len(ss) > len(shown) {
+		unshown = len(ss) - len(shown)
+	}
+	if overflow := extraMatches + unshown; overflow > 0 {
+		if !strings.HasSuffix(digestText, "\n") {
+			digestText += "\n"
+		}
+		actionLine += fmt.Sprintf("+%d more matching sessions — run deja recall to check all\n", overflow)
 	}
 	tail := openerLine(cite, byIdentifying(terms, idfOf))
 	if nudge != "" {
@@ -923,256 +1021,18 @@ func promptDigestBodyWithLead(dir, cwd, sessionID string, includeLead bool, ss [
 	// still holds. Measured over this machine's own sessions, 6.5% of
 	// substantial questions are asked again in a later session, and the
 	// exact-match counter in `deja stats` sees a fifth of them.
-	if again := search.AskedBefore(cite, terms); again != "" {
-		if includeLead {
-			lead = repeatLead(cite, again)
-		}
-		tail = repeatOpener(cite, again)
-		if nudge != "" {
-			tail += "\n" + nudge
+	if !search.HasDistinctDate(shown) && extraMatches == 0 && unshown == 0 {
+		if again := search.AskedBefore(cite, terms); again != "" {
+			if includeLead {
+				lead = repeatLead(cite, again)
+			}
+			tail = repeatOpener(cite, again)
+			if nudge != "" {
+				tail += "\n" + nudge
+			}
 		}
 	}
-	return lead + rejectedWarning + digestText + actionLine + tail, true
-}
-
-// promptPicker chooses the sessions the prompt hook injects, at most two,
-// and keeps what the choice says about the match.
-type promptPicker struct {
-	pol          policy.Policy
-	terms        []string
-	orderedTerms []string
-	asked        string
-	idfOf        map[string]float64
-	// topIDF is the idf a word said in one session reaches on this store
-	// (index.TopIDF), so a small store's rarest words still name something.
-	topIDF    float64
-	self      map[string]bool
-	leadTerms []string
-	unscoped  bool
-	cwdPlain  string
-	cwd       string
-
-	ss        []model.Session
-	confident bool
-	// worthDigest is the payload decision, kept apart from the announcement.
-	// A word rare enough to identify something is a real match — the bar above
-	// says so and lets such a question through — but saying "you have been here"
-	// on one word teaches the reader to ignore the line, so that stays at two.
-	worthDigest bool
-	// How many candidates were dropped for saying what one already chosen
-	// says. A store repeats itself — the same complaint filed against forty
-	// shards — and those copies take the ranking's window with them, so the
-	// answer to the question can sit outside it (#1556).
-	crowdedOut int
-	deadline   time.Time
-}
-
-// pick walks one ranking and takes the sessions worth injecting.
-func (p *promptPicker) pick(ranked []model.Session, matched, strong, naming []int) {
-	strongNative := search.IdentifyingTerms(p.terms, p.idfOf, p.topIDF)
-	if len(strongNative) > 0 {
-		projSelf := selfProjectWordSet(p.cwd)
-		filtered := strongNative[:0]
-		for _, t := range strongNative {
-			low := strings.ToLower(t)
-			if projSelf[low] || isHexHashLike(low) {
-				continue
-			}
-			filtered = append(filtered, t)
-		}
-		strongNative = filtered
-	}
-	for i, s := range ranked {
-		if len(p.ss) > 0 && !p.deadline.IsZero() && time.Now().After(p.deadline) {
-			return
-		}
-		// Every other injection path asks the policy first; this one is a
-		// per-prompt injection like any other, and imported projects reach
-		// it (a local project name is a substring of "imported:<name>").
-		if !p.pol.Allows(policy.ActivationAuto, s.Project) {
-			continue
-		}
-		// A scheduled job's run is searchable, not offered unasked: its
-		// prompt is the same every fire, and what it carries in the user
-		// role is often someone else's text (#4948).
-		if s.Kind == "cron" {
-			continue
-		}
-		// matched counts informative terms; strong counts the rare ones — a
-		// term that identifies something on its own rather than merely beating
-		// the corpus average. Two informative terms earn the announcement. A
-		// single term is a weak claim, so it only injects when that term is
-		// strong: "pgbouncer" answers a question, "problem" does not, and this
-		// hook pays its cost on every message the user sends. Measured on
-		// cross-paired prompts whose answer is absent, the old bar injected on
-		// 94% of them; half of those rested on one ordinary word.
-		named := -1
-		if i < len(naming) {
-			named = naming[i]
-		}
-		if !search.RecallWorthShowingNaming(p.terms, matched[i], strong[i], named, p.idfOf) {
-			continue
-		}
-		// The session being written right now is never worth recalling to
-		// itself. Work merely fresh is a different case: "what did we just
-		// change" is a question about the last ten minutes, so age alone no
-		// longer withholds an answer — it only withholds the unprompted
-		// déjà vu line below.
-		//
-		// Asked before bridged anchoring and narrowing below: narrowing scans
-		// every message, the session being written is usually the longest one
-		// on the store, and it was scanned in full only to be dropped right
-		// after.
-		if p.self[s.ID] {
-			continue
-		}
-		// A word rare enough to identify something is a real match on its own —
-		// the bar just above says so in as many words, and lets such a question
-		// through. The payload rule did not: it asked only for two informative
-		// terms, so whether the reader got the memory or a pointer to it turned
-		// on whether some ordinary word of the question happened to also appear
-		// in that session.
-		//
-		// In real-world stores, over sixty subjects the project holds:
-		// "напомни, что мы решали про X" returned content 63% of the time and
-		// "what did we decide about X" returned it never — the same question,
-		// the same answer sitting in the same session.
-		hasStrongNative := len(strongNative) > 0 && search.SpeechCarriesAnyTerm(s, strongNative)
-		askedHit := search.AskedBefore(s, p.terms) != ""
-		shortAskedHit := askedHit && len(p.terms) <= 6
-		unanchoredBridged := false
-		if named < 0 {
-			unanchoredBridged = !hasStrongNative && !askedHit
-		}
-		if !unanchoredBridged {
-			if matched[i] >= 2 {
-				p.confident = true
-			}
-			if named < 0 {
-				if (hasStrongNative && matched[i] >= 2) || shortAskedHit {
-					p.worthDigest = true
-				}
-			} else if matched[i] >= 2 || (strong[i] >= 1 && (len(p.terms) <= 2 || shortAskedHit || (hasStrongNative && len(p.terms) <= 4))) {
-				p.worthDigest = true
-			}
-		}
-		if !p.leadTermsMeet(s) {
-			// The subject matched, but only where a tool printed it: a
-			// failing job line, a bumped dependency, a pinned action
-			// version. Nobody in that session said anything about it, and a
-			// block built from those lines answers a different question
-			// than the one asked.
-			p.crowdedOut++
-			continue
-		}
-
-		// A marathon session that touched everything matches everything, so
-		// it used to be skipped whole. But the sessions people ask about are
-		// exactly the long ones — measured here, only 2% of sessions cross
-		// the line and they are the current work. The haystack argument is
-		// about the session as a whole and not about the part that matched,
-		// so narrow it to that part instead of dropping the answer.
-		if len(s.Messages) > dejaVuMaxMessages || s.Held > dejaVuMaxMessages {
-			s = focusSession(s, p.terms)
-			if len(s.Messages) == 0 {
-				continue
-			}
-		}
-		// Two slots, two answers. The same content reaches the block from
-		// several sessions all the time — a marathon that was split, a
-		// resumed session, a workflow run again — and spending both slots on
-		// it costs the reader the second answer entirely. Measured on a
-		// seeded store where the question drifted from the wording of the
-		// session that settled it, both slots went to two copies of one
-		// neighbour on every framing but the near-verbatim one.
-		if sameAnswerAs(p.ss, s, p.terms) {
-			p.crowdedOut++
-			continue
-		}
-		if _, shown := search.AutoRecallDigestShowing([]model.Session{s}, digestBudget(p.confident), p.orderedTerms, p.asked); len(shown) == 0 {
-			p.crowdedOut++
-			continue
-		}
-		p.ss = append(p.ss, s)
-		if len(p.ss) == 2 {
-			return
-		}
-	}
-}
-
-// leadTermsMeet asks for the question's lead words where someone spoke them,
-// and for two of them in one message unless a lead word names something.
-//
-// The ranking counts a word anywhere in a session, and a long session holds
-// every word of any question somewhere, each in a different turn about a
-// different thing. Replayed over 80 real prompts, 50 blocks had nothing to
-// do with the question, most of them from sessions of thousands of messages
-// matched that way.
-//
-// A word names something when it is shaped like a symbol, a path or a version,
-// or is a Latin-letter word, and the store holds it rarely
-// (search.IdentifyingTerms): "winget" or "pgbouncer" is answered by the
-// session that said it once. A word of an inflected language is never enough
-// alone, because each form of an everyday word is rare in any store.
-//
-// Asking a long session for three words together instead of two was
-// measured too: it emptied 2 of 5 blocks that answered the prompt.
-func (p *promptPicker) leadTermsMeet(s model.Session) bool {
-	if fixedNamed := namedLeadTerms(p.orderedTerms, p.idfOf, 1e9); len(fixedNamed) >= 2 {
-		sort.SliceStable(fixedNamed, func(i, j int) bool {
-			return p.idfOf[fixedNamed[i]] > p.idfOf[fixedNamed[j]]
-		})
-		if len(fixedNamed) > 4 {
-			fixedNamed = fixedNamed[:4]
-		}
-		for _, t := range fixedNamed {
-			if !search.SpeechCarriesAnyTerm(s, []string{t}) && !projectMatchesAnyTerm(s.Project, []string{t}) {
-				return false
-			}
-		}
-		if len(s.Messages) >= dejaVuMaxMessages || s.Held >= dejaVuMaxMessages {
-			return search.SpeechCarriesTermsTogether(s, fixedNamed, 2)
-		}
-		return true
-	}
-	named := namedLeadTerms(p.orderedTerms, p.idfOf, p.topIDF)
-	if len(named) > 0 {
-		need := named
-		if len(need) > 2 {
-			need = need[:2]
-		}
-		allCarry := true
-		for _, t := range need {
-			if !search.SpeechCarriesAnyTerm(s, []string{t}) && !projectMatchesAnyTerm(s.Project, []string{t}) {
-				allCarry = false
-				break
-			}
-		}
-		if allCarry {
-			if len(need) >= 2 && (len(s.Messages) >= dejaVuMaxMessages || s.Held >= dejaVuMaxMessages) {
-				return search.SpeechCarriesTermsTogether(s, need, 2)
-			}
-			return true
-		}
-	}
-	if p.unscoped {
-		// A session recorded directly in the unscoped cwd (e.g. ~) shares the
-		// caller's working directory rather than belonging to an unrelated repo.
-		if p.cwdPlain != "" && strings.EqualFold(s.Project, p.cwdPlain) && len(named) == 0 {
-			return search.SpeechCarriesTermsTogether(s, p.terms, 2)
-		}
-		// On a large multi-project store, two rare non-Latin domain terms spoken
-		// together in one message ("шлюз" + "витрина" + "роутер") identify the subject
-		// when no Latin/symbol identifier was named.
-		if len(named) == 0 && p.topIDF >= 5.0 {
-			if rare := rareTerms(p.terms, p.idfOf, 3.8); len(rare) >= 2 {
-				return search.SpeechCarriesTermsTogether(s, rare, 2)
-			}
-		}
-		return false
-	}
-	return search.SpeechCarriesTermsTogether(s, p.leadTerms, 2) ||
-		(projectMatchesAnyTerm(s.Project, p.leadTerms) && search.SpeechCarriesAnyTerm(s, p.leadTerms))
+	return lead + rejectedWarning + digestText + actionLine + tail, shown, true
 }
 
 func projectMatchesAnyTerm(project string, terms []string) bool {
@@ -1187,13 +1047,13 @@ func projectMatchesAnyTerm(project string, terms []string) bool {
 	return false
 }
 
-func pickUnscopedNamedProjects(dir string, pk *promptPicker, names, terms []string, skip map[string]bool, cut map[string]time.Time, start time.Time, budget time.Duration) {
-	if len(names) > 0 || len(pk.ss) >= 2 || len(terms) < 2 || time.Since(start) >= budget {
+func pickUnscopedNamedProjects(dir string, pk *search.PromptPicker, names, terms []string, skip map[string]bool, cut map[string]time.Time, start time.Time, budget time.Duration) {
+	if len(names) > 0 || len(pk.Picked()) >= 2 || len(terms) < 2 || time.Since(start) >= budget {
 		return
 	}
 	var projTerms []string
 	for _, t := range terms {
-		if len(t) >= 4 && latinWord(t) {
+		if len(t) >= 4 && search.LatinWord(t) {
 			projTerms = append(projTerms, t)
 		}
 	}
@@ -1206,11 +1066,7 @@ func pickUnscopedNamedProjects(dir string, pk *promptPicker, names, terms []stri
 	if perr != nil || len(pranked) == 0 {
 		return
 	}
-	pkProj := *pk
-	pkProj.unscoped = false
-	pkProj.idfOf = pidf
-	pkProj.orderedTerms = byIdentifying(terms, pidf)
-	pkProj.ss = make([]model.Session, 0, 2)
+	pkProj := pk.Fork(false, pidf, terms)
 	for i := range pranked {
 		if !projectMatchesAnyTerm(pranked[i].Project, projTerms) || !search.SpeechCarriesAnyTerm(pranked[i], terms) {
 			continue
@@ -1221,52 +1077,8 @@ func pickUnscopedNamedProjects(dir string, pk *promptPicker, names, terms []stri
 			pnaming[i] = max(pnaming[i], 1)
 		}
 	}
-	pkProj.pick(pranked, pmatched, pstrong, pnaming)
-	if len(pkProj.ss) == 0 {
-		return
-	}
-	pkProj.ss = search.LeadWithConclusion(pkProj.ss, terms)
-	for _, s := range pkProj.ss {
-		if len(pk.ss) >= 2 {
-			break
-		}
-		if !sameAnswerAs(pk.ss, s, terms) && (len(pk.ss) == 0 || s.ID != pk.ss[0].ID) {
-			pk.ss = append(pk.ss, s)
-		}
-	}
-	pk.confident = pk.confident || pkProj.confident
-	pk.worthDigest = pk.worthDigest || pkProj.worthDigest
-}
-
-func rareTerms(terms []string, idfOf map[string]float64, floor float64) []string {
-	var out []string
-	for _, t := range terms {
-		if idfOf[t] >= floor {
-			out = append(out, t)
-		}
-	}
-	return out
-}
-
-func namedLeadTerms(terms []string, idfOf map[string]float64, topIDF float64) []string {
-	var named []string
-	for _, t := range search.IdentifyingTerms(terms, idfOf, topIDF) {
-		if symbolShaped(t) || latinWord(t) {
-			named = append(named, t)
-		}
-	}
-	return named
-}
-
-// latinWord reports a term written in Latin letters, the script tool and
-// product names are written in.
-func latinWord(term string) bool {
-	for _, r := range term {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
-			return true
-		}
-	}
-	return false
+	pkProj.Pick(pranked, pmatched, pstrong, pnaming)
+	pk.MergeUnscoped(&pkProj, terms)
 }
 
 // writePromptResponse prints the per-prompt answer in the shape the host
@@ -1302,85 +1114,14 @@ func askedBeforeWhen(s model.Session) string {
 	return " (" + s.Updated.Local().Format("2006-01-02") + ")"
 }
 
-// sameAnswerAs reports whether this session would say what one already chosen
-// says. Judged on the lines the question actually matched rather than on the
-// whole transcript: two sessions of the same workflow differ everywhere else
-// and agree exactly where it matters.
-func sameAnswerAs(chosen []model.Session, s model.Session, terms []string) bool {
-	next := matchedWords(s, terms)
-	if len(next) == 0 {
-		return false
-	}
-	for _, c := range chosen {
-		if sameWords(matchedWords(c, terms), next) {
-			return true
-		}
-	}
-	return false
-}
-
-// sameWords reports whether two sessions said the same thing about the
-// question. An exact hash of the matching lines missed the case it exists for:
-// the same complaint filed twice differs by a shard number, a pid, a run id,
-// and hashing put the two copies in the block side by side while the session
-// that answered the question never appeared (#1556). The threshold matches the
-// one the session-start digest already uses on its own candidates.
-func sameWords(a, b map[string]bool) bool {
-	if len(a) == 0 || len(b) == 0 {
-		return false
-	}
-	shared := 0
-	for w := range b {
-		if a[w] {
-			shared++
-		}
-	}
-	union := len(a) + len(b) - shared
-	return union > 0 && float64(shared)/float64(union) >= sameAnswerOverlap
-}
-
-// sameAnswerOverlap is how much of what two sessions said about the question
-// has to be the same word before the second one is not worth a slot.
-const sameAnswerOverlap = 0.8
-
-// matchedWords is the words of the session's matching lines. Empty when
-// nothing matched, which is not a duplicate of anything.
-func matchedWords(s model.Session, terms []string) map[string]bool {
-	// Lines that carry the question, not lines that brush it. A session says
-	// the thing once and talks around it for the rest, and the talk differs
-	// session to session — so hashing every line that held any query word gave
-	// two sessions that settled the same thing two fingerprints, and the block
-	// spent both its slots saying it twice. A line holding one ordinary word of
-	// the question is that talk.
-	words := map[string]bool{}
-	for _, m := range s.Messages {
-		fields := strings.Fields(strings.ToLower(m.Text))
-		if search.TermHitsLowered(strings.Join(fields, " "), terms) < fingerprintTermsPerLine {
-			continue
-		}
-		if !search.SpeechCarriesAnyTerm(model.Session{Messages: []model.Message{m}}, terms) {
-			continue
-		}
-		for _, w := range fields {
-			words[w] = true
-		}
-	}
-	return words
-}
-
-// fingerprintTermsPerLine is how much of the question a line has to carry
-// before it counts toward what a session is saying.
-const fingerprintTermsPerLine = 2
-
 // widerWindow is how much further down the ranking the second pass looks when
 // near-duplicates filled the first one.
 const widerWindow = 4
 
-// leadTermsKept is how many of the question's identifying words a session may
-// be judged on. Three rather than one: the gate exists to reject a session
-// that matched only where a tool printed the subject, and three of the rarest
-// words still keep the ordinary ones out.
-const leadTermsKept = 3
+const (
+	leadTermsKept         = search.LeadTermsKept
+	mediumSalientIDFFloor = 2.2
+)
 
 // promptTermsWorthAsking is the gate before the index is touched. Two terms
 // were required, which silenced the sharpest prompt there is: "do we need
@@ -1396,55 +1137,24 @@ func promptTermsWorthAsking(terms []string) bool {
 	return len(terms) >= 2 || search.HasIdentifierTerm(terms)
 }
 
-// byIdentifying orders the query's terms by what the index says each is worth,
-// rarest first, so a caller choosing one line out of a session can prefer the
-// word that identified the match over the word that merely appeared in it.
 func byIdentifying(terms []string, idf map[string]float64) []string {
-	if len(idf) == 0 || len(terms) < 2 {
-		return terms
-	}
-	out := append([]string(nil), terms...)
-	sort.SliceStable(out, func(i, j int) bool {
-		if idf[out[i]] != idf[out[j]] {
-			return idf[out[i]] > idf[out[j]]
-		}
-		// A store of one or two sessions collapses every ratio to zero, so the
-		// terms all tied and the word the session had to have spoken was
-		// whichever the reader typed first — "seeing", in a question about
-		// gateway_timeout. The only session such a store holds was then
-		// dropped for not saying it (#2257). The rest of the ranking already
-		// treats a tiny corpus as a special case; this is that case for the
-		// lead term: prefer the word that reads like a term of art.
-		// Shape before length, or "dashboards" would out-rank "s3": a word
-		// carrying an underscore, a dot, a slash or a digit names something
-		// whatever its length, and length is only the tiebreak among words
-		// that look alike.
-		if a, b := symbolShaped(out[i]), symbolShaped(out[j]); a != b {
-			return a
-		}
-		if a, b := identifying(out[i]), identifying(out[j]); a != b {
-			return a
-		}
-		return utf8.RuneCountInString(out[i]) > utf8.RuneCountInString(out[j])
-	})
-	return out
+	return search.ByIdentifying(terms, idf)
 }
 
-// identifying reports whether one term reads like a term of art — the same
-// test the recall bar applies to a whole question, asked of a single word. It
-// admits any ordinary word of three letters, so the length below settles the
-// ties it leaves: "gateway_timeout" over "seeing".
-func identifying(term string) bool { return search.HasIdentifierTerm([]string{term}) }
+func symbolShaped(term string) bool { return search.SymbolShaped(term) }
 
-// symbolShaped reports whether a term is punctuated or numbered the way a
-// symbol, a path or a version is — "gateway_timeout", "pkg/index", "v11", "s3".
-func symbolShaped(term string) bool {
-	for _, r := range term {
-		if r == '_' || r == '.' || r == '/' || r == '-' || (r >= '0' && r <= '9') {
-			return true
-		}
-	}
-	return false
+func rareTerms(terms []string, idfOf map[string]float64, floor float64) []string {
+	return search.RareTerms(terms, idfOf, floor)
+}
+
+func namedLeadTerms(terms []string, idfOf map[string]float64, topIDF float64) []string {
+	return search.NamedLeadTerms(terms, idfOf, topIDF)
+}
+
+func latinWord(term string) bool { return search.LatinWord(term) }
+
+func sameAnswerAs(chosen []model.Session, s model.Session, terms []string) bool {
+	return search.SameAnswerAs(chosen, s, terms)
 }
 
 // openerLine pre-writes the line the agent says when it reused the recall, so
@@ -1561,551 +1271,4 @@ func citationDate(s model.Session) string {
 		layout = "Jan 2 2006"
 	}
 	return ", " + s.Updated.Local().Format(layout)
-}
-
-func maybePinLiveUserRule(dir, cwd, sessionID, prompt string) {
-	t := strings.TrimSpace(prompt)
-	if len(t) < 12 || len(t) > 1200 {
-		return
-	}
-	lower := strings.ToLower(t)
-	if strings.Contains(lower, "<system_message>") || strings.Contains(lower, "<system-message>") {
-		return
-	}
-	rules := digest.ExtractStandingRules(model.Session{
-		ID:       sessionID,
-		Messages: []model.Message{{Role: "user", Text: t}},
-	}, nil)
-	if len(rules) == 0 {
-		return
-	}
-	for _, r := range rules {
-		pinExtractedLiveRule(dir, cwd, sessionID, r.Text)
-	}
-}
-
-// syncLiveSessionRules pins standing rules and turn-pair refusals across all
-// harnesses (using the live transcript, in-memory messages, or harness session
-// store when available) and returns the preceding assistant message text.
-func syncLiveSessionRules(dir, cwd string, input promptHookInput, asked string) string {
-	msgs, prevRules, prevAssistant := liveSessionRecentMessages(dir, cwd, input, asked)
-	if len(msgs) == 0 && len(prevRules) == 0 {
-		maybePinLiveUserRule(dir, cwd, input.SessionID, asked)
-		return prevAssistant
-	}
-	rules := digest.ExtractStandingRules(model.Session{
-		ID:       input.SessionID,
-		Harness:  input.Harness,
-		Messages: msgs,
-	}, prevRules)
-	for _, r := range rules {
-		ctxTerms := turnPairContextTerms(msgs, r.Text)
-		pinExtractedLiveRule(dir, cwd, input.SessionID, r.Text, ctxTerms...)
-	}
-	return prevAssistant
-}
-
-func liveSessionRecentMessages(dir, cwd string, input promptHookInput, asked string) ([]model.Message, []model.ContextFact, string) {
-	var msgs []model.Message
-	var prevRules []model.ContextFact
-	ws := compactionWorkspace(cwd)
-	if input.SessionID != "" {
-		for _, candidateWS := range []string{cwd, sources.Home()} {
-			if candidateWS == "" {
-				continue
-			}
-			if state, found, err := index.Compaction(dir, input.SessionID, compactionWorkspace(candidateWS)); err == nil && found {
-				prevRules = append(prevRules, state.Data.Rules...)
-				if state.Data.Goal.Text != "" {
-					msgs = append(msgs, model.Message{Role: "user", Text: state.Data.Goal.Text})
-				}
-				if state.Data.Objective.Text != "" {
-					msgs = append(msgs, model.Message{Role: "user", Text: state.Data.Objective.Text})
-				}
-				break
-			}
-		}
-	}
-	msgs = append(msgs, readLiveHookTranscriptMessages(input, cwd, ws)...)
-	t := strings.TrimSpace(asked)
-	if t != "" {
-		if len(msgs) == 0 || msgs[len(msgs)-1].Role != "user" || strings.TrimSpace(msgs[len(msgs)-1].Text) != t {
-			msgs = append(msgs, model.Message{Role: "user", Text: t})
-		}
-	}
-	prevAssistant := ""
-	for _, m := range slices.Backward(msgs) {
-		if m.Role == "assistant" && strings.TrimSpace(m.Text) != "" {
-			prevAssistant = m.Text
-			break
-		}
-	}
-	return msgs, prevRules, prevAssistant
-}
-
-func readLiveHookTranscriptMessages(input promptHookInput, cwd, ws string) []model.Message {
-	if input.TranscriptPath == "" && len(input.Messages) == 0 && input.Harness == "" && input.SessionID == "" {
-		return nil
-	}
-	pre := precompactHookInput{
-		SessionID:      input.SessionID,
-		TranscriptPath: input.TranscriptPath,
-		CWD:            cwd,
-		Harness:        input.Harness,
-		Messages:       input.Messages,
-	}
-	tr, reason, _ := compactionSource(pre, ws)
-	if reason != "" && input.SessionID != "" && input.TranscriptPath == "" && len(input.Messages) == 0 {
-		if fallback, err := sources.ReadCompactionSession(input.Harness, input.SessionID, "", ws); err == nil {
-			tr = fallback
-			reason = ""
-		}
-	}
-	if reason == "" && len(tr.Session.Messages) > 0 {
-		tail := tr.Session.Messages
-		if len(tail) > 24 {
-			tail = tail[len(tail)-24:]
-		}
-		var out []model.Message
-		for _, m := range tail {
-			if (m.Role == "user" || m.Role == "assistant") && strings.TrimSpace(m.Text) != "" {
-				out = append(out, model.Message{Role: m.Role, Text: m.Text})
-			}
-		}
-		return out
-	}
-	var out []model.Message
-	if input.TranscriptPath != "" {
-		out = append(out, parseGenericTranscriptTail(input.TranscriptPath)...)
-	}
-	if len(input.Messages) > 0 {
-		out = append(out, parseGenericHookMessages(input.Messages)...)
-	}
-	return out
-}
-
-func parseGenericTranscriptTail(path string) []model.Message {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil
-	}
-	defer func() { _ = f.Close() }()
-	fi, err := f.Stat()
-	if err != nil || fi.IsDir() {
-		return nil
-	}
-	const maxTail = 256 << 10
-	offset := int64(0)
-	if fi.Size() > maxTail {
-		offset = fi.Size() - maxTail
-	}
-	if offset > 0 {
-		if _, seekErr := f.Seek(offset, io.SeekStart); seekErr != nil {
-			return nil
-		}
-	}
-	b, err := io.ReadAll(io.LimitReader(f, maxTail))
-	if err != nil {
-		return nil
-	}
-	var out []model.Message
-	for line := range bytes.SplitSeq(b, []byte{'\n'}) {
-		line = bytes.TrimSpace(line)
-		if len(line) == 0 {
-			continue
-		}
-		var row struct {
-			Type    string         `json:"type"`
-			Role    string         `json:"role"`
-			Content hookPromptText `json:"content"`
-			Text    string         `json:"text"`
-			Message struct {
-				Role    string         `json:"role"`
-				Content hookPromptText `json:"content"`
-				Text    string         `json:"text"`
-			} `json:"message"`
-		}
-		if json.Unmarshal(line, &row) != nil {
-			continue
-		}
-		role := firstNonEmpty(row.Message.Role, row.Role, row.Type)
-		if role != "user" && role != "assistant" {
-			continue
-		}
-		txt := firstNonEmpty(
-			strings.TrimSpace(string(row.Message.Content)),
-			strings.TrimSpace(row.Message.Text),
-			strings.TrimSpace(string(row.Content)),
-			strings.TrimSpace(row.Text),
-		)
-		if txt != "" {
-			out = append(out, model.Message{Role: role, Text: txt})
-		}
-	}
-	if len(out) > 24 {
-		out = out[len(out)-24:]
-	}
-	return out
-}
-
-func parseGenericHookMessages(raw json.RawMessage) []model.Message {
-	var rows []struct {
-		Role    string         `json:"role"`
-		Content hookPromptText `json:"content"`
-		Text    string         `json:"text"`
-	}
-	if json.Unmarshal(raw, &rows) != nil {
-		return nil
-	}
-	var out []model.Message
-	for _, r := range rows {
-		if r.Role != "user" && r.Role != "assistant" {
-			continue
-		}
-		txt := strings.TrimSpace(string(r.Content))
-		if txt == "" {
-			txt = strings.TrimSpace(r.Text)
-		}
-		if txt != "" {
-			out = append(out, model.Message{Role: r.Role, Text: txt})
-		}
-	}
-	if len(out) > 24 {
-		out = out[len(out)-24:]
-	}
-	return out
-}
-
-func pinExtractedLiveRule(dir, cwd, sessionID, ruleText string, extraSyms ...string) {
-	ruleText = strings.TrimSpace(ruleText)
-	if ruleText == "" {
-		return
-	}
-	paths, syms := extractLiveRulePathsAndSymbols(cwd, ruleText)
-	if len(paths) == 0 && len(syms) == 0 {
-		return
-	}
-	seenSym := map[string]bool{}
-	for _, s := range syms {
-		seenSym[strings.ToLower(s)] = true
-	}
-	for _, s := range extraSyms {
-		s = strings.TrimSpace(s)
-		low := strings.ToLower(s)
-		if len(s) >= 3 && !seenSym[low] && !isCommonKeyword(low) && len(syms) < 12 {
-			seenSym[low] = true
-			syms = append(syms, s)
-		}
-	}
-	from := "live-session"
-	if strings.TrimSpace(sessionID) != "" {
-		from = strings.TrimSpace(sessionID)
-	}
-	entry := sources.RepoEntry{
-		ID:    sources.RepoEntryID("rule", ruleText),
-		Kind:  "rule",
-		Text:  ruleText,
-		Files: paths,
-		Date:  time.Now().UTC().Format("2006-01-02"),
-		From:  from,
-	}
-	var targets []string
-	if cwd != "" {
-		root := sources.RepoRoot(cwd)
-		if root != "" {
-			targets = append(targets, filepath.Join(root, ".deja", "live_rules.jsonl"))
-		} else if len(cachedProjectNameCandidates(cwd)) > 0 {
-			targets = append(targets, filepath.Join(cwd, ".deja", "live_rules.jsonl"))
-		}
-	}
-	effDir := dir
-	if effDir == "" {
-		effDir = index.DefaultDir()
-	}
-	if effDir != "" {
-		targets = append(targets, filepath.Join(effDir, "live_rules.jsonl"))
-	}
-	for _, target := range targets {
-		appendLiveRule(target, entry, syms)
-	}
-}
-
-func syncAntigravitySessionRules(dir, cwd, conversationID string, steps []transcriptStep) {
-	var msgs []model.Message
-	var prevRules []model.ContextFact
-	if conversationID != "" {
-		for _, ws := range []string{cwd, sources.Home()} {
-			if ws == "" {
-				continue
-			}
-			if state, found, err := index.Compaction(dir, conversationID, compactionWorkspace(ws)); err == nil && found {
-				prevRules = append(prevRules, state.Data.Rules...)
-				if state.Data.Goal.Text != "" {
-					msgs = append(msgs, model.Message{Role: "user", Text: state.Data.Goal.Text})
-				}
-				if state.Data.Objective.Text != "" {
-					msgs = append(msgs, model.Message{Role: "user", Text: state.Data.Objective.Text})
-				}
-				break
-			}
-		}
-	}
-	for _, st := range slices.Backward(steps) {
-		switch st.Type {
-		case "PLANNER_RESPONSE":
-			if strings.TrimSpace(st.Content) != "" {
-				msgs = append(msgs, model.Message{Role: "assistant", Text: st.Content})
-			}
-		case "USER_INPUT":
-			if q := userRequestText(st.Content); q != "" {
-				msgs = append(msgs, model.Message{Role: "user", Text: q})
-			}
-		}
-	}
-	if len(msgs) == 0 && len(prevRules) == 0 {
-		return
-	}
-	rules := digest.ExtractStandingRules(model.Session{
-		ID:       conversationID,
-		Harness:  "antigravity",
-		Messages: msgs,
-	}, prevRules)
-	for _, r := range rules {
-		ctxTerms := turnPairContextTerms(msgs, r.Text)
-		pinExtractedLiveRule(dir, cwd, conversationID, r.Text, ctxTerms...)
-	}
-}
-
-// turnPairContextTerms extracts the co-occurring content terms from the
-// (assistant proposal, user refusal/rule) turn pair that produced ruleText, so
-// future prompts mentioning the surrounding topic match even when the user's
-// refusal did not repeat the assistant's technical vocabulary.
-func turnPairContextTerms(msgs []model.Message, ruleText string) []string {
-	body := ruleText
-	var out []string
-	if idx := strings.Index(ruleText, ": "); idx > 0 && strings.HasPrefix(ruleText, "Do not suggest ") {
-		target := strings.TrimSpace(strings.TrimPrefix(ruleText[:idx], "Do not suggest "))
-		if isTechnicalRuleSymbol(target) {
-			out = append(out, target)
-			if bare := strings.TrimLeft(target, "-/"); bare != "" && bare != target && isTechnicalRuleSymbol(bare) {
-				out = append(out, bare)
-			}
-		}
-		body = strings.TrimSpace(ruleText[idx+2:])
-	}
-	prevAssistant := ""
-	for _, m := range msgs {
-		if m.Role == "assistant" {
-			prevAssistant = m.Text
-			continue
-		}
-		if m.Role == "user" && body != "" && strings.Contains(m.Text, body) {
-			_, backtickSyms := extractLiveRulePathsAndSymbols("", prevAssistant+" "+m.Text)
-			out = append(out, backtickSyms...)
-			return out
-		}
-	}
-	return out
-}
-
-func isTechnicalRuleSymbol(tok string) bool {
-	tok = strings.TrimSpace(tok)
-	if len(tok) < 2 || strings.ContainsAny(tok, " \t\n") {
-		return false
-	}
-	low := strings.ToLower(tok)
-	if isCommonKeyword(low) {
-		return false
-	}
-	return strings.HasPrefix(tok, "-") ||
-		strings.ContainsAny(tok, "/._:") ||
-		hasMixedCaseOrUnderscore(tok)
-}
-
-func sessionStandingRuleLine(dir, cwd, sessionID, asked string, seen map[string]bool, prevAssistant ...string) (string, string) {
-	effDir := dir
-	if effDir == "" {
-		effDir = index.DefaultDir()
-	}
-	var paths []string
-	if cwd != "" {
-		if root := sources.RepoRoot(cwd); root != "" {
-			paths = append(paths, filepath.Join(root, ".deja", "live_rules.jsonl"))
-		} else if len(cachedProjectNameCandidates(cwd)) > 0 {
-			paths = append(paths, filepath.Join(cwd, ".deja", "live_rules.jsonl"))
-		}
-	}
-	if effDir != "" {
-		paths = append(paths, filepath.Join(effDir, "live_rules.jsonl"))
-	}
-	askedPaths, _ := extractLiveRulePathsAndSymbols(cwd, asked)
-	prevAsst := ""
-	if len(prevAssistant) > 0 {
-		prevAsst = strings.TrimSpace(prevAssistant[0])
-	}
-	seenID := map[string]bool{}
-	for _, p := range paths {
-		for _, rec := range slices.Backward(readLiveRuleRecords(p)) {
-			e := rec.RepoEntry
-			if e.Text == "" || seenID[e.ID] || isMalformedStandingRuleText(e.Text) {
-				continue
-			}
-			seenID[e.ID] = true
-			isSameSession := sessionID != "" && e.From == sessionID
-			isProjectFile := effDir == "" || p != filepath.Join(effDir, "live_rules.jsonl")
-			if !isSameSession && !isProjectFile {
-				continue
-			}
-			topicMatch := repoEntryMentionsCommand(asked, e.Text) ||
-				commandTouchesRepoEntryFiles(asked, e.Files) ||
-				mentionsAnySymbol(rec.Symbols, asked)
-			if !topicMatch && len(askedPaths) == 0 && prevAsst != "" {
-				topicMatch = repoEntryMentionsCommand(prevAsst, e.Text) ||
-					mentionsAnySymbol(rec.Symbols, prevAsst)
-			}
-			// A session-wide turn-pair refusal ("Do not suggest <X>: ...") pinned
-			// in the current session applies to any non-file-specific prompt in
-			// that session regardless of language or topic vocabulary, without
-			// firing when the user asks to edit an unrelated file.
-			if !topicMatch && isSameSession && len(e.Files) == 0 && len(askedPaths) == 0 && strings.HasPrefix(e.Text, "Do not suggest ") {
-				topicMatch = true
-			}
-			if !topicMatch {
-				continue
-			}
-			tok := "srule:" + shortHash(e.Text+"|"+asked)
-			if seen != nil && seen[tok] {
-				continue
-			}
-			line := "User standing rule (do not violate or re-suggest): " + search.SafeText(clipDecision(e.Text, 240))
-			return line, tok
-		}
-	}
-	return "", ""
-}
-
-// isMalformedStandingRuleText reports whether a standing rule has a punctuation-only or empty target.
-func isMalformedStandingRuleText(text string) bool {
-	s := strings.TrimSpace(text)
-	if s == "" {
-		return true
-	}
-	countLetters := func(v string) int {
-		n := 0
-		for _, r := range v {
-			if unicode.IsLetter(r) {
-				n++
-			}
-		}
-		return n
-	}
-	if rest, ok := strings.CutPrefix(s, "Do not suggest "); ok {
-		subj, body, hasColon := strings.Cut(rest, ":")
-		if hasColon && (countLetters(subj) < 2 || countLetters(body) < 2) {
-			return true
-		}
-		if !hasColon && countLetters(rest) < 2 {
-			return true
-		}
-	}
-	low := strings.ToLower(s)
-	for _, prefix := range []string{"do not suggest ", "do not use ", "do not ", "don't use ", "don't ", "never use ", "never ", "always use ", "always ", "avoid "} {
-		if rest, ok := strings.CutPrefix(low, prefix); ok {
-			return countLetters(rest) < 2
-		}
-	}
-	return countLetters(s) < 3
-}
-
-func extractLiveRulePathsAndSymbols(cwd, text string) ([]string, []string) {
-	var paths, syms []string
-	seenPath := map[string]bool{}
-	seenSym := map[string]bool{}
-	addPath := func(p string) {
-		cp := filepath.ToSlash(filepath.Clean(strings.TrimSpace(p)))
-		if cp != "" && cp != "." && !seenPath[cp] {
-			seenPath[cp] = true
-			paths = append(paths, cp)
-		}
-	}
-	addSym := func(s string) {
-		cs := strings.TrimSpace(s)
-		if cs != "" && !seenSym[cs] {
-			seenSym[cs] = true
-			syms = append(syms, cs)
-		}
-	}
-	if idx := strings.Index(text, ": "); idx > 0 && strings.HasPrefix(text, "Do not suggest ") {
-		target := strings.TrimSpace(strings.TrimPrefix(text[:idx], "Do not suggest "))
-		if isTechnicalRuleSymbol(target) {
-			addSym(target)
-			if bare := strings.TrimLeft(target, "-/"); len(bare) >= 2 && isTechnicalRuleSymbol(bare) {
-				addSym(bare)
-			}
-		}
-	}
-
-	// 1. Backtick extraction
-	s := text
-	for {
-		_, rest, ok := strings.Cut(s, "`")
-		if !ok {
-			break
-		}
-		item, after, ok := strings.Cut(rest, "`")
-		if !ok {
-			break
-		}
-		s = after
-		if strings.Contains(item, "/") || isCodeFilePath(item) {
-			addPath(item)
-		} else if len(item) >= 2 {
-			addSym(item)
-		}
-	}
-
-	// 2. Word tokens for file names or paths
-	words := strings.FieldsFunc(text, func(r rune) bool {
-		return r == ' ' || r == '\t' || r == '\n' || r == ',' || r == ';' || r == ':' || r == '(' || r == ')'
-	})
-	root := sources.RepoRoot(cwd)
-	if root == "" {
-		root = cwd
-	}
-	for _, w := range words {
-		wClean := strings.Trim(w, "`'\".,;()[]{}")
-		if wClean == "" {
-			continue
-		}
-		if isCodeFilePath(wClean) {
-			addPath(wClean)
-			continue
-		}
-		// Check if exists in cwd or root
-		for _, base := range []string{cwd, root} {
-			p := filepath.Join(base, wClean)
-			if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
-				addPath(wClean)
-				break
-			}
-		}
-	}
-	return paths, syms
-}
-
-func isCodeFilePath(p string) bool {
-	low := strings.ToLower(p)
-	exts := []string{
-		".go", ".ts", ".js", ".py", ".rs", ".json", ".yaml", ".yml",
-		".toml", ".md", ".sh", ".c", ".h", ".cpp", ".html", ".css",
-	}
-	for _, ext := range exts {
-		if strings.HasSuffix(low, ext) {
-			return true
-		}
-	}
-	if strings.HasPrefix(p, "/") && !strings.Contains(p[1:], "/") {
-		return false
-	}
-	return strings.Contains(p, "/") && !strings.Contains(p, " ")
 }

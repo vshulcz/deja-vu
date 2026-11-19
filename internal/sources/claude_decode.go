@@ -2,6 +2,7 @@ package sources
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -160,6 +161,7 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 	// Where each Bash call's record landed, so the result that arrives later
 	// can stamp its outcome onto it.
 	commandAt := map[string][]int{}
+	var pendingInlineSlots [][]int
 	// Claude Code writes one JSONL record per content block of an API reply and
 	// repeats the reply's usage block on each line, so token totals are keyed
 	// by API call identity before summing across the session (#5996).
@@ -274,7 +276,10 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 		}
 		if v.Message != nil {
 			claudeCountToolsIn(&s, content, seenTools, seenToolResults)
-			claudeAppendToolRecords(&s, content, t, commandAt)
+			claudeAppendToolRecords(&s, content, t, commandAt, &pendingInlineSlots)
+		}
+		if role == "user" {
+			pendingInlineSlots = nil
 		}
 	})
 	for _, k := range usageOrder {
@@ -365,7 +370,7 @@ func claudeCountToolsIn(s *model.Session, c *claudeContent, seenTools, seenResul
 				Name string `json:"name"`
 			}
 			if json.Unmarshal(item, &u) == nil && u.Type == "tool_use" && u.Name != "" {
-				if u.ID != "" {
+				if u.ID != "" && u.ID != inlineToolID {
 					if seenTools[u.ID] {
 						continue
 					}
@@ -382,7 +387,7 @@ func claudeCountToolsIn(s *model.Session, c *claudeContent, seenTools, seenResul
 				IsError   bool   `json:"is_error"`
 			}
 			if json.Unmarshal(item, &r) == nil && r.Type == "tool_result" && r.IsError {
-				if r.ToolUseID != "" {
+				if r.ToolUseID != "" && r.ToolUseID != inlineToolID {
 					if seenResults[r.ToolUseID] {
 						continue
 					}
@@ -397,7 +402,7 @@ func claudeCountToolsIn(s *model.Session, c *claudeContent, seenTools, seenResul
 // claudeAppendToolRecords appends the paths, edits, writes and commands a
 // record's content carries, and stamps the outcome of earlier commands whose
 // results it holds.
-func claudeAppendToolRecords(s *model.Session, content *claudeContent, t time.Time, commandAt map[string][]int) {
+func claudeAppendToolRecords(s *model.Session, content *claudeContent, t time.Time, commandAt map[string][]int, pendingInlineSlots *[][]int) {
 	if IndexToolPaths() {
 		if p := claudeToolPathsIn(content); p != "" {
 			s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: p, Time: t})
@@ -414,8 +419,10 @@ func claudeAppendToolRecords(s *model.Session, content *claudeContent, t time.Ti
 		}
 	}
 	if IndexCommands() {
-		for _, cmd := range claudeCommandsIn(content) {
-			if cmd.ID != "" {
+		cmds, inlineSeq := claudeCommandItemsIn(content)
+		base := len(s.Messages)
+		for _, cmd := range cmds {
+			if cmd.ID != "" && cmd.ID != inlineToolID {
 				// One call can carry a batch of commands, and the
 				// filter drops some of them, so the indexes under one
 				// id are neither one nor contiguous.
@@ -423,11 +430,30 @@ func claudeAppendToolRecords(s *model.Session, content *claudeContent, t time.Ti
 			}
 			s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd.Text, Time: t})
 		}
+		if pendingInlineSlots != nil {
+			for _, cmdIdx := range inlineSeq {
+				if cmdIdx >= 0 {
+					*pendingInlineSlots = append(*pendingInlineSlots, []int{base + cmdIdx})
+				} else {
+					*pendingInlineSlots = append(*pendingInlineSlots, nil)
+				}
+			}
+		}
 		// The result arrives in a later record and names the call, in
 		// the marker every other harness writes. A failure is stamped
 		// only with the code its result names; nothing is invented for
 		// one that names none.
 		for _, res := range claudeToolOutcomesIn(content) {
+			if res.ID == inlineToolID {
+				if pendingInlineSlots != nil && len(*pendingInlineSlots) > 0 {
+					slot := (*pendingInlineSlots)[0]
+					*pendingInlineSlots = (*pendingInlineSlots)[1:]
+					if len(slot) > 0 && res.Known {
+						commandExits{inlineToolID: slot}.stamp(s.Messages, inlineToolID, "", res.Code)
+					}
+				}
+				continue
+			}
 			if _, ok := commandAt[res.ID]; !ok || !res.Known {
 				continue
 			}
@@ -482,20 +508,22 @@ func claudeTime(raw json.RawMessage) time.Time {
 // wrong.
 const RoleToolOutput = "tool-output"
 
+const inlineToolID = "inline"
+
 func claudeTextKindIn(c *claudeContent) (string, bool) {
 	var sawToolResult, sawSpeech bool
 	raw := c.raw
 	if len(raw) == 0 {
 		return "", false
 	}
-	if raw[0] == '"' {
-		var s string
-		if json.Unmarshal(raw, &s) != nil {
-			return "", false
-		}
-		return s, false
-	}
 	if !c.array {
+		if raw[0] == '"' {
+			var s string
+			if json.Unmarshal(raw, &s) != nil {
+				return "", false
+			}
+			return s, false
+		}
 		return "", false
 	}
 	var b strings.Builder
@@ -550,10 +578,106 @@ type claudeContent struct {
 
 func splitClaudeContent(raw json.RawMessage) *claudeContent {
 	c := &claudeContent{raw: trimJSONSpace(raw)}
+	hasBracket := bytes.Contains(c.raw, []byte("["))
 	if len(c.raw) > 0 && c.raw[0] == '[' && json.Unmarshal(c.raw, &c.items) == nil {
 		c.array = true
+		if hasBracket {
+			for i, item := range c.items {
+				if !bytes.Contains(item, []byte("[")) {
+					continue
+				}
+				var part struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+				}
+				if json.Unmarshal(item, &part) != nil || (part.Type != "" && part.Type != "text") || part.Text == "" {
+					continue
+				}
+				if norm, ok := normalizeInlineClaudeText(part.Text); ok {
+					c.items[i] = norm
+				}
+			}
+		}
+		return c
+	}
+	if len(c.raw) > 0 && c.raw[0] == '"' && hasBracket {
+		var s string
+		if json.Unmarshal(c.raw, &s) == nil {
+			if norm, ok := normalizeInlineClaudeText(s); ok {
+				c.array = true
+				c.items = []json.RawMessage{norm}
+			}
+		}
 	}
 	return c
+}
+
+// normalizeInlineClaudeText unpacks exported text markers ([thinking],
+// [tool_use Name] {...}, [tool_result]...) into synthetic typed blocks so all
+// downstream extractors handle them uniformly without altering native JSON logs.
+func normalizeInlineClaudeText(s string) (json.RawMessage, bool) {
+	trimmed := strings.TrimSpace(s)
+	if !strings.HasPrefix(trimmed, "[") {
+		return nil, false
+	}
+	if rest, ok := strings.CutPrefix(trimmed, "[thinking]"); ok && (rest == "" || rest[0] == ' ' || rest[0] == '\t' || rest[0] == '\n' || rest[0] == '\r') {
+		b, err := json.Marshal(struct {
+			Type     string `json:"type"`
+			Thinking string `json:"thinking"`
+		}{
+			Type:     "thinking",
+			Thinking: strings.TrimSpace(rest),
+		})
+		return b, err == nil
+	}
+	if rest, ok := strings.CutPrefix(trimmed, "[tool_use "); ok {
+		closeIdx := strings.IndexByte(rest, ']')
+		if closeIdx <= 0 {
+			return nil, false
+		}
+		name := strings.TrimSpace(rest[:closeIdx])
+		if name == "" || strings.ContainsAny(name, " \t\r\n") {
+			return nil, false
+		}
+		payload := strings.TrimSpace(rest[closeIdx+1:])
+		if len(payload) < 2 || payload[0] != '{' || !json.Valid([]byte(payload)) {
+			return nil, false
+		}
+		b, err := json.Marshal(struct {
+			Type  string          `json:"type"`
+			ID    string          `json:"id"`
+			Name  string          `json:"name"`
+			Input json.RawMessage `json:"input"`
+		}{
+			Type:  "tool_use",
+			ID:    inlineToolID,
+			Name:  name,
+			Input: json.RawMessage(payload),
+		})
+		return b, err == nil
+	}
+	if rest, ok := strings.CutPrefix(trimmed, "[tool_result]"); ok && (rest == "" || rest[0] == ' ' || rest[0] == '\t' || rest[0] == '\n' || rest[0] == '\r') {
+		body := strings.TrimLeft(rest, " \t\r\n")
+		isErr := strings.HasPrefix(body, "<tool_use_error>")
+		if !isErr {
+			if code, hasCode := statusCode(firstLine(body), "Exit code ", ""); hasCode && code != 0 {
+				isErr = true
+			}
+		}
+		b, err := json.Marshal(struct {
+			Type      string `json:"type"`
+			ToolUseID string `json:"tool_use_id"`
+			IsError   bool   `json:"is_error,omitempty"`
+			Content   string `json:"content"`
+		}{
+			Type:      "tool_result",
+			ToolUseID: inlineToolID,
+			IsError:   isErr,
+			Content:   body,
+		})
+		return b, err == nil
+	}
+	return nil, false
 }
 
 // notType reports that item i is an object of another type than want. A
@@ -1018,10 +1142,16 @@ func claudeCommands(raw json.RawMessage) []claudeCommand {
 }
 
 func claudeCommandsIn(c *claudeContent) []claudeCommand {
+	cmds, _ := claudeCommandItemsIn(c)
+	return cmds
+}
+
+func claudeCommandItemsIn(c *claudeContent) ([]claudeCommand, []int) {
 	if !c.array {
-		return nil
+		return nil, nil
 	}
 	var out []claudeCommand
+	var inlineSeq []int
 	for i, item := range c.items {
 		item = trimJSONSpace(item)
 		if len(item) == 0 || item[0] != '{' || c.notType(i, "tool_use") {
@@ -1035,18 +1165,21 @@ func claudeCommandsIn(c *claudeContent) []claudeCommand {
 				Command string `json:"command"`
 			} `json:"input"`
 		}
-		if json.Unmarshal(item, &part) != nil {
+		if json.Unmarshal(item, &part) != nil || part.Type != "tool_use" {
 			continue
 		}
-		if part.Type != "tool_use" || !claudeShellTools[part.Name] || part.Input.Command == "" {
+		if claudeShellTools[part.Name] && part.Input.Command != "" && worthIndexing(part.Input.Command) {
+			if part.ID == inlineToolID {
+				inlineSeq = append(inlineSeq, len(out))
+			}
+			out = append(out, claudeCommand{ID: part.ID, Text: "$ " + part.Input.Command})
 			continue
 		}
-		if !worthIndexing(part.Input.Command) {
-			continue
+		if part.ID == inlineToolID {
+			inlineSeq = append(inlineSeq, -1)
 		}
-		out = append(out, claudeCommand{ID: part.ID, Text: "$ " + part.Input.Command})
 	}
-	return out
+	return out, inlineSeq
 }
 
 // claudeToolOutcome is one tool_result and the exit code it states. A clean
@@ -1085,7 +1218,14 @@ func claudeToolOutcomesIn(c *claudeContent) []claudeToolOutcome {
 		if part.IsError {
 			_ = json.Unmarshal(part.Content, &content)
 		}
-		out = append(out, claudeOutcome(part.ToolUseID, part.IsError, content))
+		res := claudeOutcome(part.ToolUseID, part.IsError, content)
+		if part.ToolUseID == inlineToolID && part.IsError && !res.Known {
+			// Still emit inline errors without an exit code so FIFO pending
+			// command queues advance 1-for-1 alongside their result blocks.
+			out = append(out, claudeToolOutcome{ID: inlineToolID, Known: false})
+			continue
+		}
+		out = append(out, res)
 	}
 	return out
 }

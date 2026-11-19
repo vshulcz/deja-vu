@@ -418,6 +418,7 @@ func recallConclusionLines(dir, q string, h search.Hit, o search.Options, left i
 			"assistant":          true,
 			"edit":               true,
 			"wrote":              true,
+			"command":            true,
 			index.RoleStubOthers: true,
 		}
 		for _, m := range h.Session.Messages {

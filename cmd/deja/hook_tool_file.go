@@ -49,6 +49,9 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 			if !fileMetaInScope(meta, path, nil) && !fileMetaInScope(meta, path, projects()) {
 				continue
 			}
+			if !fileMetaMatchesRepoSubpath(meta, cwd, path) {
+				continue
+			}
 			if self != nil && self(meta, path) {
 				continue
 			}
@@ -75,7 +78,13 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 		if repoDec != "" {
 			cold = name + repoDecisionLabel + repoDec
 		} else if !isTestFilePath(path) && planIndexReady(dir) {
-			if rev, _ := fileReversalLineForWithTime(dir, cwd, path, editSymbols, fileSymbols, inScope, projects, pol, self); rev != "" {
+			var promoted string
+			if sessions > 0 {
+				promoted = promotedDecisionForFileIn(dir, path, inScope)
+			}
+			if promoted != "" && (mentionsFile(path, promoted) || mentionsAnySymbol(allSymbols, promoted)) {
+				cold = name + standingLabel + promoted
+			} else if rev, _ := fileReversalLineForWithTime(dir, cwd, path, editSymbols, fileSymbols, inScope, projects, pol, self); rev != "" {
 				cold = name + revertedLabel + rev
 			}
 		}
@@ -769,6 +778,11 @@ func isEphemeralCompletionReport(s string) bool {
 		"the first ci run failed", "current audit:", "task: ",
 		"the fix is in:", "заодно поправил ", "я исправил ",
 		"the command failed because gemini cli did not clone",
+		"perfect! i've ", "perfect! i have ", "excellent! i've ", "excellent! i have ",
+		"great! i've ", "great! i have ", "i've successfully ", "i have successfully ",
+		"i successfully ", "here's what ", "here is what ",
+		"let me create a summary", "let me summarize",
+		"i have fixed ", "successfully fixed ", "all tests pass",
 		"`#", "#",
 	} {
 		if strings.HasPrefix(low, p) {
@@ -2527,6 +2541,52 @@ func fileMetaInScope(meta index.SessionMeta, path string, projects []string) boo
 		}
 	}
 	return false
+}
+
+// fileMetaMatchesRepoSubpath reports whether meta.Touched agrees with the
+// repository subpath of path so identically named files in sibling modules do
+// not leak file decisions or counts across modules.
+func fileMetaMatchesRepoSubpath(meta index.SessionMeta, cwd, path string) bool {
+	if path == "" || len(meta.Touched) == 0 {
+		return true
+	}
+	rel := path
+	if filepath.IsAbs(path) {
+		cleanPath := filepath.Clean(path)
+		baseRoot := sources.RepoRoot(filepath.Dir(cleanPath))
+		if baseRoot == "" && cwd != "" {
+			baseRoot = filepath.Clean(cwd)
+		}
+		if baseRoot != "" {
+			if r, err := filepath.Rel(baseRoot, cleanPath); err == nil && !strings.HasPrefix(r, "..") {
+				rel = r
+			}
+		}
+	}
+	rel = strings.TrimPrefix(filepath.ToSlash(filepath.Clean(rel)), "./")
+	if !strings.Contains(rel, "/") {
+		return true
+	}
+	base := filepath.Base(rel)
+	sawSameBaseWithDir := false
+	sawBareBase := false
+	for _, raw := range meta.Touched {
+		t := strings.TrimPrefix(filepath.ToSlash(filepath.Clean(raw)), "./")
+		if t == rel || strings.HasSuffix(t, "/"+rel) || (strings.Contains(t, "/") && strings.HasSuffix(rel, "/"+t)) {
+			return true
+		}
+		if filepath.Base(t) == base {
+			if strings.Contains(t, "/") {
+				sawSameBaseWithDir = true
+			} else {
+				sawBareBase = true
+			}
+		}
+	}
+	if sawSameBaseWithDir && !sawBareBase {
+		return false
+	}
+	return true
 }
 
 func baseName(p string) string { return index.CrossBase(p) }

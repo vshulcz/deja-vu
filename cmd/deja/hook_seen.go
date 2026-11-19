@@ -446,7 +446,12 @@ func blockAlreadySentThisSession(dir, sid string) bool {
 	if sid == "" {
 		return false
 	}
-	return len(recentlyInjected(dir, sid, leadWindow)) > 0
+	for id, ok := range recentlyInjected(dir, sid, leadWindow) {
+		if ok && strings.HasPrefix(id, digestSeenPrefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // digestsPerSession is how many full per-prompt digests one agent session gets
@@ -541,8 +546,8 @@ func weakRecallPointerAskedWithNudgeIn(dir, cwd, asked string, ss []model.Sessio
 	if len(ss) > 1 {
 		more = fmt.Sprintf(" (+%d more)", len(ss)-1)
 	}
-	out := fmt.Sprintf("deja: this project has history on %q from %s%s — call deja in \"recall\" mode (or recall) with a specific token if it matters here.\n",
-		search.SafeLine(topic), when, more)
+	out := fmt.Sprintf("deja: this project has history on %q from %s%s — inspect session %#q or call deja in \"recall\" mode with a specific token if it matters here.\n",
+		search.SafeLine(topic), when, more, ss[0].ID)
 	actionAsked := asked
 	if strings.TrimSpace(actionAsked) == "" {
 		actionAsked = strings.Join(terms, " ")

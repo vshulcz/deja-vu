@@ -435,29 +435,38 @@ func lineAround(s string, n int, terms []string) string {
 		return s
 	}
 	at := -1
+	matchRunes := 0
 	low := lower(s)
 	for _, t := range terms {
 		if t == "" {
 			continue
 		}
-		i := strings.Index(low, lower(t))
+		m := lower(t)
+		i := strings.Index(low, m)
 		if i < 0 {
 			if stem := termStem(t); stem != "" {
-				i = strings.Index(low, stem)
+				m = stem
+				i = strings.Index(low, m)
+			} else if root, ok := regularSingular(m); ok {
+				m = root
+				i = strings.Index(low, m)
 			}
 		}
-		if i >= 0 && (at < 0 || i < at) {
+		if i >= 0 {
 			at = len([]rune(s[:i]))
+			matchRunes = len([]rune(m))
+			break
 		}
 	}
-	// Nothing matched, or it matched inside the window anyway: the old cut is
-	// the right one.
-	if at < 0 || at < n {
+	// Nothing matched, or the match and enough trailing context fit inside the
+	// front window: keep the front cut.
+	const lead = 40
+	tail := max(matchRunes, min(lead, n/3))
+	if at < 0 || at+tail <= n {
 		return strings.TrimSpace(string(r[:n])) + "…"
 	}
 	// A little before the match, so the reader lands on a phrase rather than
 	// mid-word, and the rest of the budget after it.
-	const lead = 40
 	start := max(at-lead, 0)
 	end := min(start+n, len(r))
 	out := strings.TrimSpace(string(r[start:end]))

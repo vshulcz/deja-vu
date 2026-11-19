@@ -90,16 +90,18 @@ func AutoRecallDigestShowing(ss []model.Session, budget int, terms []string, ask
 	if budget <= 0 {
 		budget = 2000
 	}
-	// Sections are gathered until the lines that are not receipts fill the
-	// budget, so a receipt never decides which session gets in.
+	// Sections are gathered until non-receipt lines fill the budget, while
+	// still looking ahead to at least the top 3 sessions on real budgets so
+	// one long session cannot starve the remaining candidates out of secs.
 	type section struct {
 		s     model.Session
 		lines []string
 	}
 	var secs []section
 	core, total := 0, 0
+	newestByProject := make(map[string]string)
 	for _, s := range ss {
-		if core >= budget {
+		if core >= budget && (budget < 600 || len(secs) >= min(len(ss), 3)) {
 			break
 		}
 		text := autoRecallSessionForAsked(s, time.Now(), false, terms, asked)
@@ -107,6 +109,15 @@ func AutoRecallDigestShowing(ss []model.Session, budget int, terms []string, ask
 			continue
 		}
 		lines := strings.SplitAfter(text, "\n")
+		if len(lines) > 0 {
+			if day := extractHeaderDay(lines[0]); day != "" {
+				if newest, ok := newestByProject[s.Project]; ok && day < newest {
+					lines[0] = annotateEarlierHeader(lines[0], newest)
+				} else if !ok || day > newest {
+					newestByProject[s.Project] = day
+				}
+			}
+		}
 		for _, l := range lines {
 			total += len(l)
 			if !receiptLine(l) {
@@ -120,24 +131,238 @@ func AutoRecallDigestShowing(ss []model.Session, budget int, terms []string, ask
 		all[i] = secs[i].lines
 	}
 	dropReceipts(all, total, budget)
+	texts := make([]string, len(secs))
+	totalAfterDrop := 0
+	for i, sec := range secs {
+		texts[i] = strings.Join(sec.lines, "")
+		totalAfterDrop += len(texts[i])
+	}
 	var b strings.Builder
 	var shown []model.Session
-	for _, sec := range secs {
-		if b.Len() >= budget {
+	shareBudget := len(secs) >= 2 && budget >= 700 && totalAfterDrop > budget
+	for i, sec := range secs {
+		rem := budget - b.Len()
+		if rem <= 0 {
 			break
 		}
-		text := strings.Join(sec.lines, "")
-		shown = append(shown, sec.s)
-		if b.Len()+len(text) > budget {
-			cut := budget - b.Len()
-			for cut > 0 && !utf8.RuneStart(text[cut]) {
-				cut--
+		text := texts[i]
+		if len(shown) > 0 && shareBudget {
+			if firstNL := strings.IndexByte(text, '\n'); firstNL >= 0 && firstNL+1 < len(text) && rem < len(text) && rem < firstNL+24 {
+				break
 			}
-			text = text[:cut]
 		}
-		b.WriteString(text)
+		limit := rem
+		if shareBudget {
+			reserve := 0
+			switch {
+			case i == 0 && len(secs) == 2:
+				reserve = min(len(texts[1]), budget/4)
+			case i == 0 && len(secs) >= 3 && budget >= 800:
+				reserve = min(len(texts[1]), budget/4) + min(len(texts[2]), budget/5)
+			case i == 0 && len(secs) >= 3:
+				reserve = min(len(texts[1]), budget/4)
+			case i == 1 && len(secs) >= 3 && budget >= 800:
+				reserve = min(len(texts[2]), budget/5)
+			}
+			if reserve > 0 && rem-reserve > 0 {
+				limit = min(limit, rem-reserve)
+			}
+		}
+		cutText := cutSectionPreservingConclusion(sec.lines, text, limit)
+		if cutText == "" {
+			break
+		}
+		shown = append(shown, sec.s)
+		b.WriteString(cutText)
+	}
+	if len(shown) == 1 && shareBudget && b.Len() < len(texts[0]) && b.Len() < budget {
+		if full := cutSectionPreservingConclusion(secs[0].lines, texts[0], budget); len(full) > b.Len() {
+			b.Reset()
+			b.WriteString(full)
+		}
 	}
 	return strings.TrimSpace(b.String()), shown
+}
+
+func isConclusionLine(line string) bool {
+	trimmed := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "- "))
+	return strings.HasPrefix(trimmed, evidence.LabelModelSaid) ||
+		strings.HasPrefix(trimmed, evidence.LabelModel) ||
+		strings.HasPrefix(trimmed, "Assistant: ")
+}
+
+func sectionHasConclusionLine(s string) bool {
+	for line := range strings.SplitSeq(s, "\n") {
+		if isConclusionLine(line) {
+			return true
+		}
+	}
+	return false
+}
+
+func sectionLastConclusionLine(s string) string {
+	last := ""
+	for line := range strings.SplitSeq(s, "\n") {
+		if isConclusionLine(line) {
+			last = strings.TrimSpace(line)
+		}
+	}
+	return last
+}
+
+func sectionPreservesLastConclusion(full, cut string) bool {
+	want := sectionLastConclusionLine(full)
+	if want == "" {
+		return true
+	}
+	got := sectionLastConclusionLine(cut)
+	if got == "" {
+		return false
+	}
+	if got == want {
+		return true
+	}
+	prefix := strings.TrimSuffix(got, "…")
+	if !strings.HasPrefix(want, prefix) {
+		return false
+	}
+	trimmed := strings.TrimSpace(strings.TrimPrefix(prefix, "- "))
+	for _, lbl := range []string{evidence.LabelModelSaid, evidence.LabelModel, "Assistant: "} {
+		if after, ok := strings.CutPrefix(trimmed, lbl); ok {
+			return len(strings.TrimSpace(after)) >= 24
+		}
+	}
+	return len(prefix) >= 32
+}
+
+func clipLineToBytes(line string, maxBytes int) string {
+	hasNL := strings.HasSuffix(line, "\n")
+	body := strings.TrimSuffix(line, "\n")
+	if len(body) <= maxBytes {
+		return line
+	}
+	cut := max(0, maxBytes-len("…"))
+	for cut > 0 && !utf8.RuneStart(body[cut]) {
+		cut--
+	}
+	if cut == 0 {
+		return ""
+	}
+	out := strings.TrimRight(body[:cut], " \t") + "…"
+	if hasNL {
+		out += "\n"
+	}
+	return out
+}
+
+func isCompactableUserLine(l string) bool {
+	if !strings.HasPrefix(l, "  - ") {
+		return false
+	}
+	trimmed := strings.TrimPrefix(l, "  - ")
+	for _, p := range personLabels {
+		if strings.HasPrefix(trimmed, p) {
+			return true
+		}
+	}
+	return false
+}
+
+func compactSectionLines(lines []string, skipIdx map[int]bool, keepClippedUser bool) string {
+	out := make([]string, 0, len(lines))
+	keptUser := false
+	for idx, l := range lines {
+		if skipIdx[idx] {
+			continue
+		}
+		if isCompactableUserLine(l) {
+			if !keepClippedUser || keptUser {
+				continue
+			}
+			keptUser = true
+			if clipped := clipLineToBytes(l, 150); clipped != "" {
+				out = append(out, clipped)
+			}
+			continue
+		}
+		out = append(out, l)
+	}
+	return strings.Join(out, "")
+}
+
+func cutSectionPreservingConclusion(lines []string, text string, limit int) string {
+	cutText := cutDigestSection(text, limit)
+	if sectionPreservesLastConclusion(text, cutText) {
+		return cutText
+	}
+	if cand := cutDigestSection(compactSectionLines(lines, nil, true), limit); cand != "" && sectionPreservesLastConclusion(text, cand) {
+		return cand
+	}
+	withoutUsersCut := cutDigestSection(compactSectionLines(lines, nil, false), limit)
+	if withoutUsersCut != "" && sectionPreservesLastConclusion(text, withoutUsersCut) {
+		return withoutUsersCut
+	}
+	var conclIdxs []int
+	for idx, l := range lines {
+		if isConclusionLine(l) {
+			conclIdxs = append(conclIdxs, idx)
+		}
+	}
+	if len(conclIdxs) >= 2 {
+		drop := make(map[int]bool, len(conclIdxs)-1)
+		tryDrop := func(keepUser bool, allowClipped bool) string {
+			cand := cutDigestSection(compactSectionLines(lines, drop, keepUser), limit)
+			if cand == "" {
+				return ""
+			}
+			if sectionPreservesLastConclusion(text, cand) || (allowClipped && sectionHasConclusionLine(cand)) {
+				return cand
+			}
+			return ""
+		}
+		// Drop intermediate conclusion lines first so the opening and final
+		// conclusion lines can remain paired whenever both fit within limit.
+		for k := len(conclIdxs) - 2; k >= 1; k-- {
+			drop[conclIdxs[k]] = true
+			if cand := tryDrop(true, false); cand != "" {
+				return cand
+			}
+			if cand := tryDrop(false, false); cand != "" {
+				return cand
+			}
+		}
+		drop[conclIdxs[0]] = true
+		if cand := tryDrop(true, false); cand != "" {
+			return cand
+		}
+		if cand := tryDrop(false, true); cand != "" {
+			return cand
+		}
+	}
+	if !sectionHasConclusionLine(cutText) && withoutUsersCut != "" && sectionHasConclusionLine(withoutUsersCut) {
+		return withoutUsersCut
+	}
+	return cutText
+}
+
+func cutDigestSection(text string, limit int) string {
+	if limit <= 0 {
+		return ""
+	}
+	if len(text) <= limit {
+		return text
+	}
+	if nl := strings.LastIndexByte(text[:limit], '\n'); nl > 0 {
+		prefix := text[:nl+1]
+		if strings.Count(prefix, "\n") >= 2 || nl+1 == len(text) {
+			return prefix
+		}
+	}
+	cut := limit
+	for cut > 0 && !utf8.RuneStart(text[cut]) {
+		cut--
+	}
+	return text[:cut]
 }
 
 // dropReceipts blanks receipt lines of secs, whose lines come to total bytes,
@@ -450,6 +675,17 @@ func containsWord(text, term string) bool {
 		return false
 	}
 	whole := len([]rune(term)) <= wholeWordMax
+	eInflect := whole && len(term) == 4 && term[3] == 'e'
+	if containsWordMatch(text, term, whole, eInflect, eInflect) {
+		return true
+	}
+	if root, ok := regularSingular(term); ok {
+		return containsWordMatch(text, root, true, true, false)
+	}
+	return false
+}
+
+func containsWordMatch(text, term string, whole, allowS, allowD bool) bool {
 	for at := 0; ; {
 		i := strings.Index(text[at:], term)
 		if i < 0 {
@@ -457,7 +693,9 @@ func containsWord(text, term string) bool {
 		}
 		i += at
 		startsWord := !wordRuneBefore(text, i)
-		endsWord := !whole || !wordRuneAt(text, i+len(term))
+		after := i + len(term)
+		endsWord := !whole || !wordRuneAt(text, after) ||
+			(after < len(text) && ((allowS && text[after] == 's') || (allowD && text[after] == 'd')) && !wordRuneAt(text, after+1))
 		if startsWord && endsWord {
 			return true
 		}
@@ -466,6 +704,29 @@ func containsWord(text, term string) bool {
 			return false
 		}
 	}
+}
+
+// regularSingular returns the 4-5 letter root of a regular ASCII -s plural
+// (such as "bikes" -> "bike" or "weeks" -> "week") so short singular/plural
+// forms match below termStemMin without widening unrelated substring hits.
+func regularSingular(term string) (string, bool) {
+	n := len(term)
+	if n != 5 && n != 6 {
+		return "", false
+	}
+	if term[n-1] != 's' {
+		return "", false
+	}
+	prev := term[n-2]
+	if prev == 's' || prev == 'u' || prev == 'i' {
+		return "", false
+	}
+	for i := range n {
+		if term[i] < 'a' || term[i] > 'z' {
+			return "", false
+		}
+	}
+	return term[:n-1], true
 }
 
 // wordRuneBefore and wordRuneAt decode whole runes: indexing a byte lands in
@@ -540,10 +801,13 @@ func autoRecallSessionForAskedWithLimit(s model.Session, now time.Time, provenan
 		conclusionLimit = 2
 	}
 	var problem string
+	var problems []string
 	var conclusions []string
 	var matched bool
+	var matchedAt map[int]bool
 	if len(terms) > 0 {
-		problem, conclusions = matchedLinesAsked(s, terms, asked)
+		problems, conclusions, matchedAt = matchedLinesWithMatchesAskedUsers(s, terms, asked)
+		problem = strings.Join(problems, "\n")
 		matched = len(conclusions) > 0
 	} else {
 		// No question yet — this is the block handed over at session start.
@@ -559,7 +823,21 @@ func autoRecallSessionForAskedWithLimit(s model.Session, now time.Time, provenan
 			problem = sessionStartProblemForConclusions(s, conclusions)
 		}
 	}
-	for _, m := range s.Messages {
+	fallbackStart := -1
+	fallbackEnd := len(s.Messages)
+	if len(terms) > 0 && !matched && problem != "" {
+		fallbackStart = earliestMatchIndex(len(s.Messages), matchedAt)
+		if fallbackStart >= 0 {
+			fallbackEnd = nextStandaloneUserTurn(s.Messages, matchedAt, fallbackStart)
+		}
+	}
+	for i, m := range s.Messages {
+		if i < fallbackStart {
+			continue
+		}
+		if fallbackStart >= 0 && i >= fallbackEnd {
+			break
+		}
 		if problem != "" && (len(conclusions) >= conclusionLimit || matched) {
 			break
 		}
@@ -647,13 +925,18 @@ func autoRecallSessionForAskedWithLimit(s model.Session, now time.Time, provenan
 	// first, under the one mark the frame says to follow, whether or not it
 	// matched: on the stand a rule said in a session's second turn never
 	// reached the block, which showed the first turn's output.
+	if len(problems) == 0 && problem != "" {
+		problems = []string{problem}
+	}
 	userRuleLines(&b, s, "  - ")
 	problemLine := func() {
-		if problem == "" || IsUserRule(s, problem) {
-			return
-		}
-		if l, ok := scrubLine(s, personLabel(s, problem)+problem); ok {
-			fmt.Fprintf(&b, "  - %s\n", digestLine(l))
+		for _, p := range problems {
+			if p == "" || IsUserRule(s, p) {
+				continue
+			}
+			if l, ok := scrubLine(s, personLabel(s, p)+p); ok {
+				fmt.Fprintf(&b, "  - %s\n", digestLine(l))
+			}
 		}
 	}
 	if s.Path != "" && evidenceReader("").Covers(s.Updated) {
@@ -764,13 +1047,36 @@ func matchedLines(s model.Session, terms []string) (string, []string) {
 }
 
 func matchedLinesAsked(s model.Session, terms []string, asked string) (string, []string) {
-	type scored struct {
-		idx, hits int
-		text      string
+	users, out := matchedLinesAskedUsers(s, terms, asked)
+	if len(users) == 0 {
+		return "", out
 	}
-	var bestUser scored
-	var assistants []scored
+	return users[0], out
+}
+
+type matchedScoredLine struct {
+	idx, hits      int
+	text           string
+	tailConclusion bool
+}
+
+func matchedLinesAskedUsers(s model.Session, terms []string, asked string) ([]string, []string) {
+	userTexts, assistantTexts, _ := matchedLinesWithMatchesAskedUsers(s, terms, asked)
+	return userTexts, assistantTexts
+}
+
+func matchedLinesWithMatchesAskedUsers(s model.Session, terms []string, asked string) ([]string, []string, map[int]bool) {
 	trajConcl := digest.TrajectoryConclusionMessages(s.Messages)
+	userCands, assistants, matchedAt := collectMatchedSessionLines(s, terms, asked, trajConcl)
+	assistants = appendMatchedReplyConclusions(s, terms, trajConcl, matchedAt, userCands, assistants)
+	assistants, assistantTexts := selectMatchedAssistantLines(assistants, trajConcl, len(userCands) > 0, terms)
+	userTexts := selectMatchedUserLinesInSession(s, userCands, assistants, terms, asked)
+	return userTexts, assistantTexts, matchedAt
+}
+
+func collectMatchedSessionLines(s model.Session, terms []string, asked string, trajConcl map[int]bool) ([]matchedScoredLine, []matchedScoredLine, map[int]bool) {
+	var userCands []matchedScoredLine
+	var assistants []matchedScoredLine
 	// Which messages carried a query word, so the lines just after them can be
 	// considered for the conclusion slot below.
 	matchedAt := make(map[int]bool, 8)
@@ -784,14 +1090,18 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 		// everything the session ever touched, so counting terms across a
 		// message hands the slot to the longest text rather than to the one
 		// that answers.
-		line, hits := densestLine(m.Text, terms)
+		msgText := m.Text
+		if m.Role == "assistant" {
+			msgText = digest.StripAssistantBoilerplate(m.Text)
+		}
+		line, hits := densestLine(msgText, terms)
 		if hits == 0 {
 			continue
 		}
 		// An envelope can carry the query's words and say nothing a reader
 		// wanted: a wrapped inter-agent notification quoting a session id
 		// matched, and the block opened with truncated JSON (#2735).
-		if digest.IsPlumbing(line) || digest.IsToolCallRecord(line) {
+		if digest.IsPlumbing(line) || digest.IsToolCallRecord(line) || (m.Role == "assistant" && digest.IsCelebratoryBoilerplate(line)) {
 			continue
 		}
 		matchedAt[i] = true
@@ -803,7 +1113,7 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 		// already uses to tell one from the other.
 		// One bullet of a document the agent wrote is not what the session
 		// concluded, however well it matches (#2740).
-		if digest.IsDocumentItem(m.Text, line) {
+		if digest.IsDocumentItem(msgText, line) {
 			continue
 		}
 		if (digest.CarriesDecision(line) || trajConcl[i]) && (hits >= 2 || TextCarriesTerm(line, terms[0])) {
@@ -829,13 +1139,20 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 			if digest.CarriesUserCorrection(line) {
 				hits += len(terms)
 			}
-			if !noiseMessage(m.Text) && !nearCopy(line, asked) && hits > bestUser.hits {
-				bestUser = scored{i, hits, lineAround(text, 160, terms)}
+			if carriesConcreteQuantityOrUpdate(line) {
+				hits++
+			}
+			if !noiseMessage(m.Text) && !nearCopy(line, asked) {
+				userCands = append(userCands, matchedScoredLine{idx: i, hits: hits, text: lineAround(text, 160, terms)})
 			}
 		case "assistant":
-			assistants = append(assistants, scored{i, hits, lineAround(text, 320, terms)})
+			assistants = append(assistants, matchedScoredLine{idx: i, hits: hits, text: lineAround(text, 320, terms)})
 		}
 	}
+	return userCands, assistants, matchedAt
+}
+
+func appendMatchedReplyConclusions(s model.Session, terms []string, trajConcl, matchedAt map[int]bool, userCands, assistants []matchedScoredLine) []matchedScoredLine {
 	// Among the agent's lines, prefer the ones that settled something. Within a
 	// message the densest line already yields to a concluding one (#1488), but
 	// which messages get the two slots was still decided by word count alone,
@@ -853,34 +1170,161 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 	// candidates for the second slot when they conclude something: measured on
 	// a real store, of the blocks carrying no conclusion, a third had one in
 	// the session they came from, and this is why.
-	if len(matchedAt) > 0 {
-		for i, m := range s.Messages {
-			if m.Role != "assistant" || matchedAt[i] {
-				continue
-			}
-			if !nearMatch(matchedAt, i, replyWindow) {
-				continue
-			}
-			// Checked here as well as where the slot is filled: this keeps
-			// the candidate list short rather than deciding anything, so
-			// removing it changes cost and not output.
-			line, _ := densestLine(m.Text, terms)
-			if line == "" || (!digest.CarriesDecision(line) && !trajConcl[i]) || saysItHasNoMemory(line) {
-				continue
-			}
-			// The same two bars the loop above applies. This path reached the
-			// slot without them, so a captured `⚙ deja_recall {"query":…}`
-			// carrying a decision word — and the log of a question carries the
-			// question's words by construction — was quoted as the answer to
-			// the question it recorded (#2067).
-			if digest.IsPlumbing(line) || digest.IsToolCallRecord(line) {
-				continue
-			}
-			if text := contextText(line, false); strings.TrimSpace(text) != "" {
-				assistants = append(assistants, scored{i, 0, lineAround(text, 320, terms)})
+	if len(matchedAt) == 0 {
+		return assistants
+	}
+	for i, m := range s.Messages {
+		if m.Role != "assistant" || matchedAt[i] {
+			continue
+		}
+		if !nearMatch(matchedAt, i, replyWindow) {
+			continue
+		}
+		// Checked here as well as where the slot is filled: this keeps
+		// the candidate list short rather than deciding anything, so
+		// removing it changes cost and not output.
+		line, _ := densestLine(digest.StripAssistantBoilerplate(m.Text), terms)
+		if line == "" || (!digest.CarriesDecision(line) && !trajConcl[i]) || saysItHasNoMemory(line) || digest.IsCelebratoryBoilerplate(line) {
+			continue
+		}
+		// The same two bars the loop above applies. This path reached the
+		// slot without them, so a captured `⚙ deja_recall {"query":…}`
+		// carrying a decision word — and the log of a question carries the
+		// question's words by construction — was quoted as the answer to
+		// the question it recorded (#2067).
+		if digest.IsPlumbing(line) || digest.IsToolCallRecord(line) || (m.Role == "assistant" && digest.IsCelebratoryBoilerplate(line)) {
+			continue
+		}
+		if text := contextText(line, false); strings.TrimSpace(text) != "" {
+			assistants = append(assistants, matchedScoredLine{idx: i, text: lineAround(text, 320, terms)})
+		}
+	}
+	return appendSingleTaskTrajectoryConclusion(s, terms, trajConcl, matchedAt, userCands, assistants)
+}
+
+func earliestMatchIndex(msgCount int, matchedAt map[int]bool) int {
+	for i := range msgCount {
+		if matchedAt[i] {
+			return i
+		}
+	}
+	return -1
+}
+
+func strongestMatchIndex(msgCount int, matchedAt map[int]bool, userCands, assistants []matchedScoredLine) int {
+	bestIdx := -1
+	bestHits := -1
+	for _, a := range assistants {
+		if a.hits > bestHits || (a.hits == bestHits && a.idx > bestIdx) {
+			bestHits = a.hits
+			bestIdx = a.idx
+		}
+	}
+	for _, u := range userCands {
+		if u.hits > bestHits || (u.hits == bestHits && u.idx > bestIdx) {
+			bestHits = u.hits
+			bestIdx = u.idx
+		}
+	}
+	if bestIdx >= 0 {
+		return bestIdx
+	}
+	return earliestMatchIndex(msgCount, matchedAt)
+}
+
+func turnStartForMatch(msgs []model.Message, anchorIdx int) int {
+	for k := min(anchorIdx, len(msgs)-1); k >= 0; k-- {
+		m := msgs[k]
+		if m.Role != "user" || noiseMessage(m.Text) || digest.IsPlumbing(m.Text) || digest.IsAgentArtifact(m.Text) {
+			continue
+		}
+		if len(prompt.Terms(contextText(m.Text, false))) >= 2 {
+			return k
+		}
+	}
+	return max(0, anchorIdx)
+}
+
+func nextStandaloneUserTurn(msgs []model.Message, matchedAt map[int]bool, afterIdx int) int {
+	for k := afterIdx + 1; k < len(msgs); k++ {
+		m := msgs[k]
+		if m.Role != "user" || matchedAt[k] {
+			continue
+		}
+		if noiseMessage(m.Text) || digest.IsPlumbing(m.Text) || digest.IsAgentArtifact(m.Text) {
+			continue
+		}
+		if len(prompt.Terms(contextText(m.Text, false))) >= 2 {
+			return k
+		}
+	}
+	return len(msgs)
+}
+
+func appendSingleTaskTrajectoryConclusion(s model.Session, terms []string, trajConcl, matchedAt map[int]bool, userCands, assistants []matchedScoredLine) []matchedScoredLine {
+	anchorIdx := strongestMatchIndex(len(s.Messages), matchedAt, userCands, assistants)
+	if anchorIdx < 0 {
+		return assistants
+	}
+	epStart := turnStartForMatch(s.Messages, anchorIdx)
+	taskEnd := nextStandaloneUserTurn(s.Messages, matchedAt, max(anchorIdx, epStart))
+	sawAction := false
+	lastTrajIdx := -1
+	lastAsstIdx := -1
+	subMsgs := make([]model.Message, 0, taskEnd-epStart)
+	for k := epStart; k < taskEnd; k++ {
+		m := s.Messages[k]
+		if trajConcl[k] {
+			sawAction = true
+			lastTrajIdx = k
+		} else if m.Role == "edit" || m.Role == "wrote" || (m.Role == "command" && strings.Contains(m.Text, "→ exit 0")) {
+			sawAction = true
+		}
+		if m.Role == "assistant" {
+			lastAsstIdx = k
+		}
+		subMsgs = append(subMsgs, m)
+	}
+	if !sawAction || lastAsstIdx < 0 {
+		return assistants
+	}
+	concls := digest.SubstantialConclusions(model.Session{ID: s.ID, Project: s.Project, Messages: subMsgs}, 320, 1)
+	if len(concls) == 0 {
+		return assistants
+	}
+	line := concls[0]
+	if line == "" || digest.IsPlumbing(line) || digest.IsToolCallRecord(line) || digest.IsCelebratoryBoilerplate(line) || saysItHasNoMemory(line) {
+		return assistants
+	}
+	text := contextText(line, false)
+	if strings.TrimSpace(text) == "" {
+		return assistants
+	}
+	cand := lineAround(text, 320, terms)
+	conclIdx := lastAsstIdx
+	if lastTrajIdx >= 0 {
+		conclIdx = lastTrajIdx
+	}
+	if probe := digest.UTF8SafeCut(strings.TrimSpace(line), 48); probe != "" {
+		for k := taskEnd - 1; k >= epStart; k-- {
+			if s.Messages[k].Role == "assistant" && strings.Contains(s.Messages[k].Text, probe) {
+				conclIdx = k
+				break
 			}
 		}
 	}
+	for k, a := range assistants {
+		if a.idx == conclIdx && nearCopy(a.text, cand) {
+			assistants[k].text = cand
+			assistants[k].tailConclusion = true
+			return assistants
+		}
+	}
+	assistants = append(assistants, matchedScoredLine{idx: conclIdx, text: cand, tailConclusion: true})
+	return assistants
+}
+
+func selectMatchedAssistantLines(assistants []matchedScoredLine, trajConcl map[int]bool, hasUserMatch bool, terms []string) ([]matchedScoredLine, []string) {
 	// Two slots, and they answer different questions: one says what the session
 	// was about, the other what it settled. Filling both by word count gave two
 	// lines of the first kind — In real-world stores, 35 blocks of 100
@@ -889,46 +1333,72 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 	// about a neighbouring subject. One of each is what a reader needs, and it
 	// is the packaging that decides how much the retrieval is worth (surveys of
 	// agent memory put packaging above ranking for exactly this reason).
+	if len(assistants) > 1 {
+		filtered := make([]matchedScoredLine, 0, len(assistants))
+		for _, a := range assistants {
+			if digest.AnnouncesPlan(a.text) && !digest.CarriesDecision(a.text) && !trajConcl[a.idx] && !a.tailConclusion {
+				continue
+			}
+			filtered = append(filtered, a)
+		}
+		if len(filtered) > 0 {
+			assistants = filtered
+		}
+	}
 	sort.SliceStable(assistants, func(i, j int) bool { return assistants[i].hits > assistants[j].hits })
-	if len(assistants) > 2 {
+	vIdx := -1
+	bestTrajIdx := -1
+	for i, a := range assistants {
+		if !a.tailConclusion && !trajConcl[a.idx] {
+			continue
+		}
+		if vIdx < 0 || a.idx > bestTrajIdx || (a.idx == bestTrajIdx && a.tailConclusion && !assistants[vIdx].tailConclusion) {
+			vIdx = i
+			bestTrajIdx = a.idx
+		}
+	}
+	if vIdx >= 0 {
+		v := assistants[vIdx]
+		subjectCovered := hasUserMatch || termHits(v.text, terms) > 0
+		var bestOther matchedScoredLine
+		foundOther := false
+		for i, a := range assistants {
+			if i == vIdx || nearCopy(a.text, v.text) {
+				continue
+			}
+			if subjectCovered && a.idx == v.idx {
+				continue
+			}
+			if subjectCovered && a.idx < v.idx && !a.tailConclusion && !trajConcl[a.idx] {
+				continue
+			}
+			bestOther = a
+			foundOther = true
+			break
+		}
+		if foundOther {
+			assistants = []matchedScoredLine{bestOther, v}
+		} else {
+			assistants = []matchedScoredLine{v}
+		}
+	} else if len(assistants) > 2 {
 		best := assistants[0]
 		rest := assistants[1:]
 		pick := -1
 		for i, a := range rest {
-			if digest.CarriesDecision(a.text) || trajConcl[a.idx] {
+			if digest.CarriesDecision(a.text) && !nearCopy(best.text, a.text) {
 				pick = i
 				break
 			}
 		}
 		if pick >= 0 {
-			assistants = []scored{best, rest[pick]}
-		}
-	}
-	// The block opens with what the user said, and that slot is filled by the
-	// best-matching user line whatever it carries. When the session says an
-	// ordinary word of the question in one place and answers it in another,
-	// that puts the ordinary line first: measured live, "what did we decide
-	// about mm_status" opened on "1. **Decide**: User settings or project
-	// settings?" while the answer sat two lines below. If a line the agent
-	// wrote is worth more, lead with that instead of framing it with this.
-	if len(assistants) > 0 && assistants[0].hits > bestUser.hits && !digest.CarriesUserCorrection(bestUser.text) {
-		bestUser = scored{}
-	}
-	if bestUser.text != "" && len(assistants) > 0 && !digest.CarriesUserCorrection(bestUser.text) {
-		dist := bestUser.idx - assistants[0].idx
-		if dist < 0 {
-			dist = -dist
-		}
-		if dist > 30 && len(terms) > 0 && (!TextCarriesTerm(bestUser.text, terms[0]) || !TextCarriesTerm(assistants[0].text, terms[0])) {
-			bestUser = scored{}
+			assistants = []matchedScoredLine{best, rest[pick]}
 		}
 	}
 	// Three quotes, not two. The pair rule above already trims to two whenever
 	// a session has a conclusion to pair with its subject, so this only widens
 	// short sessions that have neither — and there the third line is what
-	// carries the identifying word. On LongMemEval blocks carrying a word few
-	// sessions use went from 80 to 87 of 500, and the cases where that word sat
-	// in a session the block had already quoted fell from 54 to 47.
+	// carries the identifying word.
 	if len(assistants) > 3 {
 		assistants = assistants[:3]
 	}
@@ -939,7 +1409,223 @@ func matchedLinesAsked(s model.Session, terms []string, asked string) (string, [
 	for _, a := range assistants {
 		out = append(out, a.text)
 	}
-	return bestUser.text, out
+	return assistants, out
+}
+
+func selectMatchedUserLines(userCands []matchedScoredLine, terms []string) []string {
+	return selectMatchedUserLinesInSession(model.Session{}, userCands, nil, terms, "")
+}
+
+func selectMatchedUserLinesInSession(s model.Session, userCands, assistants []matchedScoredLine, terms []string, asked string) []string {
+	// The block opens with what the user said, and that slot is filled by the
+	// best-matching user line whatever it carries. When the session says an
+	// ordinary word of the question in one place and answers it in another,
+	// that puts the ordinary line first: measured live, "what did we decide
+	// about mm_status" opened on "1. **Decide**: User settings or project
+	// settings?" while the answer sat two lines below. If a line the agent
+	// wrote is worth more, lead with that instead of framing it with this.
+	nTerms := max(1, len(terms))
+	sort.SliceStable(userCands, func(i, j int) bool {
+		if userCands[i].hits != userCands[j].hits {
+			return userCands[i].hits > userCands[j].hits
+		}
+		return userCands[i].idx > userCands[j].idx
+	})
+	var eligible []matchedScoredLine
+	for _, u := range userCands {
+		if u.text == "" {
+			continue
+		}
+		if len(assistants) > 0 && u.hits < 2*nTerms && assistants[0].hits >= u.hits+2*nTerms && !digest.CarriesUserCorrection(u.text) {
+			continue
+		}
+		if len(assistants) > 0 && !assistants[0].tailConclusion && !digest.CarriesUserCorrection(u.text) {
+			dist := u.idx - assistants[0].idx
+			if dist < 0 {
+				dist = -dist
+			}
+			if dist > 30 && len(terms) > 0 && (!TextCarriesTerm(u.text, terms[0]) || !TextCarriesTerm(assistants[0].text, terms[0])) {
+				continue
+			}
+		}
+		eligible = append(eligible, u)
+	}
+	var keptUsers []matchedScoredLine
+	if len(eligible) > 0 {
+		keptUsers = append(keptUsers, eligible[0])
+		if second, ok := selectDiverseSecondUserLine(s, eligible[0], eligible[1:], terms); ok {
+			keptUsers = append(keptUsers, second)
+		} else if adj, ok := adjacentProperNounUserLine(s, eligible[0], asked); ok {
+			keptUsers = append(keptUsers, adj)
+		}
+	}
+	sort.SliceStable(keptUsers, func(i, j int) bool { return keptUsers[i].idx < keptUsers[j].idx })
+	userTexts := make([]string, 0, len(keptUsers))
+	for _, u := range keptUsers {
+		userTexts = append(userTexts, u.text)
+	}
+	return userTexts
+}
+
+// adjacentProperNounUserLine recovers an immediately neighboring user turn
+// naming a specific entity when the lone matched user turn names none.
+func adjacentProperNounUserLine(s model.Session, anchor matchedScoredLine, asked string) (matchedScoredLine, bool) {
+	if len(s.Messages) >= 60 || prompt.CarriesMidSentenceEntity(anchor.text) {
+		return matchedScoredLine{}, false
+	}
+	for _, delta := range []int{-2, -1, 1, 2} {
+		j := anchor.idx + delta
+		if j < 0 || j >= len(s.Messages) {
+			continue
+		}
+		m := s.Messages[j]
+		if m.Role != "user" || noiseMessage(m.Text) || digest.IsCompactionSummary(strings.TrimSpace(m.Text)) ||
+			digest.IsPlumbing(m.Text) || digest.IsToolCallRecord(m.Text) {
+			continue
+		}
+		adj := firstLine(contextText(m.Text, false), 160)
+		if adj != "" && !saysItHasNoMemory(adj) && !nearCopy(adj, asked) &&
+			!nearCopy(adj, anchor.text) && prompt.CarriesMidSentenceEntity(adj) {
+			return matchedScoredLine{idx: j, text: adj}, true
+		}
+	}
+	return matchedScoredLine{}, false
+}
+
+func selectDiverseSecondUserLine(s model.Session, first matchedScoredLine, rest []matchedScoredLine, terms []string) (matchedScoredLine, bool) {
+	var uncovered []string
+	if len(terms) >= 3 {
+		rawFirst := first.text
+		if first.idx >= 0 && first.idx < len(s.Messages) {
+			rawFirst = s.Messages[first.idx].Text
+		}
+		for _, t := range terms {
+			if !TextCarriesTerm(first.text, t) && !TextCarriesTerm(rawFirst, t) {
+				uncovered = append(uncovered, t)
+			}
+		}
+	}
+	bestIdx := -1
+	bestCovered := 0
+	for i, u := range rest {
+		if redundantSecondUserLine(u.text, first.text) {
+			continue
+		}
+		if len(uncovered) > 0 {
+			covered := 0
+			for _, t := range uncovered {
+				if TextCarriesTerm(u.text, t) {
+					covered++
+				}
+			}
+			if covered > bestCovered {
+				bestIdx = i
+				bestCovered = covered
+			}
+			continue
+		}
+		if u.idx > first.idx && (digest.CarriesUserCorrection(u.text) || carriesConcreteQuantityOrUpdate(u.text)) {
+			return u, true
+		}
+	}
+	if bestIdx >= 0 {
+		return rest[bestIdx], true
+	}
+	for _, u := range rest {
+		if redundantSecondUserLine(u.text, first.text) {
+			continue
+		}
+		if u.idx > first.idx && (digest.CarriesUserCorrection(u.text) || carriesConcreteQuantityOrUpdate(u.text)) {
+			return u, true
+		}
+	}
+	for _, u := range rest {
+		if redundantSecondUserLine(u.text, first.text) {
+			continue
+		}
+		if digest.CarriesUserCorrection(u.text) || carriesConcreteQuantityOrUpdate(u.text) {
+			return u, true
+		}
+	}
+	if !prompt.CarriesMidSentenceEntity(first.text) {
+		for _, u := range rest {
+			if !redundantSecondUserLine(u.text, first.text) && prompt.CarriesMidSentenceEntity(u.text) {
+				return u, true
+			}
+		}
+	}
+	return matchedScoredLine{}, false
+}
+
+func redundantSecondUserLine(cand, first string) bool {
+	if nearCopy(cand, first) {
+		return true
+	}
+	wa := contentWords(cand)
+	wb := contentWords(first)
+	minLen := min(len(wa), len(wb))
+	if minLen < 6 {
+		return false
+	}
+	shared := 0
+	for w := range wa {
+		if wb[w] {
+			shared++
+		}
+	}
+	return float64(shared)/float64(minLen) >= 0.75
+}
+
+// concreteQuantityWords lists EN and RU numerals and quantity tokens that mark a
+// concrete specification turn worth preserving alongside a match.
+var concreteQuantityWords = map[string]bool{
+	"zero": true, "one": true, "two": true, "three": true, "four": true,
+	"five": true, "six": true, "seven": true, "eight": true, "nine": true,
+	"ten": true, "eleven": true, "twelve": true,
+	"single": true, "couple": true, "pair": true, "dozen": true, "solo": true,
+	"half": true, "quarter": true, "several": true, "twice": true,
+	"ноль": true, "нуль": true, "один": true, "одна": true, "одно": true, "одну": true,
+	"два": true, "две": true, "двое": true, "три": true, "трое": true,
+	"четыре": true, "пять": true, "шесть": true, "семь": true, "восемь": true,
+	"девять": true, "десять": true, "одиннадцать": true, "двенадцать": true,
+	"пара": true, "пару": true, "пары": true, "дюжина": true,
+	"половина": true, "половину": true, "четверть": true,
+	"несколько": true, "дважды": true, "трижды": true,
+}
+
+// concreteTransitionPhrases lists EN and RU state-update phrases that signal a
+// settled change or current ownership fact.
+var concreteTransitionPhrases = []string{
+	"moved to", "moved back", "switched to", "changed to",
+	"currently have", "currently own", "now have", "now own",
+	"переехал в", "переехала в", "переехали в",
+	"вернулся в", "вернулась в", "вернулись в",
+	"перешёл на", "перешел на", "перешла на", "перешли на",
+	"переключился на", "переключилась на",
+	"сменил на", "сменила на", "поменял на", "поменяла на",
+	"сейчас у меня", "теперь у меня", "сейчас есть", "теперь есть",
+	"на данный момент",
+}
+
+func carriesConcreteQuantityOrUpdate(line string) bool {
+	low := strings.ToLower(line)
+	for _, phrase := range concreteTransitionPhrases {
+		if strings.Contains(low, phrase) {
+			return true
+		}
+	}
+	fields := strings.FieldsFunc(low, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
+	for _, tok := range fields {
+		if concreteQuantityWords[tok] {
+			return true
+		}
+		if utf8.RuneCountInString(tok) <= 6 && strings.ContainsAny(tok, "0123456789") {
+			return true
+		}
+	}
+	return false
 }
 
 // replyWindow is how far after a matched line the reply to it may sit. A

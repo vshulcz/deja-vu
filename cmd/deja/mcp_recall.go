@@ -62,6 +62,9 @@ func attachAnswers(dir string, hits []search.Hit) {
 	sessions, err := index.FindManyByIdentityInRoles(dir, want, map[string]bool{
 		"user":               true,
 		"assistant":          true,
+		"edit":               true,
+		"wrote":              true,
+		"command":            true,
 		index.RoleStubOthers: true,
 	})
 	if err != nil {

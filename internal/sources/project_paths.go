@@ -35,7 +35,7 @@ func projectFromPaths(ms []model.Message) string {
 		}
 		for p := range strings.SplitSeq(m.Text, "\n") {
 			p = CollapseWorktreePath(strings.TrimSpace(p))
-			if p == "" {
+			if p == "" || !filepath.IsAbs(p) {
 				continue
 			}
 			if agentScratch(p) {

@@ -22,15 +22,21 @@ func relevanceTerms(q string) []string { return query.RelevanceTerms(q) }
 
 // Terms extracts the informative tokens from a natural-language prompt: stop
 // words and short fragments dropped, capped so the query stays specific.
-func Terms(prompt string) []string { return termsAsked(splitAsk(prompt)) }
+func Terms(prompt string) []string {
+	ask, rest := splitAsk(prompt)
+	return termsAsked(ask, rest, true)
+}
 
 // CommandTerms is Terms for a shell command or a plan step. Lines still split —
 // the last one is what runs — but a line is not cut into clauses: "cd repo; go
 // test ./..." would lead with the test and drop the directory, and a full stop
 // inside a quoted commit message is not a boundary at all.
-func CommandTerms(text string) []string { return termsAsked(splitAskLine(text)) }
+func CommandTerms(text string) []string {
+	ask, rest := splitAskLine(text)
+	return termsAsked(ask, rest, false)
+}
 
-func termsAsked(ask, rest string) []string {
+func termsAsked(ask, rest string, filterSingleLine bool) []string {
 	var out []string
 	seen := map[string]bool{}
 	add := func(f string) bool {
@@ -42,14 +48,178 @@ func termsAsked(ask, rest string) []string {
 		return len(out) == 6
 	}
 	if ask != "" {
-		if termsFrom(ask, seen, add) {
+		askCands := collectTermCandidates(ask, 14)
+		if len(askCands) > 6 {
+			askCands = keepAnchoredAskTerms(ask, askCands, 6)
+		}
+		if filterSingleLine && rest != "" && !strings.Contains(rest, "\n") && !isContextPaste(ask, rest, len(askCands)) && isGenericFollowupAsk(ask, askCands) {
+			restCands := collectTermCandidates(rest, 14)
+			combined := make([]string, 0, len(restCands)+len(askCands))
+			for _, f := range restCands {
+				if !slices.Contains(combined, f) {
+					combined = append(combined, f)
+				}
+			}
+			for _, f := range askCands {
+				if !slices.Contains(combined, f) {
+					combined = append(combined, f)
+				}
+			}
+			if len(combined) > 6 {
+				combined = keepAnchoredAskTerms(rest+" "+ask, combined, 6)
+			}
+			for _, f := range combined {
+				if add(f) {
+					break
+				}
+			}
 			return out
 		}
+		if slices.ContainsFunc(askCands, add) {
+			return out
+		}
+	}
+	if filterSingleLine && ask == "" && rest != "" && !strings.Contains(rest, "\n") {
+		restCands := collectTermCandidates(rest, 14)
+		if len(restCands) > 6 {
+			restCands = keepAnchoredAskTerms(rest, restCands, 6)
+		}
+		for _, f := range restCands {
+			if add(f) {
+				break
+			}
+		}
+		return out
 	}
 	if len(out) > 0 && isContextPaste(ask, rest, len(out)) {
 		return out
 	}
 	termsFrom(rest, seen, add)
+	return out
+}
+
+func collectTermCandidates(s string, limit int) []string {
+	var cands []string
+	seen := make(map[string]bool, limit)
+	termsFrom(s, seen, func(f string) bool {
+		seen[f] = true
+		cands = append(cands, f)
+		return len(cands) == limit
+	})
+	return cands
+}
+
+func isGenericFollowupAsk(ask string, askCands []string) bool {
+	if len(askCands) == 0 || len(askCands) > 4 || len(askAnchoredTerms(ask)) > 0 {
+		return false
+	}
+	hasGenericNoun := false
+	substantive := 0
+	for _, c := range askCands {
+		if genericFollowupNouns[c] {
+			hasGenericNoun = true
+		}
+		if !IsFramingModifier(c) {
+			substantive++
+		}
+	}
+	return hasGenericNoun && substantive <= 1
+}
+
+func askRightClauseTerms(ask string, limit int) (map[string]bool, int, bool) {
+	leftPart, rightPart, isWhen, ok := PairedClauseSplit(ask)
+	if !ok {
+		return nil, 0, false
+	}
+	reserve := 2
+	if isWhen {
+		reserve = limit / 2
+	}
+	leftCands := collectTermCandidates(leftPart, 16)
+	if len(leftCands) < 2 {
+		return nil, 0, false
+	}
+	leftSet := make(map[string]bool, len(leftCands))
+	for _, t := range leftCands {
+		leftSet[t] = true
+	}
+	rightCands := collectTermCandidates(rightPart, 16)
+	right := make(map[string]bool, len(rightCands))
+	for _, t := range rightCands {
+		if !leftSet[t] && !IsFramingModifier(t) {
+			right[t] = true
+		}
+	}
+	if len(right) == 0 {
+		return nil, 0, false
+	}
+	return right, reserve, isWhen
+}
+
+func keepAnchoredAskTerms(ask string, cands []string, limit int) []string {
+	anchored := askAnchoredTerms(ask)
+	rightOnly, rightReserve, isWhen := askRightClauseTerms(ask, limit)
+	keep := make([]bool, len(cands))
+	kept := 0
+	rightKept := 0
+	mark := func(i int) {
+		if keep[i] || kept >= limit {
+			return
+		}
+		keep[i] = true
+		kept++
+		if rightOnly[cands[i]] {
+			rightKept++
+		}
+	}
+	if isWhen {
+		for i, c := range cands {
+			if anchored[c] && rightOnly[c] {
+				mark(i)
+			}
+		}
+		for i, c := range cands {
+			if rightKept >= rightReserve {
+				break
+			}
+			if rightOnly[c] {
+				mark(i)
+			}
+		}
+	}
+	for i, c := range cands {
+		if anchored[c] {
+			mark(i)
+		}
+	}
+	for i, c := range cands {
+		if rightKept >= rightReserve {
+			break
+		}
+		if rightOnly[c] {
+			mark(i)
+		}
+	}
+	for i, c := range cands {
+		if kept >= limit {
+			break
+		}
+		if !IsFramingModifier(c) {
+			mark(i)
+		}
+	}
+	for i := range cands {
+		if kept >= limit {
+			break
+		}
+		mark(i)
+	}
+	out := make([]string, 0, limit)
+	for i, c := range cands {
+		if keep[i] {
+			out = append(out, c)
+		}
+	}
 	return out
 }
 
@@ -107,8 +277,8 @@ func isPastePathToken(w string) bool {
 }
 
 // termsFrom runs the three passes — identifiers, CJK bigrams, Cyrillic words —
-// over one part of the prompt, and reports whether the budget filled.
-func termsFrom(prompt string, seen map[string]bool, add func(string) bool) bool {
+// over one part of the prompt until add reports the budget filled.
+func termsFrom(prompt string, seen map[string]bool, add func(string) bool) {
 	fields := strings.FieldsFunc(strings.ToLower(prompt), func(r rune) bool {
 		wordy := (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') ||
 			r == '-' || r == '_' || r == '.' || r == '/' || r >= 0x400
@@ -128,7 +298,7 @@ func termsFrom(prompt string, seen map[string]bool, add func(string) bool) bool 
 			continue
 		}
 		if add(f) {
-			return true
+			return
 		}
 	}
 	// CJK carries no spaces, so FieldsFunc hands back a whole phrase as one
@@ -150,7 +320,7 @@ func termsFrom(prompt string, seen map[string]bool, add func(string) bool) bool 
 				continue
 			}
 			if add(t) {
-				return true
+				return
 			}
 		}
 	}
@@ -164,10 +334,9 @@ func termsFrom(prompt string, seen map[string]bool, add func(string) bool) bool 
 			continue
 		}
 		if add(f) {
-			return true
+			return
 		}
 	}
-	return false
 }
 
 // splitAsk separates the question from the rest of the prompt. The ask is the
@@ -193,10 +362,11 @@ func splitAskLine(text string) (ask, rest string) {
 }
 
 func split(prompt string, byClause bool) (ask, rest string) {
-	lines := strings.Split(prompt, "\n")
+	norm := strings.ReplaceAll(prompt, "\r\n", "\n")
+	lines := strings.Split(norm, "\n")
 	q := askLine(lines)
 	if q < 0 {
-		return "", prompt
+		return "", norm
 	}
 	clause, left := "", ""
 	if byClause {
@@ -204,7 +374,7 @@ func split(prompt string, byClause bool) (ask, rest string) {
 	}
 	if clause == "" {
 		if len(lines) == 1 {
-			return "", prompt
+			return "", norm
 		}
 		clause, left = lines[q], ""
 	}
@@ -380,7 +550,7 @@ var shortWord = map[string]bool{
 	"its": true, "has": true, "was": true, "are": true, "can": true,
 	"did": true, "let": true, "try": true, "job": true, "bug": true,
 	"yes": true, "may": true, "our": true, "his": true, "her": true,
-	"you": true, "too": true, "own": true, "per": true, "via": true,
+	"you": true, "too": true, "own": true, "per": true, "via": true, "ago": true,
 }
 
 // promptFiller is the short English filler a four-character floor lets
@@ -398,7 +568,7 @@ var promptFiller = map[string]bool{
 	"then": true, "than": true, "here": true, "your": true, "ours": true,
 	"going": true, "doing": true, "being": true, "used": true, "using": true,
 	"give": true, "take": true, "come": true, "seen": true, "said": true,
-	"deal": true, "touch": true,
+	"deal": true, "touch": true, "many": true, "much": true, "been": true,
 }
 
 // techTerm keeps tokens that can actually identify past work: identifiers,
@@ -501,10 +671,6 @@ var cyrPromptStop = map[string]bool{
 	// for; it also sits in the decision markers, so keeping it made a line
 	// count as a conclusion because the asker had used the phrase.
 	"итоге": true, "итог": true, "конце": true, "концов": true,
-	// Imperatives that open a message and name nothing. Measured on a real
-	// store, "продолжай рефактор виджет-сервиса" matched a session on "продолжай" and
-	// showed "продолжай и не отключай больше сборку"; five messages of 142
-	// got a block whose only terms were words of this kind.
 	// Imperatives that open a message and name nothing. Measured on a real
 	// store, "продолжай рефактор виджет-сервиса" matched a session on "продолжай" and
 	// showed "продолжай и не отключай больше сборку"; five messages of 142
