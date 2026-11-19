@@ -1,12 +1,16 @@
 package index
 
 import (
+	"cmp"
+	"errors"
+	"io"
 	"maps"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -182,40 +186,114 @@ func readFixesChecked(dir string) (pairs []FixPair, torn bool) {
 	return pairs, false
 }
 
-// remineFixes mines the pair table of the store in dir from its records, the
-// way a full build mines it from the sessions it read. Records of one session
-// sit in the log in the order they happened, which is the order mining reads.
+type remineSpan struct {
+	key  string
+	offs []int64
+}
+
+var remineSessionHook func([]model.Message)
+
+func remineRecordOffsets(dir string, f *os.File, size int64, tbl *recordTables) (map[string][]int64, error) {
+	byKey := map[string][]int64{}
+	var start int64
+	if ro, err := readRecordOffsetsFor(dir, f, nil); err == nil {
+		if ro.byKey != nil {
+			byKey = ro.byKey
+		}
+		start = ro.covered
+	}
+	if start < size {
+		if _, err := scanRecordOffsets(f, tbl, start, size, byKey); err != nil &&
+			!errors.Is(err, io.EOF) &&
+			!errors.Is(err, io.ErrUnexpectedEOF) &&
+			!errors.Is(err, errShortRecord) {
+			return nil, err
+		}
+	}
+	return byKey, nil
+}
+
+func remineSpans(dir string, f *os.File, size int64, m Manifest, tbl *recordTables) ([]remineSpan, error) {
+	byKey, err := remineRecordOffsets(dir, f, size, tbl)
+	if err != nil {
+		return nil, err
+	}
+	spans := make([]remineSpan, 0, len(byKey))
+	for k, offs := range byKey {
+		if _, ok := m.Sessions[k]; !ok || len(offs) == 0 {
+			continue
+		}
+		slices.Sort(offs)
+		spans = append(spans, remineSpan{key: k, offs: offs})
+	}
+	slices.SortFunc(spans, func(a, b remineSpan) int {
+		return cmp.Or(cmp.Compare(a.offs[0], b.offs[0]), cmp.Compare(a.key, b.key))
+	})
+	return spans, nil
+}
+
+// remineFixes mines the pair table of the store in dir one session at a time so
+// peak heap stays bounded by active worker sessions rather than the whole log.
 func remineFixes(dir string) {
 	m, err := readManifest(dir)
 	if err != nil {
 		return
 	}
-	by := map[string]*model.Session{}
-	var order []string
-	if err := eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
-		meta, ok := m.Sessions[r.Key]
-		if !ok || foreignPath(r.SourcePath, meta) {
-			return
-		}
-		s := by[r.Key]
-		if s == nil {
-			cp := sessionFromMeta(meta)
-			s = &cp
-			by[r.Key] = s
-			order = append(order, r.Key)
-		}
-		s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
-	}); err != nil {
+	tbl := tablesFromManifest(m)
+	f, err := openIndexFile(filepath.Join(dir, "records.bin"))
+	if err != nil {
 		return
 	}
-	ss := make([]model.Session, 0, len(order))
-	for _, k := range order {
-		ss = append(ss, *by[k])
+	defer func() { _ = f.Close() }()
+	fi, err := f.Stat()
+	if err != nil {
+		return
 	}
-	_ = os.Remove(fixesPath(dir))
-	_ = os.Remove(fixRawPath(dir))
-	invalidateFixesCache()
-	buildFixes(dir, ss, func(s model.Session) string { return s.Key() })
+	spans, err := remineSpans(dir, f, fi.Size(), m, tbl)
+	if err != nil {
+		return
+	}
+
+	perSession := make([][]FixPair, len(spans))
+	var readFailed atomic.Bool
+	parallelForRanked(len(spans), func(i int) {
+		if readFailed.Load() {
+			return
+		}
+		sp := spans[i]
+		meta := m.Sessions[sp.key]
+		var msgs []model.Message
+		if err := eachRecordAt(f, sp.offs, tbl, func(r Record) {
+			if r.Key != sp.key || foreignPath(r.SourcePath, meta) {
+				return
+			}
+			msgs = append(msgs, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
+		}); err != nil {
+			readFailed.Store(true)
+			return
+		}
+		if remineSessionHook != nil {
+			remineSessionHook(msgs)
+		}
+		if len(msgs) > 0 {
+			perSession[i] = fixPairsIn(msgs, sp.key, meta.Project)
+		}
+		spans[i].offs = nil
+	})
+	if readFailed.Load() {
+		return
+	}
+
+	total := 0
+	for _, ps := range perSession {
+		total += len(ps)
+	}
+	all := make([]FixPair, 0, total)
+	for i, ps := range perSession {
+		all = append(all, ps...)
+		perSession[i] = nil
+	}
+	writeFixTables(dir, all)
 }
 
 // ReadFixes loads the mined pairs. An index built before they existed simply
