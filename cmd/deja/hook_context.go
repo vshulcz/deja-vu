@@ -662,9 +662,12 @@ func runHookContextMode(dir string, plain, once bool) error {
 		// The session that spawned this one, when the host knows it: an
 		// opencode task session's digest led with its parent, which is live
 		// and asking through it (#4548).
-		ParentSessionID string `json:"parent_session_id"`
-		TranscriptPath  string `json:"transcript_path"`
-		CWD             string `json:"cwd"`
+		ParentSessionID      string `json:"parent_session_id"`
+		ParentSessionIDCamel string `json:"parentSessionId"`
+		AgentID              string `json:"agent_id"`
+		AgentTranscriptPath  string `json:"agent_transcript_path"`
+		TranscriptPath       string `json:"transcript_path"`
+		CWD                  string `json:"cwd"`
 		// Cursor leaves cwd empty and names the project here instead.
 		WorkspaceRoots []string `json:"workspace_roots"`
 		// Grok spells all of this in camelCase, and so does Copilot CLI
@@ -704,6 +707,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 	adoptCopilotHost(payload)
 	adoptCursorHost(payload)
 	input.SessionID = adoptGrok(adoptGrok(input.SessionID, input.grokEnvelope.SessionID), input.ConversationID)
+	input.ParentSessionID = adoptGrok(input.ParentSessionID, input.ParentSessionIDCamel)
 	input.WorkspaceRoots = adoptGrokRoots(input.WorkspaceRoots, input.WorkspaceRoot)
 	// The reply goes out under the event it arrived on, not under
 	// SessionStart by right: Devin fires this hook on PostCompaction too,
@@ -711,16 +715,15 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// 3000.11.3). Only canonical names echo — hosts that spell their own
 	// events here (Cursor's camelCase sessionStart, Gemini's BeforeAgent)
 	// get the fallback they got before the echo existed.
-	eventName := replyEventName(input.HookEventName, "SessionStart", "SessionStart", "PostCompaction")
-	shape := hookToolClaude
-	switch {
-	case plain:
-		shape = hookToolPlain
-	case copilotHookOutput:
-		shape = hookToolCopilot
-	case mcodeHookOutput:
-		shape = hookToolMcode
+	eventName := replyEventName(input.HookEventName, "SessionStart", "SessionStart", "PostCompaction", "SubagentStart")
+	parentTranscript := ""
+	if eventName == "SubagentStart" && input.ParentSessionID == "" && input.AgentID != "" {
+		parentTranscript = input.TranscriptPath
+		input.ParentSessionID = input.SessionID
+		input.SessionID = input.AgentID
+		input.TranscriptPath = input.AgentTranscriptPath
 	}
+	shape := contextHookShape(plain)
 	if input.Once && input.PromptStamps && sessionHadDigest(dir, input.SessionID) {
 		return nil
 	}
@@ -748,18 +751,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// chain in sessions.db; reset the seen ledger and capture the pre-compaction
 	// turns from the store before emitting the recovery packet.
 	if eventName == "PostCompaction" {
-		forgetInjected(dir, input.SessionID)
-		if input.SessionID != "" {
-			forgetInjected(dir, compactionFailureKey(input.SessionID))
-		}
-		captureCompaction(dir, precompactHookInput{
-			SessionID:      input.SessionID,
-			TranscriptPath: input.TranscriptPath,
-			CWD:            input.CWD,
-			WorkspaceRoots: input.WorkspaceRoots,
-			Harness:        "devin",
-		})
-		requestWarmup(dir)
+		preparePostCompactionContext(dir, input.SessionID, input.TranscriptPath, input.CWD, input.WorkspaceRoots)
 	}
 	// --once rides a per-prompt event beside hook-prompt, and Kimi runs the two
 	// in parallel: both found the packet undelivered and it arrived twice. The
@@ -835,33 +827,29 @@ func runHookContextMode(dir string, plain, once bool) error {
 		})
 		return resolvedHarness
 	}
+	ctxCWD := hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots))
+	parentBrief := resolveContextSubagentBrief(dir, input.Source, input.SessionID, input.ParentSessionID, input.TranscriptPath, parentTranscript, ctxCWD)
 	var claudeMemCount int
 	digest, claudeMemCount, servedProjects = attachClaudeAutoMemory(
 		dir, input.SessionID, input.TranscriptPath, input.Harness,
-		hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)),
+		ctxCWD,
 		digest, servedProjects,
 	)
 	if digest == "" {
-		return hookContextWithoutDigest(dir, rewired, unreadable, plain, eventName, input.SessionID, withheld)
+		if parentBrief == "" {
+			return hookContextWithoutDigest(dir, rewired, unreadable, plain, eventName, input.SessionID, withheld)
+		}
+		emitParentBriefWithoutDigest(dir, parentBrief, eventName, plain)
+		return nil
 	}
 	// One actionable line so injected memory leads somewhere: models that see
 	// bare data tend to ignore it.
-	lead := startLead(sessionStartLead)
-	if input.Source == "compact" {
-		lead = "Context was just compacted. The project memory below is from deja's index and survived the compaction; call the deja tool in \"context\" mode (or recall_context) with a session id from it to restore any details you lost.\n"
-		// The generic digest is about the project. What a compacted session
-		// most needs is its own evidence: measured on this corpus, a summary
-		// keeps ~77% of the decisions and 0.2% of the commands that produced
-		// them (#543).
-		if ev := compactEvidence(dir, input.SessionID, hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots))); ev != "" {
-			lead += "\n" + ev + "\n"
-		}
-	}
-	if input.Shell {
-		lead = shellRecallLead(lead)
-	}
+	lead := formatSessionStartLead(dir, input.Source, input.SessionID, ctxCWD, input.Shell)
 	digest = lead + digest
-	if tip := limitHandoffTip(dir, hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)), append(self, input.SessionID), getStartingHarness); tip != "" {
+	if parentBrief != "" {
+		digest = parentBrief + "\n\n" + digest
+	}
+	if tip := limitHandoffTip(dir, ctxCWD, append(self, input.SessionID), getStartingHarness); tip != "" {
 		digest += "\n" + tip
 	}
 	digest = frameRecall(digest)
@@ -903,29 +891,111 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// printed was "the agent starts already knowing them" and nothing else
 	// (#2697) — the silence #927 fixed on the environment-facts path, reached
 	// from the other side.
-	if notesHaveReader() {
-		if note := buildNotice(dir); note != "" {
-			if resp.SystemMessage == "" {
-				resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), note))
-			} else {
-				resp.SystemMessage = joinNotes(resp.SystemMessage, note)
-			}
-		}
-		if note := unreadableStoreNote(dir); storeNoteIsNews(dir, note) {
-			resp.SystemMessage = joinNotes(note, resp.SystemMessage)
-		}
-		// What the build found, once (#3073), then once a week what the week
-		// looked like (#3065) — after everything that needs acting on.
-		resp.SystemMessage = joinNotes(resp.SystemMessage, humanNotes(dir))
-		// An index that is behind and cannot be written stays behind. "the agent
-		// starts already knowing them" was printed over a picture missing today's
-		// work, and this path said nothing — search names the same state (#1005).
-		if note := staleReadOnlyNote(dir); note != "" {
-			resp.SystemMessage = joinNotes(note, resp.SystemMessage)
-		}
-	}
+	resp.SystemMessage = appendSessionStartSystemNotes(dir, rewired, resp.SystemMessage)
 	emitHookResponse(resp)
 	return nil
+}
+
+func contextHookShape(plain bool) hookToolShape {
+	switch {
+	case plain:
+		return hookToolPlain
+	case copilotHookOutput:
+		return hookToolCopilot
+	case mcodeHookOutput:
+		return hookToolMcode
+	default:
+		return hookToolClaude
+	}
+}
+
+func preparePostCompactionContext(dir, sessionID, transcriptPath, cwd string, roots []string) {
+	forgetInjected(dir, sessionID)
+	if sessionID != "" {
+		forgetInjected(dir, compactionFailureKey(sessionID))
+	}
+	captureCompaction(dir, precompactHookInput{
+		SessionID:      sessionID,
+		TranscriptPath: transcriptPath,
+		CWD:            cwd,
+		WorkspaceRoots: roots,
+		Harness:        "devin",
+	})
+	requestWarmup(dir)
+}
+
+func resolveContextSubagentBrief(dir, source, sessionID, parentSessionID, transcriptPath, parentTranscript, ctxCWD string) string {
+	resolvedParent := strings.TrimSpace(parentSessionID)
+	if resolvedParent == "" && source != "fork" {
+		if h, ok := askerHead(sessionID, transcriptPath); ok && h.Parent != "" && h.Kind != model.KindFork {
+			resolvedParent = h.Parent
+		}
+	}
+	if resolvedParent == "" {
+		return ""
+	}
+	coordLinkParent(dir, sessionID, resolvedParent, ctxCWD)
+	return coordSubagentBriefForStart(dir, sessionID, resolvedParent, parentTranscript, ctxCWD)
+}
+
+func emitParentBriefWithoutDigest(dir, parentBrief, eventName string, plain bool) {
+	combined := parentBrief
+	if env, _ := environmentBlockFrom(dir, policy.ActivationAuto); env != "" {
+		combined += "\n\n" + env
+	}
+	out := frameRecall(combined)
+	if plain {
+		fmt.Fprintln(os.Stdout, out)
+		return
+	}
+	var resp sessionStartHookResponse
+	resp.HookSpecificOutput.HookEventName = eventName
+	resp.HookSpecificOutput.AdditionalContext = out
+	emitHookResponse(resp)
+}
+
+func formatSessionStartLead(dir, source, sessionID, ctxCWD string, shell bool) string {
+	lead := startLead(sessionStartLead)
+	if source == "compact" {
+		lead = "Context was just compacted. The project memory below is from deja's index and survived the compaction; call the deja tool in \"context\" mode (or recall_context) with a session id from it to restore any details you lost.\n"
+		// The generic digest is about the project. What a compacted session
+		// most needs is its own evidence: measured on this corpus, a summary
+		// keeps ~77% of the decisions and 0.2% of the commands that produced
+		// them (#543).
+		if ev := compactEvidence(dir, sessionID, ctxCWD); ev != "" {
+			lead += "\n" + ev + "\n"
+		}
+	}
+	if shell {
+		lead = shellRecallLead(lead)
+	}
+	return lead
+}
+
+func appendSessionStartSystemNotes(dir string, rewired []string, msg string) string {
+	if !notesHaveReader() {
+		return msg
+	}
+	if note := buildNotice(dir); note != "" {
+		if msg == "" {
+			msg = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), note))
+		} else {
+			msg = joinNotes(msg, note)
+		}
+	}
+	if note := unreadableStoreNote(dir); storeNoteIsNews(dir, note) {
+		msg = joinNotes(note, msg)
+	}
+	// What the build found, once (#3073), then once a week what the week
+	// looked like (#3065) — after everything that needs acting on.
+	msg = joinNotes(msg, humanNotes(dir))
+	// An index that is behind and cannot be written stays behind. "the agent
+	// starts already knowing them" was printed over a picture missing today's
+	// work, and this path said nothing — search names the same state (#1005).
+	if note := staleReadOnlyNote(dir); note != "" {
+		msg = joinNotes(note, msg)
+	}
+	return msg
 }
 
 // hookContextWithoutDigest answers a session start that found no session from

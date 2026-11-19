@@ -29,14 +29,14 @@ import (
 // spawnPromptFields is where each harness keeps the instruction it hands the
 // spawned agent. Claude Code calls it prompt; the others that grew a subagent
 // tool since have kept the name, and the fallbacks cost nothing.
-var spawnPromptFields = []string{"prompt", "instructions", "task"}
+var spawnPromptFields = []string{"prompt", "instructions", "task", "message", "objective"}
 
 // isSpawnTool reports whether this action spawns an agent. Claude Code calls it
 // Task; the name is matched case-insensitively because a harness that wires the
 // hook with its own matcher may spell it differently.
 func isSpawnTool(name string) bool {
 	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "task", "agent", "subagent", "spawn_subagent":
+	case "task", "agent", "subagent", "spawn_subagent", "spawn_agent", "dispatch_agent", "delegate_task", "invoke_subagent":
 		return true
 	}
 	return false
@@ -58,20 +58,10 @@ func runHookSpawn(dir string, input toolHookInput, raw []byte, stdout io.Writer)
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return nil //nolint:nilerr // an unreadable payload means no reply
 	}
-	// Only grok, whose parent has no recall of its own. Everywhere else the
-	// parent writes these instructions after its own session-start and
-	// per-prompt recall, and the block repeated what it already knew to a
-	// reader nobody watches. Measured on one machine over 60 days of Claude
-	// Code transcripts: 1339 subagents were handed a block, none cited a
-	// session it named, and of the 539 in the last 14 days, all pointers, 4
-	// called deja and none on a word only the pointer gave. It was 55% of the
-	// per-prompt blocks deja sent. Grok discards what its main thread's hooks
-	// print (hook_grok.go), so a spawned agent's prompt is still the one place
-	// memory reaches there unasked.
-	if len(payload.ToolInput) > 0 {
-		return nil
+	hasCamel := len(payload.ToolInput) == 0 && len(payload.ToolInputCamel) > 0
+	if hasCamel {
+		payload.ToolInput = payload.ToolInputCamel
 	}
-	payload.ToolInput = payload.ToolInputCamel
 	if len(payload.ToolInput) == 0 {
 		return nil
 	}
@@ -79,15 +69,29 @@ func runHookSpawn(dir string, input toolHookInput, raw []byte, stdout io.Writer)
 	if field == "" || strings.TrimSpace(text) == "" {
 		return nil
 	}
-	block := spawnRecall(dir, input.SessionID, input.CWD, text)
-	if block == "" {
+	brief := coordSubagentBriefForSpawn(dir, input, raw)
+	var recallBlock string
+	if hasCamel && planIndexReady(dir) {
+		// Only grok runs historical prompt recall at spawn: elsewhere the parent
+		// already has session-start and per-prompt recall. Live working-set briefs
+		// still reach all harnesses whenever the parent has active work.
+		recallBlock = spawnRecall(dir, input.SessionID, input.CWD, text)
+		if recallBlock != "" {
+			recallBlock = defuseHostTriggers(recallBlock)
+		}
+	}
+	var injected string
+	switch {
+	case brief != "" && recallBlock != "":
+		injected = frameRecall(brief) + "\n\n" + recallBlock
+	case brief != "":
+		injected = frameRecall(brief)
+	case recallBlock != "":
+		injected = recallBlock
+	default:
 		return nil
 	}
-	// opencode and kilo run a task prompt through the same expansion as a typed
-	// one, so a recalled @path would attach that file to the subagent's turn.
-	// Only the recall is defused; the parent's own instructions stay as written.
-	block = defuseHostTriggers(block)
-	extended, err := json.Marshal(text + "\n\n" + block)
+	extended, err := json.Marshal(text + "\n\n" + injected)
 	if err != nil {
 		return nil //nolint:nilerr // a reply that cannot marshal means no reply
 	}
