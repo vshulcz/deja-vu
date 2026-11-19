@@ -3,8 +3,7 @@
 // Usage: node scripts/release-npm.mjs <version> <dist-dir>
 //   <dist-dir> must contain deja-vu_<version>_<os>_<arch>.{tar.gz,zip}
 // Publishes @vshulcz/deja-vu-<os>-<arch> for each platform, @vshulcz/deja-vu,
-// the harness packages under extensions/, and unscoped deja-vu at the same
-// version.
+// and the harness packages under extensions/ at the same version.
 //
 // One version for everything is the point: a user reading `dsh-deja@0.21.0`
 // knows which deja it was built against, and nobody has to remember to publish
@@ -93,11 +92,13 @@ for (const name of extensions) {
   published.push(`${outPkg.name}@${publishAs}`);
 }
 
-// unscoped wrapper package so `npx deja-vu` works alongside `@vshulcz/deja-vu`
-publishWrapper("unscoped", "deja-vu");
+// npm refuses unscoped "deja-vu" with 403 Forbidden ("too similar to existing
+// package dejavu"), which broke the tail of the v0.24.3 release job. Only the
+// @vshulcz/deja-vu wrapper is published; its bin map still exposes both `deja`
+// and `deja-vu`.
 
 console.log(
-  `published ${platforms.length} platform packages + @vshulcz/deja-vu@${version} + deja-vu@${version}` +
+  `published ${platforms.length} platform packages + @vshulcz/deja-vu@${version}` +
     (published.length ? ` + ${published.join(", ")}` : ""),
 );
 
