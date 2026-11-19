@@ -19,6 +19,7 @@ deja सब कुछ लोकल रूप से इंडेक्स कर
 </p>
 
 <p align="center">
+  <a href="https://github.com/vshulcz/deja-vu"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=social" alt="GitHub Stars"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
@@ -27,7 +28,7 @@ deja सब कुछ लोकल रूप से इंडेक्स कर
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://github.com/vshulcz/deja-vu"><b>GitHub</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/"><b>वेबसाइट और इंटरैक्टिव खोज</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>ब्राउज़र में लाइव डेमो</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">बेंचमार्क</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">तुलना</a></p>
+<p align="center"><a href="https://github.com/vshulcz/deja-vu"><b>★ vshulcz/deja-vu (GitHub)</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/"><b>वेबसाइट और इंटरैक्टिव खोज</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>ब्राउज़र में लाइव डेमो</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">बेंचमार्क</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">तुलना</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="एक ही सवाल एक ही एजेंट से दो बार: मेमोरी के बिना उसे कुछ याद नहीं, deja के साथ वह आठ महीने पुराने नतीजे से जवाब देता है"></p>
 

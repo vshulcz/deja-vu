@@ -19,6 +19,7 @@ deja indiziert alles lokal, damit deine Agents den Kontext über <code>/compact<
 </p>
 
 <p align="center">
+  <a href="https://github.com/vshulcz/deja-vu"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=social" alt="GitHub Stars"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
@@ -27,7 +28,7 @@ deja indiziert alles lokal, damit deine Agents den Kontext über <code>/compact<
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
-<p align="center"><a href="https://github.com/vshulcz/deja-vu"><b>GitHub</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/"><b>Website &amp; interaktive Suche</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>Live-Demo im Browser</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Vergleich</a></p>
+<p align="center"><a href="https://github.com/vshulcz/deja-vu"><b>★ vshulcz/deja-vu (GitHub)</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/"><b>Website &amp; interaktive Suche</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/"><b>Live-Demo im Browser</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Vergleich</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="dieselbe Frage zweimal an denselben Agenten: ohne Gedächtnis weiß er nichts, mit deja antwortet er mit einem acht Monate alten Ergebnis"></p>
 

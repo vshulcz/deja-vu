@@ -19,6 +19,7 @@ deja はそれをローカルでインデックス化し、<code>/compact</code>
 </p>
 
 <p align="center">
+  <a href="https://github.com/vshulcz/deja-vu"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=social" alt="GitHub Stars"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
@@ -27,7 +28,7 @@ deja はそれをローカルでインデックス化し、<code>/compact</code>
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
-<p align="center"><a href="https://github.com/vshulcz/deja-vu"><b>GitHub</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/">ドキュメント</a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">ブラウザデモ</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">ベンチマーク</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">他ツールとの比較</a> &middot; <a href="../../docs/INTEGRATING.md">自分のツールへの組み込み</a></p>
+<p align="center"><a href="https://github.com/vshulcz/deja-vu"><b>★ vshulcz/deja-vu (GitHub)</b></a> &middot; <a href="https://vshulcz.github.io/deja-vu/">ドキュメント</a> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">ブラウザデモ</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">ベンチマーク</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">他ツールとの比較</a> &middot; <a href="../../docs/INTEGRATING.md">自分のツールへの組み込み</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同じエージェントに同じ質問を2回する：記憶がないと何の記録もないが、deja があると8か月前の決定をもとに答える"></p>
 
