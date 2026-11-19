@@ -37,12 +37,13 @@ deja install --auto
 | [`raycast/`](raycast) | Raycast extension `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
 | [`spec-kit/`](spec-kit) | Spec Kit extension `deja-vu`, release asset `deja-spec-kit.zip` | `specify extension add deja-vu --from https://github.com/vshulcz/deja-vu/releases/latest/download/deja-spec-kit.zip` |
 
-Four more integrations live outside this directory because their registries or
-install commands read a fixed path in this repository: `claude-plugin/` (Claude
-Code marketplace), `codex-plugin/` (Codex), `codebuddy-plugin/` (CodeBuddy
-marketplace) and `devin-plugin/` (`devin plugins install
-vshulcz/deja-vu#devin-plugin`). Moving them would break manifests and install
-commands that are already out.
+Six more integrations live outside this directory because their registries or
+install commands read fixed repository paths: `claude-plugin/` (Claude Code
+marketplace), `codex-plugin/` (Codex), `cursor-plugin/` (Cursor marketplace),
+`antigravity-plugin/` (`agy plugin install`), `codebuddy-plugin/` (CodeBuddy
+marketplace), and `devin-plugin/` (`devin plugins install
+vshulcz/deja-vu#devin-plugin`). Moving them would break external manifests and
+installers.
 
 ## Publishing
 
@@ -184,12 +185,10 @@ two in step.
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (**88.9% hit@1** on the 470-question cleaned set; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents (next of 7 tools: 72 s) |
+| **97.2% R@5** on LongMemEval-S (**88.9% hit@1** on the 470-question cleaned set) | **58% fewer tokens** on repeated repo tasks | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents |
 
 ## Repository memory & handoff
 
 Share vetted project decisions and dead ends through git in `.deja/memory.jsonl` (`deja repo candidates`, `deja repo add <id>`). Entries are redacted on write, stored sorted with `merge=union` so parallel branches merge cleanly, and loaded for any teammate who clones the repository (`{"activations":{"auto":{"repo":false}}}` in the trust policy keeps them out of hooks). [More](https://vshulcz.github.io/deja-vu/guide/repo-memory.html).
 
 Switching tools mid-task? Run `deja handoff --to <agent>` (or use `handoff` via MCP) to transfer the active session's goal, decisions, touched files, passed checks, and open work into another coding agent.
-
-Found it useful? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).

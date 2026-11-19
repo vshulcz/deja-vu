@@ -2,9 +2,9 @@
 
 English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/zh.md) | [繁體中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/zh-TW.md) | [日本語](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/ja.md) | [한국어](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/ko.md) | [Español](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/es.md) | [Português](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/pt.md) | [Français](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/fr.md) | [Deutsch](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/de.md) | [Русский](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/ru.md) | [Türkçe](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/tr.md) | [हिन्दी](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/hi.md)
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 
-Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S · **13.6 s** to index 19,195 sessions · **half the tokens** of agentmemory) · [Full documentation](../../README.md) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/)
+Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S) · [Full documentation](../../README.md) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/)
 
 DeepSeek Harness (and DSH Desktop, `anywhere-labs/dsh-desktop`, which bundles the `dsh` runtime and web UI) can already search its own sessions — that is what the built-in
 `session-query` subsystem does. This plugin answers the other question: what you
@@ -222,7 +222,7 @@ errors, empty queries, disabling the feature and cleanup.
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents (next of 7 tools: 72 s) |
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents |
 
 ## Repository memory & handoff
 
@@ -234,4 +234,4 @@ Switching tools mid-task? Run `deja handoff --to <agent>` (or use `handoff` via 
 
 No LLM, no embeddings. The index is a local BM25 store under `~/.cache/deja/index.db` (`DEJA_INDEX_DIR` overrides) built over transcript files that already exist, so a query answers in about a millisecond with no network path unless you explicitly run semantic search (`deja embed`). Common secrets and tokens (`sk-*`, `ghp_*`, `AKIA*`, `Bearer`, private keys, URL credentials) are redacted at index time before any snippet reaches `dsh`.
 
-Part of [deja-vu](https://github.com/vshulcz/deja-vu). MIT. Found it useful? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).
+Part of [deja-vu](https://github.com/vshulcz/deja-vu). MIT.

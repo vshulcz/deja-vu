@@ -1,13 +1,13 @@
 # deja-vu for JetBrains IDEs
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | Português | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
 Busca local de sessões entre agentes, AI Line Blame e handoff para IntelliJ IDEA, GoLand, PyCharm, WebStorm, RustRover, CLion, PhpStorm e Rider (`2024.2+`).
 
 [deja-vu](https://github.com/vshulcz/deja-vu) indexa em SQLite FTS5 local as transcrições de sessão gravadas em disco por Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf e outros 39 agentes de código, com redação de segredos antes da saída e sem nenhum serviço na nuvem.
 
-**[★ Dê estrela ao deja-vu no GitHub](https://github.com/vshulcz/deja-vu)** · **[Documentação](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
+**[Documentação](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
 ![Demonstração do deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -54,7 +54,7 @@ O arquivo instalável é gravado em `build/distributions/`.
 
 | Recall | Tokens | Indexação e busca |
 |---|---|---|
-| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas; MemPalace publica 96.6%, agentmemory 95.2%) | **58% menos tokens** (**metade dos tokens** do agentmemory em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 49 agentes de código (próximo de 7: 72 s) |
+| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 49 agentes de código |
 
 ## Memória do repositório e handoff entre agentes
 
@@ -65,5 +65,3 @@ Trocando de ferramenta no meio da tarefa? Execute `deja handoff --to <agent>` (o
 ## Licença
 
 MIT — [github.com/vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)
-
-Achou útil? [Dê uma estrela ao deja-vu no GitHub](https://github.com/vshulcz/deja-vu).

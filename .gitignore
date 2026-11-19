@@ -55,18 +55,14 @@ deja-stats.svg
 /staleoverlap
 /testshard
 
-# Where story.py drops the film's frames when it is run without --out. Three
-# hundred and twenty PNGs, one run.
+# Demo frame output when story.py runs without --out.
 /scripts/demo/frames/
 
-# Python leaves these beside every script it runs, and there is Python in
-# scripts/ and tools/. Nothing ignored them, so they were committable as
-# binaries by anyone who ran one.
+# Python bytecode artifacts.
 __pycache__/
 *.pyc
 
-# extensions/ builds where its ecosystem builds: cargo in the Zed extension,
-# npm in the two plugin packages. None of it is ours to commit.
+# Extension and local test build outputs.
 extensions/zed/target/
 extensions/zed/Cargo.lock
 extensions/jetbrains/.gradle/
@@ -75,20 +71,15 @@ extensions/jetbrains/.intellijPlatform/
 extensions/*/node_modules/
 extensions/*/*.tgz
 extensions/*/package-lock.json
-# a test run that starts deja from cmd/deja writes its state dir there
 /cmd/deja/deja/
 
-# What a local `go test` and a local npm run leave behind, and what Finder
-# leaves in every directory it has been asked to show.
+# Local test profiles, root node_modules, and macOS metadata.
 coverage.out
 *.prof
 /node_modules/
 .DS_Store
 
-# deja's own state files, which sit beside the index: running the binary with
-# DEJA_INDEX_DIR pointing at a checkout drops them in it. `.hookseen` has been
-# sitting untracked in a working copy since September, and `.live` is new in
-# 0.21.2 and lands the same way.
+# Local deja runtime state files when DEJA_INDEX_DIR points at the checkout.
 .hookseen
 .hookcache-*
 .warmup

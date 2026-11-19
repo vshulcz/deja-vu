@@ -29,7 +29,7 @@ deja install codewhale-auto
 
 | Recall | Tokens | Indexierung & Suche |
 |---|---|---|
-| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen; MemPalace veröffentlicht 96.6%, agentmemory 95.2%) | **58% weniger Tokens** (**halb so viele Tokens** wie agentmemory bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 49 Coding-Agents hinweg (Nächstbester von 7: 72 s) |
+| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 49 Coding-Agents hinweg |
 
 ## Repository-Gedächtnis & Agenten-Übergabe
 
@@ -40,5 +40,3 @@ Werkzeugwechsel mitten in der Aufgabe? Mit `deja handoff --to <agent>` (oder `ha
 ## Lizenz
 
 [MIT](../LICENSE)
-
-Hilfreich? [Gib deja-vu einen Stern auf GitHub](https://github.com/vshulcz/deja-vu).

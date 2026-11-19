@@ -1,13 +1,13 @@
 # deja-vu for JetBrains IDEs
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | 한국어 | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
 IntelliJ IDEA, GoLand, PyCharm, WebStorm, RustRover, CLion, PhpStorm, Rider(`2024.2+`)를 위한 로컬 에이전트 간 세션 검색, AI 라인 Blame, 핸드오프 플러그인입니다.
 
 [deja-vu](https://github.com/vshulcz/deja-vu)는 Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf 외 39개 코딩 에이전트가 디스크에 남긴 세션 기록을 SQLite FTS5에 로컬로 색인합니다. 출력 전 시크릿을 마스킹하며 클라우드 서비스 없이 동작합니다.
 
-**[★ GitHub에서 deja-vu 스타 남기기](https://github.com/vshulcz/deja-vu)** · **[문서](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[벤치마크](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
+**[문서](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[벤치마크](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
 ![deja-vu 데모](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -54,7 +54,7 @@ cd extensions/jetbrains
 
 | 재현율 (Recall) | 토큰 사용량 | 인덱싱 & 조회 속도 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1; MemPalace 공개치 96.6%, agentmemory 95.2%) | **토큰 58% 절감** (반복 저장소 작업에서 agentmemory 대비 **절반의 토큰**) | 19,195개 세션 **13.6초** 인덱싱 / 49개 코딩 에이전트 통합 **0.7 ms** 조회 (비교군 7종 중 2위 72초) |
+| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1) | **토큰 58% 절감** (반복 저장소 작업) | 19,195개 세션 **13.6초** 인덱싱 / 49개 코딩 에이전트 통합 **0.7 ms** 조회 |
 
 ## 저장소 메모리 및 에이전트 간 핸드오프
 
@@ -65,5 +65,3 @@ git을 통해 `.deja/memory.jsonl`에 검증된 프로젝트 결정 사항과 �
 ## 라이선스
 
 MIT — [github.com/vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)
-
-도움이 되었나요? [GitHub에서 deja-vu에 스타 남기기](https://github.com/vshulcz/deja-vu).

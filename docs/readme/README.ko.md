@@ -19,7 +19,6 @@ deja는 그 기록을 로컬에서 색인해 <code>/compact</code> 이후에도 
 </p>
 
 <p align="center">
-  <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
@@ -42,13 +41,13 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 <table align="center">
 <tr>
-<td align="center" width="33%">재현율<br>LongMemEval-S <b>97.2% R@5</b><br><sub>전체 500문항 · MemPalace 96.6%, agentmemory 95.2%<br>같은 19,195개 세션: 1순위 적중 19/100, 차순위 14</sub></td>
-<td align="center" width="33%">토큰<br>agentmemory의 <b>절반 토큰</b><br><sub>이미 해결한 작업에서 53,558 대 104,974<br>도구 정의는 턴당 477토큰, 7개 중 최소</sub></td>
-<td align="center" width="33%">색인 시간<br>19,195개 세션 인덱싱 <b>13.6초</b><br><sub>7개 도구 중 차순위: 72초<br>첫 응답 26ms, 검색 중앙값 97ms</sub></td>
+<td align="center" width="33%">재현율<br>LongMemEval-S <b>97.2% R@5</b><br><sub>전체 500문항</sub></td>
+<td align="center" width="33%">토큰<br>반복 작업에서 <b>토큰 58% 절감</b><br><sub>메모리 없음 126,222 대 53,558<br>턴당 도구 정의 477토큰, LLM 호출 0회</sub></td>
+<td align="center" width="33%">색인 시간<br>19,195개 세션 인덱싱 <b>13.6초</b><br><sub>첫 응답 26ms, 검색 중앙값 97ms</sub></td>
 </tr>
 </table>
 
-<p align="center"><sub>deja-vu는 제가 관리하므로 모든 드라이버, 코퍼스, 채점 규칙이 이 저장소에 있습니다 &middot;
+<p align="center"><sub>모든 드라이버, 코퍼스, 채점 규칙이 이 저장소에 있습니다 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">직접 비교와 의심스러운 행을 다시 돌리는 방법</a> &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval 및 LoCoMo 실행 결과</a></sub></p>
 
@@ -152,14 +151,6 @@ deja는 그 파일들을 모두가 읽을 수 있는 하나의 기억 계층으�
 없습니다. `deja handoff --to codex`는 현재 컨텍스트를 묶어 다른 에이전트에서 이어가게 합니다. 알려진 형태의
 키, 토큰, JWT, 개인 키 블록은 색인 시점에 제거됩니다. 다만 패턴 매칭은 비밀정보 탐지기가 아니라서 모르는
 형태는 지나갈 수 있습니다.
-
-### 자기 작업을 그려 보기
-
-`deja stats --card`는 터미널에 바로 그립니다. 파일 이름을 주면 프로필 README에 넣을 SVG를 씁니다.
-다른 곳에 올리려면 [PNG로 변환](https://vshulcz.github.io/deja-vu/card/)하세요. 변환은 여러분 브라우저
-안에서 일어납니다.
-
-<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/docs/assets/stats-card-demo.svg" width="760" alt="deja 통계 카드: 1년치 세션 히트맵, 어느 에이전트에서 왔는지, 가장 길었던 세션"></p>
 
 전체 기능 레퍼런스는 [문서 사이트](https://vshulcz.github.io/deja-vu/)에 있습니다.
 
@@ -355,20 +346,6 @@ deja bench read       # 데이터베이스 기반 저장소를 읽는 비용과,
 
 색인은 증분입니다. 세션 파일이 길어지면 그 파일 하나만 다시 읽습니다.
 
-### 비교
-
-| 기능 | `deja-vu` | `claude-mem` | `MemPalace` |
-| --- | --- | --- | --- |
-| 설치 이전 기록 ([day zero](https://vshulcz.github.io/deja-vu/guide/day-zero.html)) | 지원 — 기존 트랜스크립트 인덱싱 (`36/100` hit@1) | 미지원 — 설치 시점부터 기록 (`0/100`) | Claude Code, Codex, Cursor (`16/100`) |
-| 공유 에이전트 | 49개 하네스 | 9개 (훅) | 3개 (CLI) |
-| LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
-| 런타임과 의존성 | Go 단일 바이너리 1개 | Bun 워커 + SQLite + Chroma | Python + 300 MB 임베딩 모델 |
-| LLM 호출 / 계정 필요 | 없음 | Observer LLM 호출 | 없음 |
-| 미커밋 파일 복구 | `deja restore <path>` | 없음 | 없음 |
-| 기존 `claude-mem.db` | `~/.claude-mem/claude-mem.db` 직접 읽기 | 기본 내장 | 없음 |
-
-나란히 비교하기: [15개 도구 전체 비교](https://vshulcz.github.io/deja-vu/guide/compare.html) · [claude-mem 대안](https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html) · [Mem0 대안](https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html) · [SpecStory 대안](https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html) · [Basic Memory 대안](https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html).
-
 ## 작동 방식
 
 `~/.cache/deja`에 있는 로컬 역색인입니다. JSONL과 SQLite 저장소를 파싱하고, 자격 증명을 제거하고,
@@ -381,7 +358,7 @@ deja bench read       # 데이터베이스 기반 저장소를 읽는 비용과,
 <details>
 <summary><b>다른 기억 도구와 무엇이 다른가요?</b></summary>
 
-| | deja | 기억 플랫폼<br>(Mem0, Letta, memU) | 세션 검색<br>(cass) |
+| | deja | 기억 플랫폼 | 세션 검색 |
 | --- | :-: | :-: | :-: |
 | 설치 이전의 작업을 안다 | 예 | 아니요 | 예 |
 | 수집 단계가 필요하다 | 아니요, 기록 자체가 기억 | 에이전트나 여러분 코드가 사실을 쓴다 | 아니요 |
@@ -450,8 +427,6 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 - [에이전트가 세션 사이에 잊는 이유](https://vshulcz.github.io/deja-vu/guide/forgetting.html) · [각 에이전트가 기록을 두는 곳](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
 - [압축이 잃는 것](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [에이전트 바꾸기](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [에이전트가 한 일 감사하기](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [대화 내보내기](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [기계 사이에서](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [기억에 드는 토큰 비용](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
-도구별: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi와 omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
-
 ## 개발
 
 `make build test lint` 다음 [CONTRIBUTING.md](../../CONTRIBUTING.md)를 보세요.
@@ -463,7 +438,7 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 버그와 질문은 [issues](https://github.com/vshulcz/deja-vu/issues)에 남겨 주세요.
 악용 가능성이 있다고 생각되는 문제는 대신 [SECURITY.md](../../SECURITY.md)의 비공개 보안 권고 링크로
 제보해 주세요. deja가 읽는 범위, 절대 외부로 보내지 않는 항목, 프로젝트 제외 및 세션 삭제 방법은
-[프라이버시](#프라이버시)에 있습니다. 도움이 되었나요? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).
+[프라이버시](#프라이버시)에 있습니다.
 
 ## 라이선스
 

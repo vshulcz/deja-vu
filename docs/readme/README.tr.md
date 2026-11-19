@@ -19,7 +19,6 @@ deja tüm geçmişi yerel olarak indeksler; böylece ajanlarınız <code>/compac
 </p>
 
 <p align="center">
-  <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
@@ -42,13 +41,13 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 <table align="center">
 <tr>
-<td align="center" width="33%">İsabet<br>LongMemEval-S'te <b>%97.2 R@5</b><br><sub>500 sorunun tamamı · MemPalace %96.6, agentmemory %95.2<br>aynı 19,195 oturumda: 100 sorudan 19'u ilk sırada, en yakını 14</sub></td>
-<td align="center" width="33%">Token<br>agentmemory'nin <b>yarısı kadar token</b><br><sub>zaten çözülmüş bir görevde 104,974'e karşı 53,558<br>tur başına 477 token araç tanımı, yedi sunucunun en azı</sub></td>
-<td align="center" width="33%">İndeksleme<br>19,195 oturumu <b>13.6 sn</b>'de indeksler<br><sub>yedi araçtan sonraki: 72 sn<br>ilk yanıta 26 ms, arama medyanı 97 ms</sub></td>
+<td align="center" width="33%">İsabet<br>LongMemEval-S'te <b>%97.2 R@5</b><br><sub>500 sorunun tamamı</sub></td>
+<td align="center" width="33%">Token<br>tekrarlanan işlerde <b>%58 daha az token</b><br><sub>belleksiz 126,222'ye karşı 53,558<br>tur başına 477 token araç tanımı, 0 LLM çağrısı</sub></td>
+<td align="center" width="33%">İndeksleme<br>19,195 oturumu <b>13.6 sn</b>'de indeksler<br><sub>ilk yanıta 26 ms, arama medyanı 97 ms</sub></td>
 </tr>
 </table>
 
-<p align="center"><sub>deja-vu'yu ben geliştiriyorum; bu yüzden tüm sürücüler, derlem ve puanlama kuralı bu depoda &middot;
+<p align="center"><sub>Tüm sürücüler, derlem ve puanlama kuralı bu depoda &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">birebir karşılaştırma ve şüphelendiğiniz bir satırı yeniden ölçme</a> &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval ve LoCoMo çalıştırmaları</a></sub></p>
 
@@ -154,14 +153,6 @@ veremediğinde susar; `deja sync ssh laptop` belleği makineler arasında yalnı
 girmez; `deja handoff --to codex` başka bir ajanda devam etmek için mevcut bağlamı paketler; bilinen biçimdeki
 anahtarlar, token'lar, JWT'ler ve özel anahtar blokları indeksleme sırasında çıkarılır — ne var ki örüntü
 eşleştirme sır tespiti değildir ve bilinmeyen bir biçim geçebilir.
-
-### Kendi çalışmanızı çizin
-
-`deja stats --card` doğrudan terminale çizer; bir dosya adı verirseniz profil README'niz için bir SVG yazar.
-Başka bir yerde yayımlamak için [PNG'ye çevirin](https://vshulcz.github.io/deja-vu/card/) — o sayfa dönüşümü
-sizin tarayıcınızda yapar.
-
-<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/docs/assets/stats-card-demo.svg" width="760" alt="deja istatistik kartı: bir yıllık oturumlar ısı haritası olarak, hangi ajanlardan geldikleri ve en uzun olanı"></p>
 
 Tam başvuru [belge sitesinde](https://vshulcz.github.io/deja-vu/).
 
@@ -364,20 +355,6 @@ Gerçek bir depoda ölçüldü: 2,419 oturum, 179k mesaj, 1.9 GB kayıt.
 
 İndeks artımlıdır. Bir oturum dosyası uzadığında yalnızca o dosya yeniden okunur.
 
-### Karşılaştırma
-
-| Özellik | `deja-vu` | `claude-mem` | `MemPalace` |
-| --- | --- | --- | --- |
-| Kurulum öncesi geçmiş ([sıfırıncı gün](https://vshulcz.github.io/deja-vu/guide/day-zero.html)) | Evet — mevcut transkriptleri indeksler (`36/100` hit@1) | Hayır — kurulumdan itibaren kaydeder (`0/100`) | Claude Code, Codex, Cursor (`16/100`) |
-| Paylaşılan ajanlar | 49 araç | 9 (kanca) | 3 (CLI) |
-| LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
-| Çalışma zamanı ve bağımlılıklar | 1 Go ikili dosyası | Bun çalışanı + SQLite + Chroma | Python + 300 MB gömme modeli |
-| LLM çağrısı / hesap gereksinimi | Yok | Gözlemci LLM çağrıları | Yok |
-| Commit edilmemiş dosya kurtarma | `deja restore <path>` | Hayır | Hayır |
-| Mevcut `claude-mem.db` | Doğrudan `~/.claude-mem/claude-mem.db` okur | Yerleşik | Hayır |
-
-Yan yana notlar: [15 aracın tamamı karşılaştırıldı](https://vshulcz.github.io/deja-vu/guide/compare.html) · [claude-mem alternatifi](https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html) · [Mem0 alternatifi](https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html) · [SpecStory alternatifi](https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html) · [Basic Memory alternatifi](https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html).
-
 ## Nasıl çalışır
 
 `~/.cache/deja` içinde yerel bir ters indeks: JSONL ve SQLite depolarını ayrıştırır, kimlik bilgilerini
@@ -390,7 +367,7 @@ okur. Ayrıntılar [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md) dosyasınd
 <details>
 <summary><b>Diğer bellek araçlarından farkı ne?</b></summary>
 
-| | deja | Bellek platformları<br>(Mem0, Letta, memU) | Oturum araması<br>(cass) |
+| | deja | Bellek platformları | Oturum araması |
 | --- | :-: | :-: | :-: |
 | Kurulmadan önceki işi bilir | evet | hayır | evet |
 | Bir toplama adımı gerekir | hayır, dökümün kendisi bellektir | olguları ajan ya da kodunuz yazar | hayır |
@@ -461,8 +438,6 @@ Windows'ta notlar `%AppData%\deja` içindedir).
 - [Ajanlar oturumlar arasında neden unutur](https://vshulcz.github.io/deja-vu/guide/forgetting.html) · [her ajan geçmişini nerede tutar](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
 - [Sıkıştırmanın kaybettikleri](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [ajan değiştirmek](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [ajanların ne yaptığını denetlemek](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [bir konuşmayı dışa aktarmak](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [makineler arasında](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [belleğin token maliyeti](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
-Araca göre: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi ve omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
-
 ## Geliştirme
 
 `make build test lint`, ardından [CONTRIBUTING.md](../../CONTRIBUTING.md).
@@ -475,7 +450,6 @@ Hatalar ve sorular [issues](https://github.com/vshulcz/deja-vu/issues) sayfasın
 İstismar edilebilir olduğunu düşündüğünüz her şey bunun yerine [SECURITY.md](../../SECURITY.md) içindeki
 özel bildirim bağlantısı üzerinden iletilir. deja'nın neyi okuduğu, hiçbir yere neyi göndermediği ve
 bir projeyi hariç tutma ya da oturum unutma adımları [Gizlilik](#gizlilik) bölümündedir.
-İşinize yaradı mı? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).
 
 ## Lisans
 

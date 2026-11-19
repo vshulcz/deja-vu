@@ -36,7 +36,7 @@ When `deja install orca-auto` has already written the native `UserPromptSubmit` 
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents (next of 7 tools: 72 s) |
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents |
 
 ## Repository memory & handoff
 
@@ -47,5 +47,3 @@ Switching tools mid-task? Run `deja handoff --to <agent>` (or use `handoff` via 
 ## License
 
 [MIT](LICENSE)
-
-Found it useful? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).

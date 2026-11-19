@@ -2,9 +2,9 @@
 
 English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/grok/docs/zh.md) | [繁體中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/grok/docs/zh-TW.md) | [日本語](https://github.com/vshulcz/deja-vu/blob/main/extensions/grok/docs/ja.md) | [한국어](https://github.com/vshulcz/deja-vu/blob/main/extensions/grok/docs/ko.md) | [Español](https://github.com/vshulcz/deja-vu/blob/main/extensions/grok/docs/es.md) | [Português](https://github.com/vshulcz/deja-vu/blob/main/extensions/grok/docs/pt.md) | [Français](https://github.com/vshulcz/deja-vu/blob/main/extensions/grok/docs/fr.md) | [Deutsch](https://github.com/vshulcz/deja-vu/blob/main/extensions/grok/docs/de.md) | [Русский](https://github.com/vshulcz/deja-vu/blob/main/extensions/grok/docs/ru.md) | [Türkçe](https://github.com/vshulcz/deja-vu/blob/main/extensions/grok/docs/tr.md) | [हिन्दी](https://github.com/vshulcz/deja-vu/blob/main/extensions/grok/docs/hi.md)
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 
-Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S · **13.6 s** to index 19,195 sessions · **half the tokens** of agentmemory) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/) · **[★ Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)**
+Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/)
 
 Grok remembers its own sessions. This plugin answers the other question: what
 you did in Claude Code, Codex, Cursor, opencode, Zed and forty-four more agents on
@@ -110,7 +110,7 @@ server, which is a worse thing to leave behind than an idle one.
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents (next of 7 tools: 72 s) |
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents |
 
 ## Repository memory & handoff
 
@@ -122,4 +122,4 @@ Switching tools mid-task? Run `deja handoff --to <agent>` (or use `handoff` via 
 
 MIT
 
-Part of [deja-vu](https://github.com/vshulcz/deja-vu). MIT. Found it useful? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).
+Part of [deja-vu](https://github.com/vshulcz/deja-vu). MIT.

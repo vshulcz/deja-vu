@@ -19,7 +19,6 @@ deja 在本地索引全部历史，让智能体跨 <code>/compact</code> 保住�
 </p>
 
 <p align="center">
-  <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
@@ -42,9 +41,9 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 <table align="center">
 <tr>
-<td align="center" width="33%">召回率<br><b>97.2% R@5</b>（LongMemEval-S）<br><sub>全部 500 题 · MemPalace 96.6%，agentmemory 95.2%<br>同样 19,195 个会话：100 题中 19 题排第一，第二名 14 题</sub></td>
-<td align="center" width="33%">Token 用量<br>token 只有 agentmemory 的<b>一半</b><br><sub>已做过的任务：53,558 对比 104,974<br>工具定义每轮 477 token，七个里最少</sub></td>
-<td align="center" width="33%">索引耗时<br><b>13.6 秒</b>索引 19,195 个会话<br><sub>七个工具里第二名：72 秒<br>首次回答 26 毫秒，搜索中位数 97 毫秒</sub></td>
+<td align="center" width="33%">召回率<br><b>97.2% R@5</b>（LongMemEval-S）<br><sub>全部 500 题</sub></td>
+<td align="center" width="33%">Token 用量<br>重复任务 <b>token 减少 58%</b><br><sub>53,558 对比无记忆 126,222<br>工具定义每轮 477 token，零 LLM 调用</sub></td>
+<td align="center" width="33%">索引耗时<br><b>13.6 秒</b>索引 19,195 个会话<br><sub>首次回答 26 毫秒，搜索中位数 97 毫秒</sub></td>
 </tr>
 </table>
 
@@ -151,12 +150,6 @@ deja 把这些文件变成一层它们都能读的记忆。
 `deja sync ssh laptop` 在机器之间搬运记忆，只追加、中间没有云；
 `deja handoff --to codex` 把当前上下文打包，好在另一个智能体里接着做；
 已知形态的密钥、令牌、JWT 和私钥块在建索引时会被剥掉；模式匹配不是密钥检测，未知形态可能漏过。
-
-### 把你自己的工作画出来
-
-`deja stats --card` 直接画在终端里；给它一个文件名，它会写出一张 SVG，可以放进个人主页的 README。要发到别处，就把它[转成 PNG](https://vshulcz.github.io/deja-vu/card/)——那个页面在你自己的浏览器里完成转换。
-
-<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/docs/assets/stats-card-demo.svg" width="760" alt="deja 统计卡片：一年的会话热力图、它们来自哪些智能体、以及最长的一次"></p>
 
 完整的功能参考在[文档站](https://vshulcz.github.io/deja-vu/)。
 
@@ -337,20 +330,6 @@ deja bench read       # 读取一个数据库存储的代价，以及一个超�
 
 索引是增量的。会话文件变长时，只重新读那一个文件。
 
-### 对比
-
-| 能力 | `deja-vu` | `claude-mem` | `MemPalace` |
-| --- | --- | --- | --- |
-| 安装前的历史记录（[第零天](https://vshulcz.github.io/deja-vu/guide/day-zero.html)） | 是 — 索引已有的会话转录（`36/100` hit@1） | 否 — 仅从安装后开始记录（`0/100`） | Claude Code、Codex、Cursor（`16/100`） |
-| 共享范围 | 49 款工具 | 9 款（hooks） | 3 款（CLI） |
-| LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
-| 运行时与依赖 | 1 个 Go 二进制 | Bun worker + SQLite + Chroma | Python + 300 MB 向量模型 |
-| LLM 调用 / 账号要求 | 无 | Observer LLM 调用 | 无 |
-| 未提交文件恢复 | `deja restore <path>` | 否 | 否 |
-| 已有 `claude-mem.db` | 直接读取 `~/.claude-mem/claude-mem.db` | 原生 | 否 |
-
-横向对比：[15 款工具完整对比](https://vshulcz.github.io/deja-vu/guide/compare.html) · [claude-mem 替代方案（中文）](https://vshulcz.github.io/deja-vu/zh/guide/claude-mem-alternative.html) · [Mem0 替代方案](https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html) · [SpecStory 替代方案](https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html) · [Basic Memory 替代方案](https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html)。
-
 ## 工作原理
 
 `~/.cache/deja` 里的本地倒排索引：解析 JSONL 与 SQLite 存储、脱敏凭据、写出 `records.bin`
@@ -363,7 +342,7 @@ MCP 服务端、统计、分享和同步都读这一份索引。细节见
 <details>
 <summary><b>和其他记忆工具有什么不同？</b></summary>
 
-| | deja | 记忆平台<br>(Mem0、Letta、memU) | 会话检索<br>(cass) |
+| | deja | 记忆平台 | 会话检索 |
 | --- | :-: | :-: | :-: |
 | 知道安装它之前的工作 | 是 | 否 | 是 |
 | 需要采集步骤 | 不需要，转录本身就是记忆 | 由智能体或你的代码写入事实 | 不需要 |
@@ -416,8 +395,6 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 - **查找与继续工作：** [接着昨天的会话做](https://vshulcz.github.io/deja-vu/guide/resume-a-session.html) · [找到当初解决它的那次会话](https://vshulcz.github.io/deja-vu/guide/find-a-session.html) · [智能体又犯了你已经修过的错](https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html) · [换一个智能体](https://vshulcz.github.io/deja-vu/guide/switching-agents.html)
 - **会话文件与日常维护：** [磁盘上的会话文件](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html) · [每个智能体把历史存在哪里](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html) · [审计智能体做过什么](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [导出一次对话](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [跨机器](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [记忆要花多少 token](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
-按工具：[opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [DeepSeek Harness（中文）](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html) · [Kimi Code（中文）](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [Qwen Code（中文）](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi 和 omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
-
 ## 参与开发
 
 `make build test lint`，然后看 [CONTRIBUTING.md](../../CONTRIBUTING.md)。
@@ -429,7 +406,6 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 问题和建议请提交到 [issues](https://github.com/vshulcz/deja-vu/issues)。
 如果你认为某个问题存在可利用风险，请改走 [SECURITY.md](../../SECURITY.md) 里的私密安全通告链接。
 deja 读取什么、绝不向外发送什么，以及如何排除项目或遗忘会话，见 [隐私](#隐私)。
-觉得有用？[Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)。
 
 ## 许可
 

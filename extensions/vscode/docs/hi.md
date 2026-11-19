@@ -1,6 +1,6 @@
 # VS Code, Cursor, Windsurf और Antigravity के लिए deja-vu
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | हिन्दी
 
@@ -8,7 +8,7 @@
 
 [deja-vu](https://github.com/vshulcz/deja-vu) उन सेशन ट्रांसक्रिप्ट्स को लोकल स्तर पर इंडेक्स करता है जिन्हें Claude Code, Cursor, Codex, Windsurf, Copilot Chat, OpenCode, Cline, Roo Code और 41 अन्य कोडिंग एजेंट्स पहले ही डिस्क पर लिख चुके हैं — एक Go बाइनरी में, बिना LLM और बिना बैकग्राउंड डेमन के।
 
-**[★ GitHub पर स्टार करें](https://github.com/vshulcz/deja-vu)** · **[दस्तावेज़](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[बेंचमार्क](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
+**[दस्तावेज़](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[बेंचमार्क](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
 ![deja-vu डेमो](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -34,10 +34,10 @@ code --install-extension vshulcz.deja-status
 
 | बेंचमार्क | परिणाम |
 |---|---|
-| LongMemEval-S रिट्रीवल सटीकता (470 साफ़ प्रश्न) | **97.2% R@5**, **88.9% hit@1** (MemPalace 96.6%, agentmemory 95.2%) |
-| दोहराए गए रेपो काम पर टोकन लागत | **58% कम टोकन** — agentmemory से आधे (`52,815` बनाम बिना मेमोरी `103,443`, 11 युग्मित रन) |
+| LongMemEval-S रिट्रीवल सटीकता (470 साफ़ प्रश्न) | **97.2% R@5**, **88.9% hit@1** |
+| दोहराए गए रेपो काम पर टोकन लागत | **58% कम टोकन**|
 | इन-प्रोसेस लेक्सिकल क्वेरी लेटेंसी | 49 कोडिंग एजेंट्स में माध्यिका **0.7–0.8 ms** |
-| 19,195 वास्तविक सेशन की प्रारंभिक इंडेक्सिंग | **13.6 s**, कोई API कुंजी नहीं (7 में अगला: 72 s) |
+| 19,195 वास्तविक सेशन की प्रारंभिक इंडेक्सिंग | **13.6 s**, कोई API कुंजी नहीं |
 
 ## रेपो मेमोरी और एजेंट हैंडऑफ़
 
@@ -49,4 +49,4 @@ code --install-extension vshulcz.deja-status
 
 MIT — [github.com/vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)
 
-[deja-vu](https://github.com/vshulcz/deja-vu) का हिस्सा। MIT लाइसेंस। उपयोगी लगा? [GitHub पर deja-vu को स्टार दें](https://github.com/vshulcz/deja-vu)।
+[deja-vu](https://github.com/vshulcz/deja-vu) का हिस्सा। MIT लाइसेंस।

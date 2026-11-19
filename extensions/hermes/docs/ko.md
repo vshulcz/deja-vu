@@ -2,9 +2,9 @@
 
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | 한국어 | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 
-**[deja-vu](https://github.com/vshulcz/deja-vu)** 확장 (LongMemEval-S **97.2% R@5** · 19,195개 세션 **13.6초** 인덱싱 · agentmemory 대비 **토큰 절반**) · [문서](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [라이브 데모](https://vshulcz.github.io/deja-vu/view/) · [벤치마크](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) · **[★ GitHub 스타](https://github.com/vshulcz/deja-vu)**
+**[deja-vu](https://github.com/vshulcz/deja-vu)** 확장 (LongMemEval-S **97.2% R@5**) · [문서](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [라이브 데모](https://vshulcz.github.io/deja-vu/view/) · [벤치마크](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
 이 머신에 이미 존재하는 코딩 세션(Claude Code, Codex, Cursor, Hermes 자체 및 deja가 읽는 다른 모든 에이전트, 아무것도 설치하기 전 수개월간의 기록 포함)을 바탕으로 답변하는 Hermes 메모리 프로바이더입니다. 별도 모델, API 키, 백그라운드 서버 없이 단일 Go 바이너리 [deja](https://github.com/vshulcz/deja-vu)가 로컬에서 기록을 색인합니다.
 
@@ -40,7 +40,7 @@ Hermes 턴을 별도로 복제해 쓰지 않으며, Hermes가 저장한 데이�
 
 | 재현율 (Recall) | 토큰 사용량 | 인덱싱 & 조회 속도 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1; MemPalace 공개치 96.6%, agentmemory 95.2%) | **토큰 58% 절감** (반복 저장소 작업에서 agentmemory 대비 **절반의 토큰**) | 19,195개 세션 **13.6초** 인덱싱 / 49개 코딩 에이전트 통합 **0.7 ms** 조회 (비교군 7종 중 2위 72초) |
+| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1) | **토큰 58% 절감** (반복 저장소 작업) | 19,195개 세션 **13.6초** 인덱싱 / 49개 코딩 에이전트 통합 **0.7 ms** 조회 |
 
 ## 저장소 메모리 및 에이전트 간 핸드오프
 
@@ -52,4 +52,4 @@ git을 통해 `.deja/memory.jsonl`에 검증된 프로젝트 결정 사항과 �
 
 `deja install hermes-auto`는 이 프로바이더를 `~/.hermes/plugins/deja-memory`에 기록하면서 MCP 서버와 `pre_llm_call` 훅 플러그인도 같이 씁니다. 여기 있는 파일은 동일한 소스(`cmd/deja/install_hermes_memory.go`)에서 생성되며, 유일한 차이는 경로를 고정하지 않고 PATH에서 `deja`를 찾는다는 점입니다. 둘이 어긋나면 `TestHermesExtensionIsTheProviderInstallWrites`가 실패합니다.
 
-[deja-vu](https://github.com/vshulcz/deja-vu)의 일부입니다. MIT.도움이 되었나요? [GitHub에서 deja-vu에 스타 남기기](https://github.com/vshulcz/deja-vu).
+[deja-vu](https://github.com/vshulcz/deja-vu)의 일부입니다. MIT.

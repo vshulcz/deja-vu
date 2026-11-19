@@ -2,9 +2,9 @@
 
 [English](../README.md) | [简体中文](zh.md) | 繁體中文 | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 
-**[deja-vu](https://github.com/vshulcz/deja-vu)** 擴充套件（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 個會話 · token 用量為 agentmemory 的**一半**）· [文件](https://vshulcz.github.io/deja-vu/) · [線上展示](https://vshulcz.github.io/deja-vu/view/) · [評測](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) · **[★ GitHub 給星](https://github.com/vshulcz/deja-vu)**
+**[deja-vu](https://github.com/vshulcz/deja-vu)** 擴充套件（LongMemEval-S **97.2% R@5**）· [文件](https://vshulcz.github.io/deja-vu/) · [線上展示](https://vshulcz.github.io/deja-vu/view/) · [評測](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
 一套 Hermes 記憶提供者（memory provider），直接從本機既有的程式設計會話回答問題：涵蓋 Claude Code、Codex、Cursor、Hermes 本身以及 deja 可讀取的其他代理，連同安裝任何工具之前數月留下的紀錄。無須額外模型、API 金鑰或常駐服務；歷史紀錄由單一 Go 執行檔 [deja](https://github.com/vshulcz/deja-vu) 在本機建立索引。
 
@@ -40,7 +40,7 @@ hermes config set memory.provider deja-memory
 
 | 召回率 | Token 用量 | 索引與檢索耗時 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1；MemPalace 公布 96.6%，agentmemory 為 95.2%） | **token 減少 58%**（同儲存庫重複任務上 token 用量只有 agentmemory 的**一半**） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 49 個程式設計代理的檢索僅 **0.7 ms**（7 款對比工具中第二名 72 秒） |
+| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 49 個程式設計代理的檢索僅 **0.7 ms** |
 
 ## 儲存庫記憶與跨代理接力
 
@@ -52,4 +52,4 @@ hermes config set memory.provider deja-memory
 
 `deja install hermes-auto` 會將這份提供者寫入 `~/.hermes/plugins/deja-memory`，同時安裝 MCP 伺服器與 `pre_llm_call` 鉤子外掛。這裡的檔案與安裝器源自同一份原始碼（`cmd/deja/install_hermes_memory.go`），唯一差異是這份複本改由 `PATH` 尋找 `deja`，而非寫死路徑。若兩者不一致，`TestHermesExtensionIsTheProviderInstallWrites` 測試便會失敗。
 
-[deja-vu](https://github.com/vshulcz/deja-vu) 生態組件。MIT 授權。覺得實用？[到 GitHub 為 deja-vu 點顆星](https://github.com/vshulcz/deja-vu)。
+[deja-vu](https://github.com/vshulcz/deja-vu) 生態組件。MIT 授權。
