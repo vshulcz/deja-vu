@@ -1,6 +1,6 @@
 # deja-vu for VS Code, Cursor, Windsurf & Antigravity
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | 日本語 | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
@@ -8,7 +8,7 @@
 
 [deja-vu](https://github.com/vshulcz/deja-vu) は Claude Code・Cursor・Codex・Windsurf・Copilot Chat・OpenCode・Cline・Roo Code ほか 41 種のコーディングエージェントがディスクへ保存しているセッショントランスクリプトを単一 Go バイナリでローカルインデックスします。LLM 不要・常駐デーモン不要です。
 
-**[★ GitHub でスター](https://github.com/vshulcz/deja-vu)** · **[ドキュメント](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[ベンチマーク](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
+**[ドキュメント](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[ベンチマーク](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
 ![deja-vu デモ](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -34,10 +34,10 @@ code --install-extension vshulcz.deja-status
 
 | 計測項目 | 結果 |
 |---|---|
-| LongMemEval-S 検索精度（クレンジング済み 470 問） | **97.2% R@5**、**88.9% hit@1**（MemPalace 公表値 96.6%、agentmemory 95.2%） |
-| 同一リポジトリ作業でのトークン消費量 | **58% 削減** — agentmemory の**半分**（`52,815` 対 コールド時 `103,443`、11 ペア計測） |
+| LongMemEval-S 検索精度（クレンジング済み 470 問） | **97.2% R@5**、**88.9% hit@1** |
+| 同一リポジトリ作業でのトークン消費量 | **58% 削減**|
 | プロセス内語彙検索レイテンシ | 49 種のエージェント横断で中央値 **0.7–0.8 ms** |
-| 19,195 件の実セッションに対する初期インデックス時間 | **13.6 s**、API キー不要（7 ツール中の次点は 72 s） |
+| 19,195 件の実セッションに対する初期インデックス時間 | **13.6 s**、API キー不要 |
 
 ## リポジトリメモリとエージェント間の引き継ぎ
 
@@ -49,4 +49,4 @@ code --install-extension vshulcz.deja-status
 
 MIT — [github.com/vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)
 
-[deja-vu](https://github.com/vshulcz/deja-vu) の一部です。MIT。役に立ちましたか？ [GitHub で deja-vu にスターを付ける](https://github.com/vshulcz/deja-vu)。
+[deja-vu](https://github.com/vshulcz/deja-vu) の一部です。MIT。

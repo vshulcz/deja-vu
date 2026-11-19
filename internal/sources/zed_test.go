@@ -13,6 +13,297 @@ import (
 	"time"
 )
 
+// A thread that reads the same file twice and runs the same command twice —
+// ordinary work, and what a real Zed thread does all day. Every message
+// carried the thread's start, so the ingest's duplicate check saw one turn
+// where there were two: 1385 of 6767 messages from the 30 real threads on
+// this machine never reached the index (#3333).
+const zedRepeatBody = `{"version":"0.3.0","title":"repeated work","updated_at":"2026-07-19T09:00:02Z","messages":[
+{"User":{"id":"u1","content":[{"Text":"the retry queue stalls on staging"}]}},
+{"Agent":{"content":[
+ {"ToolUse":{"id":"c1","name":"read_file","input":{"path":"/w/app/queue/retry.go","start_line":1,"end_line":80}}},
+ {"ToolUse":{"id":"c2","name":"terminal","input":{"command":"go test ./queue/...","cd":"/w/app"}}}
+],"tool_results":{},"reasoning_details":null}},
+{"Agent":{"content":[
+ {"ToolUse":{"id":"c3","name":"read_file","input":{"path":"/w/app/queue/retry.go","start_line":1,"end_line":80}}},
+ {"ToolUse":{"id":"c4","name":"terminal","input":{"command":"go test ./queue/...","cd":"/w/app"}}}
+],"tool_results":{},"reasoning_details":null}}
+]}`
+
+func TestZedTellsTwoIdenticalTurnsApartByTheirPlace(t *testing.T) {
+	zedHome(t)
+	hex := zedZstdHex(t, zedRepeatBody)
+	sql := fmt.Sprintf("%s\ninsert into threads (id, summary, updated_at, data_type, data, folder_paths, created_at) values ('r1', 'repeated work', '2026-07-19T09:00:02Z', 'zstd', x'%s', '[\"/w/app\"]', '2026-07-19T08:00:00Z');", zedSchema, hex)
+	db := zedTestDB(t, sql)
+	if !ZstdAvailable() {
+		t.Skip("zstd not installed")
+	}
+	ss, err := ParseZedDB(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ss) != 1 {
+		t.Fatalf("sessions = %d, want 1", len(ss))
+	}
+	seen := map[string]int{}
+	for _, m := range ss[0].Messages {
+		seen[m.Role+"\x00"+m.Text+"\x00"+m.Time.Format("2006-01-02T15:04:05.000000000Z07:00")]++
+	}
+	for k, n := range seen {
+		if n > 1 {
+			t.Errorf("%d messages share role, text and stamp — the ingest stores one of them: %q", n, k)
+		}
+	}
+	// The stamps stay inside the thread's own span and keep the array's order.
+	prev := ss[0].Messages[0].Time
+	for _, m := range ss[0].Messages[1:] {
+		if m.Time.Before(prev) {
+			t.Errorf("message stamped before the one ahead of it: %v < %v", m.Time, prev)
+		}
+		prev = m.Time
+	}
+	if last := ss[0].Messages[len(ss[0].Messages)-1].Time; last.After(ss[0].Updated) {
+		t.Errorf("last message stamped %v, after the thread's own update %v", last, ss[0].Updated)
+	}
+}
+
+// Where Zed keeps settings.json differs by platform, and the installer writes
+// to whatever this returns. A wrong answer here does not fail loudly: install
+// reports success and Zed reads a file deja never touched.
+func TestZedConfigDirPerPlatform(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	// Pointed away from the profile on purpose: a roaming profile is not
+	// always under the home directory, and reading APPDATA is the only way to
+	// find it. Same answer either way proves nothing.
+	roaming := filepath.Join(t.TempDir(), "Roaming")
+	t.Setenv("APPDATA", roaming)
+	if got, want := zedConfigDir("windows"), filepath.Join(roaming, "Zed"); got != want {
+		t.Errorf("windows config dir = %q, want %q", got, want)
+	}
+	// A windows without APPDATA set still has a profile to fall back on.
+	t.Setenv("APPDATA", "")
+	if got, want := zedConfigDir("windows"), filepath.Join(home, "AppData", "Roaming", "Zed"); got != want {
+		t.Errorf("windows config dir without APPDATA = %q, want %q", got, want)
+	}
+
+	t.Setenv("XDG_CONFIG_HOME", "")
+	if got, want := zedConfigDir("linux"), filepath.Join(home, ".config", "zed"); got != want {
+		t.Errorf("posix config dir = %q, want %q", got, want)
+	}
+	xdg := filepath.Join(home, "elsewhere")
+	t.Setenv("XDG_CONFIG_HOME", xdg)
+	if got, want := zedConfigDir("linux"), filepath.Join(xdg, "zed"); got != want {
+		t.Errorf("XDG_CONFIG_HOME ignored: %q, want %q", got, want)
+	}
+}
+
+// The override is what lets anyone whose layout differs point deja at the real
+// file, and it is how this is tested without a Zed install.
+func TestZedSettingsPathHonoursTheOverride(t *testing.T) {
+	want := filepath.Join(t.TempDir(), "settings.json")
+	t.Setenv("DEJA_ZED_CONFIG", want)
+	if got := ZedSettingsPath(); got != want {
+		t.Errorf("ZedSettingsPath = %q, want %q", got, want)
+	}
+	t.Setenv("DEJA_ZED_CONFIG", "")
+	if got := ZedSettingsPath(); got == want {
+		t.Errorf("the override outlived its variable: %q", got)
+	}
+}
+
+// Zed records both sides of an edit, but on the result rather than on the call:
+// the `edit_file` input is a path, a mode and a sentence of intent, and the
+// change itself comes back under `output` as a unified diff beside the whole
+// file before and after. Counted on a real store, 589 of 684 edit_file results
+// carry it and not one call did — so 29 of 30 zed sessions had no recorded edit
+// at all (#595). Shape from a real thread.
+func TestZedEditsComeFromTheToolResult(t *testing.T) {
+	const removed = "cfg.MaxConns = 10 // the number from before this change"
+	const added = "cfg.MaxConns = int32(size) // default_pool_size, from the ini"
+	msg := `{"Agent":{"content":[{"ToolUse":{"id":"call_1","name":"edit_file","input":{"path":"/w/internal/pool/pool.go","mode":"edit","display_description":"Raise the pool size"}}}],
+	 "tool_results":{"call_1":{"tool_use_id":"call_1","tool_name":"edit_file","is_error":false,"content":{"Text":"Edited pool.go"},
+	  "output":{"input_path":"/w/internal/pool/pool.go","diff":"@@ -18,7 +18,7 @@\n func open(size int) {\n-` + removed + `\n+` + added + `\n }\n","old_text":"whole file before","new_text":"whole file after"}}}}}`
+	at := time.Date(2026, 9, 20, 9, 0, 0, 0, time.UTC)
+
+	var replaced, wrote []string
+	for _, m := range zedWork([]byte(msg), at) {
+		switch m.Role {
+		case RoleEdit:
+			replaced = append(replaced, m.Text)
+		case RoleWrote:
+			wrote = append(wrote, m.Text)
+		}
+	}
+	if len(replaced) != 1 {
+		t.Fatalf("replaced spans = %q, want the one the diff removed", replaced)
+	}
+	path, span, _ := strings.Cut(replaced[0], "\n")
+	if path != "/w/internal/pool/pool.go" {
+		t.Errorf("the span is filed under %q", path)
+	}
+	if !strings.Contains(span, removed) {
+		t.Errorf("the span is not what the diff removed: %q", span)
+	}
+	// The whole-file texts beside the diff are 67 KB at their largest on a real
+	// store, and they are not what stopped existing at that line.
+	if strings.Contains(span, "whole file before") {
+		t.Error("the whole file was stored as the replaced span")
+	}
+
+	if len(wrote) != 1 {
+		t.Fatalf("written records = %q, want one for the diff's added lines", wrote)
+	}
+	h, ok := HashWrittenLine(added)
+	if !ok {
+		t.Fatal("the added line is not evidence")
+	}
+	if _, has := WroteRecordHas(wrote[0], h); !has {
+		t.Errorf("the written record does not hold the added line: %q", wrote[0])
+	}
+	// And not the removed one: that is the other rule's evidence.
+	if old, _ := HashWrittenLine(removed); func() bool { _, has := WroteRecordHas(wrote[0], old); return has }() {
+		t.Error("a removed line was hashed as written")
+	}
+}
+
+func TestZedEditsStopWhenSwitchedOff(t *testing.T) {
+	msg := `{"Agent":{"content":[],"tool_results":{"call_1":{"tool_use_id":"call_1","tool_name":"edit_file",
+	  "output":{"input_path":"/w/pool.go","diff":"@@ -1,1 +1,1 @@\n-cfg.MaxConns = 10 // the number before this change\n+cfg.MaxConns = int32(size) // from the ini\n"}}}}}`
+	at := time.Date(2026, 9, 20, 9, 0, 0, 0, time.UTC)
+	t.Setenv("DEJA_INDEX_EDITS", "0")
+	t.Setenv("DEJA_INDEX_WRITES", "0")
+	for _, m := range zedWork([]byte(msg), at) {
+		if m.Role == RoleEdit || m.Role == RoleWrote {
+			t.Errorf("a %s record survived with both switches off: %q", m.Role, m.Text)
+		}
+	}
+}
+
+// A result without the diff is not an edit anyone can attribute: 95 of the 684
+// on the real store carry no output object at all, and inventing a span from
+// the call's own input would file a sentence of intent as the file's old text.
+func TestZedSkipsAnEditItCannotRead(t *testing.T) {
+	at := time.Date(2026, 9, 20, 9, 0, 0, 0, time.UTC)
+	for name, msg := range map[string]string{
+		"the output is a plain string": `{"Agent":{"content":[{"ToolUse":{"id":"call_1","name":"edit_file","input":{"path":"/w/pool.go","mode":"edit","display_description":"Raise the pool size"}}}],
+	 "tool_results":{"call_1":{"tool_use_id":"call_1","tool_name":"edit_file","output":"Edited pool.go"}}}}`,
+		// Zed writes this one itself: the edit was refused or produced nothing,
+		// and the result comes back with the path and an empty diff. A record
+		// built from it says a session edited a file and gives nothing to match.
+		"the diff is empty": `{"Agent":{"content":[],
+	 "tool_results":{"call_1":{"tool_use_id":"call_1","tool_name":"edit_file","output":{"input_path":"/w/pool.go","diff":"","old_text":"whole file","new_text":"whole file"}}}}}`,
+	} {
+		for _, m := range zedWork([]byte(msg), at) {
+			if m.Role == RoleEdit || m.Role == RoleWrote {
+				t.Errorf("%s: a %s record was invented: %q", name, m.Role, m.Text)
+			}
+		}
+	}
+}
+
+// Only an edit_file result. The filter is on the tool name rather than on the
+// shape of the output, so a tool that grows a `diff` field later — zed's own
+// `git_state` snapshot already carries one, under another key — does not start
+// producing edit records nobody checked.
+func TestZedReadsEditsOnlyFromTheEditTool(t *testing.T) {
+	msg := `{"Agent":{"content":[],
+	 "tool_results":{"call_1":{"tool_use_id":"call_1","tool_name":"terminal",
+	  "output":{"input_path":"/w/pool.go","diff":"@@ -1,1 +1,1 @@\n-cfg.MaxConns = 10 // the number before this change\n+cfg.MaxConns = int32(size) // from the ini\n"}}}}}`
+	at := time.Date(2026, 9, 20, 9, 0, 0, 0, time.UTC)
+	for _, m := range zedWork([]byte(msg), at) {
+		if m.Role == RoleEdit || m.Role == RoleWrote {
+			t.Errorf("a %s record came from a %s result: %q", m.Role, "terminal", m.Text)
+		}
+	}
+}
+
+// Zed 1.22's `write_file` creates or overwrites a whole file. Its input is
+// {path, content} and its result the same EditSessionOutput edit_file returns,
+// so a file the agent created reaches files, edits and blame the same way
+// (#4339). Shape from crates/agent/src/tools/write_file_tool.rs, v1.22.0.
+func TestZedReadsAFileTheAgentWrote(t *testing.T) {
+	const added = "func Retry(n int, f func() error) error { // three tries, then give up"
+	msg := `{"Agent":{"content":[{"ToolUse":{"id":"call_1","name":"write_file","input":{"path":"proj/retry.go","content":"package main\n` + added + `\n"}}}],
+	 "tool_results":{"call_1":{"tool_use_id":"call_1","tool_name":"write_file","is_error":false,"content":{"Text":"ok"},
+	  "output":{"input_path":"proj/retry.go","diff":"@@ -0,0 +1,2 @@\n+package main\n+` + added + `\n","old_text":"","new_text":"package main\n` + added + `\n"}}}}}`
+	at := time.Date(2026, 9, 30, 10, 0, 0, 0, time.UTC)
+
+	var files, wrote []string
+	for _, m := range zedWork([]byte(msg), at) {
+		switch m.Role {
+		case RoleFiles:
+			files = append(files, m.Text)
+		case RoleWrote:
+			wrote = append(wrote, m.Text)
+		}
+	}
+	if len(files) != 1 || files[0] != "proj/retry.go" {
+		t.Errorf("files records = %q, want the written file", files)
+	}
+	if len(wrote) != 1 {
+		t.Fatalf("written records = %q, want one for the new file", wrote)
+	}
+	h, ok := HashWrittenLine(added)
+	if !ok {
+		t.Fatal("the added line is not evidence")
+	}
+	if _, has := WroteRecordHas(wrote[0], h); !has {
+		t.Errorf("the written record does not hold the file's line: %q", wrote[0])
+	}
+}
+
+// @-mentioning another thread inlines Zed's own generated summary of it into
+// the message. deja indexed that as the person's words — 48798 characters
+// across the 12 mentions on this machine's store, each standing above the
+// sentence someone actually typed (#3336). A selection mention is the other
+// kind and is theirs: code they attached on purpose.
+const zedMentionBody = `{"version":"0.3.0","title":"mention thread","updated_at":"2026-02-02T12:35:02Z","messages":[
+{"User":{"id":"u1","content":[
+ {"Mention":{"uri":{"Thread":{"id":"a6c02f18-ab43-4848-97a4-2a84f53ab927","name":"Deep Code Review Advertising Feature Branch"}},"content":"# Conversation Summary: Deep Code Review\n## 1. Overview\n- The user requested a deep review of the advertising branch."}},
+ {"Text":"\ncarry on with the errors listed in KNOWN_ISSUES.md"}]}},
+{"User":{"id":"u2","content":[
+ {"Mention":{"uri":{"Selection":{"abs_path":"/w/app/pool.go","line_range":{"start":12,"end":18}}},"content":"item := pool.Get()\npool.Put(item)"}},
+ {"Text":"\nwhy does this leak"}]}}
+]}`
+
+func TestZedDoesNotTakeTheSummaryOfAMentionedThreadAsSpeech(t *testing.T) {
+	zedHome(t)
+	hex := zedZstdHex(t, zedMentionBody)
+	sql := fmt.Sprintf("%s\ninsert into threads (id, summary, updated_at, data_type, data, folder_paths, created_at) values ('m1', 'mention thread', '2026-02-02T12:35:02Z', 'zstd', x'%s', '[\"/w/app\"]', '2026-02-02T12:35:00Z');", zedSchema, hex)
+	db := zedTestDB(t, sql)
+	if !ZstdAvailable() {
+		t.Skip("zstd not installed")
+	}
+	ss, err := ParseZedDB(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ss) != 1 {
+		t.Fatalf("sessions = %d, want 1", len(ss))
+	}
+	var users []string
+	for _, m := range ss[0].Messages {
+		if m.Role == "user" {
+			users = append(users, m.Text)
+		}
+	}
+	if len(users) != 2 {
+		t.Fatalf("user turns = %d, want 2: %q", len(users), users)
+	}
+	if strings.Contains(users[0], "Conversation Summary") {
+		t.Errorf("the editor's summary of another thread is indexed as the person's words: %q", users[0])
+	}
+	if !strings.Contains(users[0], "carry on with the errors listed in KNOWN_ISSUES.md") {
+		t.Errorf("the person's own sentence went with it: %q", users[0])
+	}
+	if !strings.Contains(users[1], "pool.Put(item)") {
+		t.Errorf("a selection the person attached is theirs and must stay: %q", users[1])
+	}
+}
+
 // zedHome isolates a test from a real Zed install. Both the store location and
 // the home it is derived from are pinned, so a contributor with threads on disk
 // runs the same test as CI.
@@ -646,4 +937,223 @@ func TestZstdAvailableReportsThePath(t *testing.T) {
 	if SQLite3Available() {
 		t.Fatal("SQLite3Available must be false with an empty PATH")
 	}
+}
+
+// Zed keeps what a tool returned on the agent message, tool_results keyed by
+// tool_use_id; the reader took the ToolUse blocks and not the results, and
+// the comment said Zed stores none (#3291). Shape from a real thread.
+func TestZedToolResultsAreIndexedAsToolOutput(t *testing.T) {
+	msg := `{"Agent":{"content":[{"Text":"Running the tests."},{"ToolUse":{"id":"call_1","name":"terminal","input":{"command":"go test ./...","cd":"."}}}],
+	 "tool_results":{"call_1":{"tool_use_id":"call_1","tool_name":"terminal","is_error":false,"content":{"Text":"Command \"go test ./...\" failed with exit code 1.\n\n# app/pkg\npkg/parser.go:42:9: undefined: frobnicateWidget\nFAIL"},"output":"…"},
+	  "call_0":{"tool_use_id":"call_0","tool_name":"list_directory","is_error":true,"content":{"Text":"Path .} not found in project"},"output":"Path .} not found in project"}}}}`
+	at := time.Date(2026, 7, 19, 9, 0, 0, 0, time.UTC)
+	var toolOut []string
+	for _, m := range zedWork([]byte(msg), at) {
+		if m.Role == RoleToolOutput {
+			toolOut = append(toolOut, m.Text)
+		}
+	}
+	if len(toolOut) != 2 {
+		t.Fatalf("tool output = %q, want both results", toolOut)
+	}
+	joined := strings.Join(toolOut, "\n")
+	for _, want := range []string{"failed with exit code 1", "undefined: frobnicateWidget", "not found in project"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("tool output lacks %q:\n%s", want, joined)
+		}
+	}
+}
+
+// A thread that talks and works: two commands, several files, and the calls
+// that name neither. Shaped after a real store — Zed keeps tool calls in the
+// same content array as the prose, tagged ToolUse.
+const zedWorkBody = `{"version":"0.3.0","title":"worked thread","updated_at":"2026-07-19T09:00:02Z","messages":[
+{"User":{"id":"u1","content":[{"Text":"the retry queue stalls on staging"}]}},
+{"Agent":{"content":[
+ {"Text":"Let me look."},
+ {"ToolUse":{"id":"c1","name":"read_file","input":{"path":"/w/app/queue/retry.go","start_line":1,"end_line":80}}},
+ {"ToolUse":{"id":"c2","name":"terminal","input":{"command":"go test ./queue/...","cd":"/w/app"}}},
+ {"ToolUse":{"id":"c3","name":"grep","input":{"regex":"backoff","include_pattern":"**/*.go"}}}
+],"tool_results":{},"reasoning_details":null}},
+{"Agent":{"content":[
+ {"ToolUse":{"id":"c4","name":"edit_file","input":{"path":"/w/app/queue/retry.go","display_description":"spread the wakeups","mode":"edit"}}},
+ {"ToolUse":{"id":"c5","name":"read_file","input":{"path":"/w/app/queue/retry.go","start_line":1,"end_line":80}}},
+ {"ToolUse":{"id":"c6","name":"move_path","input":{"source_path":"/w/app/old.go","destination_path":"/w/app/queue/jitter.go"}}},
+ {"ToolUse":{"id":"c7","name":"terminal","input":{"command":"go build ./...","cd":"/w/app"}}},
+ {"ToolUse":{"id":"c8","name":"copy_path","input":{"source_path":"/w/app/queue/retry.go","destination_path":"/w/app/queue/retry_backup.go"}}},
+ {"ToolUse":{"id":"c9","name":"save_file","input":{"paths":["/w/app/queue/jitter.go","/w/app/README.md"]}}},
+ {"ToolUse":{"id":"c10","name":"diagnostics","input":{"path":"/w/app/queue/lint.go"}}},
+ {"ToolUse":{"id":"c11","name":"list_directory","input":{"path":"/w/app/vendor"}}},
+ {"Text":"We spread the wakeups over a second."}
+],"tool_results":{},"reasoning_details":null}}
+]}`
+
+func zedWorkedStore(t *testing.T) []string {
+	t.Helper()
+	zedHome(t)
+	hex := zedZstdHex(t, zedWorkBody)
+	sql := fmt.Sprintf("%s\ninsert into threads (id, summary, updated_at, data_type, data, folder_paths, created_at) values ('w1', 'worked thread', '2026-07-19T09:00:02Z', 'zstd', x'%s', '[\"/w/app\"]', '2026-07-19T08:00:00Z');", zedSchema, hex)
+	db := zedTestDB(t, sql)
+	if !ZstdAvailable() {
+		t.Skip("zstd not installed")
+	}
+	sessions, err := ParseZedDB(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sessions) != 1 {
+		t.Fatalf("sessions = %d, want 1", len(sessions))
+	}
+	roles := make([]string, 0, len(sessions[0].Messages))
+	for _, m := range sessions[0].Messages {
+		roles = append(roles, m.Role+"\t"+m.Text)
+	}
+	return roles
+}
+
+// Zed keeps what the agent did in the same place as what it said, and deja read
+// only the saying. Measured on a real 30-thread store: 797 ToolUse blocks
+// against 69 of agent prose, so `deja how`, `deja blame`, the files-touched
+// line and the worked-on-most ranking were all blind on a Zed history.
+func TestZedIndexesTheCommandsAThreadRan(t *testing.T) {
+	rows := zedWorkedStore(t)
+
+	var commands []string
+	for _, r := range rows {
+		role, text, _ := strings.Cut(r, "\t")
+		if role == RoleCommand {
+			commands = append(commands, text)
+		}
+	}
+	if len(commands) != 2 {
+		t.Fatalf("commands = %v, want the two terminal calls", commands)
+	}
+	for i, want := range []string{"$ go test ./queue/...", "$ go build ./..."} {
+		if commands[i] != want {
+			t.Errorf("command %d = %q, want %q", i, commands[i], want)
+		}
+	}
+	// The prose is still there: the work is added beside it, not instead.
+	joined := strings.Join(rows, "\n")
+	for _, said := range []string{"the retry queue stalls on staging", "We spread the wakeups over a second."} {
+		if !strings.Contains(joined, said) {
+			t.Errorf("the conversation lost %q:\n%s", said, joined)
+		}
+	}
+}
+
+func TestZedIndexesTheFilesAThreadTouched(t *testing.T) {
+	rows := zedWorkedStore(t)
+
+	var files []string
+	for _, r := range rows {
+		role, text, _ := strings.Cut(r, "\t")
+		if role == RoleFiles {
+			files = append(files, strings.Split(text, "\n")...)
+		}
+	}
+	want := []string{
+		"/w/app/queue/retry.go",
+		"/w/app/old.go",
+		"/w/app/queue/jitter.go",
+		// A copy names both ends, the same as a move.
+		"/w/app/queue/retry_backup.go",
+		// save_file and restore_file_from_disk act on a selection, so their
+		// paths arrive as a list rather than one string.
+		"/w/app/README.md",
+		// Asking for a file's diagnostics is the agent looking at that file,
+		// the same as reading it.
+		"/w/app/queue/lint.go",
+	}
+	for _, w := range want {
+		found := false
+		for _, f := range files {
+			if f == w {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("%s is missing from %v", w, files)
+		}
+	}
+	// A path is recorded once per message however often the thread reads it:
+	// the record is which files the work touched, not how many reads it took.
+	for _, r := range rows {
+		role, text, _ := strings.Cut(r, "\t")
+		if role != RoleFiles {
+			continue
+		}
+		seen := map[string]bool{}
+		for p := range strings.SplitSeq(text, "\n") {
+			if seen[p] {
+				t.Errorf("%s is listed twice in one record: %q", p, text)
+			}
+			seen[p] = true
+		}
+	}
+}
+
+// A search names a pattern and a scope, not a file the session worked on, and
+// a path inside a shell command is guesswork — the same line claude's parser
+// draws.
+func TestZedLeavesSearchesAndShellPathsOutOfTheFileRecord(t *testing.T) {
+	rows := zedWorkedStore(t)
+
+	joined := strings.Join(rows, "\n")
+	for _, absent := range []string{"backoff", "**/*.go"} {
+		if strings.Contains(joined, absent) {
+			t.Errorf("a grep's pattern reached the index: %q in\n%s", absent, joined)
+		}
+	}
+	for _, r := range rows {
+		role, text, _ := strings.Cut(r, "\t")
+		if role == RoleFiles && strings.Contains(text, "/w/app\n") {
+			t.Errorf("a terminal's working directory was recorded as a file: %q", text)
+		}
+	}
+	// Listing a directory is looking around, not working on a file.
+	if strings.Contains(joined, "/w/app/vendor") {
+		t.Errorf("a directory listing reached the file record:\n%s", joined)
+	}
+}
+
+// A thread deja cannot decode is skipped, and the skip is counted against the
+// store the way an unusable JSONL line is. Dropped in silence, a new data_type
+// from Zed would have emptied the harness while doctor still said "found"
+// (#4341).
+func TestParseZedDBCountsTheThreadsItCannotDecode(t *testing.T) {
+	zedHome(t)
+	good := zedZstdHex(t, zedModernBody)
+	sql := zedSchema + `
+insert into threads (id,summary,updated_at,data_type,data,folder_paths,created_at) values
+ ('broken-frame','truncated','2026-07-19T09:00:00+00:00','zstd',x'28b52ffd00',  '/w/p','2026-07-19T09:00:00+00:00'),
+ ('unknown-type','future encoding','2026-07-19T09:00:01+00:00','brotli',x'00',   '/w/p','2026-07-19T09:00:01+00:00'),
+ ('not-json','json but not a thread','2026-07-19T09:00:02+00:00','json','not json at all','/w/p','2026-07-19T09:00:02+00:00'),
+ ('no-messages','empty thread','2026-07-19T09:00:03+00:00','json','{"version":"0.3.0","title":"t","messages":[]}','/w/p','2026-07-19T09:00:03+00:00'),
+ ('ok','fine','2026-07-19T09:00:04+00:00','zstd',x'` + good + `','/w/p','2026-07-19T09:00:04+00:00');`
+	db := zedTestDB(t, sql)
+	DiagSnapshot()
+	if _, err := ParseZedDB(db); err != nil {
+		t.Fatal(err)
+	}
+	reasons := DiagReasons()
+	malformed, _ := DiagSnapshot()
+	// An empty thread is a thread with nothing in it, not one deja failed on.
+	if malformed[db] != 3 {
+		t.Fatalf("unreadable threads counted = %d, want 3: %v", malformed[db], malformed)
+	}
+	// Rows come back by updated_at, so the last skip is the JSON one; the
+	// brotli row has to name its encoding when it is the only one.
+	if r := reasons[db]; !strings.Contains(r, "not-json") {
+		t.Fatalf("reason = %q, want the last skipped thread named", r)
+	}
+	brotli := zedTestDB(t, zedSchema+`
+insert into threads (id,summary,updated_at,data_type,data) values ('unknown-type','s','2026-07-19T09:00:01+00:00','brotli',x'00');`)
+	if _, err := ParseZedDB(brotli); err != nil {
+		t.Fatal(err)
+	}
+	if r := DiagReasons()[brotli]; !strings.Contains(r, `unknown data_type "brotli"`) {
+		t.Fatalf("reason = %q, want the unknown data_type named", r)
+	}
+	DiagSnapshot()
 }

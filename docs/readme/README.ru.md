@@ -19,7 +19,6 @@ deja индексирует всю историю локально, чтобы �
 </p>
 
 <p align="center">
-  <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
@@ -42,9 +41,9 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 <table align="center">
 <tr>
-<td align="center" width="33%">Полнота<br><b>97.2% R@5</b> на LongMemEval-S<br><sub>все 500 вопросов · MemPalace 96.6%, agentmemory 95.2%<br>на тех же 19,195 сессиях: 19/100 на первом месте, у ближайшего 14</sub></td>
-<td align="center" width="33%">Токены<br><b>вдвое меньше токенов</b>, чем у agentmemory<br><sub>53,558 против 104,974 на уже решённой задаче<br>477 токенов на описание инструментов — меньше всех из семи</sub></td>
-<td align="center" width="33%">Индексация<br><b>13.6 с</b> на индекс 19,195 сессий<br><sub>следующий из семи: 72 с<br>26 мс до первого ответа, медиана поиска 97 мс</sub></td>
+<td align="center" width="33%">Полнота<br><b>97.2% R@5</b> на LongMemEval-S<br><sub>все 500 вопросов</sub></td>
+<td align="center" width="33%">Токены<br><b>на 58% меньше токенов</b> на повторных задачах<br><sub>53,558 против 126,222 без памяти<br>477 токенов на описание инструментов, 0 вызовов LLM</sub></td>
+<td align="center" width="33%">Индексация<br><b>13.6 с</b> на индекс 19,195 сессий<br><sub>26 мс до первого ответа, медиана поиска 97 мс</sub></td>
 </tr>
 </table>
 
@@ -153,14 +152,6 @@ deja превращает эти файлы в слой памяти, котор
 посередине; `deja handoff --to codex` упаковывает текущий контекст, чтобы продолжить в другом агенте;
 ключи, токены, JWT и блоки приватных ключей известных форм вырезаются при индексации — но совпадение по
 шаблону не детектор секретов, незнакомая форма может пройти.
-
-### Нарисуйте собственную работу
-
-`deja stats --card` рисует прямо в терминале; дайте имя файла — запишет SVG для README вашего профиля.
-Чтобы опубликовать в другом месте, [переведите в PNG](https://vshulcz.github.io/deja-vu/card/) — страница
-конвертирует в вашем же браузере.
-
-<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/docs/assets/stats-card-demo.svg" width="760" alt="карточка статистики deja: год сессий тепловой картой, из каких они агентов и какая была самой длинной"></p>
 
 Полный справочник — на [сайте документации](https://vshulcz.github.io/deja-vu/).
 
@@ -364,20 +355,6 @@ deja bench read       # сколько стоит прочитать храни�
 
 Индекс инкрементальный. Когда файл сессии дописан, перечитывается только он.
 
-### Сравнение
-
-| Возможность | `deja-vu` | `claude-mem` | `MemPalace` |
-| --- | --- | --- | --- |
-| История до установки ([нулевой день](https://vshulcz.github.io/deja-vu/guide/day-zero.html)) | Да — индексирует готовые транскрипты (`36/100` hit@1) | Нет — пишет с момента установки (`0/100`) | Claude Code, Codex, Cursor (`16/100`) |
-| Общие агенты | 49 харнесов | 9 (хуки) | 3 (CLI) |
-| LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
-| Рантайм и зависимости | 1 Go-бинарник | Воркер Bun + SQLite + Chroma | Python + модель эмбеддингов на 300 МБ |
-| Вызовы LLM / аккаунт | Не нужны | Вызовы LLM-наблюдателя | Не нужны |
-| Восстановление незакоммиченных файлов | `deja restore <path>` | Нет | Нет |
-| Готовая `claude-mem.db` | Читает `~/.claude-mem/claude-mem.db` напрямую | Нативно | Нет |
-
-Подробное сравнение: [все 15 инструментов](https://vshulcz.github.io/deja-vu/guide/compare.html) · [альтернатива claude-mem](https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html) · [альтернатива Mem0](https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html) · [альтернатива SpecStory](https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html) · [альтернатива Basic Memory](https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html).
-
 ## Как это устроено
 
 Локальный инвертированный индекс в `~/.cache/deja`: разбирает JSONL- и SQLite-хранилища, вычищает секреты,
@@ -390,7 +367,7 @@ deja bench read       # сколько стоит прочитать храни�
 <details>
 <summary><b>Чем это отличается от других инструментов памяти?</b></summary>
 
-| | deja | Платформы памяти<br>(Mem0, Letta, memU) | Поиск по сессиям<br>(cass) |
+| | deja | Платформы памяти | Поиск по сессиям |
 | --- | :-: | :-: | :-: |
 | Знает работу, которая была до установки | да | нет | да |
 | Нужен шаг сбора | нет, запись и есть память | агент или ваш код пишет факты | нет |
@@ -452,8 +429,6 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 - **Файлы сессий и очистка:** [Файлы сессий на диске](https://vshulcz.github.io/deja-vu/ru/guide/session-files-on-disk.html) · [Где каждый агент хранит историю](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html) · [state.vscdb в Cursor слишком большой](https://vshulcz.github.io/deja-vu/ru/guide/cursor-state-vscdb-too-large.html) · [История сессий Codex CLI](https://vshulcz.github.io/deja-vu/ru/guide/codex-history.html)
 - **Эксплуатация и стоимость:** [Аудит того, что делали агенты](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [Экспорт разговора](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [Между машинами](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [Во сколько токенов обходится память](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
-По инструментам: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi и omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
-
 ## Разработка
 
 `make build test lint`, дальше [CONTRIBUTING.md](../../CONTRIBUTING.md).
@@ -466,7 +441,6 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 Всё, что может быть уязвимостью, отправляйте через приватную ссылку на уведомление в
 [SECURITY.md](../../SECURITY.md). Что deja читает, чего он никогда никуда не отправляет и как
 исключить проект или забыть сессию, описано в разделе [Приватность](#приватность).
-Пригодилось? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).
 
 ## Лицензия
 

@@ -14,7 +14,7 @@
 Forty-nine coding agents — including Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, opencode, Cline, Copilot CLI, Roo Code, Kilo Code, aider, Goose, Qwen Code, Kimi Code, Antigravity, Grok Build, pi, omp, DeepSeek Harness, Hermes, Kiro, Reasonix and Zed — already write every session to local files. **deja starts full**: it indexes months of history from before you installed it so your agents keep context across `/compact`, hand off mid-task via `deja handoff`, and recover overwritten code via `deja restore` and `deja blame` — with no model and no capture step.
 
 One Go binary. No LLM, no embeddings, no API key. The network is used only by commands you run for it, such as `deja update` and `deja sync ssh`, and by a daily release check, which `DEJA_OFFLINE=1` turns off.
-**58% fewer tokens** on a task this machine had already solved (53,558 against 126,222 with nothing wired, and 52,815 against 103,443 on a later build with the arms run alternately, eleven runs an arm each time). **97.2% R@5** on LongMemEval-S (**88.9% hit@1** on the 470-question cleaned set), **half the tokens** of agentmemory, and **13.6 s** to index 19,195 sessions across gigabytes of history.
+**58% fewer tokens** on repeated repository tasks (53,558 vs 126,222 baseline; 52,815 vs 103,443 in alternated 11-run trials). **97.2% R@5** on LongMemEval-S (**88.9% hit@1** on the 470-question cleaned set), and **13.6 s** to index 19,195 sessions (**0.7–0.8 ms** in-process lookup).
 
 ```sh
 npx @vshulcz/deja-vu audit                         # inspect local stores, retention risk & recoverable files, no install
@@ -46,7 +46,7 @@ Or wire the stdio MCP server directly in any MCP client (`mcp.json` / `claude_de
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (**88.9% hit@1** on the 470-question cleaned set; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents (next of 7 tools: 72 s) |
+| **97.2% R@5** on LongMemEval-S (**88.9% hit@1** on the 470-question cleaned set) | **58% fewer tokens** on repeated repository tasks | **13.6 s** to index 19,195 sessions / **0.7–0.8 ms** in-process lookup across 49 coding agents |
 
 ## Repository memory & handoff
 
@@ -59,5 +59,3 @@ Full documentation, the harness matrix and the benchmarks:
 [vshulcz.github.io/deja-vu](https://vshulcz.github.io/deja-vu/)
 
 MIT
-
-Found it useful? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).

@@ -1,10 +1,10 @@
 # @vshulcz/pi-deja
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 
 [English](../README.md) | 简体中文 | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-**[deja-vu](https://github.com/vshulcz/deja-vu)** 扩展（LongMemEval-S **97.2% R@5** · **13.6 秒**索引 19,195 个会话 · token 用量为 agentmemory 的**一半**）· [文档](https://vshulcz.github.io/deja-vu/zh/) · [在线演示](https://vshulcz.github.io/deja-vu/view/) · [评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) · **[★ GitHub 点赞](https://github.com/vshulcz/deja-vu)**
+**[deja-vu](https://github.com/vshulcz/deja-vu)** 扩展（LongMemEval-S **97.2% R@5**）· [文档](https://vshulcz.github.io/deja-vu/zh/) · [在线演示](https://vshulcz.github.io/deja-vu/view/) · [评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
 pi 记得自己的会话。这个扩展回答的是另一个问题：这台机器上 Claude Code、Codex、Cursor、Gemini、OpenClaw、Hermes 等其他四十八个编程智能体里做过什么，包括装 pi 之前的那几个月。记忆在本地以单文件 Go 二进制 `deja` 运行并建立 BM25 索引，无需额外 LLM、嵌入模型或云端账号；除主动运行的更新与同步命令及可用 `DEJA_OFFLINE=1` 关闭的每日版本检查外，不发起网络请求。
 
@@ -47,7 +47,7 @@ brew install deja-vu
 
 | 召回率 | Token 用量 | 索引与检索耗时 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1；MemPalace 公布 96.6%，agentmemory 为 95.2%） | **token 减少 58%**（同一仓储重复任务上 token 用量只有 agentmemory 的**一半**） | **13.6 秒**索引 19,195 个历史会话 / 跨越 49 个编程智能体的检索仅 **0.7 ms**（7 款对比工具中第二名 72 秒） |
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 49 个编程智能体的检索仅 **0.7 ms** |
 
 ## 仓库记忆与跨智能体接力
 
@@ -61,4 +61,4 @@ brew install deja-vu
 
 ## 许可证
 
-[deja-vu](https://github.com/vshulcz/deja-vu) 生态组件。MIT 协议。觉得有用？[去 GitHub 为 deja-vu 点颗星](https://github.com/vshulcz/deja-vu)。
+[deja-vu](https://github.com/vshulcz/deja-vu) 生态组件。MIT 协议。

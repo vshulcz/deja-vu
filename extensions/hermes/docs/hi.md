@@ -2,9 +2,9 @@
 
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | हिन्दी
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 
-**[deja-vu](https://github.com/vshulcz/deja-vu)** का हिस्सा (LongMemEval-S पर **97.2% R@5** · 19,195 सेशन इंडेक्स करने में **13.6 s** · agentmemory के **आधे टोकन**) · [दस्तावेज़](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [लाइव डेमो](https://vshulcz.github.io/deja-vu/view/) · [बेंचमार्क](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) · **[★ GitHub पर स्टार करें](https://github.com/vshulcz/deja-vu)**
+**[deja-vu](https://github.com/vshulcz/deja-vu)** का हिस्सा (LongMemEval-S पर **97.2% R@5**) · [दस्तावेज़](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [लाइव डेमो](https://vshulcz.github.io/deja-vu/view/) · [बेंचमार्क](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
 Hermes के लिए एक मेमोरी प्रोवाइडर जो इस मशीन पर पहले से मौजूद कोडिंग सेशन से उत्तर देता है: Claude Code, Codex, Cursor, स्वयं Hermes और अन्य एजेंट्स जिन्हें deja पढ़ता है—किसी भी चीज़ के इंस्टॉल होने से पहले के महीनों का इतिहास भी शामिल है। न कोई मॉडल, न API कुंजी, न कोई सर्वर। इतिहास एक सिंगल Go बाइनरी [deja](https://github.com/vshulcz/deja-vu) द्वारा लोकल इंडेक्स होता है।
 
@@ -40,7 +40,7 @@ hermes config set memory.provider deja-memory
 
 | रिकॉल (Recall) | टोकन | इंडेक्सिंग और खोज |
 |---|---|---|
-| LongMemEval-S पर **97.2% R@5** (470 प्रश्नों पर 88.9% hit@1; MemPalace 96.6% और agentmemory 95.2% प्रकाशित करते हैं) | **58% कम टोकन** (दोहराए गए कार्य पर agentmemory के **आधे टोकन**) | 19,195 सेशन इंडेक्स करने में **13.6 s** / 49 कोडिंग एजेंट्स में **0.7 ms** खोज समय (7 में अगला: 72 s) |
+| LongMemEval-S पर **97.2% R@5** (470 प्रश्नों पर 88.9% hit@1) | **58% कम टोकन** (दोहराए गए रेपो कार्य पर) | 19,195 सेशन इंडेक्स करने में **13.6 s** / 49 कोडिंग एजेंट्स में **0.7 ms** खोज समय |
 
 ## रेपो मेमोरी और एजेंट हैंडऑफ़
 
@@ -52,4 +52,4 @@ hermes config set memory.provider deja-memory
 
 `deja install hermes-auto` इस प्रोवाइडर को MCP सर्वर और `pre_llm_call` हुक प्लगइन के साथ `~/.hermes/plugins/deja-memory` में लिखता है। यहाँ की फ़ाइलें उसी स्रोत (`cmd/deja/install_hermes_memory.go`) से बनती हैं; फ़र्क केवल इतना है कि यह प्रति पाथ हार्डकोड करने के बजाय `PATH` पर `deja` ढूँढती है। दोनों अलग होने पर `TestHermesExtensionIsTheProviderInstallWrites` फ़ेल हो जाता है।
 
-[deja-vu](https://github.com/vshulcz/deja-vu) का हिस्सा। MIT लाइसेंस। उपयोगी लगा? [GitHub पर deja-vu को स्टार दें](https://github.com/vshulcz/deja-vu)।
+[deja-vu](https://github.com/vshulcz/deja-vu) का हिस्सा। MIT लाइसेंस।

@@ -1,6 +1,6 @@
 # deja-vu для VS Code, Cursor, Windsurf и Antigravity
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | Русский | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
@@ -8,7 +8,7 @@
 
 [deja-vu](https://github.com/vshulcz/deja-vu) локально индексирует историю сессий, которую Claude Code, Cursor, Codex, Windsurf, Copilot Chat, OpenCode, Cline, Roo Code и ещё 41 кодинг-агент уже сохраняют на диск — один Go-бинарник, без LLM и без фонового демона.
 
-**[★ Поставить звезду на GitHub](https://github.com/vshulcz/deja-vu)** · **[Документация](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[Бенчмарки](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
+**[Документация](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[Бенчмарки](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
 ![Демонстрация deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -34,10 +34,10 @@ code --install-extension vshulcz.deja-status
 
 | Бенчмарк | Результат |
 |---|---|
-| Точность на LongMemEval-S (470 очищенных вопросов) | **97.2% R@5**, **88.9% hit@1** (MemPalace 96.6%, agentmemory 95.2%) |
-| Расход токенов на повторных задачах в репозитории | **На 58% меньше токенов** — вдвое меньше agentmemory (`52,815` против `103,443` без памяти, 11 пар) |
+| Точность на LongMemEval-S (470 очищенных вопросов) | **97.2% R@5**, **88.9% hit@1** |
+| Расход токенов на повторных задачах в репозитории | **На 58% меньше токенов**|
 | Задержка лексического поиска в процессе | Медиана **0.7–0.8 мс** по 49 кодинг-агентам |
-| Первичная индексация 19,195 реальных сессий | **13.6 с**, без API-ключей (следующий из 7 инструментов: 72 с) |
+| Первичная индексация 19,195 реальных сессий | **13.6 с**, без API-ключей |
 
 ## Память в репозитории и передача сессии (`handoff`)
 
@@ -49,4 +49,4 @@ code --install-extension vshulcz.deja-status
 
 MIT — [github.com/vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)
 
-Часть [deja-vu](https://github.com/vshulcz/deja-vu). Лицензия MIT. Пригодилось? [Поставьте deja-vu звезду на GitHub](https://github.com/vshulcz/deja-vu).
+Часть [deja-vu](https://github.com/vshulcz/deja-vu). Лицензия MIT.

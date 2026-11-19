@@ -1,13 +1,13 @@
 # deja-vu for JetBrains IDEs
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 [English](../README.md) | [简体中文](zh.md) | 繁體中文 | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
 為 IntelliJ IDEA、GoLand、PyCharm、WebStorm、RustRover、CLion、PhpStorm 與 Rider（`2024.2+`）提供本地端跨代理會話檢索、AI 程式碼行溯源（AI Line Blame）與跨代理接力。
 
 [deja-vu](https://github.com/vshulcz/deja-vu) 會在本地 SQLite FTS5 中索引 Claude Code、Codex、OpenCode、Cursor、Gemini CLI、Junie、GitHub Copilot、Aider、Windsurf 及其他 39 款程式設計代理寫入磁碟的會話紀錄，輸出前自動脫敏，無需任何雲端服務。
 
-**[★ 到 GitHub 為 deja-vu 點星](https://github.com/vshulcz/deja-vu)** · **[文件](https://vshulcz.github.io/deja-vu/)** · **[評測](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
+**[文件](https://vshulcz.github.io/deja-vu/)** · **[評測](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
 ![deja-vu 示範](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -54,7 +54,7 @@ cd extensions/jetbrains
 
 | 召回率 | Token 用量 | 索引與檢索耗時 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1；MemPalace 公布 96.6%，agentmemory 為 95.2%） | **token 減少 58%**（同儲存庫重複任務上 token 用量只有 agentmemory 的**一半**） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 49 個程式設計代理的檢索僅 **0.7 ms**（7 款對比工具中第二名 72 秒） |
+| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 49 個程式設計代理的檢索僅 **0.7 ms** |
 
 ## 儲存庫記憶與跨代理接力
 
@@ -65,5 +65,3 @@ cd extensions/jetbrains
 ## 授權條款
 
 MIT — [github.com/vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)
-
-覺得實用？[到 GitHub 為 deja-vu 點顆星](https://github.com/vshulcz/deja-vu)。

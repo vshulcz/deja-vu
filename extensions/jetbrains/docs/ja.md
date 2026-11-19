@@ -1,13 +1,13 @@
 # deja-vu for JetBrains IDEs
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | 日本語 | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
 IntelliJ IDEA、GoLand、PyCharm、WebStorm、RustRover、CLion、PhpStorm、Rider（`2024.2+`）向けのローカル横断セッション検索、AI 行単位 blame、エージェント間引き継ぎプラグインです。
 
 [deja-vu](https://github.com/vshulcz/deja-vu) は、Claude Code、Codex、OpenCode、Cursor、Gemini CLI、Junie、GitHub Copilot、Aider、Windsurf など計 49 のコーディングエージェントがディスクに書き出すセッション記録を SQLite FTS5 でローカルインデックス化し、シークレットをマスクしたうえでクラウド不要で参照します。
 
-**[★ GitHub で deja-vu にスターを付ける](https://github.com/vshulcz/deja-vu)** · **[ドキュメント](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[ベンチマーク](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
+**[ドキュメント](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[ベンチマーク](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
 ![deja-vu デモ](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -54,7 +54,7 @@ cd extensions/jetbrains
 
 | 再現率 | トークン消費 | インデックス & 検索速度 |
 |---|---|---|
-| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1；MemPalace 公表値 96.6%、agentmemory 95.2%） | **トークン 58% 削減**（反復作業において agentmemory の**半分のトークン**） | 19,195 セッションを **13.6 秒**でインデックス / 49 種のエージェント横断で **0.7 ms** 検索（7 ツール中の次点 72 秒） |
+| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1） | **トークン 58% 削減**（同一リポジトリの反復作業） | 19,195 セッションを **13.6 秒**でインデックス / 49 種のエージェント横断で **0.7 ms** 検索 |
 
 ## リポジトリメモリとエージェント間の引き継ぎ
 
@@ -65,5 +65,3 @@ cd extensions/jetbrains
 ## ライセンス
 
 MIT — [github.com/vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)
-
-役に立ちましたか？ [GitHub で deja-vu にスターを付ける](https://github.com/vshulcz/deja-vu)。

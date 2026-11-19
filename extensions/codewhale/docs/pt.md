@@ -29,7 +29,7 @@ deja install codewhale-auto
 
 | Recall | Tokens | Indexação e busca |
 |---|---|---|
-| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas; MemPalace publica 96.6%, agentmemory 95.2%) | **58% menos tokens** (**metade dos tokens** do agentmemory em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 49 agentes de código (próximo de 7: 72 s) |
+| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 49 agentes de código |
 
 ## Memória do repositório e handoff entre agentes
 
@@ -40,5 +40,3 @@ Trocando de ferramenta no meio da tarefa? Execute `deja handoff --to <agent>` (o
 ## Licença
 
 [MIT](../LICENSE)
-
-Achou útil? [Dê uma estrela ao deja-vu no GitHub](https://github.com/vshulcz/deja-vu).

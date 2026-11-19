@@ -2,9 +2,9 @@
 
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | Español | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 
-Parte de **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** en LongMemEval-S · **13.6 s** para indexar 19,195 sesiones · **la mitad de tokens** que agentmemory) · [Documentación](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Demo en vivo](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) · **[★ Estrella en GitHub](https://github.com/vshulcz/deja-vu)**
+Parte de **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** en LongMemEval-S) · [Documentación](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Demo en vivo](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
 [deja](https://github.com/vshulcz/deja-vu) indexa los archivos de sesión que los agentes de código ya guardan en disco —Claude Code, Codex, Cursor, opencode y 45 más— y responde a partir de ellos. Esta extensión expone ese índice en el panel de agente de Zed como servidor de contexto, para que un hilo busque trabajo anterior incluso previo a instalar deja.
 
@@ -49,7 +49,7 @@ El indexado y la búsqueda son locales: sin llamadas de red y con redacción de 
 
 | Recall | Tokens | Indexado y búsqueda |
 |---|---|---|
-| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas; MemPalace publica 96.6%, agentmemory 95.2%) | **58% menos tokens** (**la mitad de tokens** que agentmemory en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 49 agentes de programación (el siguiente de 7: 72 s) |
+| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas) | **58% menos tokens** (en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 49 agentes de programación |
 
 ## Memoria de repositorio y relevo entre agentes
 
@@ -59,4 +59,4 @@ Comparte decisiones validadas y callejones sin salida del proyecto vía git en `
 
 Licencia MIT, igual que deja.
 
-Parte de [deja-vu](https://github.com/vshulcz/deja-vu). MIT. ¿Te resultó útil? [Dale una estrella a deja-vu en GitHub](https://github.com/vshulcz/deja-vu).
+Parte de [deja-vu](https://github.com/vshulcz/deja-vu). MIT.

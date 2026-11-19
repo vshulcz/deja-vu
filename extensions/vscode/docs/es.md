@@ -1,6 +1,6 @@
 # deja-vu para VS Code, Cursor, Windsurf y Antigravity
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | Español | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
@@ -8,7 +8,7 @@
 
 [deja-vu](https://github.com/vshulcz/deja-vu) indexa localmente los historiales de sesión que Claude Code, Cursor, Codex, Windsurf, Copilot Chat, OpenCode, Cline, Roo Code y otros 41 agentes ya escriben en disco — en un único binario en Go, sin LLM ni demonio en segundo plano.
 
-**[★ Estrella en GitHub](https://github.com/vshulcz/deja-vu)** · **[Documentación](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
+**[Documentación](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
 ![Demostración de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -34,10 +34,10 @@ code --install-extension vshulcz.deja-status
 
 | Benchmark | Resultado |
 |---|---|
-| Precisión en LongMemEval-S (470 preguntas depuradas) | **97.2% R@5**, **88.9% hit@1** (MemPalace 96.6%, agentmemory 95.2%) |
-| Costo de tokens en trabajo repetido sobre el repositorio | **58% menos tokens** — la mitad que agentmemory (`52,815` vs `103,443` en frío, 11 pares) |
+| Precisión en LongMemEval-S (470 preguntas depuradas) | **97.2% R@5**, **88.9% hit@1** |
+| Costo de tokens en trabajo repetido sobre el repositorio | **58% menos tokens**|
 | Latencia de consulta léxica en proceso | Mediana de **0.7–0.8 ms** en 49 agentes de programación |
-| Indexado inicial de 19,195 sesiones reales | **13.6 s**, sin claves API (el siguiente de 7 herramientas: 72 s) |
+| Indexado inicial de 19,195 sesiones reales | **13.6 s**, sin claves API |
 
 ## Memoria de repositorio y relevo entre agentes
 
@@ -49,4 +49,4 @@ Comparte decisiones validadas y callejones sin salida del proyecto vía git en `
 
 MIT — [github.com/vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)
 
-Parte de [deja-vu](https://github.com/vshulcz/deja-vu). MIT. ¿Te resultó útil? [Dale una estrella a deja-vu en GitHub](https://github.com/vshulcz/deja-vu).
+Parte de [deja-vu](https://github.com/vshulcz/deja-vu). MIT.

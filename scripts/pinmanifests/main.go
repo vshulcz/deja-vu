@@ -1,10 +1,8 @@
 // Command pinmanifests rewrites the scoop, winget and plugin manifests for a
 // release.
 //
-// These files carry a version and the SHA-256 of the two Windows zips, and they
-// used to be updated by hand after each release. That step is invisible when it
-// is skipped: v0.16.0 shipped with the manifests still on 0.15.6, so scoop and
-// winget users were two releases behind and nothing said so.
+// Rewrites release versions and Windows archive SHA-256 digests across package
+// and plugin manifests so release pins stay synchronized.
 //
 //	go run ./scripts/pinmanifests -version 0.16.1 -checksums dist/checksums.txt
 //	go run ./scripts/pinmanifests -check          # fails if they lag the newest release
@@ -37,15 +35,10 @@ const (
 	versionPath = "packaging/winget/vshulcz.deja-vu.yaml"
 	localePath  = "packaging/winget/vshulcz.deja-vu.locale.en-US.yaml"
 	installer   = "packaging/winget/vshulcz.deja-vu.installer.yaml"
-	// The Codex plugin is installed from the default branch rather than from a
-	// release asset, so the version committed here is the one a user sees. It
-	// sat at 0.1.0 from July through 0.17.1 because nothing compared it to
-	// anything.
+	// Codex plugin manifests read directly from the default branch.
 	codexPlugin     = "codex-plugin/.codex-plugin/plugin.json"
 	codexRootPlugin = ".codex-plugin/plugin.json"
-	// Same reasoning for the Claude bundle, which the directory mirrors from
-	// the default branch. It had no version field at all until the directory's
-	// own scanner asked for one.
+	// Claude plugin manifest mirrored from the default branch.
 	claudePlugin = "claude-plugin/.claude-plugin/plugin.json"
 	// The same plugin in the Agent Plugins v1 layout, which directories such as
 	// awesome-copilot read: plugin.json at the plugin root.
@@ -73,19 +66,11 @@ const (
 	// layout take it straight from the default branch, so its version is the
 	// one a listing shows.
 	agentPlugin = "plugin.json"
-	// The MCP registry entry. `mcp-registry.yml` stamps the release version
-	// into this file inside its own checkout at publish time and never commits
-	// it back, so the committed value drifts on its own: it sat at 0.13.0
-	// through eight minors while the registry served the right one. Pinned
-	// here so the file in the repository reads like the entry it produces.
+	// MCP registry manifests stamped at publish time and kept in sync in-repo.
 	serverJSON         = "server.json"
 	mcpbRegistryServer = "packaging/mcpb/registry-server.json"
 
-	// The Kimi Code plugin is packed into the release archive, so the version
-	// in its manifest is the one a Kimi user reads. It sat at 0.1.0 from the
-	// day it was added — the same way the Codex plugin did, and for the same
-	// reason: the workflow that validates its shape never compares its version
-	// to anything.
+	// Kimi Code plugin manifest packed into the release archive.
 	kimiPlugin = "kimi.plugin.json"
 	// Packed under extensions/, and a test pins the two to agree.
 	kimiPacked = "extensions/kimi/kimi.plugin.json"
@@ -298,10 +283,7 @@ func renderScoop(p pins) ([]byte, error) {
 // The winget files are edited rather than regenerated: they carry tags and
 // descriptions that are not derived from a release, and rewriting them from a
 // template here would quietly drop whatever someone adds later.
-// renderVersion covers the winget version manifest, which carries its own
-// PackageVersion. Leaving it out pinned two of the three winget files and the
-// set failed its own consistency test — caught after 0.16.2 shipped, having
-// been fixed by hand before that.
+// renderVersion updates PackageVersion in the winget version manifest.
 func renderVersion(p pins) ([]byte, error) { return edit(versionPath, p) }
 
 func renderLocale(p pins) ([]byte, error) { return edit(localePath, p) }
@@ -397,9 +379,7 @@ func renderMCPBRegistryServer(path string) func(pins) ([]byte, error) {
 
 var (
 	versionLine = regexp.MustCompile(`(?m)^PackageVersion: .*$`)
-	// (?m) because a tag reference is often the last thing on its line: the
-	// ReleaseNotesUrl in the winget locale sat at v0.16.1 through three
-	// releases while every reference followed by a slash moved (#2088).
+	// (?m) matches tag references both mid-URL and at end-of-line (e.g. ReleaseNotesUrl).
 	tagRefs      = regexp.MustCompile(`(?m)/v\d+\.\d+\.\d+(/|$)`)
 	fileRefs     = regexp.MustCompile(`deja-vu_\d+\.\d+\.\d+_windows`)
 	mcpbFileRefs = regexp.MustCompile(`deja-vu_\d+\.\d+\.\d+_registry\.mcpb`)

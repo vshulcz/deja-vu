@@ -1,65 +1,28 @@
 # Roadmap
 
-Direction, not release commitments. What ships moves into the changelog; what is
-here is where the work is going. Linked issues carry the current scope and are
-the place to discuss design.
+Engineering direction rather than release commitments; shipped work moves to `CHANGELOG.md`.
 
 ## Now
 
-- **Answer-bearing blocks at every seam.** The session-start digest, the
-  per-prompt recall and the point-of-action tool hooks are judged on whether
-  the injected block carries the settled conclusion rather than just a matching
-  word. That is measured on the prompt and block benchmarks, on LongMemEval-S
-  end to end, and against real multi-harness stores; every change ships with
-  the before and after.
-- **Sub-second incremental indexing on 50k+ session stores.** Rewritten
-  transcripts already append in place; the remaining work is keeping renames
-  and multi-session SQLite stores (opencode, Cursor, Kilo, ZCode, goose)
-  proportional to the delta rather than the store size.
-- **Cross-platform parity across macOS, Linux and Windows.** Path handling,
-  store relocation, rebuild exclusions and native launcher wiring are verified
-  hermetically across all three operating systems.
-- **Supply-chain and privacy guarantees.** Maintain the redaction boundary,
-  trust policy (`policy.json`), signed checksums, provenance and release SBOMs
-  as upstream harness formats evolve.
+- **Answer-bearing blocks at every seam.** Judge session-start, per-prompt, and tool hooks by whether injected context carries settled conclusions rather than keyword overlap, gated by the prompt/block suites and LongMemEval-S.
+- **Sub-second incremental indexing on 50k+ session stores.** Rewritten JSONL transcripts already append and scrub in place; extend delta-proportional updates to file renames and multi-session SQLite stores (opencode, Cursor, Kilo, ZCode, goose).
+- **Cross-platform parity.** Keep path handling, store relocation, rebuild exclusions, and hook launchers hermetic across macOS, Linux, and Windows.
+- **Supply-chain and privacy guarantees.** Maintain index-time redaction, trust policy (`policy.json`), signed checksums, build provenance, and release SBOMs as harness formats evolve.
 
 ## Next
 
-- **Compaction recovery across the remaining hosts.** The recovery packet after
-  context compaction now reaches 36 of the 49 harnesses (with reset and capture
-  in 38) — either through a native `PreCompact` / `PostCompaction` hook or by
-  catching up from the store's pre-summary turns on the next hook that reaches
-  the model. The remaining hosts are blocked on upstream compaction hooks (`#308`).
-- **Pre-execution plan checks.** `deja check` answers a proposed plan with what
-  this machine already settled or reverted on the same files, and `hook-plan`
-  delivers it before execution. Wiring it by default waits on measuring how
-  often the warning changes a flawed plan without adding noise on clean ones.
-- **Query-scoped reuse.** Reuse is a global signal today: a session recalled
-  for one topic receives a small lift everywhere. Recording which terms a
-  recall served lets the lift apply only when the same subject returns.
-- **Point-of-action coverage.** Prior file decisions before an edit and failure
-  repairs now reach 37 of the 49 harnesses. As the remaining upstream
-  harnesses add pre/post tool hooks or plugin middleware, each is wired and
-  recorded in the format registry with a reproducible stand check.
+- **Compaction recovery across remaining hosts.** Recovery reaches 36 of the 49 harnesses (capture/reset in 38) via `PreCompact`/`PostCompaction` hooks or catch-up parsers; remaining hosts depend on upstream hook support (`#308`).
+- **Pre-execution plan checks.** `deja check` and `hook-plan` answer proposed plans with prior decisions and reversions on touched files; default hook wiring is gated on precision/noise measurement.
+- **Query-scoped reuse.** Attribute session recall lifts to the matched terms/subject rather than applying a global per-session boost.
+- **Point-of-action coverage.** File-history hints and failure remediation reach 37 of the 49 harnesses; remaining targets are wired as upstream hosts expose tool middleware.
 
 ## Later
 
-- **Optional semantic sidecar (`deja embed`).** Off by default and external to
-  the binary, the vector sidecar reranks lexical hits and answers when a query
-  shares no exact tokens with the session (cross-language and paraphrased
-  queries, `#4976`).
+- **Optional semantic sidecar (`deja embed`).** External opt-in vector sidecar for cross-language and paraphrased queries (`#4976`).
 
 ## Not planned
 
-- **Capture daemons.** deja indexes the histories each harness already writes; a
-  background recorder would add a persistent process and a second source of
-  truth.
-- **Cloud sync by default.** Implicit upload conflicts with local-only indexing;
-  sync stays an explicit export or an SSH operation you run.
-- **Embeddings in the base binary.** Model weights and vector runtimes would
-  break the zero-runtime-dependency distribution and inflate index cost. The
-  semantic tier stays opt-in and external.
-- **Enforcing recalled conclusions.** deja stays at the evidence layer. Curation
-  — `promote`, lifecycle states, standing project decisions — makes a decision
-  durable and surfaces when it was reverted or superseded, but the agent
-  decides.
+- **Capture daemons.** Index host transcripts in place rather than running background recorders.
+- **Cloud sync by default.** Keep synchronization explicit via `deja sync export/import/ssh`.
+- **Bundled embeddings.** Keep zero runtime weight dependencies; embeddings stay external and opt-in.
+- **Silent constraint enforcement.** Surface curated and rejected decisions with provenance while leaving execution control to the agent.

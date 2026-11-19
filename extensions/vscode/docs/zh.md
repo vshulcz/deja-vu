@@ -1,6 +1,6 @@
 # deja-vu（VS Code、Cursor、Windsurf 与 Antigravity 扩展）
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 
 [English](../README.md) | 简体中文 | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
@@ -8,7 +8,7 @@
 
 [deja-vu](https://github.com/vshulcz/deja-vu) 本地索引 Claude Code、Cursor、Codex、Windsurf、Copilot Chat、OpenCode、Cline、Roo Code 与其他 41 个编程智能体写入磁盘的历史会话——单个 Go 二进制本地运行，无 LLM 调用、无后台守护进程。
 
-**[★ 去 GitHub 点颗星](https://github.com/vshulcz/deja-vu)** · **[文档](https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html)** · **[基准评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
+**[文档](https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html)** · **[基准评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
 ![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -34,10 +34,10 @@ code --install-extension vshulcz.deja-status
 
 | 指标 | 结果 |
 |---|---|
-| LongMemEval-S 检索准确率（470 道清洗后题目） | **97.2% R@5**，**88.9% hit@1**（MemPalace 公布 96.6%，agentmemory 为 95.2%） |
-| 重复仓库任务的 Token 消耗 | **减少 58%**——只有 agentmemory 的**一半**（`52,815` 对比冷启动 `103,443`，11 组配对测试） |
+| LongMemEval-S 检索准确率（470 道清洗后题目） | **97.2% R@5**，**88.9% hit@1** |
+| 重复仓库任务的 Token 消耗 | **减少 58%**|
 | 进程内词法查询延迟 | 跨 49 个编程智能体中位数 **0.7–0.8 ms** |
-| 对 19,195 个历史会话的零配置建库耗时 | **13.6 s**，无需 API Key（7 款工具中第二名为 72 s） |
+| 对 19,195 个历史会话的零配置建库耗时 | **13.6 s**，无需 API Key |
 
 ## 仓库记忆与跨智能体接力
 
@@ -49,4 +49,4 @@ code --install-extension vshulcz.deja-status
 
 MIT — [github.com/vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)
 
-[deja-vu](https://github.com/vshulcz/deja-vu) 生态组件。MIT 协议。觉得有用？[去 GitHub 为 deja-vu 点颗星](https://github.com/vshulcz/deja-vu)。
+[deja-vu](https://github.com/vshulcz/deja-vu) 生态组件。MIT 协议。

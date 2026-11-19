@@ -1,6 +1,6 @@
 # deja-vu（VS Code、Cursor、Windsurf 與 Antigravity 擴充功能）
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 
 [English](../README.md) | [简体中文](zh.md) | 繁體中文 | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
@@ -8,7 +8,7 @@
 
 [deja-vu](https://github.com/vshulcz/deja-vu) 本機索引 Claude Code、Cursor、Codex、Windsurf、Copilot Chat、OpenCode、Cline、Roo Code 與其他 41 個程式設計代理寫入磁碟的會話紀錄——單個 Go 二進位檔本機執行，無需 LLM 也無背景常駐程式。
 
-**[★ 到 GitHub 給星](https://github.com/vshulcz/deja-vu)** · **[說明文件](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[基準評測](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
+**[說明文件](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[基準評測](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
 ![deja-vu 示範](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -34,10 +34,10 @@ code --install-extension vshulcz.deja-status
 
 | 指標 | 結果 |
 |---|---|
-| LongMemEval-S 檢索準確率（470 道清洗後題目） | **97.2% R@5**，**88.9% hit@1**（MemPalace 公布 96.6%，agentmemory 為 95.2%） |
-| 重複儲存庫任務的 Token 消耗 | **減少 58%**——只有 agentmemory 的**一半**（`52,815` 對比冷啟動 `103,443`，11 組配對測試） |
+| LongMemEval-S 檢索準確率（470 道清洗後題目） | **97.2% R@5**，**88.9% hit@1** |
+| 重複儲存庫任務的 Token 消耗 | **減少 58%**|
 | 行程內詞法查詢延遲 | 跨 49 個程式設計代理中位數 **0.7–0.8 ms** |
-| 對 19,195 個歷史會話的零配置建庫耗時 | **13.6 s**，無需 API Key（7 款工具中第二名為 72 s） |
+| 對 19,195 個歷史會話的零配置建庫耗時 | **13.6 s**，無需 API Key |
 
 ## 儲存庫記憶與跨代理接力
 
@@ -49,4 +49,4 @@ code --install-extension vshulcz.deja-status
 
 MIT — [github.com/vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)
 
-[deja-vu](https://github.com/vshulcz/deja-vu) 生態組件。MIT 授權。覺得實用？[到 GitHub 為 deja-vu 點顆星](https://github.com/vshulcz/deja-vu)。
+[deja-vu](https://github.com/vshulcz/deja-vu) 生態組件。MIT 授權。

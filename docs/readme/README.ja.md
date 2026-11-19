@@ -19,7 +19,6 @@ deja はそれをローカルでインデックス化し、<code>/compact</code>
 </p>
 
 <p align="center">
-  <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
@@ -42,9 +41,9 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 <table align="center">
 <tr>
-<td align="center" width="33%">再現率<br>LongMemEval-S で <b>97.2% R@5</b><br><sub>全 500 問 · MemPalace 96.6%、agentmemory 95.2%<br>同じ 19,195 セッションで 1 位正解 19/100、次点は 14</sub></td>
-<td align="center" width="33%">トークン<br>agentmemory の<b>半分のトークン</b><br><sub>解決済みのタスクで 53,558 対 104,974<br>ツール定義は 1 ターン 477 トークン、7 つの中で最少</sub></td>
-<td align="center" width="33%">インデックス時間<br>19,195 セッションを <b>13.6 秒</b>でインデックス<br><sub>7 ツール中の次点は 72 秒<br>最初の回答まで 26 ms、検索の中央値 97 ms</sub></td>
+<td align="center" width="33%">再現率<br>LongMemEval-S で <b>97.2% R@5</b><br><sub>全 500 問</sub></td>
+<td align="center" width="33%">トークン<br>反復タスクで<b>トークン 58% 削減</b><br><sub>メモリなし 126,222 対 53,558<br>ツール定義は 1 ターン 477 トークン、LLM 呼び出しゼロ</sub></td>
+<td align="center" width="33%">インデックス時間<br>19,195 セッションを <b>13.6 秒</b>でインデックス<br><sub>最初の回答まで 26 ms、検索の中央値 97 ms</sub></td>
 </tr>
 </table>
 
@@ -167,14 +166,6 @@ aider の読み取り専用コンテキストファイル、Windows の `cmd /c 
 | **秘匿化（リダクション）** | キー、トークン、JWT、秘密鍵ブロックはインデックス作成時に取り除かれます。パターン一致なので、規則が知らない形のものは通り抜けます。境界はセキュリティモデルに記載しています。 |
 
 </details>
-
-### あなた自身の作業の振り返り
-
-`deja stats --card` はターミナルに描画します。ファイル名を渡すと、プロフィール README 用の SVG を
-書き出します。他の場所に投稿するなら、[PNG に変換](https://vshulcz.github.io/deja-vu/card/)してください——
-そのページはあなたのブラウザ内で変換します。
-
-<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/docs/assets/stats-card-demo.svg" width="760" alt="deja stats カード：1年分のエージェントセッションのヒートマップ、その出どころのエージェント、最長のセッション"></p>
 
 機能の完全なリファレンスは[ドキュメント](https://vshulcz.github.io/deja-vu/)にあります。
 
@@ -529,7 +520,6 @@ deja bench read       # what it costs to read a database-backed store, and what 
 | `newest-turn`（ベースライン） | 0.00 | 289 |
 | `cold` | 0.00 | 0 |
 
-
 コンテキスト実験では、deja-recall を全履歴、単純な grep、コールドコンテキストと比較します。
 デフォルトのシードでの結果：
 
@@ -561,20 +551,6 @@ deja bench read       # what it costs to read a database-backed store, and what 
 
 インデックスはインクリメンタルです。セッションファイルが増えたときは、そのファイルだけを読み直します。
 
-### 比較
-
-| 機能 | `deja-vu` | `claude-mem` | `MemPalace` |
-| --- | --- | --- | --- |
-| 導入前の履歴（[day zero](https://vshulcz.github.io/deja-vu/guide/day-zero.html)） | 対応 — 既存の会話記録をインデックス化（`36/100` hit@1） | 非対応 — 導入後から記録（`0/100`） | Claude Code, Codex, Cursor（`16/100`） |
-| 共有対象エージェント | 49 ハーネス | 9（フック） | 3（CLI） |
-| LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
-| ランタイムと依存関係 | Go 単一バイナリ 1 個 | Bun ワーカー + SQLite + Chroma | Python + 300 MB 埋め込みモデル |
-| LLM 呼び出し / アカウント要否 | 不要 | Observer LLM 呼び出し | 不要 |
-| 未コミットファイルの復元 | `deja restore <path>` | 非対応 | 非対応 |
-| 既存の `claude-mem.db` | `~/.claude-mem/claude-mem.db` を直接参照 | ネイティブ | 非対応 |
-
-詳細比較：[全 15 ツールの比較](https://vshulcz.github.io/deja-vu/guide/compare.html) · [claude-mem 代替](https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html) · [Mem0 代替](https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html) · [SpecStory 代替](https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html) · [Basic Memory 代替](https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html)。
-
 ## 仕組み
 
 `~/.cache/deja` にあるローカルの転置インデックスです：JSONL と SQLite のストアを解析し、認証情報を
@@ -587,16 +563,14 @@ deja bench read       # what it costs to read a database-backed store, and what 
 <details>
 <summary><b>他のメモリツールとどう違うのですか？</b></summary>
 
-| | deja | メモリプラットフォーム<br>（Mem0、Letta、memU） | セッション検索<br>（cass） |
+| | deja | メモリプラットフォーム | セッション検索 |
 | --- | :-: | :-: | :-: |
 | インストール前の作業を知っている | はい | いいえ | はい |
 | キャプチャ手順 | 不要、トランスクリプトがそのまま記憶 | エージェントやあなたのコードが事実を書き込む | 不要 |
 | LLM や埋め込みのキーが必要 | いいえ | はい | 任意 |
 | 頼まれなくてもリコールする | セッション開始時とツール実行前 | いいえ | いいえ |
 
-[engram](https://github.com/Gentleman-Programming/engram) は記録先行型ツールの中で最も優れており、
-そのモデルが合うなら試す価値があります。ただし、やはり空の状態から始まり、エージェントが保存することを
-選んだものしか知りません。[完全な比較](https://vshulcz.github.io/deja-vu/guide/compare.html)では
+[完全な比較](https://vshulcz.github.io/deja-vu/guide/compare.html)では
 15 のツールを取り上げています。
 
 </details>
@@ -650,8 +624,6 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 - **検索と再開：** [昨日のセッションを再開する](https://vshulcz.github.io/deja-vu/guide/resume-a-session.html) · [問題を解決したセッションを見つける](https://vshulcz.github.io/deja-vu/guide/find-a-session.html) · [エージェントが修正済みのミスを繰り返す](https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html) · [エージェントの切り替え](https://vshulcz.github.io/deja-vu/guide/switching-agents.html)
 - **セッションファイルと運用：** [ディスク上のセッションファイル](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html) · [各エージェントの履歴の保存場所](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html) · [エージェントの監査](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [会話のエクスポート](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [マシン間での利用](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [記憶のコスト](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
-ハーネス別：[opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [DeepSeek Harness](https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html) · [Kimi Code](https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [Qwen Code](https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi と omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
-
 ## コントリビュート
 
 `make build test lint` を実行してから、[CONTRIBUTING.md](../../CONTRIBUTING.md) を読んでください。ハーネスの追加は
@@ -664,7 +636,6 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 悪用可能だと思われるものは、代わりに [SECURITY.md](../../SECURITY.md) にある非公開のアドバイザリリンクから
 報告してください。deja が何を読み、何をどこにも送らないか、そしてプロジェクトを除外したりセッションを
 忘れさせたりする方法は[プライバシー](#プライバシー)にまとめています。
-役に立ちましたか？[Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)。
 
 ## ライセンス
 

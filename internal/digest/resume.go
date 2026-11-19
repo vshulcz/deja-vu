@@ -9,30 +9,14 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-// Resume is the working state a session had reached at a point.
-//
-// A compaction is where a session's working state goes, and it is the most
-// expensive moment deja can see.
-//
-// Measured on this machine's transcripts: a cold session takes a median of 10
-// actions before its first edit, and a session takes 28 after a compaction —
-// p75 61 — across 86 compactions. Nothing is missing from the store when that
-// happens; what is missing is the shape. So this reads the transcript up to a
-// point and answers the four questions the next turn starts by re-deriving.
-//
-// Everything here is derived. deja has two places an agent can write and both
-// are nearly empty — 9 writes against 3793 injections over sixteen days, 2
-// accepted notes after months — so nothing is asked of the agent.
-//
-// Counted over 96 real compactions, the material is there: what was asked in
-// 94% of them, the last command in 94%, a decision the session had reached in
-// 94%, and a file in flight in 76%.
+// Resume captures the working state of a session up to a compaction boundary.
+// Everything is derived directly from transcript messages (last user request,
+// active files, last command outcome, and settled decision) without requiring
+// explicit agent writes.
 type Resume struct {
 	// Asked is the last thing the person asked for.
 	Asked string
-	// Files are the ones being worked on, newest first. A compaction on this
-	// machine had a median of 38 edited files behind it and 94 at the p90, so
-	// this is a ranking rather than a list.
+	// Files are the edited files in flight, ranked newest first.
 	Files []string
 	// Command is the last command run, and Failed whether it ended badly.
 	Command string

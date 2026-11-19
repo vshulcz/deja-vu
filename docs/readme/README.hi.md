@@ -19,7 +19,6 @@ deja सब कुछ लोकल रूप से इंडेक्स कर
 </p>
 
 <p align="center">
-  <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
@@ -42,13 +41,13 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 <table align="center">
 <tr>
-<td align="center" width="33%">रिकॉल<br>LongMemEval-S पर <b>97.2% R@5</b><br><sub>सभी 500 प्रश्न · MemPalace 96.6%, agentmemory 95.2%<br>उन्हीं 19,195 सेशन पर: 100 में 19 पहले स्थान पर, अगला सबसे अच्छा 14</sub></td>
-<td align="center" width="33%">टोकन<br>agentmemory के <b>आधे टोकन</b><br><sub>पहले से हल किए काम पर 53,558 बनाम 104,974<br>हर टर्न 477 टोकन की टूल परिभाषाएँ, सात में सबसे कम</sub></td>
-<td align="center" width="33%">इंडेक्सिंग<br>19,195 सेशन इंडेक्स करने में <b>13.6 s</b><br><sub>सात में अगला: 72 s<br>पहले जवाब तक 26 ms, खोज की माध्यिका 97 ms</sub></td>
+<td align="center" width="33%">रिकॉल<br>LongMemEval-S पर <b>97.2% R@5</b><br><sub>सभी 500 प्रश्न</sub></td>
+<td align="center" width="33%">टोकन<br>दोहराए गए काम पर <b>58% कम टोकन</b><br><sub>बिना मेमोरी 126,222 के मुक़ाबले 53,558<br>हर टर्न 477 टोकन टूल परिभाषाएँ, 0 LLM कॉल</sub></td>
+<td align="center" width="33%">इंडेक्सिंग<br>19,195 सेशन इंडेक्स करने में <b>13.6 s</b><br><sub>पहले जवाब तक 26 ms, खोज की माध्यिका 97 ms</sub></td>
 </tr>
 </table>
 
-<p align="center"><sub>deja-vu का मेंटेनर मैं हूँ, इसलिए हर ड्राइवर, कॉर्पस और स्कोरिंग नियम इसी रिपॉज़िटरी में हैं &middot;
+<p align="center"><sub>हर ड्राइवर, कॉर्पस और स्कोरिंग नियम इसी रिपॉज़िटरी में हैं &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">सीधी तुलना, और जिस पंक्ति पर शक हो उसे दोबारा कैसे मापें</a> &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval और LoCoMo रन</a></sub></p>
 
@@ -153,14 +152,6 @@ skill आपके इंस्टॉल किए हुए `deja` बाइन
 नहीं; `deja handoff --to codex` मौजूदा कॉन्टेक्स्ट को बाँध देता है ताकि किसी दूसरे एजेंट में काम आगे बढ़े; जानी-पहचानी
 शक्ल वाली कुंजियाँ, टोकन, JWT और प्राइवेट की ब्लॉक इंडेक्सिंग के समय हटा दिए जाते हैं — हालाँकि पैटर्न मिलाना सीक्रेट
 पहचानना नहीं है, और कोई अनजानी शक्ल निकल सकती है।
-
-### अपना काम खुद बनाइए
-
-`deja stats --card` सीधे टर्मिनल में बनाता है; फ़ाइल का नाम दीजिए तो आपकी प्रोफ़ाइल README के लिए SVG लिख देता है।
-कहीं और प्रकाशित करने के लिए [उसे PNG में बदलिए](https://vshulcz.github.io/deja-vu/card/) — वह पेज आपके अपने
-ब्राउज़र में ही बदलता है।
-
-<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/docs/assets/stats-card-demo.svg" width="760" alt="deja स्टैट्स कार्ड: एक साल के सेशन हीटमैप में, वे किन एजेंट्स से आए, और सबसे लंबा कौन-सा था"></p>
 
 पूरा रेफ़रेंस [दस्तावेज़ साइट](https://vshulcz.github.io/deja-vu/) पर है।
 
@@ -361,20 +352,6 @@ deja bench read       # डेटाबेस वाले स्टोर क�
 
 इंडेक्स इन्क्रीमेंटल है। सेशन फ़ाइल लंबी होने पर सिर्फ़ वही एक फ़ाइल दोबारा पढ़ी जाती है।
 
-### तुलना
-
-| क्षमता | `deja-vu` | `claude-mem` | `MemPalace` |
-| --- | --- | --- | --- |
-| इंस्टॉल से पहले का इतिहास ([day zero](https://vshulcz.github.io/deja-vu/guide/day-zero.html)) | हाँ — मौजूदा ट्रांसक्रिप्ट इंडेक्स करता है (`36/100` hit@1) | नहीं — इंस्टॉल के बाद से रिकॉर्ड करता है (`0/100`) | Claude Code, Codex, Cursor (`16/100`) |
-| साझा एजेंट्स | 49 हार्नेस | 9 (हुक्स) | 3 (CLI) |
-| LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
-| रनटाइम और निर्भरताएँ | 1 Go बाइनरी | Bun वर्कर + SQLite + Chroma | Python + 300 MB एम्बेडिंग मॉडल |
-| LLM कॉल / खाता आवश्यक | कोई नहीं | ऑब्ज़र्वर LLM कॉल | कोई नहीं |
-| अनकमिटेड फ़ाइल रिकवरी | `deja restore <path>` | नहीं | नहीं |
-| मौजूदा `claude-mem.db` | सीधे `~/.claude-mem/claude-mem.db` पढ़ता है | नेटिव | नहीं |
-
-विस्तृत तुलना: [सभी 15 टूल्स की तुलना](https://vshulcz.github.io/deja-vu/guide/compare.html) · [claude-mem विकल्प](https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html) · [Mem0 विकल्प](https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html) · [SpecStory विकल्प](https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html) · [Basic Memory विकल्प](https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html).
-
 ## यह कैसे काम करता है
 
 `~/.cache/deja` में एक लोकल इनवर्टेड इंडेक्स: JSONL और SQLite स्टोर पार्स करता है, क्रेडेंशियल साफ़ करता है,
@@ -387,7 +364,7 @@ deja bench read       # डेटाबेस वाले स्टोर क�
 <details>
 <summary><b>दूसरे मेमोरी टूल्स से यह कैसे अलग है?</b></summary>
 
-| | deja | मेमोरी प्लेटफ़ॉर्म<br>(Mem0, Letta, memU) | सेशन खोज<br>(cass) |
+| | deja | मेमोरी प्लेटफ़ॉर्म | सेशन खोज |
 | --- | :-: | :-: | :-: |
 | इंस्टॉल से पहले के काम को जानता है | हाँ | नहीं | हाँ |
 | कैप्चर स्टेप चाहिए | नहीं, ट्रांसक्रिप्ट ही मेमोरी है | एजेंट या आपका कोड तथ्य लिखता है | नहीं |
@@ -457,8 +434,6 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 - [एजेंट सेशन्स के बीच क्यों भूलते हैं](https://vshulcz.github.io/deja-vu/guide/forgetting.html) · [हर एजेंट इतिहास कहाँ रखता है](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
 - [कॉम्पैक्शन क्या खोता है](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [एजेंट बदलना](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [एजेंट्स ने क्या किया इसका ऑडिट](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [बातचीत निर्यात करना](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [मशीनों के बीच](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [मेमोरी की टोकन लागत](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
-टूल के हिसाब से: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi और omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
-
 ## विकास
 
 `make build test lint`, फिर [CONTRIBUTING.md](../../CONTRIBUTING.md)।
@@ -471,7 +446,6 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 जो भी चीज़ शोषण योग्य लगे, उसे इसके बजाय [SECURITY.md](../../SECURITY.md) में दिए
 निजी एडवाइज़री लिंक से रिपोर्ट करें। deja क्या पढ़ता है, क्या कभी कहीं नहीं भेजता,
 और किसी प्रोजेक्ट को बाहर करने या किसी सेशन को भुलाने का तरीक़ा [निजता](#निजता) में है।
-उपयोगी लगा? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).
 
 ## लाइसेंस
 

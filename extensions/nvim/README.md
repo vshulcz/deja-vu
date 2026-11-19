@@ -1,6 +1,6 @@
 # deja-vu for Neovim
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/nvim/docs/zh.md) | [繁體中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/nvim/docs/zh-TW.md) | [日本語](https://github.com/vshulcz/deja-vu/blob/main/extensions/nvim/docs/ja.md) | [한국어](https://github.com/vshulcz/deja-vu/blob/main/extensions/nvim/docs/ko.md) | [Español](https://github.com/vshulcz/deja-vu/blob/main/extensions/nvim/docs/es.md) | [Português](https://github.com/vshulcz/deja-vu/blob/main/extensions/nvim/docs/pt.md) | [Français](https://github.com/vshulcz/deja-vu/blob/main/extensions/nvim/docs/fr.md) | [Deutsch](https://github.com/vshulcz/deja-vu/blob/main/extensions/nvim/docs/de.md) | [Русский](https://github.com/vshulcz/deja-vu/blob/main/extensions/nvim/docs/ru.md) | [Türkçe](https://github.com/vshulcz/deja-vu/blob/main/extensions/nvim/docs/tr.md) | [हिन्दी](https://github.com/vshulcz/deja-vu/blob/main/extensions/nvim/docs/hi.md)
 
 Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**< 1 ms** SQLite FTS5 lookup · **~4%** index footprint · **0** LLM tokens at ingest) · [Documentation](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
@@ -78,7 +78,7 @@ Run `:checkhealth deja` inside Neovim to verify binary discovery and active pick
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents (next of 7 tools: 72 s) |
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents |
 
 ## Repository memory & handoff
 
@@ -86,4 +86,4 @@ Share vetted project decisions and dead ends through git in `.deja/memory.jsonl`
 
 Switching tools mid-task? Run `deja handoff --to <agent>` (or use `handoff` via MCP) to transfer the active session's goal, decisions, touched files, passed checks, and open work into another coding agent.
 
-Part of [deja-vu](https://github.com/vshulcz/deja-vu). MIT. Found it useful? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).
+Part of [deja-vu](https://github.com/vshulcz/deja-vu). MIT.

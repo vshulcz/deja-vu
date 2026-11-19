@@ -19,7 +19,6 @@ deja 在本地索引全部歷史，讓代理跨 <code>/compact</code> 保住上�
 </p>
 
 <p align="center">
-  <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
@@ -42,13 +41,13 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 <table align="center">
 <tr>
-<td align="center" width="33%">召回率<br><b>97.2% R@5</b>（LongMemEval-S）<br><sub>全部 500 題 · MemPalace 96.6%，agentmemory 95.2%<br>同樣 19,195 個會話：100 題中 19 題排第一，第二名 14 題</sub></td>
-<td align="center" width="33%">Token 用量<br>token 只有 agentmemory 的<b>一半</b><br><sub>已做過的任務：53,558 對比 104,974<br>工具定義每輪 477 token，七個裡最少</sub></td>
-<td align="center" width="33%">索引耗時<br><b>13.6 秒</b>索引 19,195 個會話<br><sub>七個工具裡第二名：72 秒<br>首次回答 26 毫秒，搜尋中位數 97 毫秒</sub></td>
+<td align="center" width="33%">召回率<br><b>97.2% R@5</b>（LongMemEval-S）<br><sub>全部 500 題</sub></td>
+<td align="center" width="33%">Token 用量<br>重複任務 <b>token 減少 58%</b><br><sub>53,558 對比無記憶 126,222<br>工具定義每輪 477 token，零 LLM 呼叫</sub></td>
+<td align="center" width="33%">索引耗時<br><b>13.6 秒</b>索引 19,195 個會話<br><sub>首次回答 26 毫秒，搜尋中位數 97 毫秒</sub></td>
 </tr>
 </table>
 
-<p align="center"><sub>deja-vu 由我維護，所以每個驅動腳本、語料和評分規則都在本儲存庫裡 &middot;
+<p align="center"><sub>每個驅動腳本、語料和評分規則都在本儲存庫裡 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">正面對比，以及如何重跑你懷疑的那一列</a> &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval 與 LoCoMo 的執行紀錄</a></sub></p>
 
@@ -149,12 +148,6 @@ deja 把這些檔案變成一層它們都能讀的記憶。
 `deja sync ssh laptop` 在機器之間搬運記憶，只追加、中間沒有雲端；
 `deja handoff --to codex` 把當前上下文打包，好在另一個代理裡接著做；
 已知形態的金鑰、token、JWT 和私鑰區塊在建索引時會被剝掉；樣式比對不是金鑰偵測，未知形態可能漏過。
-
-### 把你自己的工作畫出來
-
-`deja stats --card` 直接畫在終端機裡；給它一個檔名，它會寫出一張 SVG，可以放進個人主頁的 README。要發到別處，就把它[轉成 PNG](https://vshulcz.github.io/deja-vu/card/)——那個頁面在你自己的瀏覽器裡完成轉換。
-
-<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/docs/assets/stats-card-demo.svg" width="760" alt="deja 統計卡片：一年的會話熱力圖、它們來自哪些代理、以及最長的一次"></p>
 
 完整的功能參考在[文件站](https://vshulcz.github.io/deja-vu/)。
 
@@ -341,20 +334,6 @@ deja bench read       # 讀取一個資料庫儲存的代價，以及一個超�
 
 索引是增量的。會話檔案變長時，只重新讀那一個檔案。
 
-### 比較
-
-| 能力 | `deja-vu` | `claude-mem` | `MemPalace` |
-| --- | --- | --- | --- |
-| 安裝前的歷史記錄（[第一天](https://vshulcz.github.io/deja-vu/guide/day-zero.html)） | 是 — 索引既有的轉錄檔（`36/100` hit@1） | 否 — 從安裝起才開始記錄（`0/100`） | Claude Code、Codex、Cursor（`16/100`） |
-| 共用代理數 | 49 款工具 | 9 款（hooks） | 3 款（CLI） |
-| LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
-| 執行時期與相依套件 | 1 個 Go 二進位檔 | Bun worker + SQLite + Chroma | Python + 300 MB 嵌入模型 |
-| LLM 呼叫 / 帳號要求 | 無 | 觀察者 LLM 呼叫 | 無 |
-| 未提交檔案復原 | `deja restore <path>` | 否 | 否 |
-| 現有 `claude-mem.db` | 直接讀取 `~/.claude-mem/claude-mem.db` | 原生 | 否 |
-
-逐項比較：[15 套工具完整對比](https://vshulcz.github.io/deja-vu/guide/compare.html) · [claude-mem 替代方案](https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html) · [Mem0 替代方案](https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html) · [SpecStory 替代方案](https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html) · [Basic Memory 替代方案](https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html)。
-
 ## 運作方式
 
 `~/.cache/deja` 裡的本機倒排索引：解析 JSONL 與 SQLite 儲存、遮蔽憑證、寫出 `records.bin`
@@ -367,7 +346,7 @@ MCP 伺服器、統計、分享和同步都讀這一份索引。細節見
 <details>
 <summary><b>和其他記憶工具有什麼不同？</b></summary>
 
-| | deja | 記憶平台<br>(Mem0、Letta、memU) | 會話檢索<br>(cass) |
+| | deja | 記憶平台 | 會話檢索 |
 | --- | :-: | :-: | :-: |
 | 知道安裝它之前的工作 | 是 | 否 | 是 |
 | 需要蒐集步驟 | 不需要，逐字稿本身就是記憶 | 由代理或你的程式碼寫入事實 | 不需要 |
@@ -428,8 +407,6 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 - [為什麼代理在會話之間會忘事](https://vshulcz.github.io/deja-vu/guide/forgetting.html) · [每個代理把歷史存在哪裡](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
 - [壓縮會丟掉什麼](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [換一個代理](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [稽核代理做過什麼](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [匯出一次對話](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [跨機器](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [記憶要花多少 token](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
-按工具：[opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi 和 omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
-
 ## 參與開發
 
 `make build test lint`，然後看 [CONTRIBUTING.md](../../CONTRIBUTING.md)。
@@ -441,7 +418,7 @@ rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 錯誤與問題請提交到 [issues](https://github.com/vshulcz/deja-vu/issues)。
 若認為可能構成安全漏洞，請改走 [SECURITY.md](../../SECURITY.md) 裡的私密通報連結。
 deja 會讀取什麼、絕不向外傳送什麼，以及如何排除專案或遺忘特定會話，都寫在
-[隱私](#隱私)。覺得有幫助？[Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)。
+[隱私](#隱私)。
 
 ## 授權
 

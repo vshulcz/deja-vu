@@ -1,7 +1,7 @@
 package cjkfold
 
 // Code generated from the Unihan database (kSimplifiedVariant); DO NOT EDIT.
-// Regenerate with tools/gen_cjk_fold.py — see that file for the exact source
+// Regenerate with scripts/gen_cjk_fold.py — see that file for the exact source
 // and the filtering rule.
 //
 // CJK bigrams are sequences of raw codepoints, so 距離 and 距离 are unrelated

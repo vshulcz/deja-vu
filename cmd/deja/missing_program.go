@@ -9,21 +9,10 @@ import (
 	"github.com/vshulcz/deja-vu/internal/policy"
 )
 
-// A program this machine does not have is the one thing deja can say for
-// certain before a command runs, and it was the one thing it did not say.
-//
-// The session-start block has carried it for a long time — "18 separate
-// sessions hit `command not found: timeout`" — and measured on this machine's
-// own transcripts, of the ten sessions that were told, nine went on to run the
-// command anyway and got the same refusal. `timeout` alone: named at the start
-// of ten sessions, run in nine of them. A fact stated at the start does not
-// survive to the moment it matters.
-//
-// This is that fact, moved to the moment. The pre-tool hook already fires
-// before the command runs and was silent here, because what it looks up is the
-// shape of the whole command — `timeout 30 go test ./...` shares no shape with
-// `timeout 600 python3 build.py`, so nothing matched. A missing program is not
-// about the shape. It is about the first word.
+// Pre-tool detection for missing binaries. Session-start warnings about
+// `command not found` are easily forgotten mid-session, and whole-command shape
+// matching misses distinct invocations of the same absent binary, so the hook
+// checks the leading command token directly before execution.
 const (
 	// missingProgramMinSessions is how many separate sessions have to have been
 	// refused before deja says so. One is a machine that has changed since;

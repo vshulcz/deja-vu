@@ -2,9 +2,9 @@
 
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | Türkçe | [हिन्दी](hi.md)
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 
-**[deja-vu](https://github.com/vshulcz/deja-vu)** eklentisi (LongMemEval-S'te **%97.2 R@5** · 19,195 oturumu **13.6 sn**'de indeksleme · agentmemory'nin **yarısı kadar token**) · [Belgeler](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Canlı demo](https://vshulcz.github.io/deja-vu/view/) · [Ölçümler](https://vshulcz.github.io/deja-vu/guide/benchmarks.html) · **[★ GitHub'da yıldız ver](https://github.com/vshulcz/deja-vu)**
+**[deja-vu](https://github.com/vshulcz/deja-vu)** eklentisi (LongMemEval-S'te **%97.2 R@5**) · [Belgeler](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Canlı demo](https://vshulcz.github.io/deja-vu/view/) · [Ölçümler](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
 Bu makinede zaten bulunan kodlama oturumlarından yanıt veren bir Hermes bellek sağlayıcısıdır: Claude Code, Codex, Cursor, Hermes'in kendisi ve deja'nın okuduğu diğer ajanlar (herhangi bir şey kurulmadan önceki aylar dahil). Ek model yok, API anahtarı yok, arka plan sunucusu yok; geçmiş, tek bir Go ikilisi olan [deja](https://github.com/vshulcz/deja-vu) tarafından yerel olarak indekslenir.
 
@@ -40,7 +40,7 @@ Hermes turlarını ayrıca bir yere yazmaz: Hermes onları zaten kaydeder ve dej
 
 | İsabet (Recall) | Token | İndeksleme ve sorgu |
 |---|---|---|
-| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1; MemPalace %96.6, agentmemory %95.2 yayımlar) | **%58 daha az token** (tekrarlanan depo işlerinde agentmemory'nin **yarısı kadar token**) | 19,195 oturumu **13.6 sn**'de indeksler / 49 kodlama ajanı genelinde **0.7 ms** sorgu süresi (7 araçtan sonraki: 72 sn) |
+| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1) | **%58 daha az token** (tekrarlanan depo işlerinde) | 19,195 oturumu **13.6 sn**'de indeksler / 49 kodlama ajanı genelinde **0.7 ms** sorgu süresi |
 
 ## Depo belleği ve ajanlar arası devir (`handoff`)
 
@@ -52,4 +52,4 @@ Görevin ortasında araç mı değiştiriyorsunuz? `deja handoff --to <agent>` �
 
 `deja install hermes-auto` bu sağlayıcıyı `~/.hermes/plugins/deja-memory` içine MCP sunucusu ve `pre_llm_call` kanca eklentisiyle birlikte yazar. Buradaki dosyalar aynı kaynaktan (`cmd/deja/install_hermes_memory.go`) üretilir; tek fark bu kopyanın yolu içine yazmak yerine `PATH` üzerinde `deja` aramasıdır. İkisi ayrışırsa `TestHermesExtensionIsTheProviderInstallWrites` testi hata verir.
 
-[deja-vu](https://github.com/vshulcz/deja-vu) parçasıdır. MIT. İşinize yaradı mı? [GitHub'da deja-vu'ya yıldız verin](https://github.com/vshulcz/deja-vu).
+[deja-vu](https://github.com/vshulcz/deja-vu) parçasıdır. MIT.

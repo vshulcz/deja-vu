@@ -19,7 +19,6 @@ deja indexe tout localement pour que vos agents gardent le contexte après <code
 </p>
 
 <p align="center">
-  <a href="https://github.com/vshulcz/deja-vu/stargazers"><img src="https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&color=f59e0b" alt="GitHub Stars"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/coverage-88%25-brightgreen" alt="Coverage"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases/latest"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
@@ -42,13 +41,13 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 <table align="center">
 <tr>
-<td align="center" width="33%">Rappel<br><b>97.2% R@5</b> sur LongMemEval-S<br><sub>les 500 questions · MemPalace 96.6%, agentmemory 95.2%<br>mêmes 19,195 sessions : 19/100 au premier rang, le suivant 14</sub></td>
-<td align="center" width="33%">Tokens<br><b>moitié moins de tokens</b> qu'agentmemory<br><sub>53,558 contre 104,974 sur une tâche déjà résolue<br>477 tokens de définitions d'outils, le moins des sept</sub></td>
-<td align="center" width="33%">Indexation<br><b>13.6 s</b> pour indexer 19,195 sessions<br><sub>le suivant des sept : 72 s<br>26 ms jusqu'à la première réponse, recherche médiane en 97 ms</sub></td>
+<td align="center" width="33%">Rappel<br><b>97.2% R@5</b> sur LongMemEval-S<br><sub>les 500 questions</sub></td>
+<td align="center" width="33%">Tokens<br><b>58% de tokens en moins</b> sur tâches répétées<br><sub>53,558 contre 126,222 sans mémoire<br>477 tokens de définitions par tour, 0 appel LLM</sub></td>
+<td align="center" width="33%">Indexation<br><b>13.6 s</b> pour indexer 19,195 sessions<br><sub>26 ms jusqu'à la première réponse, recherche médiane en 97 ms</sub></td>
 </tr>
 </table>
 
-<p align="center"><sub>Je maintiens deja-vu, donc chaque driver, le corpus et la règle de score sont dans ce dépôt &middot;
+<p align="center"><sub>Chaque driver, le corpus et la règle de score sont dans ce dépôt &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">la comparaison directe, et comment remesurer une ligne dont vous doutez</a> &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">les runs LongMemEval et LoCoMo</a></sub></p>
 
@@ -154,15 +153,6 @@ se tait quand il ne peut pas trancher ; `deja sync ssh laptop` déplace la mémo
 ajout, sans nuage au milieu ; `deja handoff --to codex` emballe le contexte courant pour continuer dans un autre
 agent ; les clés, jetons, JWT et blocs de clé privée de formes connues sont retirés à l'indexation, sachant que
 faire correspondre un motif n'est pas détecter un secret et qu'une forme inconnue peut passer.
-
-### Dessinez votre propre travail
-
-`deja stats --card` dessine directement dans le terminal ; donnez-lui un nom de fichier et il écrit un SVG pour
-le README de votre profil. Pour le publier ailleurs,
-[convertissez-le en PNG](https://vshulcz.github.io/deja-vu/card/) : cette page convertit dans votre propre
-navigateur.
-
-<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/docs/assets/stats-card-demo.svg" width="760" alt="carte de statistiques deja : une année de sessions en carte de chaleur, de quels agents elles viennent, et la plus longue"></p>
 
 La référence complète est sur le [site de documentation](https://vshulcz.github.io/deja-vu/).
 
@@ -370,20 +360,6 @@ Mesuré sur un vrai stockage : 2,419 sessions, 179k messages, 1.9 Go d'enregistr
 
 L'index est incrémental. Quand un fichier de session s'allonge, seul ce fichier est relu.
 
-### Comment il se compare
-
-| Capacité | `deja-vu` | `claude-mem` | `MemPalace` |
-| --- | --- | --- | --- |
-| Historique avant installation ([jour zéro](https://vshulcz.github.io/deja-vu/guide/day-zero.html)) | Oui — indexe les transcriptions existantes (`36/100` hit@1) | Non — enregistre après installation (`0/100`) | Claude Code, Codex, Cursor (`16/100`) |
-| Agents partagés | 49 harnais | 9 (hooks) | 3 (CLI) |
-| LongMemEval-S R@5 | **97.2%** (88.9% hit@1) | — | 96.6% |
-| Runtime et dépendances | 1 binaire Go | Worker Bun + SQLite + Chroma | Python + modèle d'embedding de 300 Mo |
-| Appels LLM / compte requis | Aucun | Appels LLM d'observation | Aucun |
-| Récupération non commitée | `deja restore <path>` | Non | Non |
-| `claude-mem.db` existant | Lit `~/.claude-mem/claude-mem.db` directement | Natif | Non |
-
-Comparatifs détaillés : [les 15 outils comparés](https://vshulcz.github.io/deja-vu/guide/compare.html) · [alternative à claude-mem](https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html) · [alternative à Mem0](https://vshulcz.github.io/deja-vu/guide/mem0-alternative.html) · [alternative à SpecStory](https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html) · [alternative à Basic Memory](https://vshulcz.github.io/deja-vu/guide/basic-memory-alternative.html).
-
 ## Comment ça marche
 
 Un index inversé local dans `~/.cache/deja` : il analyse les stockages JSONL et SQLite, nettoie les
@@ -396,7 +372,7 @@ lisent ce même index. Les détails sont dans [docs/ARCHITECTURE.md](../../docs/
 <details>
 <summary><b>En quoi est-ce différent des autres outils de mémoire ?</b></summary>
 
-| | deja | Plateformes de mémoire<br>(Mem0, Letta, memU) | Recherche de sessions<br>(cass) |
+| | deja | Plateformes de mémoire | Recherche de sessions |
 | --- | :-: | :-: | :-: |
 | Connaît le travail antérieur à son installation | oui | non | oui |
 | Nécessite une étape de collecte | non, la transcription est la mémoire | l'agent ou votre code écrivent des faits | non |
@@ -467,8 +443,6 @@ Windows, les notes sont dans `%AppData%\deja`).
 - [Pourquoi les agents oublient entre les sessions](https://vshulcz.github.io/deja-vu/guide/forgetting.html) · [où chaque agent range son historique](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
 - [Ce que le compactage perd](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [changer d'agent](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [auditer ce qu'ont fait les agents](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [exporter une conversation](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [entre machines](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [ce que la mémoire coûte en tokens](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
-Par outil : [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi et omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
-
 ## Développement
 
 `make build test lint`, puis [CONTRIBUTING.md](../../CONTRIBUTING.md).
@@ -481,7 +455,7 @@ Les bogues et questions se signalent dans [issues](https://github.com/vshulcz/de
 Tout problème potentiellement exploitable passe plutôt par le lien d'alerte privée dans
 [SECURITY.md](../../SECURITY.md). Ce que deja lit, ce qu'il n'envoie jamais où que ce soit
 et comment exclure un projet ou oublier une session se trouvent sous
-[Vie privée](#vie-privée). Utile ? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).
+[Vie privée](#vie-privée).
 
 ## Licence
 

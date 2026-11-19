@@ -1,13 +1,13 @@
 # deja-vu for JetBrains IDEs
 
-[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=flat&label=Stars)](https://github.com/vshulcz/deja-vu/stargazers)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640)
 English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/jetbrains/docs/zh.md) | [繁體中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/jetbrains/docs/zh-TW.md) | [日本語](https://github.com/vshulcz/deja-vu/blob/main/extensions/jetbrains/docs/ja.md) | [한국어](https://github.com/vshulcz/deja-vu/blob/main/extensions/jetbrains/docs/ko.md) | [Español](https://github.com/vshulcz/deja-vu/blob/main/extensions/jetbrains/docs/es.md) | [Português](https://github.com/vshulcz/deja-vu/blob/main/extensions/jetbrains/docs/pt.md) | [Français](https://github.com/vshulcz/deja-vu/blob/main/extensions/jetbrains/docs/fr.md) | [Deutsch](https://github.com/vshulcz/deja-vu/blob/main/extensions/jetbrains/docs/de.md) | [Русский](https://github.com/vshulcz/deja-vu/blob/main/extensions/jetbrains/docs/ru.md) | [Türkçe](https://github.com/vshulcz/deja-vu/blob/main/extensions/jetbrains/docs/tr.md) | [हिन्दी](https://github.com/vshulcz/deja-vu/blob/main/extensions/jetbrains/docs/hi.md)
 
 Local cross-agent session recall, AI line blame, and handoff for IntelliJ IDEA, GoLand, PyCharm, WebStorm, RustRover, CLion, PhpStorm, and Rider (`2024.2+`).
 
 [deja-vu](https://github.com/vshulcz/deja-vu) indexes the session transcripts Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf, and 39 other coding agents write to disk — locally in SQLite FTS5, with secrets redacted before output and no cloud service.
 
-**[★ Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu)** · **[Documentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
+**[Documentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
 ![deja-vu demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -54,7 +54,7 @@ The installable archive is written to `build/distributions/`.
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions; MemPalace publishes 96.6%, agentmemory 95.2%) | **58% fewer tokens** (**half the tokens** of agentmemory on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents (next of 7 tools: 72 s) |
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents |
 
 ## Repository memory & handoff
 
@@ -65,5 +65,3 @@ Switching tools mid-task? Run `deja handoff --to <agent>` (or use `handoff` via 
 ## License
 
 MIT — [github.com/vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)
-
-Found it useful? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).
