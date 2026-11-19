@@ -7,8 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Add **Claw Code** (`clawcode`) session reader, `clawcode` / `clawcode-auto` installer targets (`PreToolUse`, `PostToolUse`, `PostToolUseFailure`), `claw --resume` support, and `PostToolUseFailure` handling in `deja hook-tool-after`.
-- Add standalone plugins for **Orca** (`extensions/orca`) and **CodeWhale** (`extensions/codewhale`), and update storefront docs for DeepSeek Harness, Magpie, opencode, pi, and OpenClaw.
+## [0.24.3] - 2026-11-19
+
+Six new agent readers (`clawcode`, `codearts`, `mimo`, `omnigent`, `orca`, and
+`qoder`, bringing `deja` to 49 harnesses), cross-harness extraction and audit
+parity, `deja audit --secrets` raw credential scanning, `deja stats --no-index`,
+and bounded-memory indexing across split batches and `remineFixes`.
+
+### Added
+
+- Six new agent readers bring `deja` to 49 harnesses (#6028, #6046, #6051, #6059, #6060). Adds Claw Code (`clawcode`, installer hooks, `claw --resume`), Qoder CLI (`qoder`), CodeArts Desktop (`codearts`), MiMo-Code (`mimo`), Omnigent (`omnigent`), Orca (`orca`), and Zoo Code task discovery under Roo roots.
+- `deja audit --secrets` and `--fail-on-secrets` scan raw stores for unredacted credentials without indexing (#6087). Also indexes Claude `auto-memory` notes and tracks all 49 registry stores (#6058, #6091).
+- `deja stats --no-index` scans local agent stores with zero index writes (#6055).
+- Standalone Orca (`extensions/orca`) and CodeWhale (`extensions/codewhale`) plugins, a `deja-handoff` skill, root Qwen/Codex/Skill manifests, a release `.mcpb` registry manifest, and an unscoped `deja-vu` npm wrapper (#6057, #6059, #6076, #6079, #6086).
+- `PreToolUse` and `PostToolUse` catch post-edit signature changes, moved files, `PostToolUseFailure` events, and Antigravity tool failures (#6053, #6059).
+- `PromptPicker` and multi-session recall ranking improve search across related sessions (#6088).
+- 49-harness parity across all 12 README locales, agent memory config guides, `llms-full.txt`, and session-deletion guides for DeepSeek Harness and Devin (#6021, #6024, #6059, #6065, #6075).
+
+### Changed
+
+- Non-Claude harnesses share Claude's worktree and scratch-path normalization (`/.worktrees/`, `/.claude/worktrees/`, `/.projects/`, `/.jobs/`), inline command/exit/edited-file extraction, and transcript fallback project resolution (#6091).
+- Cold code guards decouple from hot-path hook execution, and MCP / OpenCode recall cuts query latency (#6051, #6062).
+
+### Fixed
+
+- Incremental indexing holds deferred tail sessions across split sub-batches (`withoutDeferred`), splits batches with new files when no session crosses the midpoint, streams `remineFixes` one session at a time, and flushes each postings bucket during compaction before reading the next (#6078, #6089, #6090, #6091).
+- MCP recall triggers proactively, excludes unstamped asking sessions, and `deja doctor` handles dead launchers and keeps `live_rules.jsonl` group-writable in shared indexes (#6045, #6056, #6067).
+- Hooks scope the `.hookseen` lock to the current commit, add a `source-hints` opt-out, guard non-repo roots with edit/traceback recovery, dedupe anonymous tool calls, and measure Antigravity compactions (#6049, #6054, #6085).
+- `DefaultDir` honors absolute `XDG_CACHE_HOME`, Windows Devin reads `sessions.db` from `APPDATA`, `deja rules sync` updates Hermes profile `SOUL.md` files, and `day0bench` deduplicates identical sessions across haystacks (#6050, #6064, #6083, #6084).
 
 ## [0.24.2] - 2026-11-12
 
