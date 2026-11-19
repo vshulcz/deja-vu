@@ -120,9 +120,9 @@ func TestOpencodeTUIPluginFitsFooterAndRefreshesStaleGeneratedFile(t *testing.T)
 	if _, err := installTarget("opencode-auto", "/opt/deja/bin/deja", false); err != nil {
 		t.Fatal(err)
 	}
-	v1Bytes, err := os.ReadFile(filepath.Join(dir, "plugins", "deja-status.tsx"))
-	if err != nil {
-		t.Fatal(err)
+	v1Bytes, v1Err := os.ReadFile(filepath.Join(dir, "plugins", "deja-status.tsx"))
+	if v1Err != nil {
+		t.Fatal(v1Err)
 	}
 	v1Src := string(v1Bytes)
 	for _, want := range []string{"fitSegments", "sidebarOpen", `process.stdout?.on?.("resize"`} {
@@ -136,9 +136,9 @@ func TestOpencodeTUIPluginFitsFooterAndRefreshesStaleGeneratedFile(t *testing.T)
 		t.Fatal(err)
 	}
 	v2Path := filepath.Join(dir, "plugins", "deja-status", "tui.tsx")
-	v2Bytes, err := os.ReadFile(v2Path)
-	if err != nil {
-		t.Fatal(err)
+	v2Bytes, v2Err := os.ReadFile(v2Path)
+	if v2Err != nil {
+		t.Fatal(v2Err)
 	}
 	v2Src := string(v2Bytes)
 	for _, want := range []string{"fitSegments", "onSizeChange", "sidebarOpen", `process.stdout?.on?.("resize"`} {
