@@ -283,7 +283,7 @@ func TestParityQoderAndCherryStudioCompactionAndAutoMemory(t *testing.T) {
 
 	cProj := filepath.Join(cherryProjects, "-Users-alex-cproj")
 	cMem := filepath.Join(cProj, "memory")
-	if err := os.MkdirAll(cMem, 0o755); err != nil {
+	if err = os.MkdirAll(cMem, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	cTranscript := filepath.Join(cProj, "cs-sess-1.jsonl")
@@ -292,10 +292,10 @@ func TestParityQoderAndCherryStudioCompactionAndAutoMemory(t *testing.T) {
 		`{"type":"assistant","uuid":"u1","requestId":"req-1","sessionId":"cs-sess-1","cwd":"/Users/alex/cproj","timestamp":"2026-10-03T10:00:01Z","message":{"id":"msg-1","role":"assistant","content":[{"type":"text","text":"advisory"}]}}`,
 		`{"type":"assistant","uuid":"u2","requestId":"req-1","sessionId":"cs-sess-1","cwd":"/Users/alex/cproj","timestamp":"2026-10-03T10:00:02Z","message":{"id":"msg-1","role":"assistant","content":[{"type":"text","text":"advisory lock timeout"},{"type":"tool_use","id":"cs-read-1","name":"Read","input":{"file_path":"/Users/alex/cproj/lock.go"}}]}}`,
 	}, "\n") + "\n"
-	if err := os.WriteFile(cTranscript, []byte(cBody), 0o600); err != nil {
+	if err = os.WriteFile(cTranscript, []byte(cBody), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(cMem, "project_conventions.md"), []byte("---\nname: Lock timeout\ntype: project\n---\nUse explicit lock timeout on migrations.\n"), 0o600); err != nil {
+	if err = os.WriteFile(filepath.Join(cMem, "project_conventions.md"), []byte("---\nname: Lock timeout\ntype: project\n---\nUse explicit lock timeout on migrations.\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

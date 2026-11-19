@@ -727,7 +727,8 @@ func TestASplitWithANewFileKeepsItsReadAccounting(t *testing.T) {
 	}
 }
 
-func makePaddedLines(n int, lineFn func(i int, pad string) string, padLen int) string {
+func makePaddedLines(n int, lineFn func(i int, pad string) string) string {
+	const padLen = 16 << 10
 	pad := strings.Repeat("p", padLen)
 	var b strings.Builder
 	b.Grow(n * (padLen + 160))
@@ -786,9 +787,9 @@ func TestSplitBatchDefersChangedAppendableWithoutFullRead(t *testing.T) {
 	makeHistPad := func(i int, pad string) string {
 		return codexHistoryLine(oldID, oldTime.Add(time.Duration(i)*time.Second), "hist head "+pad)
 	}
-	histHead := makePaddedLines(36, makeHistPad, 16<<10)
-	histMid := makePaddedLines(5, makeHistPad, 16<<10)
-	histTail := makePaddedLines(36, makeHistPad, 16<<10)
+	histHead := makePaddedLines(36, makeHistPad)
+	histMid := makePaddedLines(5, makeHistPad)
+	histTail := makePaddedLines(36, makeHistPad)
 
 	write(t, history, histHead+histMid+histTail)
 	write(t, grown, claudeLine("s-grown", "2026-01-02T03:04:05Z", "grown alpha"))
@@ -814,7 +815,7 @@ func TestSplitBatchDefersChangedAppendableWithoutFullRead(t *testing.T) {
 	bumpMTime(t, rewritten)
 
 	var progress bytes.Buffer
-	if err := Ensure(dir, "", false, &progress); err != nil {
+	if err = Ensure(dir, "", false, &progress); err != nil {
 		t.Fatal(err)
 	}
 	gotProgress := progress.String()
@@ -898,12 +899,12 @@ func TestIncrementalAndSplitReadByteBudgetAcrossHarnesses(t *testing.T) {
 
 			makeClaude := func() harnessFile {
 				p := filepath.Join(tmp, "claude", "p", "budget-claude.jsonl")
-				line := func(i int, pad string) string {
+				line := func(_ int, pad string) string {
 					return claudeLine("s-claude-budget", "2026-06-02T10:00:05Z", "claudemsg "+pad)
 				}
-				head := makePaddedLines(36, line, 16<<10)
-				mid := makePaddedLines(5, line, 16<<10)
-				tail := makePaddedLines(36, line, 16<<10)
+				head := makePaddedLines(36, line)
+				mid := makePaddedLines(5, line)
+				tail := makePaddedLines(36, line)
 				tok := "claude_delta_sentinel_budget"
 				return harnessFile{
 					path:       p,
@@ -928,9 +929,9 @@ func TestIncrementalAndSplitReadByteBudgetAcrossHarnesses(t *testing.T) {
 						"content": []any{map[string]any{"type": "input_text", "text": "codexmsg " + pad}},
 					})
 				}
-				head := meta + makePaddedLines(36, line, 16<<10)
-				mid := makePaddedLines(5, line, 16<<10)
-				tail := makePaddedLines(36, line, 16<<10)
+				head := meta + makePaddedLines(36, line)
+				mid := makePaddedLines(5, line)
+				tail := makePaddedLines(36, line)
 				tok := "codex_delta_sentinel_budget"
 				return harnessFile{
 					path:   p,
@@ -950,12 +951,12 @@ func TestIncrementalAndSplitReadByteBudgetAcrossHarnesses(t *testing.T) {
 
 			makeQwen := func() harnessFile {
 				p := filepath.Join(tmp, "qwen", "projects", "-tmp-qwen", "chats", "session.jsonl")
-				line := func(i int, pad string) string {
+				line := func(_ int, pad string) string {
 					return `{"type":"user","sessionId":"s-qwen-budget","timestamp":"2026-06-02T10:00:05Z","message":{"role":"user","parts":[{"text":"qwenmsg ` + pad + `"}]}}` + "\n"
 				}
-				head := makePaddedLines(36, line, 16<<10)
-				mid := makePaddedLines(5, line, 16<<10)
-				tail := makePaddedLines(36, line, 16<<10)
+				head := makePaddedLines(36, line)
+				mid := makePaddedLines(5, line)
+				tail := makePaddedLines(36, line)
 				tok := "qwen_delta_sentinel_budget"
 				return harnessFile{
 					path:       p,
@@ -1000,7 +1001,7 @@ func TestIncrementalAndSplitReadByteBudgetAcrossHarnesses(t *testing.T) {
 			}
 
 			var progress bytes.Buffer
-			if err := Ensure(dir, "", false, &progress); err != nil {
+			if err = Ensure(dir, "", false, &progress); err != nil {
 				t.Fatal(err)
 			}
 			gotProgress := progress.String()
