@@ -104,66 +104,36 @@ func runAudit(dir string, args []string, stdout io.Writer) error {
 	return nil
 }
 
+type auditStoreSpec struct {
+	name  string
+	files func() []string
+}
+
+func auditStoreSpecs() []auditStoreSpec {
+	reg := sources.Registry()
+	specs := make([]auditStoreSpec, 0, len(reg))
+	for _, h := range reg {
+		if h.Name == "deja" || h.Files == nil {
+			continue
+		}
+		files := h.Files
+		switch h.Name {
+		case "cursor":
+			files = cursorReadFiles
+		case "grok":
+			files = grokReadFiles
+		}
+		specs = append(specs, auditStoreSpec{name: h.Name, files: files})
+	}
+	return specs
+}
+
 func collectAuditWithOptions(dir string, now time.Time, scanSecrets bool) auditReport {
 	var rep auditReport
 	rep.Stores = []auditStoreRow{}
 	rep.WiredTargets = []string{}
 
-	type storeSpec struct {
-		name  string
-		files func() []string
-	}
-	specs := []storeSpec{
-		{"claude", sources.ClaudeFiles},
-		{"codex", sources.CodexFiles},
-		{"cursor", cursorReadFiles},
-		{"opencode", func() []string { return []string{sources.OpencodeDB()} }},
-		{"gemini", sources.GeminiChatFiles},
-		{"antigravity", sources.AntigravityTranscripts},
-		{"openclaw", sources.OpenClawStoreFiles},
-		{"hermes", sources.HermesSessionFiles},
-		{"copilot", sources.CopilotSessionFiles},
-		{"copilot-chat", sources.CopilotChatSessionFiles},
-		{"cline", sources.ClineSessionFiles},
-		{"roo", sources.RooTaskFiles},
-		{"kilocode", sources.KiloSessionFiles},
-		{"aider", sources.AiderFiles},
-		{"goose", sources.GooseSessionFiles},
-		{"qwen", sources.QwenSessionFiles},
-		{"qoder", sources.QoderSessionFiles},
-		{"kimi", sources.KimiSessionFiles},
-		{"zed", func() []string { return []string{sources.ZedDB()} }},
-		{"windsurf", sources.WindsurfSessionFiles},
-		{"kiro", sources.KiroSessionFiles},
-		{"continue", sources.ContinueSessionFiles},
-		{"amp", sources.AmpThreadFiles},
-		{"pi", sources.PiSessionFiles},
-		{"omp", sources.OmpSessionFiles},
-		{"crush", sources.CrushDBs},
-		{"deepseek", sources.DeepSeekSessionFiles},
-		{"grok", grokReadFiles},
-		{"trae", sources.TraeFiles},
-		{"codebuddy", sources.CodeBuddySessionFiles},
-		{"codearts", sources.CodeArtsFiles},
-		{"cherrystudio", sources.CherryStudioSessionFiles},
-		{"junie", sources.JunieSessionFiles},
-		{"jetbrains", sources.JetBrainsSessionFiles},
-		{"devin", sources.DevinFiles},
-		{"senpi", sources.SenpiSessionFiles},
-		{"kimchi", sources.KimchiSessionFiles},
-		{"commandcode", sources.CommandCodeSessionFiles},
-		{"clawcode", sources.ClawCodeSessionFiles},
-		{"zcode", sources.ZCodeSessionFiles},
-		{"gjc", sources.GjcSessionFiles},
-		{"prime", sources.PrimeSessionFiles},
-		{"codewhale", sources.CodeWhaleSessionFiles},
-		{"reasonix", sources.ReasonixSessionFiles},
-		{"muse", sources.MuseSessionFiles},
-		{"mcode", sources.McodeSessionFiles},
-		{"mimo", func() []string { return []string{sources.MimoDB()} }},
-		{"omnigent", func() []string { return []string{sources.OmnigentDB()} }},
-		{"orca", func() []string { return []string{sources.OrcaDB()} }},
-	}
+	specs := auditStoreSpecs()
 
 	skipStore := sources.ExcludedHarnesses()
 	claudeSkipped := skipStore["claude"] || sources.StoreSilenced("claude")

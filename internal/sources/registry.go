@@ -226,6 +226,7 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 				Match:     IsCodeArtsHistory,
 				Parse:     fullParse(ParseCodeArtsFile),
 				ParseFrom: offsetParse(parseCodeArtsFileFromOffset),
+				Resumes:   codeartsResumes,
 			}},
 		},
 		{
@@ -476,6 +477,7 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 				},
 				Parse:     fullParse(ParseQoderFile),
 				ParseFrom: offsetParse(ParseQoderFileFromOffset),
+				Resumes:   claudeResumes,
 			}},
 		},
 		{
@@ -614,6 +616,7 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 				Match:     ZCodeUnderRoot,
 				Parse:     fullParse(ParseZCodeFile),
 				ParseFrom: offsetParse(ParseZCodeFileFromOffset),
+				Resumes:   flatRoleExitResumes,
 			}, {
 				// The CLI's database, in OpenCode's schema — the same pair Kilo
 				// has (#3675).

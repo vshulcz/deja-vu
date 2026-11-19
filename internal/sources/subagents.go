@@ -98,10 +98,13 @@ func switchedLoad(f func() []model.Session) func() []model.Session {
 	return func() []model.Session { return applyReadSwitches(f()) }
 }
 
-// applyReadSwitches is every switch on what a reader returned: the parse
-// switches, then the sub-agent cut, so the turns a cut keeps are counted
-// among the records the index keeps.
+// applyReadSwitches is every switch on what a reader returned: resolve any
+// missing/home project attribution before ApplyParseSwitches can drop RoleFiles,
+// then run the parse switches and sub-agent filter.
 func applyReadSwitches(ss []model.Session) []model.Session {
+	for i := range ss {
+		resolveFallbackProject(&ss[i])
+	}
 	return ApplySubagentSwitch(ApplyParseSwitches(ss))
 }
 

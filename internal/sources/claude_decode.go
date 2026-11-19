@@ -508,8 +508,6 @@ func claudeTime(raw json.RawMessage) time.Time {
 // wrong.
 const RoleToolOutput = "tool-output"
 
-const inlineToolID = "inline"
-
 func claudeTextKindIn(c *claudeContent) (string, bool) {
 	var sawToolResult, sawSpeech bool
 	raw := c.raw
@@ -610,74 +608,6 @@ func splitClaudeContent(raw json.RawMessage) *claudeContent {
 		}
 	}
 	return c
-}
-
-// normalizeInlineClaudeText unpacks exported text markers ([thinking],
-// [tool_use Name] {...}, [tool_result]...) into synthetic typed blocks so all
-// downstream extractors handle them uniformly without altering native JSON logs.
-func normalizeInlineClaudeText(s string) (json.RawMessage, bool) {
-	trimmed := strings.TrimSpace(s)
-	if !strings.HasPrefix(trimmed, "[") {
-		return nil, false
-	}
-	if rest, ok := strings.CutPrefix(trimmed, "[thinking]"); ok && (rest == "" || rest[0] == ' ' || rest[0] == '\t' || rest[0] == '\n' || rest[0] == '\r') {
-		b, err := json.Marshal(struct {
-			Type     string `json:"type"`
-			Thinking string `json:"thinking"`
-		}{
-			Type:     "thinking",
-			Thinking: strings.TrimSpace(rest),
-		})
-		return b, err == nil
-	}
-	if rest, ok := strings.CutPrefix(trimmed, "[tool_use "); ok {
-		closeIdx := strings.IndexByte(rest, ']')
-		if closeIdx <= 0 {
-			return nil, false
-		}
-		name := strings.TrimSpace(rest[:closeIdx])
-		if name == "" || strings.ContainsAny(name, " \t\r\n") {
-			return nil, false
-		}
-		payload := strings.TrimSpace(rest[closeIdx+1:])
-		if len(payload) < 2 || payload[0] != '{' || !json.Valid([]byte(payload)) {
-			return nil, false
-		}
-		b, err := json.Marshal(struct {
-			Type  string          `json:"type"`
-			ID    string          `json:"id"`
-			Name  string          `json:"name"`
-			Input json.RawMessage `json:"input"`
-		}{
-			Type:  "tool_use",
-			ID:    inlineToolID,
-			Name:  name,
-			Input: json.RawMessage(payload),
-		})
-		return b, err == nil
-	}
-	if rest, ok := strings.CutPrefix(trimmed, "[tool_result]"); ok && (rest == "" || rest[0] == ' ' || rest[0] == '\t' || rest[0] == '\n' || rest[0] == '\r') {
-		body := strings.TrimLeft(rest, " \t\r\n")
-		isErr := strings.HasPrefix(body, "<tool_use_error>")
-		if !isErr {
-			if code, hasCode := statusCode(firstLine(body), "Exit code ", ""); hasCode && code != 0 {
-				isErr = true
-			}
-		}
-		b, err := json.Marshal(struct {
-			Type      string `json:"type"`
-			ToolUseID string `json:"tool_use_id"`
-			IsError   bool   `json:"is_error,omitempty"`
-			Content   string `json:"content"`
-		}{
-			Type:      "tool_result",
-			ToolUseID: inlineToolID,
-			IsError:   isErr,
-			Content:   body,
-		})
-		return b, err == nil
-	}
-	return nil, false
 }
 
 // notType reports that item i is an object of another type than want. A

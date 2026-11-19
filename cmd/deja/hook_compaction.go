@@ -206,7 +206,13 @@ func compactionOSErrorCode(err error) string {
 // TRAE CLI is not one of them: its rollout opens with Codex's session_meta,
 // but 0.207 writes turns as history_mutation records the Codex parser does not
 // read, and a live /compact captured nothing (transcript_unavailable).
-var compactionTailHarnesses = map[string]bool{"claude": true, "codex": true, "codebuddy": true}
+var compactionTailHarnesses = map[string]bool{
+	"claude":       true,
+	"codex":        true,
+	"codebuddy":    true,
+	"qoder":        true,
+	"cherrystudio": true,
+}
 
 // readCompactionFile reads the transcript the host named. Claude, Codex and
 // CodeBuddy files go through the bounded tail reader; any other store's file,

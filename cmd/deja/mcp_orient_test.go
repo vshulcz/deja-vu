@@ -262,3 +262,61 @@ func TestFilterAndSortOrientCmdsPrefersRecentVerifyCommandsOverStaleOnes(t *test
 		t.Errorf("got[0].Command = %q, want ./scripts/verify-fast.sh ahead of stale command", got[0].Command)
 	}
 }
+
+func TestOrientAndRepoCandidatesParityPaths(t *testing.T) {
+	if !orientEphemeralCommand("go test /w/svc/.cursor/worktrees/wt1/pkg") {
+		t.Error("expected .cursor worktree path in command to be ephemeral")
+	}
+	if !orientEphemeralCommand(`cmd="/w/svc/.windsurf/worktrees/wt2/pkg"`) {
+		t.Error("expected quoted .windsurf worktree path in command to be ephemeral")
+	}
+	if orientEphemeralCommand("go test ../worktrees/wt1/pkg") {
+		t.Error("relative ../worktrees path must not be treated as a hidden worktree dir")
+	}
+	if orientEphemeralCommand("go test /w/svc/sub/worktrees/wt1/pkg") {
+		t.Error("non-dot sub/worktrees path must not be treated as a hidden worktree dir")
+	}
+
+	if !isOrientEphemeralFile("/Users/alex/.qwen/projects/proj-a/chat.jsonl") {
+		t.Error("expected .qwen/projects file to be ephemeral")
+	}
+	if !containsDotProjectsOrJobs("/users/alex/.custom/projects/p1/a.go") {
+		t.Error("expected /.custom/projects/ to match containsDotProjectsOrJobs")
+	}
+	if !containsDotProjectsOrJobs("/users/alex/.custom/jobs/j1/a.go") {
+		t.Error("expected /.custom/jobs/ to match containsDotProjectsOrJobs")
+	}
+	if containsDotProjectsOrJobs("/users/alex/../projects/p1/a.go") {
+		t.Error("/../projects/ must not match containsDotProjectsOrJobs")
+	}
+
+	if got, want := stripWorktreeSegment("/.git/worktrees/wt1/cmd/main.go"), filepath.FromSlash("/cmd/main.go"); got != want {
+		t.Errorf("stripWorktreeSegment(/.git/worktrees/...) = %q, want %q", got, want)
+	}
+
+	repo := t.TempDir()
+	other := t.TempDir()
+	mainFile := filepath.Join(repo, "cmd", "deja", "main.go")
+	if err := os.MkdirAll(filepath.Dir(mainFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(mainFile, []byte("package main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(other, "outside.go"), []byte("package other\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := cleanRepoRelFile(repo, filepath.Join(repo, ".cursor", "worktrees", "wt1", "cmd", "deja", "main.go")); got != "cmd/deja/main.go" {
+		t.Errorf("cleanRepoRelFile(worktree path) = %q, want cmd/deja/main.go", got)
+	}
+	if got := cleanRepoRelFile(repo, "/.git/worktrees/wt1/cmd/deja/main.go"); got != "" {
+		t.Errorf("cleanRepoRelFile(/.git/worktrees/...) = %q, want empty", got)
+	}
+	if got := cleanRepoRelFile(repo, filepath.Join(other, "outside.go")); got != "" {
+		t.Errorf("cleanRepoRelFile(outside repo) = %q, want empty", got)
+	}
+	if got := cleanRepoRelFile(repo, ".deja/memory.jsonl"); got != "" {
+		t.Errorf("cleanRepoRelFile(.deja/memory.jsonl) = %q, want empty", got)
+	}
+}

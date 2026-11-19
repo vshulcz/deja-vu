@@ -390,7 +390,7 @@ func claudeProjectName(dir string) string {
 // names ("deja-vu", not "deja/vu"). Falls back to the dash heuristic when the
 // path no longer exists (deleted projects, dirs imported from other machines).
 func decodeProjectBase(base string) string {
-	if i := strings.Index(base, "--claude-worktrees-"); i > 0 {
+	if i := findEncodedWorktreeMarker(base); i > 0 {
 		base = base[:i]
 	}
 	if resolved := resolveEncodedPath(base); resolved != "" {
@@ -416,6 +416,43 @@ func decodeProjectBase(base string) string {
 		return clean[0]
 	}
 	return projectSegments(clean[len(clean)-2], clean[len(clean)-1])
+}
+
+func findEncodedWorktreeMarker(base string) int {
+	const needle = "-worktrees-"
+	start := 0
+	for start < len(base) {
+		rel := strings.Index(base[start:], needle)
+		if rel < 0 {
+			return -1
+		}
+		j := start + rel
+		start = j + len(needle)
+		k := strings.LastIndex(base[:j], "--")
+		if k <= 0 {
+			continue
+		}
+		dot := base[k+2 : j]
+		if !isWorktreeDotDir("." + dot) {
+			continue
+		}
+		if isEncodedHomePrefix(base[:k]) {
+			continue
+		}
+		return k
+	}
+	return -1
+}
+
+func isEncodedHomePrefix(prefix string) bool {
+	if drive, rest, ok := splitEncodedWindowsDrive(prefix); ok {
+		return isHomeRootPath(drive + "/" + strings.ReplaceAll(strings.TrimPrefix(rest, "-"), "-", "/"))
+	}
+	if prefix == "" || prefix[0] != '-' {
+		return false
+	}
+	trimmed := strings.TrimPrefix(strings.TrimPrefix(prefix, "-"), "-")
+	return isHomeRootPath("/" + strings.ReplaceAll(trimmed, "-", "/"))
 }
 
 // resolveEncodedPath finds the real directory an encoded project name points

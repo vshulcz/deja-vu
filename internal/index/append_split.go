@@ -100,6 +100,7 @@ type splitRead struct {
 	sessions []model.Session
 	at       FileState
 	again    bool
+	deferred bool
 	err      error
 }
 
@@ -175,11 +176,37 @@ func splitKeys(old Manifest, files map[string]FileState, reads map[string]splitR
 func withoutRest(files map[string]FileState, rest, old map[string]FileState) map[string]FileState {
 	out := maps.Clone(files)
 	for p := range rest {
-		if of, ok := old[p]; ok {
-			out[p] = of
-		} else {
-			delete(out, p)
+		holdFileAtOld(out, p, old)
+	}
+	return out
+}
+
+// withoutDeferred holds append-deferred files at their indexed state so Pass 2
+// leaves them for a later incremental pass instead of forcing a full re-read.
+func withoutDeferred(files map[string]FileState, appends map[string]splitRead, old map[string]FileState) map[string]FileState {
+	hasDeferred := false
+	for _, r := range appends {
+		if r.deferred {
+			hasDeferred = true
+			break
+		}
+	}
+	if !hasDeferred {
+		return files
+	}
+	out := maps.Clone(files)
+	for p, r := range appends {
+		if r.deferred {
+			holdFileAtOld(out, p, old)
 		}
 	}
 	return out
+}
+
+func holdFileAtOld(out map[string]FileState, path string, old map[string]FileState) {
+	if of, ok := old[path]; ok {
+		out[path] = of
+		return
+	}
+	delete(out, path)
 }

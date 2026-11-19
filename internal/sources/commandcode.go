@@ -109,7 +109,7 @@ func parseCommandCodeWith(path string, scan func(func(map[string]any)) error) ([
 				s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: text, Time: t})
 			}
 		default:
-			flatRoleLine(&s, m)
+			flatRoleLineWithExits(&s, m, exits)
 		}
 	})
 	if len(s.Messages) == 0 {

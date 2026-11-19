@@ -306,8 +306,10 @@ func ParseDeepSeekFile(path string) ([]model.Session, error) {
 				s.Messages = append(s.Messages, call.settle(s.Messages, text)...)
 			}
 			if text != "" {
-				s.Messages = append(s.Messages, model.Message{Role: "tool-output", Text: text, Time: at})
 				s.Touch(at)
+				if IndexToolOutput() {
+					s.Messages = append(s.Messages, model.Message{Role: RoleToolOutput, Text: capParsedMessage(text), Time: at})
+				}
 			}
 		}
 	}

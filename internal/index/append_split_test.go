@@ -726,3 +726,315 @@ func TestASplitWithANewFileKeepsItsReadAccounting(t *testing.T) {
 		})
 	}
 }
+
+func makePaddedLines(n int, lineFn func(i int, pad string) string, padLen int) string {
+	pad := strings.Repeat("p", padLen)
+	var b strings.Builder
+	b.Grow(n * (padLen + 160))
+	for i := range n {
+		b.WriteString(lineFn(i, pad))
+	}
+	return b.String()
+}
+
+func corruptMidSameLen(mid string) string {
+	const prefix = "corrupt_middle_never_read_"
+	if len(mid) <= len(prefix)+1 {
+		panic("mid too short")
+	}
+	return prefix + strings.Repeat("x", len(mid)-len(prefix)-1) + "\n"
+}
+
+// When an appendable file in a split batch is deferred during appendPass (for
+// example codex history waiting on its matching rollout), Pass 2 must leave it
+// at its pre-pass state instead of falling back to a full offset-0 re-read.
+func TestSplitBatchDefersChangedAppendableWithoutFullRead(t *testing.T) {
+	tmp := parityEnv(t, map[string]string{
+		"DEJA_CLAUDE_ROOT": "claude",
+		"DEJA_CODEX_ROOT":  "codex",
+	})
+	t.Setenv("CODEX_HOME", "")
+
+	// withoutDeferred must also drop unknown deferred files from Pass 2.
+	unknownPath := filepath.Join(tmp, "unknown.jsonl")
+	knownPath := filepath.Join(tmp, "known.jsonl")
+	fUnknown := FileState{Size: 10}
+	fKnownOld := FileState{Size: 20}
+	fKnownNew := FileState{Size: 40}
+	filtered := withoutDeferred(
+		map[string]FileState{unknownPath: fUnknown, knownPath: fKnownNew},
+		map[string]splitRead{unknownPath: {deferred: true}, knownPath: {deferred: true}},
+		map[string]FileState{knownPath: fKnownOld},
+	)
+	if _, exists := filtered[unknownPath]; exists {
+		t.Fatalf("withoutDeferred kept unknown deferred file: %v", filtered)
+	}
+	if got := filtered[knownPath]; got != fKnownOld {
+		t.Fatalf("withoutDeferred known = %+v, want %+v", got, fKnownOld)
+	}
+
+	const oldID = "019a0000-0000-7000-8000-000000000101"
+	const pendingID = "019a0000-0000-7000-8000-000000000102"
+	oldTime := time.Date(2026, 6, 1, 10, 0, 0, 0, time.UTC)
+
+	history := filepath.Join(tmp, "codex", "history.jsonl")
+	grown := filepath.Join(tmp, "claude", "p", "grown.jsonl")
+	rewritten := filepath.Join(tmp, "claude", "p", "rewritten.jsonl")
+
+	// Exceed 2 * 512 KiB so head and tail prefixSample windows stay identical
+	// when the middle lines are corrupted; any offset-0 re-read would hit them.
+	makeHistPad := func(i int, pad string) string {
+		return codexHistoryLine(oldID, oldTime.Add(time.Duration(i)*time.Second), "hist head "+pad)
+	}
+	histHead := makePaddedLines(36, makeHistPad, 16<<10)
+	histMid := makePaddedLines(5, makeHistPad, 16<<10)
+	histTail := makePaddedLines(36, makeHistPad, 16<<10)
+
+	write(t, history, histHead+histMid+histTail)
+	write(t, grown, claudeLine("s-grown", "2026-01-02T03:04:05Z", "grown alpha"))
+	write(t, rewritten, claudeLine("s-rewritten", "2026-01-02T03:04:05Z", "rewrite before"))
+
+	dir := filepath.Join(tmp, "idx")
+	indexPass(t, dir)
+	before, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := before.Files[history]; !ok || before.Files[history].SafeSize == 0 {
+		t.Fatalf("history must be indexed with SafeSize > 0: %+v", before.Files[history])
+	}
+
+	// Poison the middle (outside both prefixSample windows) and append a fresh
+	// history entry with no rollout yet so readAppended defers history.
+	pendingPrompt := "pending rollout delta prompt"
+	pendingLine := codexHistoryLine(pendingID, time.Now().UTC(), pendingPrompt)
+	write(t, history, histHead+corruptMidSameLen(histMid)+histTail+pendingLine)
+	appendTo(t, grown, claudeLine("s-grown", "2026-01-02T04:00:00Z", "grown omega"))
+	write(t, rewritten, claudeLine("s-rewritten", "2026-01-02T03:04:05Z", "rewrite after"))
+	bumpMTime(t, rewritten)
+
+	var progress bytes.Buffer
+	if err := Ensure(dir, "", false, &progress); err != nil {
+		t.Fatal(err)
+	}
+	gotProgress := progress.String()
+	if !strings.Contains(gotProgress, "updated 1 file") {
+		t.Errorf("expected grown to append cleanly in pass 1, progress=%q", gotProgress)
+	}
+	wantReplace := replacementPassMarker + " 1 changed transcript,"
+	if !strings.Contains(gotProgress, wantReplace) {
+		t.Errorf("expected pass 2 to replace only rewritten (%q), progress=%q", wantReplace, gotProgress)
+	}
+
+	after, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Files[history] != before.Files[history] {
+		t.Errorf("deferred history state changed: got=%+v want=%+v", after.Files[history], before.Files[history])
+	}
+	if mal := after.IngestFiles[history].Malformed; mal != 0 {
+		t.Errorf("deferred history malformed = %d (full re-read hit poisoned middle), want 0", mal)
+	}
+
+	// Once the matching rollout appears, a later incremental pass picks up the
+	// deferred append from SafeSize without re-reading the poisoned middle.
+	rollout := filepath.Join(tmp, "codex", "sessions", "rollout-"+pendingID+".jsonl")
+	write(t, rollout,
+		codexLine(time.Now().UTC(), "session_meta", map[string]any{"id": pendingID, "cwd": "/w/app"})+
+			codexLine(time.Now().UTC(), "response_item", map[string]any{
+				"type":    "message",
+				"role":    "user",
+				"content": []any{map[string]any{"type": "input_text", "text": pendingPrompt}},
+			}),
+	)
+	indexPass(t, dir)
+	finalManifest, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mal := finalManifest.IngestFiles[history].Malformed; mal != 0 {
+		t.Errorf("post-recovery history malformed = %d (re-read middle), want 0", mal)
+	}
+	if finalManifest.Files[history].SafeSize <= before.Files[history].SafeSize {
+		t.Errorf("post-recovery history SafeSize did not advance: before=%d after=%d",
+			before.Files[history].SafeSize, finalManifest.Files[history].SafeSize)
+	}
+	if _, ok := finalManifest.Sessions["codex:"+pendingID]; !ok {
+		t.Errorf("deferred session %q was not indexed once rollout appeared", pendingID)
+	}
+	if gotView := sessionView(t, dir, "codex", pendingID); !strings.Contains(gotView, pendingPrompt) {
+		t.Errorf("recovered session view missing pending prompt %q: %s", pendingPrompt, gotView)
+	}
+}
+
+// Across offset-resumable harnesses, both pure incremental append and split-batch
+// append must never re-read bytes before SafeSize (proven by poisoning bytes
+// strictly between the head and tail prefixSample windows and asserting
+// Malformed stays zero while appended messages are indexed).
+func TestIncrementalAndSplitReadByteBudgetAcrossHarnesses(t *testing.T) {
+	for _, splitMode := range []bool{false, true} {
+		name := "pure_append"
+		if splitMode {
+			name = "split_batch"
+		}
+		t.Run(name, func(t *testing.T) {
+			tmp := parityEnv(t, map[string]string{
+				"DEJA_CLAUDE_ROOT": "claude",
+				"DEJA_CODEX_ROOT":  "codex",
+				"DEJA_QWEN_ROOT":   "qwen",
+			})
+			t.Setenv("CODEX_HOME", "")
+
+			baseTime := time.Date(2026, 6, 2, 10, 0, 0, 0, time.UTC)
+
+			type harnessFile struct {
+				path         string
+				prefix, mid  string
+				tail, delta  string
+				deltaToken   string
+				harness, sid string
+			}
+
+			makeClaude := func() harnessFile {
+				p := filepath.Join(tmp, "claude", "p", "budget-claude.jsonl")
+				line := func(i int, pad string) string {
+					return claudeLine("s-claude-budget", "2026-06-02T10:00:05Z", "claudemsg "+pad)
+				}
+				head := makePaddedLines(36, line, 16<<10)
+				mid := makePaddedLines(5, line, 16<<10)
+				tail := makePaddedLines(36, line, 16<<10)
+				tok := "claude_delta_sentinel_budget"
+				return harnessFile{
+					path:       p,
+					prefix:     head,
+					mid:        mid,
+					tail:       tail,
+					delta:      claudeLine("s-claude-budget", "2026-06-02T10:05:00Z", tok),
+					deltaToken: tok,
+					harness:    "claude",
+					sid:        "s-claude-budget",
+				}
+			}
+
+			makeCodexRollout := func() harnessFile {
+				const sid = "019a0000-0000-7000-8000-000000000201"
+				p := filepath.Join(tmp, "codex", "sessions", "rollout-"+sid+".jsonl")
+				meta := codexLine(baseTime, "session_meta", map[string]any{"id": sid, "cwd": "/w/app"})
+				line := func(i int, pad string) string {
+					return codexLine(baseTime.Add(time.Duration(i)*time.Second), "response_item", map[string]any{
+						"type":    "message",
+						"role":    "user",
+						"content": []any{map[string]any{"type": "input_text", "text": "codexmsg " + pad}},
+					})
+				}
+				head := meta + makePaddedLines(36, line, 16<<10)
+				mid := makePaddedLines(5, line, 16<<10)
+				tail := makePaddedLines(36, line, 16<<10)
+				tok := "codex_delta_sentinel_budget"
+				return harnessFile{
+					path:   p,
+					prefix: head,
+					mid:    mid,
+					tail:   tail,
+					delta: codexLine(baseTime.Add(time.Hour), "response_item", map[string]any{
+						"type":    "message",
+						"role":    "user",
+						"content": []any{map[string]any{"type": "input_text", "text": tok}},
+					}),
+					deltaToken: tok,
+					harness:    "codex",
+					sid:        sid,
+				}
+			}
+
+			makeQwen := func() harnessFile {
+				p := filepath.Join(tmp, "qwen", "projects", "-tmp-qwen", "chats", "session.jsonl")
+				line := func(i int, pad string) string {
+					return `{"type":"user","sessionId":"s-qwen-budget","timestamp":"2026-06-02T10:00:05Z","message":{"role":"user","parts":[{"text":"qwenmsg ` + pad + `"}]}}` + "\n"
+				}
+				head := makePaddedLines(36, line, 16<<10)
+				mid := makePaddedLines(5, line, 16<<10)
+				tail := makePaddedLines(36, line, 16<<10)
+				tok := "qwen_delta_sentinel_budget"
+				return harnessFile{
+					path:       p,
+					prefix:     head,
+					mid:        mid,
+					tail:       tail,
+					delta:      `{"type":"user","sessionId":"s-qwen-budget","timestamp":"2026-06-02T10:05:00Z","message":{"role":"user","parts":[{"text":"` + tok + `"}]}}` + "\n",
+					deltaToken: tok,
+					harness:    "qwen",
+					sid:        "s-qwen-budget",
+				}
+			}
+
+			files := []harnessFile{makeClaude(), makeCodexRollout(), makeQwen()}
+			for _, hf := range files {
+				write(t, hf.path, hf.prefix+hf.mid+hf.tail)
+			}
+			rewritten := filepath.Join(tmp, "claude", "p", "other-rewritten.jsonl")
+			if splitMode {
+				write(t, rewritten, claudeLine("s-split-other", "2026-06-02T09:00:00Z", "split initial"))
+			}
+
+			dir := filepath.Join(tmp, "idx")
+			indexPass(t, dir)
+
+			before, err := readManifest(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, hf := range files {
+				if before.Files[hf.path].SafeSize != int64(len(hf.prefix)+len(hf.mid)+len(hf.tail)) {
+					t.Fatalf("%s initial SafeSize = %d, want %d", hf.harness, before.Files[hf.path].SafeSize, len(hf.prefix)+len(hf.mid)+len(hf.tail))
+				}
+			}
+
+			for _, hf := range files {
+				write(t, hf.path, hf.prefix+corruptMidSameLen(hf.mid)+hf.tail+hf.delta)
+			}
+			if splitMode {
+				write(t, rewritten, claudeLine("s-split-other", "2026-06-02T09:00:00Z", "split rewritten"))
+				bumpMTime(t, rewritten)
+			}
+
+			var progress bytes.Buffer
+			if err := Ensure(dir, "", false, &progress); err != nil {
+				t.Fatal(err)
+			}
+			gotProgress := progress.String()
+			if !strings.Contains(gotProgress, "updated 3 files") {
+				t.Errorf("expected 3 appended files, progress=%q", gotProgress)
+			}
+			if splitMode {
+				wantReplace := replacementPassMarker + " 1 changed transcript,"
+				if !strings.Contains(gotProgress, wantReplace) {
+					t.Errorf("split pass should replace only rewritten (%q), progress=%q", wantReplace, gotProgress)
+				}
+			} else if strings.Contains(gotProgress, replacementPassMarker) {
+				t.Errorf("pure append unexpectedly triggered replacement pass: %q", gotProgress)
+			}
+
+			after, err := readManifest(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, hf := range files {
+				if mal := after.IngestFiles[hf.path].Malformed; mal != 0 {
+					t.Errorf("%s malformed = %d (read before SafeSize!), want 0", hf.harness, mal)
+				}
+				wantSize := int64(len(hf.prefix) + len(hf.mid) + len(hf.tail) + len(hf.delta))
+				if after.Files[hf.path].SafeSize != wantSize {
+					t.Errorf("%s SafeSize = %d, want %d", hf.harness, after.Files[hf.path].SafeSize, wantSize)
+				}
+				if _, ok := after.Sessions[hf.harness+":"+hf.sid]; !ok {
+					t.Errorf("%s session %q missing after append", hf.harness, hf.sid)
+				}
+				if gotView := sessionView(t, dir, hf.harness, hf.sid); !strings.Contains(gotView, hf.deltaToken) {
+					t.Errorf("%s session view missing appended delta %q", hf.harness, hf.deltaToken)
+				}
+			}
+		})
+	}
+}

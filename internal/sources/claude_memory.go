@@ -170,7 +170,7 @@ func claudeAutoMemoryDirs(dirs []string) []string {
 			memDirs = append(memDirs, p)
 		}
 	}
-	for _, root := range ClaudeRoots() {
+	for _, root := range claudeAutoMemoryRoots() {
 		for _, cand := range cands {
 			enc := claudeEncodePath(cand)
 			if enc == "" {
@@ -192,6 +192,32 @@ func claudeAutoMemoryDirs(dirs []string) []string {
 		}
 	}
 	return memDirs
+}
+
+func claudeAutoMemoryRoots() []string {
+	var roots []string
+	add := func(r string) {
+		if r == "" {
+			return
+		}
+		r = filepath.Clean(r)
+		if !slices.Contains(roots, r) {
+			roots = append(roots, r)
+		}
+	}
+	for _, r := range ClaudeRoots() {
+		add(r)
+	}
+	claudePinned := os.Getenv("DEJA_CLAUDE_ROOT") != ""
+	if !claudePinned || os.Getenv("DEJA_CHERRYSTUDIO_ROOTS") != "" {
+		for _, r := range CherryStudioRoots() {
+			add(r)
+		}
+	}
+	if !claudePinned || os.Getenv("DEJA_QODER_ROOT") != "" {
+		add(filepath.Join(QoderRoot(), "projects"))
+	}
+	return roots
 }
 
 func parseClaudeMemoryFile(full, memDir string, de os.DirEntry) (ClaudeMemoryEntry, bool) {
@@ -424,7 +450,7 @@ func IsClaudeAutoMemoryFile(p string) bool {
 func ClaudeAutoMemoryFiles() []string {
 	var out []string
 	seen := map[string]bool{}
-	for _, root := range ClaudeRoots() {
+	for _, root := range claudeAutoMemoryRoots() {
 		projEntries, err := os.ReadDir(root)
 		if err != nil {
 			continue
