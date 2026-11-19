@@ -220,22 +220,14 @@ func remineSpans(dir string, f *os.File, size int64, m Manifest, tbl *recordTabl
 	}
 	spans := make([]remineSpan, 0, len(byKey))
 	for k, offs := range byKey {
-		if len(offs) == 0 {
+		if _, ok := m.Sessions[k]; !ok || len(offs) == 0 {
 			continue
 		}
-		if _, ok := m.Sessions[k]; !ok {
-			continue
-		}
-		if !slices.IsSorted(offs) {
-			slices.Sort(offs)
-		}
+		slices.Sort(offs)
 		spans = append(spans, remineSpan{key: k, offs: offs})
 	}
 	slices.SortFunc(spans, func(a, b remineSpan) int {
-		if c := cmp.Compare(a.offs[0], b.offs[0]); c != 0 {
-			return c
-		}
-		return cmp.Compare(a.key, b.key)
+		return cmp.Or(cmp.Compare(a.offs[0], b.offs[0]), cmp.Compare(a.key, b.key))
 	})
 	return spans, nil
 }

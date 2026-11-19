@@ -265,3 +265,81 @@ func TestRemineFixesReleasesSessionMessagesBetweenSessions(t *testing.T) {
 		t.Fatalf("got %d mined pairs, want %d", len(got), totalSessions)
 	}
 }
+
+func TestRemineFixesDefensiveBranches(t *testing.T) {
+	// Missing manifest.json returns cleanly without writing fix tables.
+	missingDir := t.TempDir()
+	remineFixes(missingDir)
+	if len(ReadFixes(missingDir)) != 0 {
+		t.Fatalf("unexpected fixes in empty dir")
+	}
+
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	makeSession := func(id string) model.Session {
+		return model.Session{
+			ID:      id,
+			Harness: "claude",
+			Project: "app",
+			Updated: now,
+			Messages: []model.Message{
+				{Role: "tool-output", Text: "zsh:1: command not found: edgebin" + id, Time: now},
+				{Role: "command", Text: "brew install edgebin" + id, Time: now.Add(time.Second)},
+				{Role: "tool-output", Text: "ok", Time: now.Add(2 * time.Second)},
+			},
+		}
+	}
+
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir+".tmp", "buckets"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeSessions(dir+".tmp", dir, []model.Session{makeSession("s1"), makeSession("s2")}, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+
+	// Orphan record key removed from m.Sessions is skipped cleanly.
+	m, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	delete(m.Sessions, "claude:s2")
+	if err = writeManifest(dir, m); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.Remove(fixesPath(dir))
+	_ = os.Remove(fixRawPath(dir))
+	invalidateFixesCache()
+	remineFixes(dir)
+	got := ReadFixes(dir)
+	if len(got) != 1 || got[0].Key != "claude:s1" {
+		t.Fatalf("expected only claude:s1 after deleting claude:s2 from manifest, got %+v", got)
+	}
+
+	// Oversized record header triggers scanRecordOffsets corruption error and preserves fixes.gob.
+	_ = os.Remove(filepath.Join(dir, recordOffsetsFile))
+	rp := filepath.Join(dir, "records.bin")
+	origLog, err := os.ReadFile(rp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	corrupt := slices.Clone(origLog)
+	binary.LittleEndian.PutUint32(corrupt[:4], 0x7fffffff)
+	if err = os.WriteFile(rp, corrupt, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	remineFixes(dir)
+	invalidateFixesCache()
+	if after := ReadFixes(dir); !reflect.DeepEqual(after, got) {
+		t.Fatalf("oversized log modified existing fixes.gob\n got: %+v\nwant: %+v", after, got)
+	}
+
+	// Missing records.bin preserves existing fixes.gob.
+	if err = os.Remove(rp); err != nil {
+		t.Fatal(err)
+	}
+	remineFixes(dir)
+	invalidateFixesCache()
+	if after := ReadFixes(dir); !reflect.DeepEqual(after, got) {
+		t.Fatalf("missing records.bin modified existing fixes.gob\n got: %+v\nwant: %+v", after, got)
+	}
+}
