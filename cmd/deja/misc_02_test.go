@@ -2691,8 +2691,8 @@ func TestBenchCompletionDispatch(t *testing.T) {
 		{[]string{"deja", "bench", "block", "--"}, []string{"--json", "--seed"}, []string{}},
 		{[]string{"deja", "bench", "ingest", "--"}, []string{"--json", "--seed"}, []string{}},
 		{[]string{"deja", "bench", "read", "--"}, []string{"--json", "--seed"}, []string{}},
-		{[]string{"deja", "bench", "recall", "--"}, []string{"--json", "--seed"}, []string{}},
-		{[]string{"deja", "bench", "live", "--"}, []string{"--json"}, []string{"--seed"}},
+		{[]string{"deja", "bench", "recall", "--"}, []string{"--json", "--seed"}, []string{"--delivery"}},
+		{[]string{"deja", "bench", "live", "--"}, []string{"--delivery", "--json"}, []string{"--seed"}},
 	})
 }
 

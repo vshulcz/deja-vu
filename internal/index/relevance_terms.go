@@ -97,10 +97,12 @@ type sessionCredit struct {
 	// messages is how many of its records matched a term. bestTerms and
 	// bestIDF are, over those records, the most distinct terms one of them
 	// holds and the most idf mass one of them collects (scoreSession).
-	messages  int32
-	bestTerms float64
-	bestIDF   float64
-	credited  bool
+	messages       int32
+	bestTerms      float64
+	bestIDF        float64
+	bestFocusTerms float64
+	bestFocusIDF   float64
+	credited       bool
 }
 
 // messageCredit is one matched record. Co-occurrence inside one message is a
@@ -109,10 +111,12 @@ type sessionCredit struct {
 // carry: a session can then be ranked by its best single message rather than
 // by the total it collects across thousands of them.
 type messageCredit struct {
-	off   int64
-	place int32
-	terms int32
-	idf   float64
+	off        int64
+	place      int32
+	terms      int32
+	idf        float64
+	focusTerms int32
+	focusIDF   float64
 	// tool marks a tool record rather than speech, so its credit can be
 	// weighed at toolMatchWeight below.
 	tool bool
@@ -703,6 +707,12 @@ func (a *relevanceAcc) scoreTerm(term string, th termHits) {
 		}
 		msg.terms++
 		msg.idf += rank
+		if informative {
+			msg.focusTerms++
+			msg.focusIDF += rank
+		} else if inTitle && rank >= 0.45 {
+			msg.focusIDF += 0.5 * rank
+		}
 		// A term the session only ever held in tool records was not said
 		// by anyone there; it sat in a file it read or a command's output.
 		if !msg.tool {
@@ -760,15 +770,26 @@ func (a *relevanceAcc) bestMessages() {
 		}
 		s := &a.sess[msg.place]
 		kk, v := float64(msg.terms), msg.idf
+		fk, fv := float64(msg.focusTerms), msg.focusIDF
 		if msg.tool {
 			kk = 1 + (kk-1)*toolMatchWeight
 			v *= toolMatchWeight
+			if fk > 1 {
+				fk = 1 + (fk-1)*toolMatchWeight
+			}
+			fv *= toolMatchWeight
 		}
 		if kk > s.bestTerms {
 			s.bestTerms = kk
 		}
 		if v > s.bestIDF {
 			s.bestIDF = v
+		}
+		if fk > s.bestFocusTerms {
+			s.bestFocusTerms = fk
+		}
+		if fv > s.bestFocusIDF {
+			s.bestFocusIDF = fv
 		}
 	}
 }
@@ -790,8 +811,18 @@ func (a *relevanceAcc) scoreSession(p int32, long bool, sumWords, nWords float64
 	// outranks the short session that actually answers.
 	bestMsg := s.bestIDF
 	coocc := 1 + 0.2*(best-1)
+	tailWeight := 0.25
+	if a.queryTerms >= 4 && meta.Counted > 64 {
+		tailWeight = 0.25 / math.Sqrt(float64(meta.Counted)/64.0)
+	}
 	if !long {
-		sc = bestMsg*coocc + 0.25*(sc-bestMsg)
+		sc = bestMsg*coocc + tailWeight*(sc-bestMsg)
+		if s.focus > 0 {
+			fBest := max(1.0, s.bestFocusTerms)
+			fCoocc := 1 + 0.2*(fBest-1)
+			fMsg := min(s.focus, s.bestFocusIDF)
+			s.focus = fMsg*fCoocc + tailWeight*max(0, s.focus-fMsg)
+		}
 	}
 	// Coverage: distinct informative terms beat repetition.
 	covered := coverageCount(s.matched, s.identifying, a.identifyingTerms)
@@ -810,6 +841,7 @@ func (a *relevanceAcc) scoreSession(p int32, long bool, sumWords, nWords float64
 			share = 1
 		}
 		sc *= 1 + marathonShare*share
+		s.focus *= 1 + marathonShare*share
 	}
 	zoneMult := a.zoneFieldMultiplier(meta)
 	if zoneMult != 1.0 {

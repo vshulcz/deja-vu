@@ -775,3 +775,58 @@ func TestSplitShellAndGitInvocationWindowsPaths(t *testing.T) {
 		t.Fatalf("parseGitInvocation UNC path failed: ok=%v dir=%q sub=%q fields=%q", ok, dirFlag, sub, uncFields)
 	}
 }
+
+func TestCoordSkipsMCPHelperSessionsAndPlainInputField(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "index.db")
+	hostsNoWarmup(t)
+	_ = withFrozenCoordClock(t, time.Date(2026, 5, 1, 18, 0, 0, 0, time.UTC))
+
+	// Ephemeral helper sessions (*-mcp-*) must never write .coord or fire radar.
+	_ = coordRunToolHook(t, dir, map[string]any{
+		"hook_event_name": "PreToolUse",
+		"tool_name":       "Edit",
+		"tool_input":      map[string]any{"file_path": "config.go"},
+		"session_id":      "helper-mcp-001",
+		"cwd":             "/work/alpha",
+	})
+	if got := coordRunToolHook(t, dir, map[string]any{
+		"hook_event_name": "PreToolUse",
+		"tool_name":       "Edit",
+		"tool_input":      map[string]any{"file_path": "config.go"},
+		"session_id":      "sess_main",
+		"cwd":             "/work/alpha",
+	}); got != "" {
+		t.Fatalf("expected no radar warning from helper-mcp session, got %q", got)
+	}
+
+	// Non-patch tools carrying "input" must not be treated as patches.
+	searchStore := filepath.Join(t.TempDir(), "index2.db")
+	_ = coordRunToolHook(t, searchStore, map[string]any{
+		"hook_event_name": "PreToolUse",
+		"tool_name":       "search",
+		"tool_input":      map[string]any{"input": "plain search query for config.go", "file_path": "config.go"},
+		"session_id":      "sess_search",
+		"cwd":             "/work/alpha",
+	})
+	if _, err := os.Stat(coordPath(searchStore)); !os.IsNotExist(err) {
+		t.Fatalf("plain input search tool must not write .coord, got err=%v", err)
+	}
+
+	// Real apply_patch carrying patch text in "input" still records the edited path.
+	_ = coordRunToolHook(t, searchStore, map[string]any{
+		"hook_event_name": "PreToolUse",
+		"tool_name":       "apply_patch",
+		"tool_input":      map[string]any{"input": "*** Begin Patch\n*** Update File: config.go\n@@ -1 +1 @@\n-old\n+new\n*** End Patch\n"},
+		"session_id":      "sess_patch_1",
+		"cwd":             "/work/alpha",
+	})
+	if warn := coordRunToolHook(t, searchStore, map[string]any{
+		"hook_event_name": "PreToolUse",
+		"tool_name":       "Edit",
+		"tool_input":      map[string]any{"file_path": "config.go"},
+		"session_id":      "sess_patch_2",
+		"cwd":             "/work/alpha",
+	}); !strings.Contains(warn, "parallel edit radar:") {
+		t.Fatalf("expected parallel edit radar after apply_patch input, got %q", warn)
+	}
+}

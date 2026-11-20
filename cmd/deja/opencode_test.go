@@ -1461,3 +1461,38 @@ func TestOpencodePluginExportsV2Definition(t *testing.T) {
 		t.Error("the plugin no longer reads the recall envelope")
 	}
 }
+
+func TestOpencodePluginAfterHookHandlesPatchInputAndStringResult(t *testing.T) {
+	t.Cleanup(func() { opencodeVersionMajor = opencodeVersionMajorReal })
+
+	opencodeVersionMajor = func() int { return 2 }
+	v2 := opencodePluginJS("/bin/deja")
+	if opencodePluginShapeStale(v2) {
+		t.Fatal("generated 2.x plugin should not read as stale")
+	}
+	v2AfterAt := strings.Index(v2, "execute.after")
+	if v2AfterAt < 0 {
+		t.Fatal("2.x plugin missing execute.after")
+	}
+	v2After := v2[v2AfterAt:]
+	for _, want := range []string{
+		`includes("patch") ? event.input?.input || ""`,
+		`typeof fres.content === "string"`,
+		`typeof fres.output === "string"`,
+		`typeof event.result === "string"`,
+	} {
+		if !strings.Contains(v2After, want) {
+			t.Errorf("2.x execute.after missing %q", want)
+		}
+	}
+
+	opencodeVersionMajor = func() int { return 1 }
+	v1 := opencodeLegacyPluginJS("/bin/deja")
+	v1AfterAt := strings.Index(v1, "tool.execute.after")
+	if v1AfterAt < 0 {
+		t.Fatal("1.x plugin missing tool.execute.after")
+	}
+	if !strings.Contains(v1[v1AfterAt:], `includes("patch") ? input?.args?.input || ""`) {
+		t.Error("1.x tool.execute.after missing patch input extraction")
+	}
+}

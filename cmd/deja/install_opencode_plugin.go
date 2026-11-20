@@ -311,10 +311,18 @@ export default {
         // model. Matched on the argument, because the tool that carries a file
         // path is a file action whatever this version calls it.
         const fpath = event.input?.filePath || event.input?.path || ""
-        const patchText = event.input?.patchText || event.input?.patch || ""
+        const patchText = event.input?.patchText || event.input?.patch || (String(event.tool || "").toLowerCase().includes("patch") ? event.input?.input || "" : "")
         if ((fpath || patchText) && event.tool !== "shell" && event.status === "completed") {
-          const fres = event.result || {}
-          const fcontent = Array.isArray(fres.content) ? fres.content : []
+          const fres = typeof event.result === "object" && event.result !== null ? event.result : {}
+          const fcontent = Array.isArray(fres.content)
+            ? fres.content
+            : typeof fres.content === "string"
+              ? [{ type: "text", text: fres.content }]
+              : typeof fres.output === "string"
+                ? [{ type: "text", text: fres.output }]
+                : typeof event.result === "string"
+                  ? [{ type: "text", text: event.result }]
+                  : []
           const fpayload = {
             hook_event_name: "PostToolUse",
             tool_name: event.tool || "read",
@@ -792,7 +800,7 @@ func legacyPluginJSFor(target, exe string) string { //nolint:funlen // the body 
         // on the argument rather than the tool name — a tool carrying a file
         // path is a file action whatever this version calls it.
         const fpath = input?.args?.filePath || input?.args?.path || ""
-        const patchText = input?.args?.patchText || input?.args?.patch || ""
+        const patchText = input?.args?.patchText || input?.args?.patch || (String(input?.tool || "").toLowerCase().includes("patch") ? input?.args?.input || "" : "")
         if ((fpath || patchText) && input?.tool !== "bash") {
           const ftext = output?.output
           if (!ftext) return

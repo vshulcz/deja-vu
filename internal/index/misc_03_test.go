@@ -1642,6 +1642,73 @@ func TestCompactionCoreSurvivesTheFirstIndexBuildBoundary(t *testing.T) {
 	}
 }
 
+func TestPutCompactionFallsBackToSidecarWhileIndexLocked(t *testing.T) {
+	home := t.TempDir()
+	setHome(t, home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
+
+	dir := filepath.Join(t.TempDir(), "index.db")
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	unlock, locked, err := tryLockDir(dir)
+	if err != nil || !locked {
+		t.Fatalf("tryLockDir locked=%t err=%v", locked, err)
+	}
+	lockedHeld := true
+	defer func() {
+		if lockedHeld {
+			unlock()
+		}
+	}()
+
+	saved, err := PutCompaction(dir, compactionState("native-busy", workspace, time.Unix(40, 0)))
+	if err != nil {
+		t.Fatalf("PutCompaction while locked failed: %v", err)
+	}
+	if saved.Revision != 1 {
+		t.Fatalf("saved revision=%d, want 1", saved.Revision)
+	}
+	got, found, err := Compaction(dir, "native-busy", workspace)
+	if err != nil || !found || got.Revision != 1 {
+		t.Fatalf("Compaction while locked got=%#v found=%t err=%v", got, found, err)
+	}
+
+	unlock()
+	lockedHeld = false
+
+	carried := compactionsForRebuild(dir, nil)
+	if _, ok := carried[compactionKey("native-busy", workspace)]; !ok {
+		t.Fatalf("compactionsForRebuild missing sidecar entry: %#v", carried)
+	}
+	if _, err := Forget(dir, ForgetOptions{Session: "codex:native-busy"}); err != nil {
+		t.Fatalf("Forget sidecar entry: %v", err)
+	}
+	if _, found, err := Compaction(dir, "native-busy", workspace); err != nil || found {
+		t.Fatalf("forgotten sidecar entry still present: found=%t err=%v", found, err)
+	}
+	if _, err := os.Stat(compactionSidecarPath(dir)); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("sidecar file not removed after Forget: err=%v", err)
+	}
+}
+
+func TestBuildCommandsSkipsAntigravitySchedulerTasks(t *testing.T) {
+	dir := t.TempDir()
+	at := time.Date(2026, 8, 1, 10, 0, 0, 0, time.UTC)
+	msgs := []model.Message{
+		{Role: roleCommand, Text: "$ Timer: 60s (check status)", Time: at},
+		{Role: roleCommand, Text: "$ Cron: */5 * * * * cleanup", Time: at.Add(time.Minute)},
+		{Role: roleCommand, Text: "$ golangci-lint run", Time: at.Add(2 * time.Minute)},
+	}
+	sessions := []model.Session{
+		{ID: "ag-1", Harness: "antigravity", Project: "app", Messages: msgs},
+		{ID: "ag-2", Harness: "antigravity", Project: "app", Messages: msgs},
+	}
+	buildCommands(dir, sessions)
+	uses := ReadCommands(dir)
+	if len(uses) != 1 || uses[0].Command != "$ golangci-lint run" {
+		t.Fatalf("ReadCommands = %#v, want only $ golangci-lint run", uses)
+	}
+}
+
 func TestCompactionBoundsWholePersistedState(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
 	state := compactionState("native-1", t.TempDir(), time.Now())

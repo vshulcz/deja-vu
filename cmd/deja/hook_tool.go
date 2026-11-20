@@ -719,7 +719,7 @@ func fileLineFor(dir, cwd string, input toolHookInput) string {
 		input.ToolInput.PatchText,
 		input.ToolInput.Patch,
 	}, "\n")
-	line := fileHookLineOutsideWithEdit(dir, cwd, path, editText, askerSkip(dir, input))
+	line := fileHookLineOutsideWithMode(dir, cwd, path, editText, isReadOnlyFileTool(input.ToolName), askerSkip(dir, input))
 	if missing := missingFileHintLine(cwd, path, input.ToolName); missing != "" {
 		if line == "" {
 			line = search.SafePath(baseName(path)) + missing
@@ -751,6 +751,15 @@ func fileLineFor(dir, cwd string, input toolHookInput) string {
 		}
 	}
 	return line
+}
+
+// isReadOnlyFileTool reports whether toolName is a file-read PostToolUse channel.
+func isReadOnlyFileTool(toolName string) bool {
+	switch strings.TrimSpace(toolName) {
+	case "read", "read_file", "Read":
+		return true
+	}
+	return false
 }
 
 // isSearchReplaceEditTool reports whether toolName is a search-and-replace edit tool.

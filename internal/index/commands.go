@@ -449,7 +449,7 @@ func normalizeCommand(s string) string {
 func canonicalCommandOutcome(raw string) (cmd string, code int, hasExit bool) {
 	body, code, hasExit := CommandExitOutcome(strings.TrimRight(raw, " \t\r\n"))
 	line := CanonicalRecurringCommand(strings.TrimSpace(firstTextLine(body)))
-	if line == "" {
+	if line == "" || sources.IsNonShellTaskDescription(line) {
 		return "", 0, false
 	}
 	return line, code, hasExit

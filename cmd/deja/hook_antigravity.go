@@ -58,18 +58,15 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	// Antigravity runs the hook with the working directory set to the folder
 	// holding hooks.json, not the user's project, so scoping recall by cwd
 	// would silently recall nothing. The payload names the real workspace.
-	workspace := ""
-	if len(input.WorkspacePaths) > 0 {
-		workspace = input.WorkspacePaths[0]
-	}
-	if workspace == "" {
-		workspace = workspaceFromConversation(input.TranscriptPath, input.ConversationID)
-	}
 	// Decode the transcript tail once per invocation rather than re-reading and
 	// re-unmarshaling up to 128 KB of JSONL four times across checkpoint,
 	// failure, prompt, and edit checks.
 	tailSteps := transcriptTailSteps(input.TranscriptPath)
-	projectWorkspace := antigravityProjectWorkspace(workspace, tailSteps)
+	convFallback := ""
+	if len(input.WorkspacePaths) == 0 {
+		convFallback = workspaceFromConversation(input.TranscriptPath, input.ConversationID)
+	}
+	workspace, projectWorkspace := selectAntigravityWorkspaces(input.WorkspacePaths, convFallback, tailSteps)
 	syncAntigravitySessionRules(dir, projectWorkspace, input.ConversationID, tailSteps)
 	coordRecordAntigravitySteps(dir, projectWorkspace, input.ConversationID, tailSteps)
 	// A compaction throws away the blocks this conversation was shown while the

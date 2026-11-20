@@ -1097,3 +1097,35 @@ func TestAntigravityProjectDeterministicAcrossWorkspaces(t *testing.T) {
 		}
 	}
 }
+
+func TestAntigravitySkipsSchedulerTaskDescriptionsButKeepsGenericCommand(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "brain", "conv-timer", ".system_generated", "logs")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rows := []string{
+		`{"source":"USER_EXPLICIT","type":"USER_INPUT","created_at":"2026-07-20T10:00:00Z","content":"check status"}`,
+		`{"source":"MODEL","type":"GENERIC","created_at":"2026-07-20T10:01:00Z","content":"Created At: 2026-07-20T10:01:00Z\nTask Description: Timer: 60s (check status)"}`,
+		`{"source":"MODEL","type":"RUN_COMMAND","created_at":"2026-07-20T10:01:30Z","content":"Created At: 2026-07-20T10:01:30Z\nTask Description: Cron: */5 * * * * cleanup"}`,
+		`{"source":"MODEL","type":"GENERIC","created_at":"2026-07-20T10:02:00Z","content":"Created At: 2026-07-20T10:02:00Z\nTask Description: golangci-lint run"}`,
+	}
+	p := filepath.Join(dir, "transcript.jsonl")
+	if err := os.WriteFile(p, []byte(strings.Join(rows, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_ANTIGRAVITY_ROOT", root)
+	ss, err := ParseAntigravityFile(p)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("%v %#v", err, ss)
+	}
+	var cmds []string
+	for _, m := range ss[0].Messages {
+		if m.Role == RoleCommand {
+			cmds = append(cmds, m.Text)
+		}
+	}
+	if len(cmds) != 1 || cmds[0] != "$ golangci-lint run" {
+		t.Fatalf("commands = %q, want only golangci-lint run", cmds)
+	}
+}

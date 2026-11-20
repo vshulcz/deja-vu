@@ -908,6 +908,62 @@ func TestAntigravityProjectWorkspaceNarrowsHomeToActiveCheckout(t *testing.T) {
 	}
 }
 
+func TestAntigravityMultiWorkspaceSelectsActiveRepo(t *testing.T) {
+	tmp := hermeticEnv(t)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+
+	missing := filepath.Join(tmp, "missing-user")
+	repo := filepath.Join(tmp, "coding", "active-repo")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	other := filepath.Join(tmp, "coding", "other-repo")
+	if err := os.MkdirAll(filepath.Join(other, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	writeClaudeFixture(t, filepath.Join(root, "active-repo", "s-active.jsonl"), "s-active", []string{
+		`{"type":"user","sessionId":"s-active","cwd":"` + filepath.ToSlash(repo) + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"token refresh"}}`,
+		`{"type":"assistant","sessionId":"s-active","cwd":"` + filepath.ToSlash(repo) + `","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":"We settled on rotating refresh tokens atomically in active-repo."}}`,
+	})
+	writeClaudeFixture(t, filepath.Join(root, "other-repo", "s-other.jsonl"), "s-other", []string{
+		`{"type":"user","sessionId":"s-other","cwd":"` + filepath.ToSlash(other) + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"other work"}}`,
+		`{"type":"assistant","sessionId":"s-other","cwd":"` + filepath.ToSlash(other) + `","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":"other repo token refresh note."}}`,
+	})
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+
+	logs := filepath.Join(tmp, "brain", "agy-multi", ".system_generated", "logs")
+	if err := os.MkdirAll(logs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	transcript := filepath.Join(logs, "transcript.jsonl")
+	if err := os.WriteFile(transcript, []byte(
+		`{"source":"USER_EXPLICIT","type":"USER_INPUT","created_at":"2026-10-07T10:00:00Z","content":"<USER_REQUEST>how should token refresh work?</USER_REQUEST>"}`+"\n",
+	), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	payload := mustMarshal(t, map[string]any{
+		"invocationNum":  0,
+		"workspacePaths": []string{missing, repo},
+		"transcriptPath": transcript,
+		"conversationId": "agy-multi",
+	})
+	var out bytes.Buffer
+	if err := runHookAntigravity(dir, bytes.NewReader(payload), &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "rotating refresh tokens atomically in active-repo") {
+		t.Fatalf("expected active-repo recall when missing path came first, got %q", out.String())
+	}
+	if strings.Contains(out.String(), "other repo token refresh note") {
+		t.Fatalf("leaked other repo recall: %q", out.String())
+	}
+}
+
 // A hook fed something that is not a payload carries on with the zero value,
 // and what that costs depends on what else names the project. On a host that
 // exports nothing and runs the hook outside the project — the shape #759 is

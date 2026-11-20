@@ -77,9 +77,38 @@ type liveBenchReport struct {
 	Injections       liveInjectionAudit    `json:"injections"`
 }
 
+// liveBenchOptions holds parsed CLI flags for deja bench live.
+type liveBenchOptions struct {
+	jsonOutput bool
+	delivery   bool
+}
+
+// liveDeliveryWiring summarizes read-only installation wiring state for one harness.
+type liveDeliveryWiring struct {
+	Harness string `json:"harness"`
+	State   string `json:"state"`
+}
+
+// liveDeliveryReport summarizes delivery effectiveness across harnesses and retained telemetry.
+type liveDeliveryReport struct {
+	Repo                     string                   `json:"repo"`
+	Wirings                  []liveDeliveryWiring     `json:"wirings"`
+	Recalls                  int                      `json:"recalls"`
+	EmptyResultRate          float64                  `json:"empty_result_rate"`
+	Injections               int                      `json:"injections"`
+	DejaVuMoments            int                      `json:"dejavu_moments"`
+	ToolLines                int                      `json:"tool_lines"`
+	FixesServed              int                      `json:"fixes_served"`
+	PushToPullRatio          float64                  `json:"push_to_pull_ratio"`
+	Compaction               *usage.CompactionSummary `json:"compaction,omitempty"`
+	Snapshots                liveInjectionAudit       `json:"snapshots"`
+	DuplicateDigestSnapshots int                      `json:"duplicate_digest_snapshots"`
+	WallMS                   float64                  `json:"wall_ms"`
+}
+
 // runBenchLive evaluates hook-tool recall on the current repository against the live index.
 func runBenchLive(args []string) error {
-	jsonOutput, err := parseBenchLiveArgs(args)
+	opts, err := parseBenchLiveArgs(args)
 	if err != nil {
 		return err
 	}
@@ -87,11 +116,19 @@ func runBenchLive(args []string) error {
 	if err != nil {
 		return err
 	}
+	if opts.delivery {
+		report := measureLiveDelivery(index.DefaultDir(), cwd)
+		if opts.jsonOutput {
+			return json.NewEncoder(os.Stdout).Encode(report)
+		}
+		printLiveDeliveryReport(os.Stdout, report)
+		return nil
+	}
 	report, err := measureLiveRepo(index.DefaultDir(), cwd)
 	if err != nil {
 		return err
 	}
-	if jsonOutput {
+	if opts.jsonOutput {
 		return json.NewEncoder(os.Stdout).Encode(report)
 	}
 	printLiveBenchReport(os.Stdout, report)
@@ -99,17 +136,19 @@ func runBenchLive(args []string) error {
 }
 
 // parseBenchLiveArgs reads flags for deja bench live.
-func parseBenchLiveArgs(args []string) (bool, error) {
-	var jsonOutput bool
+func parseBenchLiveArgs(args []string) (liveBenchOptions, error) {
+	var opts liveBenchOptions
 	for _, arg := range args {
 		switch arg {
 		case "--json":
-			jsonOutput = true
+			opts.jsonOutput = true
+		case "--delivery":
+			opts.delivery = true
 		default:
-			return false, errors.New("bench: usage: bench live [--json]")
+			return liveBenchOptions{}, errors.New("bench: usage: bench live [--delivery] [--json]")
 		}
 	}
-	return jsonOutput, nil
+	return opts, nil
 }
 
 // measureLiveRepo runs read-only hook-tool evaluation across non-test source files in cwd.
@@ -385,6 +424,126 @@ func printLiveBenchReport(w io.Writer, r liveBenchReport) {
 			r.Injections.Total, r.Injections.Tool, r.Injections.DejaVu, r.Injections.Context,
 			r.Injections.MedianBytes, r.Injections.ToolNoise)
 	}
+}
+
+// measureLiveDelivery collects read-only wiring and delivery telemetry metrics without mutating indexDir.
+func measureLiveDelivery(indexDir, cwd string) liveDeliveryReport {
+	start := time.Now()
+	root := sources.RepoRoot(cwd)
+	if root == "" {
+		root = cwd
+	}
+	tot := usage.Totals(indexDir)
+	snaps := usage.Snapshots(indexDir, 0)
+	dupCount := 0
+	for _, s := range snaps {
+		if hasDuplicateDigestLines(s.Digest) {
+			dupCount++
+		}
+	}
+	push := tot.Injections
+	ratio := 0.0
+	if tot.Recalls > 0 {
+		ratio = math.Round((float64(push)/float64(tot.Recalls))*100) / 100
+	}
+	return liveDeliveryReport{
+		Repo:                     filepath.Base(root),
+		Wirings:                  collectLiveDeliveryWirings(),
+		Recalls:                  tot.Recalls,
+		EmptyResultRate:          math.Round(tot.EmptyResultRate*1000) / 1000,
+		Injections:               tot.Injections,
+		DejaVuMoments:            tot.DejaVuMoments,
+		ToolLines:                tot.ToolLines,
+		FixesServed:              tot.FixesServed,
+		PushToPullRatio:          ratio,
+		Compaction:               tot.Compaction,
+		Snapshots:                auditLiveInjections(indexDir),
+		DuplicateDigestSnapshots: dupCount,
+		WallMS:                   roundMS(time.Since(start)),
+	}
+}
+
+func collectLiveDeliveryWirings() []liveDeliveryWiring {
+	claudeSt := claudeHookWiringState()
+	claudeState := claudeSt.state
+	if claudeSt.absent || claudeState == "" {
+		claudeState = "missing"
+	}
+	out := []liveDeliveryWiring{{Harness: "claude-code", State: claudeState}}
+	seen := map[string]bool{"claude-code": true}
+
+	core := map[string]bool{"opencode": true, "antigravity": true, "hermes": true}
+	var extras []liveDeliveryWiring
+	byCore := map[string]string{}
+	for _, w := range autoWirings() {
+		if seen[w.name] {
+			continue
+		}
+		st, _ := autoWiringState(w)
+		if core[w.name] {
+			if _, ok := byCore[w.name]; !ok {
+				byCore[w.name] = st
+			}
+			continue
+		}
+		if st == "wired" || st == "stale" || st == "partial" {
+			seen[w.name] = true
+			extras = append(extras, liveDeliveryWiring{Harness: w.name, State: st})
+		}
+	}
+	for _, name := range []string{"opencode", "antigravity", "hermes"} {
+		if st, ok := byCore[name]; ok {
+			out = append(out, liveDeliveryWiring{Harness: name, State: st})
+		}
+	}
+	out = append(out, extras...)
+	return out
+}
+
+func hasDuplicateDigestLines(digestText string) bool {
+	if digestText == "" {
+		return false
+	}
+	seen := map[string]bool{}
+	for line := range strings.SplitSeq(digestText, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if len(trimmed) < 24 {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "<deja-") || strings.HasPrefix(trimmed, "</deja-") {
+			continue
+		}
+		if strings.Trim(trimmed, "-= ") == "" {
+			continue
+		}
+		if seen[trimmed] {
+			return true
+		}
+		seen[trimmed] = true
+	}
+	return false
+}
+
+// printLiveDeliveryReport formats liveDeliveryReport for terminal output.
+func printLiveDeliveryReport(w io.Writer, r liveDeliveryReport) {
+	_, _ = fmt.Fprintf(w, "repo: %s  wall %.0f ms\n", r.Repo, r.WallMS)
+	parts := make([]string, 0, len(r.Wirings))
+	for _, hw := range r.Wirings {
+		parts = append(parts, hw.Harness+"="+hw.State)
+	}
+	_, _ = fmt.Fprintf(w, "wirings: %s\n", strings.Join(parts, "  "))
+	_, _ = fmt.Fprintf(w, "pull: %d recalls (empty %.1f%%)  fixes served: %d\n",
+		r.Recalls, r.EmptyResultRate*100, r.FixesServed)
+	_, _ = fmt.Fprintf(w, "push: %d total (%d dejavu, %d tool lines)  push/pull %.2f\n",
+		r.Injections, r.DejaVuMoments, r.ToolLines, r.PushToPullRatio)
+	if r.Compaction != nil {
+		_, _ = fmt.Fprintf(w, "compaction: %d captures  %d measured  %d pending  %d unmeasured  median %.1f  p75 %d\n",
+			r.Compaction.Captures, r.Compaction.Measured, r.Compaction.Pending, r.Compaction.Unmeasured,
+			r.Compaction.MedianActions, r.Compaction.P75Actions)
+	}
+	_, _ = fmt.Fprintf(w, "snapshots: %d recent (tool %d, dejavu %d, context %d)  median %d B  tool noise %d  duplicate lines %d\n",
+		r.Snapshots.Total, r.Snapshots.Tool, r.Snapshots.DejaVu, r.Snapshots.Context,
+		r.Snapshots.MedianBytes, r.Snapshots.ToolNoise, r.DuplicateDigestSnapshots)
 }
 
 // measureLiveLocalization replays real opening user task prompts from past

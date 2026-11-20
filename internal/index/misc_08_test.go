@@ -3672,3 +3672,54 @@ func TestDroppingAMissingWrapperIsARepair(t *testing.T) {
 		t.Errorf("timeout with no command after it is %q", got)
 	}
 }
+
+func TestRelevanceSixWordQueryPrefersFocusedSessionOverMarathon(t *testing.T) {
+	h := newTwoWayEnv(t)
+	// Seed background corpus so IDF estimates behave realistically.
+	for i := range 24 {
+		sid := fmt.Sprintf("bg-%d", i)
+		h.put("app", sid, hPrompt("app", sid, 2, 0, fmt.Sprintf("background deploy check item %d retry budget", i))+
+			hSay("app", sid, 2, 1, "verified baseline configuration"))
+	}
+	// Marathon session: 1,500 turns scattering query terms across distant messages.
+	var marathon strings.Builder
+	marathon.WriteString(hPrompt("svc", "marathon-1500", 5, 0, "ongoing cluster maintenance thread"))
+	words := []string{"cobalt", "harbor", "turbine", "manifest", "quorum", "latch"}
+	for i := 1; i <= 1500; i++ {
+		w := words[i%len(words)]
+		extra := ""
+		if i%30 == 0 {
+			extra = " retry backoff"
+		}
+		marathon.WriteString(hSay("svc", "marathon-1500", 5+i/60, i%60, fmt.Sprintf("step %d checking %s telemetry%s", i, w, extra)))
+	}
+	h.put("svc", "marathon-1500", marathon.String())
+
+	// Short focused session: co-occurs all six terms in a single message.
+	h.put("svc", "focused-win", hPrompt("svc", "focused-win", 6, 0, "cobalt harbor turbine manifest quorum latch resolution")+
+		hSay("svc", "focused-win", 6, 1, "Fixed cobalt harbor turbine manifest quorum latch mismatch in one pass."))
+
+	dir := filepath.Join(h.tmp, "idx.db")
+	if err := Ensure(dir, "claude", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	// Check both exact and fallback relevance tier (7th missing term forces relevanceSearch).
+	for _, q := range []string{
+		"cobalt harbor turbine manifest quorum latch",
+		"cobalt harbor turbine manifest quorum latch unindexedword",
+	} {
+		res, err := searchDetailedRead(dir, query.Options{
+			Query: q,
+			Limit: 5,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res.Sessions) < 2 {
+			t.Fatalf("query %q got %d sessions, want at least 2", q, len(res.Sessions))
+		}
+		if res.Sessions[0].ID != "focused-win" {
+			t.Fatalf("query %q got top session %q (behind %q), want focused-win over marathon", q, res.Sessions[0].ID, res.Sessions[1].ID)
+		}
+	}
+}
