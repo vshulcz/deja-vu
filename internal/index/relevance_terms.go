@@ -1089,19 +1089,79 @@ func hasRawCodeShape(raw string) bool {
 	hasInternalUpper, hasLower, hasDigit, hasLetter := false, false, false, false
 	for i := range len(s) {
 		c := s[i]
-		if c >= 'A' && c <= 'Z' {
+		switch {
+		case c >= 'A' && c <= 'Z':
 			hasLetter = true
 			if i > 0 {
 				hasInternalUpper = true
 			}
-		} else if c >= 'a' && c <= 'z' {
+		case c >= 'a' && c <= 'z':
 			hasLetter = true
 			hasLower = true
-		} else if c >= '0' && c <= '9' {
+		case c >= '0' && c <= '9':
 			hasDigit = true
 		}
 	}
 	return (hasInternalUpper && hasLower) || (hasLetter && hasDigit)
+}
+
+func addTermDelimitedParts(terms []string, delim string, addPart func(string)) {
+	for _, t := range terms {
+		lowT := strings.ToLower(t)
+		if strings.HasPrefix(lowT, "http://") || strings.HasPrefix(lowT, "https://") || strings.HasPrefix(lowT, "www.") {
+			continue
+		}
+		if len(t) < 5 || !strings.ContainsAny(t, delim) {
+			continue
+		}
+		for _, seg := range strings.FieldsFunc(t, func(r rune) bool {
+			return strings.ContainsRune(delim, r)
+		}) {
+			addPart(seg)
+		}
+	}
+}
+
+func addAcronymCamelParts(tok string, addPart func(string)) {
+	for p := 0; p+2 < len(tok); p++ {
+		if tok[p] >= 'A' && tok[p] <= 'Z' &&
+			(p == 0 || (tok[p-1] >= 'a' && tok[p-1] <= 'z') || (tok[p-1] >= '0' && tok[p-1] <= '9')) &&
+			tok[p+1] >= 'A' && tok[p+1] <= 'Z' &&
+			tok[p+2] >= 'a' && tok[p+2] <= 'z' {
+			end := p + 3
+			for end < len(tok) && ((tok[end] >= 'a' && tok[end] <= 'z') || (tok[end] >= '0' && tok[end] <= '9')) {
+				end++
+			}
+			addPart(strings.ToLower(tok[p:end]))
+		}
+	}
+}
+
+func scanRawIdentCompoundParts(rawQuery string, terms []string, addPart func(string)) {
+	scanText := stripEmbeddedURLs(stripHTMLComments(rawQuery))
+	if strings.TrimSpace(scanText) == "" {
+		scanText = strings.Join(terms, " ")
+	}
+	var k keyer
+	start := -1
+	for i := 0; i <= len(scanText); i++ {
+		isIdent := i < len(scanText) && isIdentByte(scanText[i])
+		switch {
+		case isIdent && start < 0:
+			start = i
+		case !isIdent && start >= 0:
+			tok := scanText[start:i]
+			if len(tok) >= 6 {
+				k.identifierParts(tok, func(b []byte) {
+					if len(b) > 1 {
+						addPart(string(b[1:]))
+					}
+				})
+				addAcronymCamelParts(tok, addPart)
+			}
+			start = -1
+		}
+	}
 }
 
 // queryCompoundParts extracts sub-tokens from CamelCase and snake_case
@@ -1112,9 +1172,8 @@ func queryCompoundParts(rawQuery string, terms []string) []string {
 	for _, t := range terms {
 		termSet[t] = true
 	}
-	var out []string
+	out := make([]string, 0, maxCompoundParts)
 	seen := map[string]bool{}
-	var k keyer
 	addPart := func(part string) {
 		if part == "" || termSet[part] || seen[part] || len(out) >= maxCompoundParts {
 			return
@@ -1127,67 +1186,9 @@ func queryCompoundParts(rawQuery string, terms []string) []string {
 	}
 	// Preserve snake_case identifiers inside dotted/slashed paths and calls
 	// before breaking identifiers on underscores.
-	for _, t := range terms {
-		lowT := strings.ToLower(t)
-		if strings.HasPrefix(lowT, "http://") || strings.HasPrefix(lowT, "https://") || strings.HasPrefix(lowT, "www.") {
-			continue
-		}
-		if len(t) < 5 || !strings.ContainsAny(t, "./") {
-			continue
-		}
-		for _, seg := range strings.FieldsFunc(t, func(r rune) bool {
-			return r == '.' || r == '/'
-		}) {
-			addPart(seg)
-		}
-	}
-	scanText := stripEmbeddedURLs(stripHTMLComments(rawQuery))
-	if strings.TrimSpace(scanText) == "" {
-		scanText = strings.Join(terms, " ")
-	}
-	start := -1
-	for i := 0; i <= len(scanText); i++ {
-		isIdent := i < len(scanText) && isIdentByte(scanText[i])
-		if isIdent && start < 0 {
-			start = i
-		} else if !isIdent && start >= 0 {
-			tok := scanText[start:i]
-			if len(tok) >= 6 {
-				k.identifierParts(tok, func(b []byte) {
-					if len(b) > 1 {
-						addPart(string(b[1:]))
-					}
-				})
-				for p := 0; p+2 < len(tok); p++ {
-					if tok[p] >= 'A' && tok[p] <= 'Z' &&
-						(p == 0 || (tok[p-1] >= 'a' && tok[p-1] <= 'z') || (tok[p-1] >= '0' && tok[p-1] <= '9')) &&
-						tok[p+1] >= 'A' && tok[p+1] <= 'Z' &&
-						tok[p+2] >= 'a' && tok[p+2] <= 'z' {
-						end := p + 3
-						for end < len(tok) && ((tok[end] >= 'a' && tok[end] <= 'z') || (tok[end] >= '0' && tok[end] <= '9')) {
-							end++
-						}
-						addPart(strings.ToLower(tok[p:end]))
-					}
-				}
-			}
-			start = -1
-		}
-	}
-	for _, t := range terms {
-		lowT := strings.ToLower(t)
-		if strings.HasPrefix(lowT, "http://") || strings.HasPrefix(lowT, "https://") || strings.HasPrefix(lowT, "www.") {
-			continue
-		}
-		if len(t) < 5 || !strings.ContainsAny(t, "-./_") {
-			continue
-		}
-		for _, seg := range strings.FieldsFunc(t, func(r rune) bool {
-			return r == '-' || r == '.' || r == '/' || r == '_'
-		}) {
-			addPart(seg)
-		}
-	}
+	addTermDelimitedParts(terms, "./", addPart)
+	scanRawIdentCompoundParts(rawQuery, terms, addPart)
+	addTermDelimitedParts(terms, "-./_", addPart)
 	return out
 }
 
@@ -1256,7 +1257,7 @@ func docQueryTermWeights(rawQuery string, terms []string) (map[string]float64, m
 		}
 	}
 	parts := queryCompoundParts(cleaned, terms)
-	keys := make([]string, 0, len(terms)*2+len(parts))
+	keys := make([]string, 0, 32)
 	for _, t := range terms {
 		keys = append(keys, t)
 		if norm := normDocTerm(t); norm != "" && norm != t {
@@ -1290,6 +1291,63 @@ func docQueryTermWeights(rawQuery string, terms []string) (map[string]float64, m
 	return out, titleTerms
 }
 
+type compoundRescueOff struct {
+	place int32
+	off   int64
+	idf   float64
+}
+
+func (a *relevanceAcc) collectCompoundPartHits(part string) ([][]posting, []int32) {
+	orKeys := a.stemKeys(part, []string{"t" + part})
+	lists := make([][]posting, 0, 4)
+	hits := a.hits[:0]
+	for _, key := range orKeys {
+		posts, err := a.postings(key)
+		if err != nil || len(posts) == 0 {
+			continue
+		}
+		lists = append(lists, posts)
+		for _, pp := range posts {
+			place := a.placeOf(pp.Sid)
+			if place < 0 {
+				continue
+			}
+			a.noteTool(pp, place)
+			if a.termTF[place] == 0 {
+				hits = append(hits, place)
+			}
+			a.termTF[place]++
+		}
+	}
+	return lists, hits
+}
+
+func (a *relevanceAcc) applyCompoundRescues(rescued, rescueParts []int32, rescueScore []float64, rescueOffs []compoundRescueOff) {
+	for _, ro := range rescueOffs {
+		if rescueParts[ro.place] < 2 {
+			continue
+		}
+		msg := &a.msgs[a.message(ro.off, ro.place)]
+		if !msg.matched {
+			msg.matched = true
+			a.sess[ro.place].messages++
+		}
+		msg.terms++
+		msg.idf += ro.idf
+	}
+	for _, p := range rescued {
+		s := &a.sess[p]
+		if !s.credited {
+			s.credited = true
+			a.credited = append(a.credited, p)
+		}
+		s.score += rescueScore[p]
+		s.focus += rescueScore[p]
+		s.any = 2
+		s.matched = 1
+	}
+}
+
 // addCompoundParts credits informative identifier parts to sessions already
 // matching a query term without inflating queryTerms/identifyingTerms/
 // termsKnown/s.matched/s.strong, and optionally rescues sessions hitting >=2
@@ -1298,41 +1356,16 @@ func (a *relevanceAcc) addCompoundParts(parts []string, allowRescue bool) {
 	if len(parts) == 0 || a.readErr != nil {
 		return
 	}
-	type rescueOff struct {
-		place int32
-		off   int64
-		idf   float64
-	}
 	var rescueParts []int32
 	var rescueScore []float64
 	var rescued []int32
-	var rescueOffs []rescueOff
+	var rescueOffs []compoundRescueOff
 	if allowRescue {
 		rescueParts = make([]int32, len(a.sess))
 		rescueScore = make([]float64, len(a.sess))
 	}
 	for _, part := range parts {
-		orKeys := a.stemKeys(part, []string{"t" + part})
-		var lists [][]posting
-		hits := a.hits[:0]
-		for _, key := range orKeys {
-			posts, err := a.postings(key)
-			if err != nil || len(posts) == 0 {
-				continue
-			}
-			lists = append(lists, posts)
-			for _, pp := range posts {
-				place := a.placeOf(pp.Sid)
-				if place < 0 {
-					continue
-				}
-				a.noteTool(pp, place)
-				if a.termTF[place] == 0 {
-					hits = append(hits, place)
-				}
-				a.termTF[place]++
-			}
-		}
+		lists, hits := a.collectCompoundPartHits(part)
 		if len(hits) == 0 {
 			continue
 		}
@@ -1393,7 +1426,7 @@ func (a *relevanceAcc) addCompoundParts(parts []string, allowRescue bool) {
 				if !pp.Tool && !a.msgs[a.message(pp.Off, place)].tool {
 					a.spoken[place] = true
 				}
-				rescueOffs = append(rescueOffs, rescueOff{place: place, off: pp.Off, idf: partRank})
+				rescueOffs = append(rescueOffs, compoundRescueOff{place: place, off: pp.Off, idf: partRank})
 			}
 		}
 		for _, p := range hits {
@@ -1423,27 +1456,5 @@ func (a *relevanceAcc) addCompoundParts(parts []string, allowRescue bool) {
 	if !allowRescue || len(rescued) == 0 {
 		return
 	}
-	for _, ro := range rescueOffs {
-		if rescueParts[ro.place] < 2 {
-			continue
-		}
-		msg := &a.msgs[a.message(ro.off, ro.place)]
-		if !msg.matched {
-			msg.matched = true
-			a.sess[ro.place].messages++
-		}
-		msg.terms++
-		msg.idf += ro.idf
-	}
-	for _, p := range rescued {
-		s := &a.sess[p]
-		if !s.credited {
-			s.credited = true
-			a.credited = append(a.credited, p)
-		}
-		s.score += rescueScore[p]
-		s.focus += rescueScore[p]
-		s.any = 2
-		s.matched = 1
-	}
+	a.applyCompoundRescues(rescued, rescueParts, rescueScore, rescueOffs)
 }

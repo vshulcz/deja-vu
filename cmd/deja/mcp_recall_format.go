@@ -47,7 +47,7 @@ func writeLeadLine(hb *strings.Builder, h search.Hit, i int, terms []string) {
 		fmt.Fprintf(hb, " · %s", h.Session.Updated.Local().Format("2006-01-02"))
 	}
 	if held := sessionHolds(h.Session, terms); len(held) > 0 {
-		fmt.Fprintf(hb, " · has %s", recallListingLine(joinWordsCapped(held, 12)))
+		fmt.Fprintf(hb, " · has %s", recallListingLine(joinWordsCapped(held)))
 	}
 	fmt.Fprintf(hb, " · %s\n", recallListingLine(h.Session.ID))
 	if i > 0 {
@@ -253,12 +253,7 @@ func writeFormsLine(b *strings.Builder, result index.SearchResult) {
 	if !result.Stemmed {
 		how = "close spellings"
 	}
-	fmt.Fprintf(b, "No exact match; using %s: %s\n", how, joinWordsCapped(fuzzySummary(result.Variants), 12))
-}
-
-// writeRecallHitHead writes one hit's header, its marks and its excerpts.
-func writeRecallHitHead(hb *strings.Builder, h search.Hit, i int, twins map[string][]string) {
-	writeRecallHitHeadBudgeted(hb, h, i, 1, 0, 0, twins)
+	fmt.Fprintf(b, "No exact match; using %s: %s\n", how, joinWordsCapped(fuzzySummary(result.Variants)))
 }
 
 // writeRecallHitHeadBudgeted writes one hit's header, its marks and its
@@ -345,13 +340,6 @@ func writeRecallHitLine(hb *strings.Builder, h search.Hit, i int) {
 		fmt.Fprintf(hb, " · reused %d×", h.Reused)
 	}
 	fmt.Fprintln(hb)
-}
-
-// writeRecallHitMarks writes a hit's bracketed notes, the person's rules and
-// its excerpts.
-func writeRecallHitMarks(hb *strings.Builder, h search.Hit, twins map[string][]string) {
-	writeRecallHitMeta(hb, h, twins)
-	writeRecallHitSnippets(hb, h.Snippets, -1, false)
 }
 
 func writeRecallHitMeta(hb *strings.Builder, h search.Hit, twins map[string][]string) {
@@ -450,8 +438,8 @@ func quoteLoosenedQuery(q, tier string) string {
 // compound parts, matched query variants, and directory tokens for snippet weighting.
 func relevanceMatchTermsFor(q string, res index.SearchResult) []string {
 	terms := index.RelevanceMatchTerms(strings.ReplaceAll(q, "\"", " "))
-	seen := make(map[string]bool, len(terms)+len(res.Variants)+1)
-	out := make([]string, 0, len(terms)+len(res.Variants)+1)
+	seen := make(map[string]bool, 32)
+	out := make([]string, 0, 32)
 	for _, t := range terms {
 		if t != "" && !seen[t] {
 			seen[t] = true

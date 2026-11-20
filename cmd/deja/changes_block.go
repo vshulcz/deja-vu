@@ -364,9 +364,7 @@ func changeQueryGroups(q string) []changeQueryGroup {
 	q = cleanChangeQuery(q)
 	rel := query.RelevanceTerms(q)
 	if len(rel) == 0 {
-		for _, t := range changeQueryTerms(q) {
-			rel = append(rel, t)
-		}
+		rel = append(rel, changeQueryTerms(q)...)
 	}
 	if len(rel) == 0 {
 		return nil
@@ -603,7 +601,7 @@ func changeLineIndent(s string) int {
 		return -1
 	}
 	n := 0
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		switch s[i] {
 		case ' ':
 			n++
@@ -674,7 +672,7 @@ func enclosingChangeHeaders(oldText, newText string) string {
 	}
 	indOld := firstIndent(oldLines[prefix:])
 	indNew := firstIndent(newLines[prefix:])
-	targetIndent := -1
+	var targetIndent int
 	switch {
 	case indOld >= 0 && indNew >= 0:
 		targetIndent = min(indOld, indNew)
@@ -956,14 +954,15 @@ func rankChangesForQueryWithIDF(cs []sources.Change, q string, termIDF map[strin
 			if w == 0 {
 				continue
 			}
-			if ev.codeHit(g) {
+			switch {
+			case ev.codeHit(g):
 				score += 10 * w
 				if ev.wholeCodeHit(g.whole) {
 					score += 4 * w
 				}
-			} else if ev.hunkHit(g) {
+			case ev.hunkHit(g):
 				score += 6 * w
-			} else if ev.pathHit(g) {
+			case ev.pathHit(g):
 				score += 5 * w
 			}
 		}
@@ -1049,14 +1048,148 @@ func changesBindToQueryWithTopIDF(cs []sources.Change, q string, termIDF map[str
 	return changesBindToQueryWithSessionIDF(cs, q, termIDF, nil, topIDF)
 }
 
+type changeBindState struct {
+	groups            []changeQueryGroup
+	termIDF           map[string]float64
+	sessionIDF        map[string]float64
+	topIDF            float64
+	directFloor       float64
+	tinyLong          bool
+	hunkHit           []bool
+	anyHit            []bool
+	infoHunkSet       map[string]bool
+	infoAnySet        map[string]bool
+	specificDirectHit bool
+	rareChangedDefHit bool
+	substantiveHit    bool
+}
+
+func (st *changeBindState) recordAnchor(canon string, inHunk bool) {
+	if inHunk {
+		st.infoHunkSet[canon] = true
+	}
+	st.infoAnySet[canon] = true
+}
+
+func (st *changeBindState) noteHunkDirectAndDef(ev changeEvidenceView, g changeQueryGroup) {
+	core := canonChangeToken(g.whole)
+	wholeMatch := ev.wholeCodeHit(g.whole) || (len(st.groups) < 12 && (changeTermHit(g.whole, ev.hunkLow, ev.hunkIdents) || changeTermHit(g.whole, ev.baseLow, ev.baseIdents)))
+	if st.tinyLong {
+		wholeMatch = changeTermHit(g.whole, ev.changedLow, ev.changedIdents) || changeTermHit(g.whole, ev.hunkLow, ev.hunkIdents)
+	}
+	if g.isIdent && len(core) >= 7 && !isGenericExceptionIdent(core) && !isBoilerplateCodeToken(core) && !isGenericPathToken(core) && wholeMatch {
+		idf, known := changeGroupIDF(g, st.termIDF)
+		enclosingOrChangedDef := ev.enclosingIdents[core] || ev.changedDefIdents[core]
+		tinyMultiSegDef := st.tinyLong && enclosingOrChangedDef && len(g.parts) >= 3 && len(core) >= 15
+		if len(st.termIDF) == 0 || (known && idf >= st.directFloor) || tinyMultiSegDef || (!known && !st.tinyLong && ev.wholeCodeHit(g.whole) && !strings.ContainsAny(core, "./-")) {
+			st.specificDirectHit = true
+		}
+	}
+	if !st.tinyLong && len([]rune(core)) >= 4 && ev.changedDefIdents[core] &&
+		!query.IsStopWord(core) && !isBoilerplateCodeToken(core) && !isGenericExceptionIdent(core) &&
+		!isGenericPathToken(core) && !isUbiquitousDocPlotToken(core) && len(st.termIDF) > 0 {
+		idf, known := st.termIDF[core]
+		sessOK := len(st.sessionIDF) == 0 || st.sessionIDF[core] >= 2.40
+		if known && idf >= st.directFloor && sessOK {
+			st.rareChangedDefHit = true
+		}
+	}
+}
+
+func (st *changeBindState) matchGroupPartsFallback(ev changeEvidenceView, idx int, g changeQueryGroup) {
+	for _, p := range g.parts {
+		if len([]rune(p)) < 4 || isBoilerplateCodeToken(p) || isGenericExceptionIdent(p) || isGenericPathToken(p) {
+			continue
+		}
+		pHunk := changeTermHit(p, ev.hunkLow, ev.hunkIdents)
+		pPath := !isGenericPathToken(p) && changeTermHit(p, ev.nonRoot, ev.nonRootIdents)
+		if !pHunk && !pPath {
+			continue
+		}
+		st.anyHit[idx] = true
+		st.substantiveHit = true
+		if pHunk {
+			st.hunkHit[idx] = true
+		}
+		pIsIdent := hasInternalIdentShape(p) || strings.ContainsRune(p, '_') || (g.isIdent && !st.tinyLong)
+		pAllowUnknown := !st.tinyLong && g.isIdent && len(st.termIDF) == 0
+		if changeAnchorTokenValid(p, pIsIdent, len(st.groups), pAllowUnknown, pHunk, st.termIDF, st.sessionIDF, st.topIDF) {
+			st.recordAnchor(p, pHunk)
+		}
+	}
+}
+
+func (st *changeBindState) recordMatchingPartAnchors(ev changeEvidenceView, parts []string) bool {
+	counted := false
+	for _, p := range parts {
+		pHunk := changeTermHit(p, ev.hunkLow, ev.hunkIdents)
+		pPath := changeTermHit(p, ev.nonRoot, ev.nonRootIdents)
+		if (pHunk || pPath) && changeAnchorTokenValid(p, hasInternalIdentShape(p) || strings.ContainsRune(p, '_'), len(st.groups), false, pHunk, st.termIDF, st.sessionIDF, st.topIDF) {
+			st.recordAnchor(p, pHunk)
+			counted = true
+		}
+	}
+	return counted
+}
+
+func (st *changeBindState) recordPathStemAnchor(ev changeEvidenceView, g changeQueryGroup, pHit bool) {
+	if !pHit || !changePathStemHit(g, ev.nonRootIdents) {
+		return
+	}
+	canon := canonChangeToken(g.whole)
+	if changeAnchorTokenValid(canon, g.isIdent, len(st.groups), false, false, st.termIDF, st.sessionIDF, st.topIDF) {
+		st.recordAnchor(canon, false)
+	}
+}
+
+func (st *changeBindState) recordGroupAnchors(ev changeEvidenceView, g changeQueryGroup, pHit bool) {
+	wholeHunk := changeTermHit(g.whole, ev.hunkLow, ev.hunkIdents)
+	wholePath := !isGenericPathToken(g.whole) && changeTermHit(g.whole, ev.nonRoot, ev.nonRootIdents)
+	switch {
+	case wholeHunk || wholePath:
+		canon := canonChangeToken(g.whole)
+		allowUnknown := ev.wholeCodeHit(g.whole) && len(g.whole) >= 6 && !strings.ContainsAny(canon, "./-")
+		if changeAnchorTokenValid(canon, g.isIdent, len(st.groups), allowUnknown, wholeHunk, st.termIDF, st.sessionIDF, st.topIDF) {
+			st.recordAnchor(canon, wholeHunk)
+		} else if _, ok := st.termIDF[g.whole]; !ok && strings.ContainsAny(g.whole, "._/-") {
+			st.recordMatchingPartAnchors(ev, g.parts)
+		}
+	case len(g.parts) > 0:
+		if !st.recordMatchingPartAnchors(ev, g.parts) {
+			st.recordPathStemAnchor(ev, g, pHit)
+		}
+	default:
+		st.recordPathStemAnchor(ev, g, pHit)
+	}
+}
+
+func (st *changeBindState) observeChange(ev changeEvidenceView) {
+	for i, g := range st.groups {
+		hHit := ev.hunkHit(g)
+		pHit := ev.pathHit(g)
+		if hHit {
+			st.hunkHit[i] = true
+			st.noteHunkDirectAndDef(ev, g)
+		}
+		if !hHit && !pHit {
+			st.matchGroupPartsFallback(ev, i, g)
+			continue
+		}
+		st.anyHit[i] = true
+		if !isBoilerplateCodeToken(g.whole) && !isGenericExceptionIdent(g.whole) {
+			st.substantiveHit = true
+		}
+		st.recordGroupAnchors(ev, g, pHit)
+	}
+}
+
 func changesBindToQueryWithSessionIDF(cs []sources.Change, q string, termIDF, sessionIDF map[string]float64, topIDF float64) bool {
 	groups := changeQueryGroups(q)
 	if len(groups) == 0 {
 		return true
 	}
 	_, _, _, directFloor := changeIDFFloors(topIDF, len(groups))
-	tinyLong := topIDF > 0 && !math.IsInf(topIDF, 1) && topIDF < index.InformativeIDF && len(groups) >= 12
-	var primary []sources.Change
+	primary := make([]sources.Change, 0, len(cs))
 	for _, c := range cs {
 		if !isTestChangePath(c.Path) && !isDocChangePath(c.Path) {
 			primary = append(primary, c)
@@ -1065,152 +1198,52 @@ func changesBindToQueryWithSessionIDF(cs []sources.Change, q string, termIDF, se
 	if len(primary) == 0 {
 		primary = cs
 	}
-	hunkHit := make([]bool, len(groups))
-	anyHit := make([]bool, len(groups))
-	infoHunkSet := map[string]bool{}
-	infoAnySet := map[string]bool{}
-	specificDirectHit := false
-	rareChangedDefHit := false
-	substantiveHit := false
-	recordAnchor := func(canon string, inHunk bool) {
-		if inHunk {
-			infoHunkSet[canon] = true
-		}
-		infoAnySet[canon] = true
+	st := changeBindState{
+		groups:      groups,
+		termIDF:     termIDF,
+		sessionIDF:  sessionIDF,
+		topIDF:      topIDF,
+		directFloor: directFloor,
+		tinyLong:    topIDF > 0 && !math.IsInf(topIDF, 1) && topIDF < index.InformativeIDF && len(groups) >= 12,
+		hunkHit:     make([]bool, len(groups)),
+		anyHit:      make([]bool, len(groups)),
+		infoHunkSet: map[string]bool{},
+		infoAnySet:  map[string]bool{},
 	}
 	for _, c := range primary {
-		ev := newChangeEvidenceView(c)
-		for i, g := range groups {
-			hHit := ev.hunkHit(g)
-			pHit := ev.pathHit(g)
-			if hHit {
-				hunkHit[i] = true
-				core := canonChangeToken(g.whole)
-				wholeMatch := ev.wholeCodeHit(g.whole) || (len(groups) < 12 && (changeTermHit(g.whole, ev.hunkLow, ev.hunkIdents) || changeTermHit(g.whole, ev.baseLow, ev.baseIdents)))
-				if tinyLong {
-					wholeMatch = changeTermHit(g.whole, ev.changedLow, ev.changedIdents) || changeTermHit(g.whole, ev.hunkLow, ev.hunkIdents)
-				}
-				if g.isIdent && len(core) >= 7 && !isGenericExceptionIdent(core) && !isBoilerplateCodeToken(core) && !isGenericPathToken(core) && wholeMatch {
-					idf, known := changeGroupIDF(g, termIDF)
-					enclosingOrChangedDef := ev.enclosingIdents[core] || ev.changedDefIdents[core]
-					tinyMultiSegDef := tinyLong && enclosingOrChangedDef && len(g.parts) >= 3 && len(core) >= 15
-					if len(termIDF) == 0 || (known && idf >= directFloor) || tinyMultiSegDef || (!known && !tinyLong && ev.wholeCodeHit(g.whole) && !strings.ContainsAny(core, "./-")) {
-						specificDirectHit = true
-					}
-				}
-				if !tinyLong && len([]rune(core)) >= 4 && ev.changedDefIdents[core] &&
-					!query.IsStopWord(core) && !isBoilerplateCodeToken(core) && !isGenericExceptionIdent(core) &&
-					!isGenericPathToken(core) && !isUbiquitousDocPlotToken(core) && len(termIDF) > 0 {
-					idf, known := termIDF[core]
-					sessOK := len(sessionIDF) == 0 || sessionIDF[core] >= 2.40
-					if known && idf >= directFloor && sessOK {
-						rareChangedDefHit = true
-					}
-				}
-			}
-			if hHit || pHit {
-				anyHit[i] = true
-				if !isBoilerplateCodeToken(g.whole) && !isGenericExceptionIdent(g.whole) {
-					substantiveHit = true
-				}
-			} else {
-				if len(g.parts) == 0 {
-					continue
-				}
-				for _, p := range g.parts {
-					if len([]rune(p)) < 4 || isBoilerplateCodeToken(p) || isGenericExceptionIdent(p) || isGenericPathToken(p) {
-						continue
-					}
-					pHunk := changeTermHit(p, ev.hunkLow, ev.hunkIdents)
-					pPath := !isGenericPathToken(p) && changeTermHit(p, ev.nonRoot, ev.nonRootIdents)
-					if !pHunk && !pPath {
-						continue
-					}
-					anyHit[i] = true
-					substantiveHit = true
-					if pHunk {
-						hunkHit[i] = true
-					}
-					pIsIdent := hasInternalIdentShape(p) || strings.ContainsRune(p, '_') || (g.isIdent && !tinyLong)
-					pAllowUnknown := !tinyLong && g.isIdent && len(termIDF) == 0
-					if changeAnchorTokenValid(p, pIsIdent, len(groups), pAllowUnknown, pHunk, termIDF, sessionIDF, topIDF) {
-						recordAnchor(p, pHunk)
-					}
-				}
-				continue
-			}
-
-			wholeHunk := changeTermHit(g.whole, ev.hunkLow, ev.hunkIdents)
-			wholePath := !isGenericPathToken(g.whole) && changeTermHit(g.whole, ev.nonRoot, ev.nonRootIdents)
-			if wholeHunk || wholePath {
-				canon := canonChangeToken(g.whole)
-				allowUnknown := ev.wholeCodeHit(g.whole) && len(g.whole) >= 6 && !strings.ContainsAny(canon, "./-")
-				if changeAnchorTokenValid(canon, g.isIdent, len(groups), allowUnknown, wholeHunk, termIDF, sessionIDF, topIDF) {
-					recordAnchor(canon, wholeHunk)
-				} else if _, ok := termIDF[g.whole]; !ok && strings.ContainsAny(g.whole, "._/-") {
-					for _, p := range g.parts {
-						pHunk := changeTermHit(p, ev.hunkLow, ev.hunkIdents)
-						pPath := changeTermHit(p, ev.nonRoot, ev.nonRootIdents)
-						if (pHunk || pPath) && changeAnchorTokenValid(p, hasInternalIdentShape(p) || strings.ContainsRune(p, '_'), len(groups), false, pHunk, termIDF, sessionIDF, topIDF) {
-							recordAnchor(p, pHunk)
-						}
-					}
-				}
-			} else if len(g.parts) > 0 {
-				partCounted := false
-				for _, p := range g.parts {
-					pHunk := changeTermHit(p, ev.hunkLow, ev.hunkIdents)
-					pPath := changeTermHit(p, ev.nonRoot, ev.nonRootIdents)
-					if (pHunk || pPath) && changeAnchorTokenValid(p, hasInternalIdentShape(p) || strings.ContainsRune(p, '_'), len(groups), false, pHunk, termIDF, sessionIDF, topIDF) {
-						recordAnchor(p, pHunk)
-						partCounted = true
-					}
-				}
-				if !partCounted && pHit && changePathStemHit(g, ev.nonRootIdents) {
-					canon := canonChangeToken(g.whole)
-					if changeAnchorTokenValid(canon, g.isIdent, len(groups), false, false, termIDF, sessionIDF, topIDF) {
-						recordAnchor(canon, false)
-					}
-				}
-			} else if pHit && changePathStemHit(g, ev.nonRootIdents) {
-				canon := canonChangeToken(g.whole)
-				if changeAnchorTokenValid(canon, g.isIdent, len(groups), false, false, termIDF, sessionIDF, topIDF) {
-					recordAnchor(canon, false)
-				}
-			}
-		}
+		st.observeChange(newChangeEvidenceView(c))
 	}
-	if len(groups) >= 6 && !substantiveHit {
+	if len(groups) >= 6 && !st.substantiveHit {
 		return false
 	}
 	hunkCount, anyCount := 0, 0
 	for i := range groups {
-		if hunkHit[i] {
+		if st.hunkHit[i] {
 			hunkCount++
 		}
-		if anyHit[i] {
+		if st.anyHit[i] {
 			anyCount++
 		}
 	}
-	infoHunkCount, infoAnyCount := len(infoHunkSet), len(infoAnySet)
+	infoHunkCount, infoAnyCount := len(st.infoHunkSet), len(st.infoAnySet)
 	switch len(groups) {
 	case 1:
 		return anyCount >= 1
 	case 2:
 		if len(termIDF) > 0 {
-			return infoHunkCount >= 2 || (infoHunkCount >= 1 && (infoAnyCount >= 2 || specificDirectHit))
+			return infoHunkCount >= 2 || (infoHunkCount >= 1 && (infoAnyCount >= 2 || st.specificDirectHit))
 		}
-		return hunkCount >= 2 || (hunkCount >= 1 && (anyCount >= 2 || specificDirectHit))
+		return hunkCount >= 2 || (hunkCount >= 1 && (anyCount >= 2 || st.specificDirectHit))
 	case 3, 4, 5:
 		if len(termIDF) > 0 {
-			return infoHunkCount >= 2 || (infoHunkCount >= 1 && infoAnyCount >= 2) || specificDirectHit
+			return infoHunkCount >= 2 || (infoHunkCount >= 1 && infoAnyCount >= 2) || st.specificDirectHit
 		}
-		return hunkCount >= 2 || (hunkCount >= 1 && anyCount >= 2) || specificDirectHit
+		return hunkCount >= 2 || (hunkCount >= 1 && anyCount >= 2) || st.specificDirectHit
 	default:
-		if specificDirectHit && (len(groups) < 15 || infoAnyCount >= 2 || (tinyLong && anyCount >= 2)) {
+		if st.specificDirectHit && (len(groups) < 15 || infoAnyCount >= 2 || (st.tinyLong && anyCount >= 2)) {
 			return true
 		}
-		if rareChangedDefHit && infoHunkCount >= 1 && anyCount >= 2 {
+		if st.rareChangedDefHit && infoHunkCount >= 1 && anyCount >= 2 {
 			return true
 		}
 		if len(termIDF) > 0 {
@@ -1298,8 +1331,9 @@ func patienceLISMatches(a []string, aOff int, b []string, bOff int) []diffMatch 
 }
 
 func dpLCSMatches(a []string, aOff int, b []string, bOff int) []diffMatch {
+	const maxDPLines = 4096
 	m, n := len(a), len(b)
-	if m == 0 || n == 0 || m*n > 250000 {
+	if m <= 0 || m > maxDPLines || n <= 0 || n > maxDPLines || m*n > 250000 {
 		return nil
 	}
 	cols := n + 1
@@ -1308,25 +1342,27 @@ func dpLCSMatches(a []string, aOff int, b []string, bOff int) []diffMatch {
 		row := i * cols
 		nextRow := (i + 1) * cols
 		for j := n - 1; j >= 0; j-- {
-			if a[i] == b[j] {
+			switch {
+			case a[i] == b[j]:
 				dp[row+j] = dp[nextRow+j+1] + 1
-			} else if dp[nextRow+j] >= dp[row+j+1] {
+			case dp[nextRow+j] >= dp[row+j+1]:
 				dp[row+j] = dp[nextRow+j]
-			} else {
+			default:
 				dp[row+j] = dp[row+j+1]
 			}
 		}
 	}
-	var matches []diffMatch
+	matches := make([]diffMatch, 0, 16)
 	i, j := 0, 0
 	for i < m && j < n {
-		if a[i] == b[j] {
+		switch {
+		case a[i] == b[j]:
 			matches = append(matches, diffMatch{aOff + i, bOff + j})
 			i++
 			j++
-		} else if dp[(i+1)*cols+j] >= dp[i*cols+j+1] {
+		case dp[(i+1)*cols+j] >= dp[i*cols+j+1]:
 			i++
-		} else {
+		default:
 			j++
 		}
 	}
@@ -1364,7 +1400,7 @@ func collectLCSMatches(a []string, aOff int, b []string, bOff int, out *[]diffMa
 			*out = append(*out, dpLCSMatches(subA, aSubOff, subB, bSubOff)...)
 		}
 	}
-	for k := 0; k < suf; k++ {
+	for k := range suf {
 		*out = append(*out, diffMatch{aOff + len(a) - suf + k, bOff + len(b) - suf + k})
 	}
 }
@@ -1389,7 +1425,7 @@ func changeDiff(old, updated string) string {
 	midA := a[pre : len(a)-suf]
 	midB := b[pre : len(b)-suf]
 	if len(midA) == 0 || len(midB) == 0 || len(midA)+len(midB) <= 8 {
-		out := make([]string, 0, 2*changeContext+len(midA)+len(midB))
+		out := make([]string, 0, 16)
 		for _, l := range a[max(0, pre-changeContext):pre] {
 			out = append(out, "  "+l)
 		}
@@ -1405,7 +1441,7 @@ func changeDiff(old, updated string) string {
 		return strings.Join(out, "\n")
 	}
 
-	var matches []diffMatch
+	matches := make([]diffMatch, 0, 8)
 	collectLCSMatches(midA, pre, midB, pre, &matches)
 	matches = append(matches, diffMatch{len(a) - suf, len(b) - suf})
 	edits := make([]diffEdit, 0, len(matches))
@@ -1419,7 +1455,7 @@ func changeDiff(old, updated string) string {
 	if len(edits) == 0 {
 		return ""
 	}
-	out := make([]string, 0, len(midA)+len(midB)+len(edits)*changeContext*2)
+	out := make([]string, 0, 32)
 	for _, l := range a[max(0, edits[0].aStart-changeContext):edits[0].aStart] {
 		out = append(out, "  "+l)
 	}
@@ -1690,9 +1726,9 @@ func isHashedWrote(body string) bool {
 		if len(f) < minLen || len(f) > 16 {
 			return false
 		}
-		for i := 0; i < len(f); i++ {
+		for i := range len(f) {
 			c := f[i]
-			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+			if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 				return false
 			}
 		}

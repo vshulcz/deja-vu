@@ -2535,7 +2535,7 @@ func TestRecallPacksFiveVerboseHitsOnMultiLineIssueQuery(t *testing.T) {
 	for i := 1; i <= 5; i++ {
 		sid := fmt.Sprintf("verbose-%d", i)
 		padding := strings.Repeat("additional diagnostic trace context for batched tensor evaluation and solver state ", 2)
-		var lines []string
+		lines := make([]string, 0, 10)
 		for turn := range 5 {
 			tsU := fmt.Sprintf("2026-09-%02dT10:%02d:00Z", i, turn*2)
 			tsA := fmt.Sprintf("2026-09-%02dT10:%02d:30Z", i, turn*2)

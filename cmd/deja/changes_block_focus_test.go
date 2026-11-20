@@ -217,13 +217,13 @@ func TestChangeDiffSplitsDistantEditsInLargeFile(t *testing.T) {
 }
 
 func TestFormatChangeDiffBoundedPreservesAddedFixUnderLargeDeletion(t *testing.T) {
-	var oldLines, newLines []string
+	oldLines := make([]string, 0, 64)
 	oldLines = append(oldLines, "func keepBefore() {}", "func header() {}")
 	for i := 1; i <= 60; i++ {
 		oldLines = append(oldLines, fmt.Sprintf("var deprecatedSlot%02d = %d // obsolete legacy buffer entry padding", i, i))
 	}
 	oldLines = append(oldLines, "return nil", "func keepAfter() {}")
-	newLines = append(newLines, "func keepBefore() {}", "func header() {}", "return applySparsePivotFix(ctx)", "func keepAfter() {}")
+	newLines := []string{"func keepBefore() {}", "func header() {}", "return applySparsePivotFix(ctx)", "func keepAfter() {}"}
 
 	got := formatChangeDiffBounded(sources.Change{
 		Path: "solver/pivot.go",

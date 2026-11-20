@@ -1046,7 +1046,7 @@ func TestStackTraceAndDottedCompoundPartsDisambiguateLongIssue(t *testing.T) {
 }
 
 func TestIssueQueryStripsCommentsURLsAndPopulatesSessionIDF(t *testing.T) {
-	var extraMsgs []string
+	extraMsgs := make([]string, 0, 25)
 	for i := range 25 {
 		extraMsgs = append(extraMsgs, fmt.Sprintf("Checked archive message %d about forums/topic/thread alignment.", i))
 	}

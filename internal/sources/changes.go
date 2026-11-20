@@ -274,29 +274,170 @@ type pendingInlineCall struct {
 	editEnd     int
 }
 
-func claudeChanges(file, id string) []Change {
-	var out []Change
-	cwd := ""
-	failed := map[string]bool{}
-	structRevert := map[string][]string{}
-	structTest := map[string]int{}
-	var inlinePending []pendingInlineCall
-	inlineSeq := 0
+type claudeChangeTracker struct {
+	out           []Change
+	cwd           string
+	failed        map[string]bool
+	structRevert  map[string][]string
+	structTest    map[string]int
+	inlinePending []pendingInlineCall
+	inlineSeq     int
+}
 
-	applyTestResult := func(endIdx int, failedTest bool) {
-		limit := min(endIdx, len(out))
-		for i := range limit {
-			out[i].TestFailed = failedTest
+func (t *claudeChangeTracker) applyTestResult(endIdx int, failedTest bool) {
+	limit := min(endIdx, len(t.out))
+	for i := range limit {
+		t.out[i].TestFailed = failedTest
+	}
+}
+
+func (t *claudeChangeTracker) handleWriteEdit(p claudeMsgPart) {
+	var in struct {
+		FilePath  string `json:"file_path"`
+		OldString string `json:"old_string"`
+		NewString string `json:"new_string"`
+		Content   string `json:"content"`
+		Edits     []struct {
+			OldString string `json:"old_string"`
+			NewString string `json:"new_string"`
+		} `json:"edits"`
+	}
+	if json.Unmarshal(p.input, &in) != nil || in.FilePath == "" || strings.ContainsAny(in.FilePath, "\n\r") {
+		if p.inline {
+			t.inlinePending = append(t.inlinePending, pendingInlineCall{kind: pendingOther})
 		}
+		return
+	}
+	callID := p.id
+	if p.inline || callID == "" || callID == inlineToolID {
+		t.inlineSeq++
+		callID = "__inline_" + strconv.Itoa(t.inlineSeq)
+	}
+	rel := cleanRepoPath(relTo(t.cwd, in.FilePath))
+	before := len(t.out)
+	switch p.name {
+	case "Write":
+		t.out = append(t.out, Change{Path: rel, New: in.Content, Created: true, call: callID})
+	case "Edit":
+		t.out = append(t.out, Change{Path: rel, Old: in.OldString, New: in.NewString, call: callID})
+	case "MultiEdit":
+		for _, e := range in.Edits {
+			t.out = append(t.out, Change{Path: rel, Old: e.OldString, New: e.NewString, call: callID})
+		}
+	}
+	if !p.inline {
+		return
+	}
+	if len(t.out) > before {
+		t.inlinePending = append(t.inlinePending, pendingInlineCall{kind: pendingEdit, callID: callID})
+	} else {
+		t.inlinePending = append(t.inlinePending, pendingInlineCall{kind: pendingOther})
+	}
+}
+
+func (t *claudeChangeTracker) handleBash(p claudeMsgPart) {
+	var in struct {
+		Command string `json:"command"`
+	}
+	if json.Unmarshal(p.input, &in) != nil {
+		if p.inline {
+			t.inlinePending = append(t.inlinePending, pendingInlineCall{kind: pendingOther})
+		}
+		return
+	}
+	reverts := parseShellRevert(in.Command)
+	isTest := len(t.out) > 0 && isTestCommand(in.Command)
+	if p.inline || p.id == "" || p.id == inlineToolID {
+		kind := pendingOther
+		if len(reverts) > 0 || isTest {
+			kind = pendingBash
+		}
+		t.inlinePending = append(t.inlinePending, pendingInlineCall{
+			kind:        kind,
+			revertPaths: reverts,
+			isTest:      isTest,
+			editEnd:     len(t.out),
+		})
+		return
+	}
+	if len(reverts) > 0 {
+		t.structRevert[p.id] = reverts
+	}
+	if isTest {
+		t.structTest[p.id] = len(t.out)
+	}
+}
+
+func (t *claudeChangeTracker) handleToolUse(p claudeMsgPart) {
+	switch p.name {
+	case "Write", "Edit", "MultiEdit":
+		t.handleWriteEdit(p)
+	case "Bash":
+		t.handleBash(p)
+	default:
+		if p.inline {
+			t.inlinePending = append(t.inlinePending, pendingInlineCall{kind: pendingOther})
+		}
+	}
+}
+
+func (t *claudeChangeTracker) handleToolResult(p claudeMsgPart) {
+	if !p.inline && p.toolUseID != "" && p.toolUseID != inlineToolID {
+		if p.isErr {
+			t.failed[p.toolUseID] = true
+		}
+		if rps, ok := t.structRevert[p.toolUseID]; ok {
+			delete(t.structRevert, p.toolUseID)
+			if !p.isErr {
+				for _, rp := range rps {
+					t.out = append(t.out, Change{Path: cleanRepoPath(relTo(t.cwd, rp)), Reverted: true})
+				}
+			}
+		}
+		if endIdx, ok := t.structTest[p.toolUseID]; ok {
+			delete(t.structTest, p.toolUseID)
+			t.applyTestResult(endIdx, p.isErr || testOutputFailed(p.text))
+		}
+		return
+	}
+	if len(t.inlinePending) == 0 {
+		return
+	}
+	pend := t.inlinePending[0]
+	t.inlinePending = t.inlinePending[1:]
+	switch pend.kind {
+	case pendingEdit:
+		if p.isErr && pend.callID != "" {
+			t.failed[pend.callID] = true
+		}
+	case pendingBash:
+		if len(pend.revertPaths) > 0 && !p.isErr {
+			for _, rp := range pend.revertPaths {
+				t.out = append(t.out, Change{Path: cleanRepoPath(relTo(t.cwd, rp)), Reverted: true})
+			}
+		}
+		if pend.isTest {
+			t.applyTestResult(pend.editEnd, p.isErr || testOutputFailed(p.text))
+		}
+	case pendingOther:
+		// Non-edit, non-revert/test inline call leaves no change state.
+	}
+}
+
+func claudeChanges(file, id string) []Change {
+	t := claudeChangeTracker{
+		failed:       map[string]bool{},
+		structRevert: map[string][]string{},
+		structTest:   map[string]int{},
 	}
 
 	_ = scanJSONLBytes(file, 0, func(line []byte) {
 		hasFilePath := bytes.Contains(line, []byte("file_path"))
 		hasToolUse := bytes.Contains(line, []byte("tool_use"))
-		hasCommand := len(out) > 0 && bytes.Contains(line, []byte("command"))
-		hasResult := (len(out) > 0 || len(inlinePending) > 0) &&
+		hasCommand := len(t.out) > 0 && bytes.Contains(line, []byte("command"))
+		hasResult := (len(t.out) > 0 || len(t.inlinePending) > 0) &&
 			(bytes.Contains(line, []byte("tool_result")) || bytes.Contains(line, []byte("is_error")))
-		if !hasFilePath && !hasToolUse && !hasCommand && !hasResult && (cwd != "" || !bytes.Contains(line, []byte(`"cwd"`))) {
+		if !hasFilePath && !hasToolUse && !hasCommand && !hasResult && (t.cwd != "" || !bytes.Contains(line, []byte(`"cwd"`))) {
 			return
 		}
 		var v struct {
@@ -314,132 +455,18 @@ func claudeChanges(file, id string) []Change {
 			return
 		}
 		if v.Cwd != "" {
-			cwd = v.Cwd
+			t.cwd = v.Cwd
 		}
-		parts := decodeClaudeMsgParts(v.Message.Content)
-		for _, p := range parts {
+		for _, p := range decodeClaudeMsgParts(v.Message.Content) {
 			switch p.typ {
 			case "tool_use":
-				switch p.name {
-				case "Write", "Edit", "MultiEdit":
-					var in struct {
-						FilePath  string `json:"file_path"`
-						OldString string `json:"old_string"`
-						NewString string `json:"new_string"`
-						Content   string `json:"content"`
-						Edits     []struct {
-							OldString string `json:"old_string"`
-							NewString string `json:"new_string"`
-						} `json:"edits"`
-					}
-					if json.Unmarshal(p.input, &in) != nil || in.FilePath == "" || strings.ContainsAny(in.FilePath, "\n\r") {
-						if p.inline {
-							inlinePending = append(inlinePending, pendingInlineCall{kind: pendingOther})
-						}
-						continue
-					}
-					callID := p.id
-					if p.inline || callID == "" || callID == inlineToolID {
-						inlineSeq++
-						callID = "__inline_" + strconv.Itoa(inlineSeq)
-					}
-					rel := cleanRepoPath(relTo(cwd, in.FilePath))
-					before := len(out)
-					switch p.name {
-					case "Write":
-						out = append(out, Change{Path: rel, New: in.Content, Created: true, call: callID})
-					case "Edit":
-						out = append(out, Change{Path: rel, Old: in.OldString, New: in.NewString, call: callID})
-					case "MultiEdit":
-						for _, e := range in.Edits {
-							out = append(out, Change{Path: rel, Old: e.OldString, New: e.NewString, call: callID})
-						}
-					}
-					if p.inline {
-						if len(out) > before {
-							inlinePending = append(inlinePending, pendingInlineCall{kind: pendingEdit, callID: callID})
-						} else {
-							inlinePending = append(inlinePending, pendingInlineCall{kind: pendingOther})
-						}
-					}
-				case "Bash":
-					var in struct {
-						Command string `json:"command"`
-					}
-					if json.Unmarshal(p.input, &in) != nil {
-						if p.inline {
-							inlinePending = append(inlinePending, pendingInlineCall{kind: pendingOther})
-						}
-						continue
-					}
-					reverts := parseShellRevert(in.Command)
-					isTest := len(out) > 0 && isTestCommand(in.Command)
-					if p.inline || p.id == "" || p.id == inlineToolID {
-						kind := pendingOther
-						if len(reverts) > 0 || isTest {
-							kind = pendingBash
-						}
-						inlinePending = append(inlinePending, pendingInlineCall{
-							kind:        kind,
-							revertPaths: reverts,
-							isTest:      isTest,
-							editEnd:     len(out),
-						})
-					} else {
-						if len(reverts) > 0 {
-							structRevert[p.id] = reverts
-						}
-						if isTest {
-							structTest[p.id] = len(out)
-						}
-					}
-				default:
-					if p.inline {
-						inlinePending = append(inlinePending, pendingInlineCall{kind: pendingOther})
-					}
-				}
+				t.handleToolUse(p)
 			case "tool_result":
-				if !p.inline && p.toolUseID != "" && p.toolUseID != inlineToolID {
-					if p.isErr {
-						failed[p.toolUseID] = true
-					}
-					if rps, ok := structRevert[p.toolUseID]; ok {
-						delete(structRevert, p.toolUseID)
-						if !p.isErr {
-							for _, rp := range rps {
-								out = append(out, Change{Path: cleanRepoPath(relTo(cwd, rp)), Reverted: true})
-							}
-						}
-					}
-					if endIdx, ok := structTest[p.toolUseID]; ok {
-						delete(structTest, p.toolUseID)
-						applyTestResult(endIdx, p.isErr || testOutputFailed(p.text))
-					}
-					continue
-				}
-				if len(inlinePending) > 0 {
-					pend := inlinePending[0]
-					inlinePending = inlinePending[1:]
-					switch pend.kind {
-					case pendingEdit:
-						if p.isErr && pend.callID != "" {
-							failed[pend.callID] = true
-						}
-					case pendingBash:
-						if len(pend.revertPaths) > 0 && !p.isErr {
-							for _, rp := range pend.revertPaths {
-								out = append(out, Change{Path: cleanRepoPath(relTo(cwd, rp)), Reverted: true})
-							}
-						}
-						if pend.isTest {
-							applyTestResult(pend.editEnd, p.isErr || testOutputFailed(p.text))
-						}
-					}
-				}
+				t.handleToolResult(p)
 			}
 		}
 	})
-	return finalizeSessionPaths(withoutFailed(out, failed))
+	return finalizeSessionPaths(withoutFailed(t.out, t.failed))
 }
 
 // relTo is p relative to the directory the session ran in, when it is under
@@ -627,12 +654,13 @@ func splitShellSegments(cmd string) [][]string {
 	for i := 0; i < len(cmd); i++ {
 		c := cmd[i]
 		if quote != 0 {
-			if c == quote {
+			switch {
+			case c == quote:
 				quote = 0
-			} else if c == '\\' && quote == '"' && i+1 < len(cmd) {
+			case c == '\\' && quote == '"' && i+1 < len(cmd):
 				i++
 				tok.WriteByte(cmd[i])
-			} else {
+			default:
 				tok.WriteByte(c)
 			}
 			inToken = true
@@ -704,6 +732,106 @@ func stripRedirections(args []string) []string {
 	return out
 }
 
+func parseRmRevert(args []string, addPath func(string)) {
+	pastFlags := false
+	for _, a := range args {
+		if a == "--" {
+			pastFlags = true
+			continue
+		}
+		if !pastFlags && strings.HasPrefix(a, "-") {
+			continue
+		}
+		addPath(a)
+	}
+}
+
+func parseGitCheckoutRevert(rest []string, addPath func(string)) {
+	if dash := slicesIndex(rest, "--"); dash >= 0 {
+		for _, a := range rest[dash+1:] {
+			addPath(a)
+		}
+		return
+	}
+	candidates := make([]string, 0, 8)
+	for _, a := range rest {
+		if a == "-b" || a == "-B" || a == "--orphan" || a == "--track" {
+			return
+		}
+		if !strings.HasPrefix(a, "-") && strings.Contains(a, ".") {
+			candidates = append(candidates, a)
+		}
+	}
+	for _, c := range candidates {
+		addPath(c)
+	}
+}
+
+func parseGitRestoreRevert(rest []string, addPath func(string)) {
+	stagedOnly := false
+	worktree := false
+	dash := -1
+	for idx, a := range rest {
+		if a == "--" {
+			dash = idx
+			break
+		}
+		if a == "-S" || a == "--staged" {
+			stagedOnly = true
+		}
+		if a == "-W" || a == "--worktree" {
+			worktree = true
+		}
+	}
+	if stagedOnly && !worktree {
+		return
+	}
+	start := 0
+	if dash >= 0 {
+		start = dash + 1
+	}
+	for j := start; j < len(rest); j++ {
+		a := rest[j]
+		if dash < 0 {
+			if a == "-s" || a == "--source" {
+				j++
+				continue
+			}
+			if strings.HasPrefix(a, "-") {
+				continue
+			}
+		}
+		addPath(a)
+	}
+}
+
+func parseGitRevert(args []string, addPath func(string)) {
+	i := 0
+	for i < len(args) {
+		a := args[i]
+		if a == "-C" || a == "--git-dir" || a == "--work-tree" {
+			i += 2
+			continue
+		}
+		if strings.HasPrefix(a, "-") {
+			i++
+			continue
+		}
+		break
+	}
+	if i >= len(args) {
+		return
+	}
+	sub := args[i]
+	rest := args[i+1:]
+	switch sub {
+	case "checkout":
+		parseGitCheckoutRevert(rest, addPath)
+	case "restore":
+		parseGitRestoreRevert(rest, addPath)
+	}
+}
+
 // parseShellRevert extracts repo file paths explicitly reverted or deleted by
 // shell commands such as `git checkout -- ...`, `git restore ...`, or `rm ...`.
 func parseShellRevert(cmd string) []string {
@@ -727,98 +855,9 @@ func parseShellRevert(cmd string) []string {
 		bin := path.Base(strings.ReplaceAll(args[0], `\`, "/"))
 		switch bin {
 		case "rm":
-			pastFlags := false
-			for _, a := range args[1:] {
-				if a == "--" {
-					pastFlags = true
-					continue
-				}
-				if !pastFlags && strings.HasPrefix(a, "-") {
-					continue
-				}
-				addPath(a)
-			}
+			parseRmRevert(args[1:], addPath)
 		case "git":
-			i := 1
-			for i < len(args) {
-				a := args[i]
-				if a == "-C" || a == "--git-dir" || a == "--work-tree" {
-					i += 2
-					continue
-				}
-				if strings.HasPrefix(a, "-") {
-					i++
-					continue
-				}
-				break
-			}
-			if i >= len(args) {
-				continue
-			}
-			sub := args[i]
-			rest := args[i+1:]
-			switch sub {
-			case "checkout":
-				dash := slicesIndex(rest, "--")
-				if dash >= 0 {
-					for _, a := range rest[dash+1:] {
-						addPath(a)
-					}
-					continue
-				}
-				hasBranchFlag := false
-				var candidates []string
-				for _, a := range rest {
-					if a == "-b" || a == "-B" || a == "--orphan" || a == "--track" {
-						hasBranchFlag = true
-						break
-					}
-					if !strings.HasPrefix(a, "-") && strings.Contains(a, ".") {
-						candidates = append(candidates, a)
-					}
-				}
-				if !hasBranchFlag {
-					for _, c := range candidates {
-						addPath(c)
-					}
-				}
-			case "restore":
-				stagedOnly := false
-				worktree := false
-				dash := -1
-				for idx, a := range rest {
-					if a == "--" {
-						dash = idx
-						break
-					}
-					if a == "-S" || a == "--staged" {
-						stagedOnly = true
-					}
-					if a == "-W" || a == "--worktree" {
-						worktree = true
-					}
-				}
-				if stagedOnly && !worktree {
-					continue
-				}
-				start := 0
-				if dash >= 0 {
-					start = dash + 1
-				}
-				for j := start; j < len(rest); j++ {
-					a := rest[j]
-					if dash < 0 {
-						if a == "-s" || a == "--source" {
-							j++
-							continue
-						}
-						if strings.HasPrefix(a, "-") {
-							continue
-						}
-					}
-					addPath(a)
-				}
-			}
+			parseGitRevert(args[1:], addPath)
 		}
 	}
 	return out
