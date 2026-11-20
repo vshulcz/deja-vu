@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -218,5 +219,232 @@ func TestCodexRevertAndTestCounterevidence(t *testing.T) {
 	cs := FinalChanges(Changes(model.Session{Harness: "codex", ID: "c1", Path: p}))
 	if len(cs) != 1 || !cs[0].TestFailed {
 		t.Fatalf("expected codex TestFailed=true, got: %#v", cs)
+	}
+}
+
+func TestParseShellRevertVariants(t *testing.T) {
+	cases := []struct {
+		cmd  string
+		want []string
+	}{
+		{
+			cmd:  "rm -rf -- app/scratch.py -keep_after_dash.py",
+			want: []string{"app/scratch.py"},
+		},
+		{
+			cmd:  "env FOO=bar timeout 10 command rm -f app/tmp1.py > /dev/null 2>&1 2>err.log &>all.log",
+			want: []string{"app/tmp1.py"},
+		},
+		{
+			cmd:  "git -C /repo --work-tree /repo -p restore --source HEAD -W -S -- app/restored.py",
+			want: []string{"app/restored.py"},
+		},
+		{
+			cmd:  "git restore --staged app/staged_only.py",
+			want: nil,
+		},
+		{
+			cmd:  "git restore -s HEAD~1 app/prev.py",
+			want: []string{"app/prev.py"},
+		},
+		{
+			cmd:  "git checkout --orphan pages",
+			want: nil,
+		},
+		{
+			cmd:  "git checkout HEAD app/checked_out.py",
+			want: []string{"app/checked_out.py"},
+		},
+		{
+			cmd:  "git -p",
+			want: nil,
+		},
+		{
+			cmd:  "echo 'quoted \"esc\"' \\| cat < in.txt &> out.log; echo \"a\\\"b\" && rm app/q.py",
+			want: []string{"app/q.py"},
+		},
+	}
+	for _, tc := range cases {
+		got := parseShellRevert(tc.cmd)
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("parseShellRevert(%q) = %v, want %v", tc.cmd, got, tc.want)
+		}
+	}
+}
+
+func TestIsTestCommandAndFailureOutputs(t *testing.T) {
+	yes := []string{
+		"pytest -q",
+		"./runtests.py",
+		"go test ./...",
+		"npm test",
+		"uv run pytest",
+		"manage.py test",
+		"./bin/test",
+		"python -W ignore -m pytest",
+		"python -m flake8 && python -u tests/test_core.py",
+		"python manage.py test",
+	}
+	for _, cmd := range yes {
+		if !isTestCommand(cmd) {
+			t.Errorf("isTestCommand(%q) = false, want true", cmd)
+		}
+	}
+	no := []string{
+		"python -c 'print(1)'",
+		"python script.py",
+		"git status",
+		"",
+	}
+	for _, cmd := range no {
+		if isTestCommand(cmd) {
+			t.Errorf("isTestCommand(%q) = true, want false", cmd)
+		}
+	}
+	if testOutputFailed("") {
+		t.Fatalf("empty test output must not count as failure")
+	}
+	if !testOutputFailed("<tool_use_error>boom") {
+		t.Fatalf("expected tool_use_error to fail")
+	}
+	if !testOutputFailed("Exit code: 2") {
+		t.Fatalf("expected nonzero Exit code: 2 to fail")
+	}
+	if !testOutputFailed("Ran 3 tests\nFAILED (errors=1)") {
+		t.Fatalf("expected FAILED (errors=1) to fail")
+	}
+	if !testOutputFailed("summary: failures=0 errors=2") {
+		t.Fatalf("expected nonzero errors=2 to fail")
+	}
+	if testOutputFailed("summary: failures=0 errors=0") {
+		t.Fatalf("expected zero failures/errors not to fail")
+	}
+}
+
+func TestStructuredClaudeAndScratchFiltering(t *testing.T) {
+	if got := decodeClaudeMsgParts(nil); len(got) != 0 {
+		t.Fatalf("decodeClaudeMsgParts(nil) = %d, want 0", len(got))
+	}
+	if got := decodeClaudeMsgParts(json.RawMessage("{bad")); len(got) != 0 {
+		t.Fatalf("decodeClaudeMsgParts(bad) = %d, want 0", len(got))
+	}
+	strParts := decodeClaudeMsgParts(json.RawMessage(`"[tool_use Read] {\"file_path\":\"a.py\"}"`))
+	if len(strParts) != 1 || strParts[0].typ != "tool_use" {
+		t.Fatalf("expected inline string part, got %#v", strParts)
+	}
+	arrRaw := json.RawMessage(`[123, "[tool_use Bash] {\"command\":\"ls\"}", {"type":"text","content":[{"text":"[thinking] ok"}]}, {"type":"tool_result","tool_use_id":"x1","content":[{"text":"line1"},{"text":"line2"}]}, {"type":"tool_result","tool_use_id":"x2","text":"direct"}]`)
+	arrParts := decodeClaudeMsgParts(arrRaw)
+	if len(arrParts) != 3 {
+		t.Fatalf("expected 3 decoded array parts, got %d: %#v", len(arrParts), arrParts)
+	}
+	if arrParts[1].text != "line1\nline2" || arrParts[2].text != "direct" {
+		t.Fatalf("unexpected decoded tool_result texts: %#v", arrParts)
+	}
+
+	p := writeTempJSONL(t, []any{
+		map[string]any{
+			"type":      "assistant",
+			"sessionId": "s5",
+			"cwd":       "/testbed",
+			"message": map[string]any{
+				"content": []any{
+					map[string]any{"type": "tool_use", "id": "w1", "name": "Write", "input": map[string]any{"file_path": "/testbed/reproduce_issue.py", "content": "print(1)"}},
+					map[string]any{"type": "tool_use", "id": "w2", "name": "Write", "input": map[string]any{"file_path": "/testbed/README.md", "content": "# Readme"}},
+					map[string]any{"type": "tool_use", "id": "w3", "name": "Write", "input": map[string]any{"file_path": "/testbed/NOTES.md", "content": "scratch notes"}},
+					map[string]any{"type": "tool_use", "id": "w4", "name": "Write", "input": map[string]any{"file_path": "/testbed/pkg/test_adhoc.py", "content": "assert True"}},
+					map[string]any{"type": "tool_use", "id": "e_rev", "name": "Edit", "input": map[string]any{"file_path": "/testbed/pkg/reverted.py", "old_string": "a", "new_string": "b"}},
+					map[string]any{"type": "tool_use", "id": "e_bad", "name": "Edit", "input": map[string]any{"file_path": "bad\npath", "old_string": "a", "new_string": "b"}},
+					map[string]any{"type": "tool_use", "id": "m1", "name": "MultiEdit", "input": map[string]any{
+						"file_path": "/testbed/pkg/keep.py",
+						"edits": []any{
+							map[string]any{"old_string": "old1", "new_string": "new1"},
+						},
+					}},
+				},
+			},
+		},
+		map[string]any{
+			"type":      "assistant",
+			"sessionId": "s5",
+			"message": map[string]any{
+				"content": []any{
+					map[string]any{"type": "tool_use", "id": "b_rev", "name": "Bash", "input": map[string]any{"command": "git restore pkg/reverted.py"}},
+					map[string]any{"type": "tool_use", "id": "b_test", "name": "Bash", "input": map[string]any{"command": "go test ./..."}},
+				},
+			},
+		},
+		map[string]any{
+			"type":      "user",
+			"sessionId": "s5",
+			"message": map[string]any{
+				"content": []any{
+					map[string]any{"type": "tool_result", "tool_use_id": "b_rev", "content": []any{map[string]any{"text": "ok"}}},
+					map[string]any{"type": "tool_result", "tool_use_id": "b_test", "content": []any{map[string]any{"text": "--- FAIL: TestKeep"}}},
+				},
+			},
+		},
+	})
+
+	cs := FinalChanges(Changes(model.Session{Harness: "claude", ID: "s5", Path: p}))
+	if len(cs) != 2 {
+		t.Fatalf("got %d final changes, want 2: %#v", len(cs), cs)
+	}
+	if cs[0].Path != "README.md" || cs[1].Path != "pkg/keep.py" || !cs[1].TestFailed {
+		t.Fatalf("unexpected structured changes: %#v", cs)
+	}
+}
+
+func TestInlinePrettyJSONAndUnpackVariants(t *testing.T) {
+	pretty := "[tool_use Edit]\n{\n  \"file_path\": \"a.py\",\n  \"old_string\": \"1\",\n  \"new_string\": \"2\"\n}\n[thinking]\ncheck\n[tool_result]\nExit code 2\nbad"
+	blks, speech := splitInlineBlocks(pretty)
+	if speech != "" || len(blks) != 3 {
+		t.Fatalf("got %d blocks speech=%q, want 3 blocks", len(blks), speech)
+	}
+	if blks[0].typ != "tool_use" || blks[1].typ != "thinking" || blks[2].typ != "tool_result" || !blks[2].isErr {
+		t.Fatalf("unexpected pretty inline blocks: %#v", blks)
+	}
+
+	rawArr := []any{
+		"[tool_result]\nok",
+		123,
+		map[string]any{"type": "thinking", "thinking": "x"},
+		map[string]any{"type": "tool_use", "name": "Read"},
+		map[string]any{"type": "tool_result", "text": "out1"},
+		map[string]any{"type": "text", "content": "hello"},
+		map[string]any{"type": "other", "text": "note"},
+	}
+	unpacked, results, arrSpeech, onlyTool := unpackContentBlocks(rawArr)
+	if onlyTool || len(unpacked) != 3 || len(results) != 2 || arrSpeech != "hello\nnote" {
+		t.Fatalf("unexpected unpackContentBlocks output: blocks=%d results=%v speech=%q onlyTool=%v", len(unpacked), results, arrSpeech, onlyTool)
+	}
+}
+
+func TestCodexShellArrayRevertAndJSONOutput(t *testing.T) {
+	p := writeTempJSONL(t, []any{
+		map[string]any{"type": "session_meta", "payload": map[string]any{"cwd": "/testbed"}},
+		map[string]any{"type": "session_meta", "payload": map[string]any{"cwd": "/ignored/fork"}},
+		map[string]any{"type": "response_item", "payload": map[string]any{
+			"type": "custom_tool_call", "call_id": "c1",
+			"input": "*** Begin Patch\n*** Update File: a.py\n@@\n-x = 1\n+x = 2\n*** Update File: b.py\n@@\n-y = 1\n+y = 2\n*** End Patch",
+		}},
+		map[string]any{"type": "response_item", "payload": map[string]any{
+			"type": "local_shell_call", "call_id": "r1",
+			"action": map[string]any{"command": []any{"bash", "-lc", "git restore b.py"}},
+		}},
+		map[string]any{"type": "response_item", "payload": map[string]any{
+			"type": "custom_tool_call_output", "call_id": "r1", "output": "Exit code: 0",
+		}},
+		map[string]any{"type": "response_item", "payload": map[string]any{
+			"type": "function_call", "call_id": "t1", "name": "exec_command",
+			"arguments": `{"cmd":["pytest","-q"]}`,
+		}},
+		map[string]any{"type": "response_item", "payload": map[string]any{
+			"type": "function_call_output", "call_id": "t1",
+			"output": map[string]any{"metadata": map[string]any{"exit_code": 0}, "stdout": "=== ERRORS ==="},
+		}},
+	})
+	cs := FinalChanges(Changes(model.Session{Harness: "codex", ID: "c2", Path: p}))
+	if len(cs) != 1 || cs[0].Path != "a.py" || !cs[0].TestFailed {
+		t.Fatalf("expected only a.py with TestFailed=true, got: %#v", cs)
 	}
 }

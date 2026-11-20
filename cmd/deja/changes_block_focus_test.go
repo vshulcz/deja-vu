@@ -7,7 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -645,5 +647,152 @@ func TestChangesBindToQueryEnclosingDefAndRareChangedDef(t *testing.T) {
 	}
 	if changesBindToQueryWithSessionIDF(rareDefFix, rareQ, highSincIDF, lowSincSessIDF, math.Log(78.0/2.0)) {
 		t.Fatalf("expected low sessionIDF on changed def symbol not to bind")
+	}
+}
+
+func TestCenterTextOnQueryAndReorderHunks(t *testing.T) {
+	lines := make([]string, 0, 60)
+	for i := range 60 {
+		switch i {
+		case 30:
+			lines = append(lines, "func middleTarget() { compute_eigen_shift(mat) }")
+		default:
+			lines = append(lines, fmt.Sprintf("var fillerLine%02d = %d // unchanged boilerplate buffer entry", i, i))
+		}
+	}
+	midDoc := strings.Join(lines, "\n")
+	centered := formatChangeDiffBounded(sources.Change{Path: "linalg/eigen.py", New: midDoc}, "compute_eigen_shift", 380)
+	if !strings.Contains(centered, "compute_eigen_shift") || !strings.Contains(centered, "…") {
+		t.Fatalf("expected centered excerpt around middle match, got:\n%s", centered)
+	}
+
+	eofLines := make([]string, 0, 60)
+	for i := range 60 {
+		if i == 58 {
+			eofLines = append(eofLines, "func tailTarget() { compute_eigen_shift(mat) }")
+		} else {
+			eofLines = append(eofLines, fmt.Sprintf("var fillerEOF%02d = %d // unchanged boilerplate buffer entry", i, i))
+		}
+	}
+	eofCentered := formatChangeDiffBounded(sources.Change{Path: "linalg/eigen_eof.py", New: strings.Join(eofLines, "\n")}, "compute_eigen_shift", 380)
+	if !strings.Contains(eofCentered, "compute_eigen_shift") || !strings.HasPrefix(eofCentered, "…\n") {
+		t.Fatalf("expected EOF window expansion with leading ellipsis, got:\n%s", eofCentered)
+	}
+
+	if got := centerTextOnQuery(midDoc, "", 120); !strings.HasSuffix(got, "\n…") || len(got) > 124 {
+		t.Fatalf("expected empty query fallback clip <= 124 bytes, got %d (%q)", len(got), got)
+	}
+	if got := centerTextOnQuery(midDoc, "in of to", 120); !strings.HasSuffix(got, "\n…") || len(got) > 124 {
+		t.Fatalf("expected stopword query fallback clip <= 124 bytes, got %d (%q)", len(got), got)
+	}
+
+	oldDistant := make([]string, 0, 90)
+	newDistant := make([]string, 0, 90)
+	for i := range 90 {
+		base := fmt.Sprintf("def fn_%02d(m): return m[%d]", i, i)
+		oldDistant = append(oldDistant, base)
+		switch i {
+		case 5:
+			newDistant = append(newDistant, "def fn_05(m): return trivial_one(m)")
+		case 45:
+			newDistant = append(newDistant, "def fn_45(m): return trivial_two(m)")
+		case 85:
+			newDistant = append(newDistant, "def fn_85(m): return resolve_sparse_pivot(m)")
+		default:
+			newDistant = append(newDistant, base)
+		}
+	}
+	reordered := formatChangeDiffBounded(sources.Change{
+		Path: "linalg/pivot.py",
+		Old:  strings.Join(oldDistant, "\n"),
+		New:  strings.Join(newDistant, "\n"),
+	}, "resolve_sparse_pivot", 220)
+	if !strings.Contains(reordered, "resolve_sparse_pivot") || strings.Index(reordered, "resolve_sparse_pivot") > 120 {
+		t.Fatalf("expected query-matching hunk reordered to top, got:\n%s", reordered)
+	}
+}
+
+func TestDpLCSFallbackAndSessionChangesMessages(t *testing.T) {
+	oldRep := "hdr\ndup_a\ndup_b\ndup_c\ndup_a\ndup_b\ndup_c\ntail"
+	newRep := "hdr\ndup_b\ndup_c\ndup_a\ndup_b\ndup_c\ndup_a\ntail"
+	diff := changeDiff(oldRep, newRep)
+	if !strings.Contains(diff, "- dup_a") || !strings.Contains(diff, "+ dup_a") {
+		t.Fatalf("expected dpLCSMatches fallback diff, got:\n%s", diff)
+	}
+	if got := dpLCSMatches(make([]string, 4100), 0, []string{"x"}, 0); got != nil {
+		t.Fatalf("expected oversized dpLCSMatches input to return nil, got %d matches", len(got))
+	}
+	if got := dpLCSMatches(nil, 0, []string{"x"}, 0); got != nil {
+		t.Fatalf("expected empty dpLCSMatches input to return nil, got %v", got)
+	}
+
+	s := model.Session{
+		ID:      "in-mem-msg",
+		Harness: "aider",
+		Messages: []model.Message{
+			{Role: sources.RoleEdit, Text: "pkg/calc.go\nreturn oldVal"},
+			{Role: sources.RoleWrote, Text: "pkg/calc.go\n+ return targetQuorumValue(x)"},
+			{Role: sources.RoleWrote, Text: "pkg/ignored.go\na1b2c3d4e5f60718 1122334455667788"},
+		},
+	}
+	cs := sessionChanges(s)
+	if len(cs) != 1 || cs[0].Path != "pkg/calc.go" || cs[0].New != "return targetQuorumValue(x)" {
+		t.Fatalf("unexpected reconstructed sessionChanges: %#v", cs)
+	}
+	lines := recallCodeChangedLines(s, "targetQuorumValue")
+	joined := strings.Join(lines, "")
+	if !strings.HasPrefix(joined, "  code it changed (pkg/calc.go):\n") || !strings.Contains(joined, "targetQuorumValue") {
+		t.Fatalf("unexpected recallCodeChangedLines output:\n%s", joined)
+	}
+
+	if got := fixEditDiffLines("", index.FixPair{}); got != nil {
+		t.Fatalf("expected nil fixEditDiffLines on empty input, got %v", got)
+	}
+	if got := fixEditDiffLines(t.TempDir(), index.FixPair{Key: "bad", Edit: "a.go"}); got != nil {
+		t.Fatalf("expected nil fixEditDiffLines on malformed key, got %v", got)
+	}
+}
+
+func TestChangeWeightBoundAndLoneWordHit(t *testing.T) {
+	if got := boundHunkPart(strings.Repeat("ab", 30), 25); len(got) > 25 {
+		t.Fatalf("boundHunkPart exceeded cap: len=%d", len(got))
+	}
+	if got := clipToFit(strings.Repeat("x", 40), 20); !strings.HasSuffix(got, "\n…\n") || len(got) > 20 {
+		t.Fatalf("clipToFit unexpected output: %q", got)
+	}
+	idf := map[string]float64{
+		"high":   3.2,
+		"mid":    index.InformativeIDF + 0.1,
+		"low":    1.2,
+		"common": 0.4,
+	}
+	if w := changeGroupRankWeight(changeQueryGroup{whole: "return"}, idf); w != 0 {
+		t.Fatalf("boilerplate weight = %d, want 0", w)
+	}
+	if w := changeGroupRankWeight(changeQueryGroup{whole: "high"}, idf); w != 4 {
+		t.Fatalf("high weight = %d, want 4", w)
+	}
+	if w := changeGroupRankWeight(changeQueryGroup{whole: "mid"}, idf); w != 3 {
+		t.Fatalf("mid weight = %d, want 3", w)
+	}
+	if w := changeGroupRankWeight(changeQueryGroup{whole: "low"}, idf); w != 2 {
+		t.Fatalf("low weight = %d, want 2", w)
+	}
+	if w := changeGroupRankWeight(changeQueryGroup{whole: "common"}, idf); w != 1 {
+		t.Fatalf("common weight = %d, want 1", w)
+	}
+	if w := changeGroupRankWeight(changeQueryGroup{whole: "unknown"}, idf); w != 2 {
+		t.Fatalf("unknown weight = %d, want 2", w)
+	}
+
+	var sb strings.Builder
+	writeLoneWordHit(&sb, search.Hit{
+		Session:  model.Session{Harness: "codex", Project: "proj", ID: "lw-1"},
+		Count:    2,
+		Snippets: []string{search.UserRuleLabel + " ignore rule", "actual matching excerpt line"},
+	}, 0)
+	out := sb.String()
+	if strings.Contains(out, "ignore rule") || !strings.Contains(out, "actual matching excerpt line") {
+		t.Fatalf("unexpected writeLoneWordHit output:\n%s", out)
 	}
 }
