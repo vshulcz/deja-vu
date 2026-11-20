@@ -58,7 +58,7 @@ func manualIndexNote(dir string) string {
 	switch {
 	case !index.IsCurrentVersion(dir):
 		return "deja: the index is from an older deja, and automatic indexing is off — run: deja index"
-	case index.Damaged(dir):
+	case index.HookDamaged(dir):
 		return "deja: the index could not be read, and automatic indexing is off — rebuild it with: deja index --rebuild"
 	}
 	return ""

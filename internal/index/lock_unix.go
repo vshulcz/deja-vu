@@ -3,6 +3,7 @@
 package index
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -86,4 +87,19 @@ func tryLockDir(dir string) (func(), bool, error) {
 		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 		_ = f.Close()
 	}, true, nil
+}
+
+// lockDirHeld probes whether another open handle holds dir+".lock" without
+// creating files, parent directories, or touching permissions on dir.
+func lockDirHeld(dir string) bool {
+	f, err := os.Open(dir + ".lock")
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		return errors.Is(err, syscall.EWOULDBLOCK)
+	}
+	_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+	return false
 }

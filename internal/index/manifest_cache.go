@@ -88,6 +88,8 @@ func cacheManifest(dir string, fi, si os.FileInfo, m Manifest) {
 func moveManifestCache(tmp, dir string) {
 	dropBucketDirs(tmp)
 	dropBucketDirs(dir)
+	dropBucketFileCount(tmp)
+	dropBucketFileCount(dir)
 	manifestCache.mu.Lock()
 	defer manifestCache.mu.Unlock()
 	switch manifestCache.dir {
@@ -147,6 +149,7 @@ func Stamp(dir string) string {
 // in-memory Manifest from before that atomic replacement.
 func invalidateManifestCache(dir string) {
 	dropBucketDirs(dir)
+	dropBucketFileCount(dir)
 	manifestCache.mu.Lock()
 	defer manifestCache.mu.Unlock()
 	if manifestCache.dir == dir {

@@ -1,6 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"encoding/gob"
+	"fmt"
+	"hash/fnv"
 	"io"
 	"io/fs"
 	"math"
@@ -13,6 +17,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -91,18 +96,57 @@ type repoSymbolMap struct {
 	capped     bool
 }
 
+const (
+	repoSymbolDiskTTL     = 60 * time.Second
+	repoSymbolDiskVersion = 1
+)
+
+type repoSymbolDiskSnapshot struct {
+	Version    int
+	At         time.Time
+	Files      []repoFileDiskEntry
+	ByStem     map[string][]string
+	ByDir      map[string]int
+	StemDF     map[string]int
+	DeclDF     map[string]int
+	StructDF   map[string]int
+	BodyDF     map[string]int
+	FirstDecl  map[string]symbolDeclDiskLoc
+	DirMtimes  map[string]int64
+	FileMtimes map[string]int64
+	FileSizes  map[string]int64
+	NumFiles   int
+	Capped     bool
+}
+
+type repoFileDiskEntry struct {
+	Rel       string
+	Stem      string
+	Pkg       string
+	StemWords map[string]bool
+	DeclExact map[string]bool
+	DeclWords map[string]bool
+	BodyWords map[string]int
+}
+
+type symbolDeclDiskLoc struct {
+	Rel  string
+	Line int
+	Sig  string
+}
+
 var (
 	repoSymbolMapCache                   sync.Map
 	maxRepoSymbolFileBytes               int64 = 256 << 10
 	repoSymbolScanMaxFiles                     = 2000
 	repoSymbolScanMaxBytes               int64 = 16 << 20
 	repoSymbolScanBudget                       = 2 * time.Second
-	repoSymbolScanMinFilesBeforeDeadline       = 256
+	repoSymbolScanMinFilesBeforeDeadline       = 32
 	repoSymbolScanHook                   func(string)
 )
 
-func repoSymbolMapFresh(cached repoSymbolMap) bool {
-	if cached.at.IsZero() || time.Since(cached.at) >= 5*time.Second || len(cached.dirMtimes) == 0 {
+func repoSymbolMapMtimesMatch(cached repoSymbolMap) bool {
+	if len(cached.dirMtimes) == 0 {
 		return false
 	}
 	for p, mt := range cached.dirMtimes {
@@ -123,6 +167,133 @@ func repoSymbolMapFresh(cached repoSymbolMap) bool {
 	return true
 }
 
+func repoSymbolMapFresh(cached repoSymbolMap) bool {
+	if cached.at.IsZero() || time.Since(cached.at) >= 5*time.Second {
+		return false
+	}
+	return repoSymbolMapMtimesMatch(cached)
+}
+
+func repoSymbolDiskPath(dir, scanRoot, cwd string) string {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(scanRoot + "\x00" + cwd))
+	return fmt.Sprintf("%s.symmap-%016x", dir, h.Sum64())
+}
+
+func repoSymbolDiskCacheAllowed() (string, bool) {
+	if repoSymbolScanHook != nil ||
+		maxRepoSymbolFileBytes != 256<<10 ||
+		repoSymbolScanMaxFiles != 2000 ||
+		repoSymbolScanMaxBytes != 16<<20 ||
+		repoSymbolScanBudget != 2*time.Second ||
+		repoSymbolScanMinFilesBeforeDeadline != 32 {
+		return "", false
+	}
+	dir := getActiveDejaDir()
+	if dir == "" || !index.HasManifest(dir) {
+		return "", false
+	}
+	return dir, true
+}
+
+func snapshotFromRepoSymbolMap(idx repoSymbolMap) repoSymbolDiskSnapshot {
+	files := make([]repoFileDiskEntry, len(idx.files))
+	for i, f := range idx.files {
+		files[i] = repoFileDiskEntry{
+			Rel:       f.rel,
+			Stem:      f.stem,
+			Pkg:       f.pkg,
+			StemWords: f.stemWords,
+			DeclExact: f.declExact,
+			DeclWords: f.declWords,
+			BodyWords: f.bodyWords,
+		}
+	}
+	decls := make(map[string]symbolDeclDiskLoc, len(idx.firstDecl))
+	for k, v := range idx.firstDecl {
+		decls[k] = symbolDeclDiskLoc{Rel: v.rel, Line: v.line, Sig: v.sig}
+	}
+	return repoSymbolDiskSnapshot{
+		Version:    repoSymbolDiskVersion,
+		At:         idx.at,
+		Files:      files,
+		ByStem:     idx.byStem,
+		ByDir:      idx.byDir,
+		StemDF:     idx.stemDF,
+		DeclDF:     idx.declDF,
+		StructDF:   idx.structDF,
+		BodyDF:     idx.bodyDF,
+		FirstDecl:  decls,
+		DirMtimes:  idx.dirMtimes,
+		FileMtimes: idx.fileMtimes,
+		FileSizes:  idx.fileSizes,
+		NumFiles:   idx.numFiles,
+		Capped:     idx.capped,
+	}
+}
+
+func repoSymbolMapFromSnapshot(snap repoSymbolDiskSnapshot) repoSymbolMap {
+	files := make([]repoFileEntry, len(snap.Files))
+	for i, f := range snap.Files {
+		files[i] = repoFileEntry{
+			rel:       f.Rel,
+			stem:      f.Stem,
+			pkg:       f.Pkg,
+			stemWords: f.StemWords,
+			declExact: f.DeclExact,
+			declWords: f.DeclWords,
+			bodyWords: f.BodyWords,
+		}
+	}
+	decls := make(map[string]symbolDeclLoc, len(snap.FirstDecl))
+	for k, v := range snap.FirstDecl {
+		decls[k] = symbolDeclLoc{rel: v.Rel, line: v.Line, sig: v.Sig}
+	}
+	return repoSymbolMap{
+		at:         snap.At,
+		files:      files,
+		byStem:     snap.ByStem,
+		byDir:      snap.ByDir,
+		stemDF:     snap.StemDF,
+		declDF:     snap.DeclDF,
+		structDF:   snap.StructDF,
+		bodyDF:     snap.BodyDF,
+		firstDecl:  decls,
+		dirMtimes:  snap.DirMtimes,
+		fileMtimes: snap.FileMtimes,
+		fileSizes:  snap.FileSizes,
+		numFiles:   snap.NumFiles,
+		capped:     snap.Capped,
+	}
+}
+
+func loadRepoSymbolMapFromDisk(dir, scanRoot, cwd string) (repoSymbolMap, bool) {
+	data, err := os.ReadFile(repoSymbolDiskPath(dir, scanRoot, cwd))
+	if err != nil {
+		return repoSymbolMap{}, false
+	}
+	var snap repoSymbolDiskSnapshot
+	if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&snap); err != nil {
+		return repoSymbolMap{}, false
+	}
+	if snap.Version != repoSymbolDiskVersion || snap.At.IsZero() || time.Since(snap.At) >= repoSymbolDiskTTL {
+		return repoSymbolMap{}, false
+	}
+	idx := repoSymbolMapFromSnapshot(snap)
+	if !repoSymbolMapMtimesMatch(idx) {
+		return repoSymbolMap{}, false
+	}
+	return idx, true
+}
+
+func saveRepoSymbolMapToDisk(dir, scanRoot, cwd string, idx repoSymbolMap) {
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(snapshotFromRepoSymbolMap(idx)); err != nil {
+		return
+	}
+	_ = atomicfile.Write(repoSymbolDiskPath(dir, scanRoot, cwd), buf.Bytes(), 0o600)
+}
+
 func loadRepoSymbolMap(cwd string) repoSymbolMap {
 	if cwd == "" || policy.SourceHintsOff() {
 		return repoSymbolMap{}
@@ -134,6 +305,13 @@ func loadRepoSymbolMap(cwd string) repoSymbolMap {
 	if v, ok := repoSymbolMapCache.Load(scanRoot); ok {
 		if cached, ok := v.(repoSymbolMap); ok && repoSymbolMapFresh(cached) {
 			return cached
+		}
+	}
+	if dir, ok := repoSymbolDiskCacheAllowed(); ok {
+		if disk, hit := loadRepoSymbolMapFromDisk(dir, scanRoot, cwd); hit {
+			disk.at = time.Now()
+			repoSymbolMapCache.Store(scanRoot, disk)
+			return disk
 		}
 	}
 	fi, err := os.Stat(scanRoot)
@@ -192,6 +370,9 @@ func loadRepoSymbolMap(cwd string) repoSymbolMap {
 	}
 	idx.at = time.Now()
 	repoSymbolMapCache.Store(scanRoot, idx)
+	if dir, ok := repoSymbolDiskCacheAllowed(); ok && len(idx.dirMtimes) > 0 {
+		saveRepoSymbolMapToDisk(dir, scanRoot, cwd, idx)
+	}
 	return idx
 }
 

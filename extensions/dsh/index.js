@@ -60,15 +60,19 @@ function resolveDeja() {
 
 const DEJA = resolveDeja();
 
+const HOOK_TIMEOUT_MS = 3000;
+const TOOL_TIMEOUT_MS = 20000;
+
 // run returns stdout, or "" when deja is missing or says nothing. Memory is
-// optional everywhere: a throw here would end the turn.
+// optional everywhere: a throw here would end the turn, and sync calls sit on
+// the host's main thread so they are capped tightly.
 function run(args, input, cwd) {
   try {
     return execFileSync(DEJA, args, {
       windowsHide: true,
       cwd,
       encoding: "utf8",
-      timeout: 20000,
+      timeout: HOOK_TIMEOUT_MS,
       maxBuffer: 8 * 1024 * 1024,
       input,
       stdio: [input === undefined ? "ignore" : "pipe", "pipe", "ignore"],
@@ -129,13 +133,13 @@ function tools(ctx) {
       },
     },
     output: TEXT_OUTPUT,
-    execute(args, exec) {
+    async execute(args, exec) {
       // The page the MCP recall tool serves, framed and budgeted by deja. It
       // puts the project of its working directory first, so it runs in the
       // calling session's workspace rather than wherever dsh was launched.
       const call = recallArgv(args);
-      const out = run(call, undefined, sessionCwd(exec && exec.agent));
-      return Promise.resolve(answer(out || (INSTALLED ? recallSilence(call) : "")));
+      const out = await runAsync(call, undefined, sessionCwd(exec && exec.agent));
+      return answer(out || (INSTALLED ? recallSilence(call) : ""));
     },
   })));
 
@@ -151,8 +155,8 @@ function tools(ctx) {
       },
     },
     output: TEXT_OUTPUT,
-    execute(args) {
-      return Promise.resolve(answer(run(["--framed", ...argv("ctx", [], args.query)])));
+    async execute(args) {
+      return answer(await runAsync(["--framed", ...argv("ctx", [], args.query)]));
     },
   })));
 
@@ -168,8 +172,8 @@ function tools(ctx) {
       },
     },
     output: TEXT_OUTPUT,
-    execute(args) {
-      return Promise.resolve(answer(run(["--framed", ...argv("blame", ["--json"], args.path)])));
+    async execute(args) {
+      return answer(await runAsync(["--framed", ...argv("blame", ["--json"], args.path)]));
     },
   })));
 
@@ -185,8 +189,8 @@ function tools(ctx) {
       },
     },
     output: TEXT_OUTPUT,
-    execute(args) {
-      return Promise.resolve(answer(run(["--framed", ...argv("fix", [], args.error)])));
+    async execute(args) {
+      return answer(await runAsync(["--framed", ...argv("fix", [], args.error)]));
     },
   })));
 
@@ -202,8 +206,8 @@ function tools(ctx) {
       },
     },
     output: TEXT_OUTPUT,
-    execute(args) {
-      return Promise.resolve(answer(run(["--framed", ...argv("how", [], args.what)])));
+    async execute(args) {
+      return answer(await runAsync(["--framed", ...argv("how", [], args.what)]));
     },
   })));
 
@@ -219,10 +223,10 @@ function tools(ctx) {
       },
     },
     output: TEXT_OUTPUT,
-    execute(args) {
-      const written = run(argv("remember", [], args.text));
-      if (!INSTALLED) return Promise.resolve(MISSING);
-      return Promise.resolve(written || "deja did not record that.");
+    async execute(args) {
+      const written = await runAsync(argv("remember", [], args.text));
+      if (!INSTALLED) return MISSING;
+      return written || "deja did not record that.";
     },
   })));
 }
@@ -263,14 +267,14 @@ function command(ctx, board) {
       // dispatches a word that happens to be a command, so `/deja version`
       // printed a version number and `/deja index` rebuilt the index, and one
       // of the words people most want history about is `install`.
-      const out = run(argv("search", session ? ["--session", session] : [], query));
+      const out = await runAsync(argv("search", session ? ["--session", session] : [], query));
       if (!INSTALLED) return { kind: "error", text: MISSING };
       // Outside dsh web a person sees nothing the hooks print — the digest
       // goes to the model — so the reply to /deja is where deja's own notes
       // reach them. In dsh web the session's lines may still be waiting on the
       // board for a page that has not asked; they go here, once, instead.
       const waiting = board ? board.take(sessionId(invocation && invocation.agent)) : [];
-      const notes = [...waiting, run(["hook-context", "--notes"])].filter(Boolean).join("\n");
+      const notes = [...waiting, await runAsync(["hook-context", "--notes"])].filter(Boolean).join("\n");
       return { kind: "success", text: notes ? answer(out) + "\n\n" + notes : answer(out) };
     },
   }));
@@ -327,7 +331,7 @@ function autoDigest(ctx, board) {
         const text = inert(askHook(
           ["hook-context", "--plain"],
           ["hook-context"],
-          JSON.stringify({ session_id: sid, cwd: sessionCwd(agent), source: "startup", deja_once: true }),
+          JSON.stringify({ session_id: sid, cwd: sessionCwd(agent), source: "startup", deja_once: true, harness: "deepseek" }),
           sid,
           board,
         ));
@@ -424,7 +428,7 @@ function autoRecall(ctx, board) {
           recalled = inert(askHook(
             ["hook-prompt", "--plain"],
             ["hook-prompt"],
-            JSON.stringify({ prompt, cwd, session_id: sid }),
+            JSON.stringify({ prompt, cwd, session_id: sid, harness: "deepseek" }),
             sid,
             board,
           ));
@@ -471,15 +475,28 @@ function notesRoute(ctx, board) {
 
 // runAsync is run for a seam dsh awaits, so the event loop goes on while deja
 // answers. It never rejects.
-function runAsync(args, input) {
+function runAsync(args, input, cwd) {
   return new Promise((resolve) => {
     try {
-      const child = execFile(DEJA, args, { windowsHide: true, encoding: "utf8", timeout: 20000, maxBuffer: 8 * 1024 * 1024 }, (err, stdout) =>
-        resolve(err ? "" : String(stdout || "").trim()),
+      const hasInput = input !== undefined;
+      const child = execFile(
+        DEJA,
+        args,
+        {
+          windowsHide: true,
+          cwd,
+          encoding: "utf8",
+          timeout: TOOL_TIMEOUT_MS,
+          maxBuffer: 8 * 1024 * 1024,
+          stdio: [hasInput ? "pipe" : "ignore", "pipe", "ignore"],
+        },
+        (err, stdout) => resolve(err ? "" : String(stdout || "").trim()),
       );
       child.on("error", () => resolve(""));
-      child.stdin.on("error", () => {});
-      child.stdin.end(input);
+      if (hasInput && child.stdin) {
+        child.stdin.on("error", () => {});
+        child.stdin.end(input);
+      }
     } catch {
       resolve("");
     }
@@ -569,20 +586,21 @@ function sessionEnds(ctx) {
   // Each live session with the directory it opened in: the end refreshes that
   // project's start digest, so the next session there sees this one.
   const live = new Map();
-  const end = (sid) => {
+  const end = (sid, sync = false) => {
     if (!sid || !live.has(sid)) return;
     const cwd = live.get(sid);
     live.delete(sid);
-    run(["hook-session-end"], JSON.stringify({ session_id: sid, cwd }));
+    if (sync) run(["hook-session-end"], JSON.stringify({ session_id: sid, cwd }));
+    else runAsync(["hook-session-end"], JSON.stringify({ session_id: sid, cwd }));
   };
   try {
     ctx.on("session/created", (session) => {
       const sid = bareSessionId(session && session.id);
       if (sid) live.set(sid, (session.header && session.header.cwd) || process.cwd());
     });
-    ctx.on("session/disposed", (session) => end(bareSessionId(session && session.id)));
+    ctx.on("session/disposed", (session) => end(bareSessionId(session && session.id), false));
     process.on("exit", () => {
-      for (const sid of [...live.keys()]) end(sid);
+      for (const sid of [...live.keys()]) end(sid, true);
     });
   } catch {}
 }

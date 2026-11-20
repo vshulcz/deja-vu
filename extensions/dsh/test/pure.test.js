@@ -61,9 +61,9 @@ test("every query the plugin sends goes through argv", () => {
   // A literal list is deja's own vocabulary — `run(["version"])` and the hook.
   // Anything else in that position is somebody's text, and it belongs in
   // argv(), which names the command and ends the flags.
-  const calls = source.match(/run\(\[[^\]]*\]/g) || [];
+  const calls = source.match(/(?:run|runAsync)\(\[[^\]]*\]/g) || [];
   for (const call of calls) {
-    assert.match(call, /^run\(\["/, `${call} builds a call out of something other than deja's own words`);
+    assert.match(call, /^(?:run|runAsync)\(\["/, `${call} builds a call out of something other than deja's own words`);
     assert.doesNotMatch(call, /String\(args\./, `${call} passes a query to deja without argv()`);
   }
 });
@@ -98,7 +98,17 @@ test("a compaction is captured and its packet asked for by session", () => {
   assert.match(source, /\["hook-precompact"\]/);
   assert.match(source, /harness: "deepseek"/);
   assert.match(source, /replace\(\/\^session-\/, ""\)/);
-  assert.match(source, /JSON\.stringify\(\{ prompt, cwd, session_id: sid \}\)/);
+  assert.match(source, /JSON\.stringify\(\{ prompt, cwd, session_id: sid, harness: "deepseek" \}\)/);
+  assert.match(source, /JSON\.stringify\(\{ session_id: sid, cwd: sessionCwd\(agent\), source: "startup", deja_once: true, harness: "deepseek" \}\)/);
+});
+
+test("tools run asynchronously and sync hooks cap blocking time", () => {
+  assert.match(source, /const HOOK_TIMEOUT_MS = 3000;/);
+  assert.match(source, /const TOOL_TIMEOUT_MS = 20000;/);
+  const toolsBody = source.slice(source.indexOf("function tools("), source.indexOf("function command("));
+  assert.ok(toolsBody.length > 0, "tools function missing");
+  assert.doesNotMatch(toolsBody, /\brun\(/, "model-facing tools must not block the host main thread with synchronous run()");
+  assert.match(toolsBody, /\brunAsync\(/);
 });
 
 test("the project digest opens the session once and asks deja for it", () => {

@@ -193,8 +193,10 @@ func cachedHookDigestFor(dir, fromPayload string, exclude ...string) (string, in
 	// kept serving that snapshot forever — every session recorded after the
 	// deletion invisible to the hook (#874). Caches do get wiped: ~/.cache is
 	// fair game for cleanup tools and CI images.
-	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.Damaged(dir) {
-		requestWarmup(dir)
+	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.HookDamaged(dir) {
+		if !index.RebuildInProgress(dir) {
+			requestWarmup(dir)
+		}
 	}
 	gate := hookGate() + repoMemoryStamp(cwd)
 	p := hookCachePath(dir, cwd)
@@ -384,8 +386,10 @@ func hookDigestBuild(dir, fromPayload string, exclude []string, variants bool, c
 	// upgrade recall nothing and say nothing about why.
 	// Damaged as well as stale: a kill during a write leaves records the
 	// manifest still describes, and this path answers from them (#800).
-	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.Damaged(dir) {
-		requestWarmup(dir)
+	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.HookDamaged(dir) {
+		if !index.RebuildInProgress(dir) {
+			requestWarmup(dir)
+		}
 		if repo, repoProj := repoMemoryDigestAndProject(cwd, pol, changedTaskFiles(cwd)...); repo != "" {
 			return hookCacheEntry{Digest: strings.TrimRight(repo, "\n"), Projects: []string{repoProj}}
 		}

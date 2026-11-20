@@ -633,7 +633,7 @@ func unwritableIndexDir(dir string) string {
 // absent, written by another format, or damaged. It is the condition every
 // caller of requestWarmup already tested separately.
 func indexNeedsRebuild(dir string) bool {
-	return !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.Damaged(dir)
+	return !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.HookDamaged(dir)
 }
 
 // once forces the one-digest-per-session rule on from the command line, for a
@@ -795,7 +795,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// The session asking is left out of its own digest (#4199), except after a
 	// compaction: the lead there points the agent at that session's id.
 	var self []string
-	lineage, cut := askerLineageCut(dir, input.SessionID, input.TranscriptPath, input.ParentSessionID)
+	lineage, cut := askerLineageCutForHarness(dir, input.SessionID, input.TranscriptPath, input.Harness, input.ParentSessionID)
 	for id := range lineage {
 		if input.Source == "compact" && id == input.SessionID {
 			continue
@@ -828,7 +828,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 		return resolvedHarness
 	}
 	ctxCWD := hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots))
-	parentBrief := resolveContextSubagentBrief(dir, input.Source, input.SessionID, input.ParentSessionID, input.TranscriptPath, parentTranscript, ctxCWD)
+	parentBrief := resolveContextSubagentBrief(dir, input.Source, input.SessionID, input.ParentSessionID, input.TranscriptPath, parentTranscript, input.Harness, ctxCWD)
 	var claudeMemCount int
 	digest, claudeMemCount, servedProjects = attachClaudeAutoMemory(
 		dir, input.SessionID, input.TranscriptPath, input.Harness,
@@ -924,10 +924,10 @@ func preparePostCompactionContext(dir, sessionID, transcriptPath, cwd string, ro
 	requestWarmup(dir)
 }
 
-func resolveContextSubagentBrief(dir, source, sessionID, parentSessionID, transcriptPath, parentTranscript, ctxCWD string) string {
+func resolveContextSubagentBrief(dir, source, sessionID, parentSessionID, transcriptPath, parentTranscript, harness, ctxCWD string) string {
 	resolvedParent := strings.TrimSpace(parentSessionID)
 	if resolvedParent == "" && source != "fork" {
-		if h, ok := askerHead(sessionID, transcriptPath); ok && h.Parent != "" && h.Kind != model.KindFork {
+		if h, ok := askerHeadForHarness(sessionID, transcriptPath, harness); ok && h.Parent != "" && h.Kind != model.KindFork {
 			resolvedParent = h.Parent
 		}
 	}
@@ -1525,6 +1525,11 @@ func dropHookCaches(dir string) {
 	for _, p := range matches {
 		_ = os.Remove(p)
 		_ = os.Remove(p + ".refreshing")
+	}
+	if symMatches, err := filepath.Glob(dir + ".symmap-*"); err == nil {
+		for _, p := range symMatches {
+			_ = os.Remove(p)
+		}
 	}
 	// The marks for the sessions being written go with them: a forget that left
 	// them behind would keep hiding whatever they name for the rest of the

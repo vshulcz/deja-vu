@@ -15,6 +15,7 @@ import (
 const (
 	lockfileExclusiveLock   = 0x2
 	lockfileFailImmediately = 0x1
+	errorLockViolation      = syscall.Errno(33)
 )
 
 var (
@@ -132,4 +133,25 @@ func tryLockDir(dir string) (func(), bool, error) {
 		_ = unlockFileEx(h, 0, 1, 0, &ol2)
 		_ = f.Close()
 	}, true, nil
+}
+
+// lockDirHeld probes whether another open handle holds dir+".lock" without
+// creating files, parent directories, or touching permissions on dir.
+func lockDirHeld(dir string) bool {
+	lockPath := dir + ".lock"
+	f, err := os.OpenFile(lockPath, os.O_RDWR, 0)
+	if errors.Is(err, fs.ErrPermission) {
+		f, err = os.Open(lockPath)
+	}
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	h := syscall.Handle(f.Fd())
+	var ol syscall.Overlapped
+	if err := lockFileEx(h, lockfileExclusiveLock|lockfileFailImmediately, 0, 1, 0, &ol); err != nil {
+		return errors.Is(err, errorLockViolation)
+	}
+	_ = unlockFileEx(h, 0, 1, 0, &ol)
+	return false
 }

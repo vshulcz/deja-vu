@@ -62,7 +62,7 @@ var indexDamageReason = index.DamageReason
 var planIndexReady = func(dir string) bool {
 	return index.HasManifest(dir) &&
 		index.IsCurrentVersion(dir) &&
-		!index.Damaged(dir)
+		!index.HookDamaged(dir)
 }
 
 var planFrictionLookup = index.PlanFrictionMatches

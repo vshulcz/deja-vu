@@ -92,6 +92,8 @@ panel from these files; with both installed you get one panel.
         autoRecall: false   # keep tools, /deja and manual search
 ```
 
+`deja_*` tools, `/deja`, tool notes, and search run asynchronously off DSH's main thread. Turn-start injection (`deja:project` and `deja:recall`) uses DSH's synchronous `systemPrompt.context` hook (capped at 3 s); set `autoRecall: false` on slow disks or multi-GB stores under heavy concurrent writes if turn assembly should never wait on disk I/O.
+
 ## Search controls
 
 Open **Settings → Deja** for three switches, all enabled by default and grouped
@@ -232,6 +234,6 @@ Switching tools mid-task? Run `deja handoff --to <agent>` (or use `handoff` via 
 
 ## What it does not do
 
-No LLM, no embeddings. The index is a local BM25 store under `~/.cache/deja/index.db` (`DEJA_INDEX_DIR` overrides) built over transcript files that already exist, so a query answers in about a millisecond with no network path unless you explicitly run semantic search (`deja embed`). Common secrets and tokens (`sk-*`, `ghp_*`, `AKIA*`, `Bearer`, private keys, URL credentials) are redacted at index time before any snippet reaches `dsh`.
+No LLM, no embeddings. The index is a local BM25 store under `~/.cache/deja/index.db` (`DEJA_INDEX_DIR` overrides) built over transcript files that already exist, so warm lookups answer in milliseconds with no network path unless you explicitly run semantic search (`deja embed`). Common secrets and tokens (`sk-*`, `ghp_*`, `AKIA*`, `Bearer`, private keys, URL credentials) are redacted at index time before any snippet reaches `dsh`.
 
 Part of [deja-vu](https://github.com/vshulcz/deja-vu). MIT.

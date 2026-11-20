@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -697,16 +698,26 @@ func toolFingerprint(sqlite, zstd bool) string {
 	return fmt.Sprintf("sqlite3=%t,zstd=%t", sqlite, zstd)
 }
 
-// hasBucketFile reports whether the postings directory holds anything at all.
-// It stops at the first entry: the question is emptiness, not the count.
+// hasBucketFile reports whether the postings directory holds at least one
+// postings file. It reads bounded directory batches and stops on the first match
+// rather than enumerating thousands of buckets.
 func hasBucketFile(dir string) bool {
 	f, err := os.Open(dir)
 	if err != nil {
 		return false
 	}
 	defer func() { _ = f.Close() }()
-	names, err := f.Readdirnames(1)
-	return err == nil && len(names) > 0
+	for {
+		entries, readErr := f.ReadDir(32)
+		for _, e := range entries {
+			if !e.IsDir() && isPostingsFile(e.Name()) {
+				return true
+			}
+		}
+		if len(entries) == 0 || readErr != nil {
+			return false
+		}
+	}
 }
 
 // recordsIntact reports whether records.bin still holds everything the manifest
@@ -743,11 +754,7 @@ func recordsIntactSized(dir string, m Manifest, tolerateLonger bool) bool {
 	return recordsDamage(dir, m, tolerateLonger) == ""
 }
 
-// recordsDamage is recordsIntactSized with the answer said out loud: "" when
-// the store holds what the manifest committed, and otherwise which file is not
-// what it should be. One sentence covered all of these, and named records and
-// postings for breakages that were neither (#2695).
-func recordsDamage(dir string, m Manifest, tolerateLonger bool) string {
+func recordsBaseDamage(dir string, m Manifest, tolerateLonger bool) string {
 	if m.RecordsSize <= 0 {
 		return "" // empty index, or one written before the size stamp existed
 	}
@@ -778,7 +785,8 @@ func recordsDamage(dir string, m Manifest, tolerateLonger bool) string {
 	// never was: it said "no matches in 0 indexed sessions" on every ordinary
 	// miss too, and since #637 it reports the manifest count instead.
 	if len(m.Sessions) > 0 {
-		bi, err := os.Stat(filepath.Join(dir, "buckets"))
+		buckets := filepath.Join(dir, "buckets")
+		bi, err := os.Stat(buckets)
 		if err != nil || !bi.IsDir() {
 			return "the postings directory is not there"
 		}
@@ -787,21 +795,74 @@ func recordsDamage(dir string, m Manifest, tolerateLonger bool) string {
 		// behind: every check passed, `doctor` said "built, up to date", and
 		// search answered "no matches in 3 indexed sessions" about text that
 		// was still in the record log (#946).
-		if !hasBucketFile(filepath.Join(dir, "buckets")) {
+		if !hasBucketFile(buckets) {
 			return "the postings directory is empty"
-		}
-		// Losing part of the directory is the same loss spread thinner, and it
-		// is the shape a partial copy or an interrupted sync actually leaves.
-		// Every token in a missing file answered "no matches in N indexed
-		// sessions" while its text sat in the record log, and `doctor --deep`
-		// called that index healthy (#1088). Fewer than committed only: a
-		// larger count belongs to a build this manifest does not describe, and
-		// the freshness check already covers that.
-		if m.BucketFiles > 0 && countBucketFiles(filepath.Join(dir, "buckets")) < m.BucketFiles {
-			return "some postings files are missing"
 		}
 	}
 	return ""
+}
+
+// recordsDamage is recordsIntactSized with the answer said out loud: "" when
+// the store holds what the manifest committed, and otherwise which file is not
+// what it should be. One sentence covered all of these, and named records and
+// postings for breakages that were neither (#2695).
+func recordsDamage(dir string, m Manifest, tolerateLonger bool) string {
+	if reason := recordsBaseDamage(dir, m, tolerateLonger); reason != "" {
+		return reason
+	}
+	// Losing part of the directory is the same loss spread thinner, and it
+	// is the shape a partial copy or an interrupted sync actually leaves.
+	// Every token in a missing file answered "no matches in N indexed
+	// sessions" while its text sat in the record log, and `doctor --deep`
+	// called that index healthy (#1088). Fewer than committed only: a
+	// larger count belongs to a build this manifest does not describe, and
+	// the freshness check already covers that.
+	if len(m.Sessions) > 0 && m.BucketFiles > 0 && countBucketFilesCached(filepath.Join(dir, "buckets")) < m.BucketFiles {
+		return "some postings files are missing"
+	}
+	return ""
+}
+
+var bucketFileCountCache struct {
+	mu    sync.Mutex
+	dir   string
+	mtime int64
+	count int
+	ok    bool
+}
+
+func dropBucketFileCount(dir string) {
+	buckets := filepath.Join(dir, "buckets")
+	bucketFileCountCache.mu.Lock()
+	if bucketFileCountCache.dir == dir || bucketFileCountCache.dir == buckets {
+		bucketFileCountCache.ok = false
+	}
+	bucketFileCountCache.mu.Unlock()
+}
+
+func countBucketFilesCached(dir string) int {
+	fi, err := os.Stat(dir)
+	if err != nil {
+		return 0
+	}
+	mtime := fi.ModTime().UnixNano()
+	bucketFileCountCache.mu.Lock()
+	if bucketFileCountCache.ok && bucketFileCountCache.dir == dir && bucketFileCountCache.mtime == mtime {
+		n := bucketFileCountCache.count
+		bucketFileCountCache.mu.Unlock()
+		return n
+	}
+	bucketFileCountCache.mu.Unlock()
+
+	n := countBucketFiles(dir)
+
+	bucketFileCountCache.mu.Lock()
+	bucketFileCountCache.dir = dir
+	bucketFileCountCache.mtime = mtime
+	bucketFileCountCache.count = n
+	bucketFileCountCache.ok = true
+	bucketFileCountCache.mu.Unlock()
+	return n
 }
 
 // countBucketFiles counts the postings files a buckets directory holds:
@@ -819,6 +880,38 @@ func countBucketFiles(dir string) int {
 		}
 	}
 	return n
+}
+
+// HookDamaged is the fast integrity check for hook paths. Like Damaged it
+// catches a corrupt manifest, missing or truncated records.bin, and missing or
+// empty buckets/, while tolerating a longer records.bin under an active build
+// lock without enumerating thousands of bucket files.
+func HookDamaged(dir string) bool {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		_, statErr := statIndexFile(filepath.Join(dir, "manifest.gob"))
+		return statErr == nil
+	}
+	if recordsBaseDamage(dir, m, false) == "" {
+		return false
+	}
+	if !RebuildInProgress(dir) {
+		return true
+	}
+	// While a build holds the lock, a records.bin longer than m.RecordsSize is
+	// an in-flight append (#4266); accept immediately without waiting out a swap.
+	if recordsBaseDamage(dir, m, true) == "" {
+		return false
+	}
+	waitOutSwapWindow()
+	m2, err := readManifest(dir)
+	if err != nil {
+		return false
+	}
+	return recordsBaseDamage(dir, m2, true) != ""
 }
 
 // Damaged reports whether the store on disk still holds what the manifest
@@ -883,6 +976,12 @@ func DamageReason(dir string) string {
 	if !RebuildInProgress(dir) {
 		return reason
 	}
+	// During an incremental pass, records.bin grows before the manifest is
+	// rewritten. Checking the cached manifest with tolerateLonger first avoids
+	// sleeping waitOutSwapWindow() and uncached manifest decode (#4266).
+	if reason == "the record log is longer than the manifest committed" && recordsDamage(dir, m, true) == "" {
+		return ""
+	}
 	waitOutSwapWindow()
 	m2, err := readManifest(dir)
 	if err != nil {
@@ -907,23 +1006,7 @@ func RebuildInProgress(dir string) bool {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	unlock, ok, err := tryLockDir(dir)
-	if err != nil {
-		return false
-	}
-	if ok {
-		unlock()
-		return false
-	}
-	// A lock that could not be created is not a lock somebody holds: tryLockDir
-	// answers "not acquired, no error" for a directory it may not write into,
-	// so a read-only index still serves readers — and that read as a rebuild in
-	// flight, telling people to wait for something that never finishes (#2267).
-	// A real holder left the file behind.
-	if _, err := os.Stat(dir + ".lock"); err != nil {
-		return false
-	}
-	return true
+	return lockDirHeld(dir)
 }
 
 // StampedAhead reports a session stamped later than this machine's clock, and
