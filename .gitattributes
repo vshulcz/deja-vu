@@ -1,4 +1,5 @@
 packaging/** text eol=lf
+action.yml text eol=lf
 # The doc-contract tests read a heading as a whole line, so a CRLF checkout
 # breaks eleven of them at once (#2081).
 # text=auto rather than text: docs/assets holds a png and a gif, and git decides
