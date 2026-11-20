@@ -151,7 +151,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	if result.Tier == search.TierError {
 		hits = search.ErrorHits(ss, o.Query)
 	} else if result.Tier == search.TierRelevance {
-		hits = markStrictHits(search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(q), result.TermIDF), result)
+		hits = markStrictHits(search.RelevanceHitsWeighted(ss, relevanceMatchTermsFor(q, result), result.TermIDF), result)
 	} else if hits, err = search.Run(ss, o); err != nil {
 		return "", 0, 0, nil, nil, "", err
 	}
@@ -194,17 +194,23 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	search.ScrubMessages(&whole)
 	var b bytes.Buffer
 	search.PrintContext(&b, whole, q)
-	text := withChanges(b.String(), whole) + contextOthersNote(len(hits)+unreadSessions(result), unreadEstimated(result))
+	requireBind := hits[0].Tier != search.TierExact && !hits[0].Strict
+	text := withChangesForSearch(b.String(), whole, q, requireBind, result.TermIDF, result.SessionIDF, index.TopIDF(dir)) + contextOthersNote(len(hits)+unreadSessions(result), unreadEstimated(result))
 	if hits[0].Tier != search.TierExact {
+		tier := result.Tier
+		if hits[0].Tier == search.TierRelevance {
+			tier = search.TierRelevance
+		}
+		qRel := quoteLoosenedQuery(q, tier)
 		// The words below say which one was dropped, and a session matched
 		// without it does not name what was asked either — the dropped word
 		// is the one that identified the question.
 		names := !namedSomethingAbsent(result.Variants) &&
-			(sessionNamesTheAsked(hits[0].Session, q, result.TermIDF) || sessionNamesTheAsked(whole, q, result.TermIDF))
+			(sessionNamesTheAsked(hits[0].Session, qRel, result.TermIDF) || sessionNamesTheAsked(whole, qRel, result.TermIDF))
 		// Holding most of a long query names it too, as on the recall page.
 		if !names && !hits[0].Strict {
-			names = bestCoverage([]search.Hit{hits[0]}, q, result.TermIDF).aboutIt() ||
-				bestCoverage([]search.Hit{{Session: whole}}, q, result.TermIDF).aboutIt()
+			names = bestCoverage([]search.Hit{hits[0]}, qRel, result.TermIDF).aboutIt() ||
+				bestCoverage([]search.Hit{{Session: whole}}, qRel, result.TermIDF).aboutIt()
 		}
 		text = contextTierLead(hits[0].Tier, hits[0].Strict, names) +
 			contextIgnoredWords(result) + text

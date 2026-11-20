@@ -650,6 +650,9 @@ type SearchResult struct {
 	// it that choice was made by counting terms, one each, and the two disagreed
 	// exactly when one rare word carried the session. Empty on every other tier.
 	TermIDF map[string]float64 `json:",omitempty"`
+	// SessionIDF records session-level rankIDF(len(m.Sessions), minSess) per
+	// matched query term and compound part, without message-cap inflation.
+	SessionIDF map[string]float64 `json:",omitempty"`
 	// Unread is set when Options.Window let the exact tier read only the
 	// sessions that can reach the page. The caller hands it to ranking.
 	Unread *query.Unread `json:",omitempty"`

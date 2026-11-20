@@ -57,6 +57,101 @@ func parseInlineBlock(s string) (inlineBlock, bool) {
 	return inlineBlock{}, false
 }
 
+// parseInlineBlocks extracts all exported inline blocks from a text payload
+// that may contain multiple blocks separated by newlines or preceded by prose.
+func parseInlineBlocks(s string) []inlineBlock {
+	blocks, _ := splitInlineBlocks(s)
+	return blocks
+}
+
+func splitInlineBlocks(s string) ([]inlineBlock, string) {
+	if !strings.Contains(s, "[thinking]") && !strings.Contains(s, "[tool_use ") && !strings.Contains(s, "[tool_result]") {
+		return nil, s
+	}
+	lines := strings.Split(s, "\n")
+	var blocks []inlineBlock
+	var speechLines []string
+	curKind := ""
+	var curLines []string
+	flush := func() {
+		if curKind == "" {
+			return
+		}
+		if blk, ok := parseInlineBlock(strings.Join(curLines, "\n")); ok {
+			blocks = append(blocks, blk)
+		}
+		curKind = ""
+		curLines = nil
+	}
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "[tool_use ") {
+			if blk, ok := parseInlineBlock(trimmed); ok && blk.typ == "tool_use" {
+				flush()
+				blocks = append(blocks, blk)
+				continue
+			}
+			// Handle pretty-printed multi-line JSON payloads under [tool_use Name].
+			if closeIdx := strings.IndexByte(trimmed[len("[tool_use "):], ']'); closeIdx > 0 {
+				after := strings.TrimSpace(trimmed[len("[tool_use ")+closeIdx+1:])
+				if strings.HasPrefix(after, "{") {
+					var joined strings.Builder
+					joined.WriteString(trimmed)
+					matched := false
+					maxJ := min(len(lines), i+40)
+					for j := i + 1; j < maxJ; j++ {
+						nt := strings.TrimSpace(lines[j])
+						if isThinkingOrResultHeader(nt) || strings.HasPrefix(nt, "[tool_use ") {
+							break
+						}
+						joined.WriteString("\n" + lines[j])
+						if blk, ok := parseInlineBlock(joined.String()); ok && blk.typ == "tool_use" {
+							flush()
+							blocks = append(blocks, blk)
+							i = j
+							matched = true
+							break
+						}
+					}
+					if matched {
+						continue
+					}
+				}
+			}
+		}
+		if rest, ok := strings.CutPrefix(trimmed, "[thinking]"); ok && hasInlineBoundary(rest) {
+			flush()
+			curKind = "thinking"
+			curLines = []string{line}
+			continue
+		}
+		if rest, ok := strings.CutPrefix(trimmed, "[tool_result]"); ok && hasInlineBoundary(rest) {
+			flush()
+			curKind = "tool_result"
+			curLines = []string{line}
+			continue
+		}
+		if curKind != "" {
+			curLines = append(curLines, line)
+		} else {
+			speechLines = append(speechLines, line)
+		}
+	}
+	flush()
+	return blocks, strings.TrimSpace(strings.Join(speechLines, "\n"))
+}
+
+func isThinkingOrResultHeader(trimmed string) bool {
+	if rest, ok := strings.CutPrefix(trimmed, "[thinking]"); ok && hasInlineBoundary(rest) {
+		return true
+	}
+	if rest, ok := strings.CutPrefix(trimmed, "[tool_result]"); ok && hasInlineBoundary(rest) {
+		return true
+	}
+	return false
+}
+
 // normalizeInlineClaudeText unpacks exported text markers ([thinking],
 // [tool_use Name] {...}, [tool_result]...) into synthetic typed blocks so all
 // downstream extractors handle them uniformly without altering native JSON logs.
@@ -116,38 +211,44 @@ func unpackContentBlocks(v any) (blocks []any, results []string, speech string, 
 		if txt == "" {
 			return
 		}
-		blk, ok := parseInlineBlock(txt)
-		if !ok {
+		blks, speechText := splitInlineBlocks(txt)
+		if len(blks) == 0 {
 			sawSpeech = true
 			speechParts = append(speechParts, txt)
 			return
 		}
-		switch blk.typ {
-		case "thinking":
-			return
-		case "tool_use":
-			var in map[string]any
-			if json.Unmarshal(blk.input, &in) == nil && in != nil {
-				blocks = append(blocks, map[string]any{
-					"type":  "tool_use",
-					"id":    inlineToolID,
-					"name":  blk.name,
-					"input": in,
-				})
-			}
-		case "tool_result":
-			sawTool = true
-			m := map[string]any{
-				"type":        "tool_result",
-				"tool_use_id": inlineToolID,
-				"content":     blk.text,
-			}
-			if blk.isErr {
-				m["is_error"] = true
-			}
-			blocks = append(blocks, m)
-			if blk.text != "" {
-				results = append(results, blk.text)
+		if speechText != "" {
+			sawSpeech = true
+			speechParts = append(speechParts, speechText)
+		}
+		for _, blk := range blks {
+			switch blk.typ {
+			case "thinking":
+				continue
+			case "tool_use":
+				var in map[string]any
+				if json.Unmarshal(blk.input, &in) == nil && in != nil {
+					blocks = append(blocks, map[string]any{
+						"type":  "tool_use",
+						"id":    inlineToolID,
+						"name":  blk.name,
+						"input": in,
+					})
+				}
+			case "tool_result":
+				sawTool = true
+				m := map[string]any{
+					"type":        "tool_result",
+					"tool_use_id": inlineToolID,
+					"content":     blk.text,
+				}
+				if blk.isErr {
+					m["is_error"] = true
+				}
+				blocks = append(blocks, m)
+				if blk.text != "" {
+					results = append(results, blk.text)
+				}
 			}
 		}
 	}
@@ -203,18 +304,21 @@ func unpackContentBlocks(v any) (blocks []any, results []string, speech string, 
 }
 
 func filterInlineSpeechText(s string) (string, bool) {
-	blk, ok := parseInlineBlock(s)
-	if !ok {
+	blks, speechText := splitInlineBlocks(s)
+	if len(blks) == 0 {
 		return s, s != ""
 	}
-	switch blk.typ {
-	case "thinking", "tool_use":
-		return "", false
-	case "tool_result":
-		if !IndexToolOutput() {
-			return "", false
-		}
-		return blk.text, blk.text != ""
+	var out []string
+	if speechText != "" {
+		out = append(out, speechText)
 	}
-	return s, s != ""
+	if IndexToolOutput() {
+		for _, blk := range blks {
+			if blk.typ == "tool_result" && blk.text != "" {
+				out = append(out, blk.text)
+			}
+		}
+	}
+	joined := strings.Join(out, "\n")
+	return joined, joined != ""
 }

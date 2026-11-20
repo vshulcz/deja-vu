@@ -63,6 +63,9 @@ func RecallWorthShowingNaming(terms []string, matched, strong, naming int, known
 		}
 		return true
 	}
+	if naming == 0 && HasIdentifierTerm(terms) {
+		return false
+	}
 	return matched >= 2
 }
 

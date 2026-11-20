@@ -15,9 +15,17 @@ func codexChanges(file string) []Change {
 	var out []Change
 	cwd, metaSeen := "", false
 	failed := map[string]bool{}
+	structRevert := map[string][]string{}
+	structTest := map[string]int{}
+	applyTestResult := func(endIdx int, failedTest bool) {
+		limit := min(endIdx, len(out))
+		for i := range limit {
+			out[i].TestFailed = failedTest
+		}
+	}
 	_ = scanJSONLBytes(file, 0, func(line []byte) {
 		if !bytes.Contains(line, []byte("Begin Patch")) &&
-			(len(out) == 0 || !bytes.Contains(line, []byte(`_call_output"`))) &&
+			(len(out) == 0 || (!bytes.Contains(line, []byte(`_call_output"`)) && !bytes.Contains(line, []byte(`_call"`)))) &&
 			!bytes.Contains(line, []byte(`"cwd"`)) {
 			return
 		}
@@ -51,12 +59,24 @@ func codexChanges(file string) []Change {
 					CallID string `json:"call_id"`
 					Output any    `json:"output"`
 				}
-				if json.Unmarshal(v.Payload, &o) == nil && o.CallID != "" && codexCallFailed(o.Output) {
-					failed[o.CallID] = true
+				if json.Unmarshal(v.Payload, &o) == nil && o.CallID != "" {
+					callFail := codexCallFailed(o.Output)
+					if callFail {
+						failed[o.CallID] = true
+					}
+					if rps, ok := structRevert[o.CallID]; ok {
+						delete(structRevert, o.CallID)
+						if !callFail {
+							for _, rp := range rps {
+								out = append(out, Change{Path: cleanRepoPath(relTo(cwd, rp)), Reverted: true})
+							}
+						}
+					}
+					if endIdx, ok := structTest[o.CallID]; ok {
+						delete(structTest, o.CallID)
+						applyTestResult(endIdx, callFail || testOutputFailed(codexOutputText(o.Output)))
+					}
 				}
-				return
-			}
-			if !bytes.Contains(v.Payload, []byte("Begin Patch")) {
 				return
 			}
 			var p map[string]any
@@ -69,21 +89,91 @@ func codexChanges(file string) []Change {
 				return
 			}
 			call, _ := p["call_id"].(string)
-			seen := map[string]bool{}
-			for _, patch := range patchTexts(p, 0) {
-				if seen[patch] {
-					continue
+			if bytes.Contains(v.Payload, []byte("Begin Patch")) {
+				seen := map[string]bool{}
+				for _, patch := range patchTexts(p, 0) {
+					if seen[patch] {
+						continue
+					}
+					seen[patch] = true
+					for _, c := range parseApplyPatch(patch) {
+						c.Path = cleanRepoPath(relTo(cwd, c.Path))
+						c.call = call
+						out = append(out, c)
+					}
 				}
-				seen[patch] = true
-				for _, c := range parseApplyPatch(patch) {
-					c.Path = relTo(cwd, c.Path)
-					c.call = call
-					out = append(out, c)
+			}
+			if call != "" && len(out) > 0 {
+				if cmd := codexShellCommand(p); cmd != "" {
+					if rps := parseShellRevert(cmd); len(rps) > 0 {
+						structRevert[call] = rps
+					}
+					if isTestCommand(cmd) {
+						structTest[call] = len(out)
+					}
 				}
 			}
 		}
 	})
-	return withoutFailed(out, failed)
+	return finalizeSessionPaths(withoutFailed(out, failed))
+}
+
+func codexOutputText(out any) string {
+	if text, ok := out.(string); ok {
+		return text
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+func codexShellCommand(p map[string]any) string {
+	typ, _ := p["type"].(string)
+	name, _ := p["name"].(string)
+	if typ == "function_call" && name != "" && name != "shell" && name != "shell_command" && name != "exec_command" && name != "bash" {
+		return ""
+	}
+	extractCmd := func(m map[string]any) string {
+		for _, k := range []string{"command", "cmd"} {
+			switch v := m[k].(type) {
+			case string:
+				if v != "" {
+					return v
+				}
+			case []any:
+				var parts []string
+				for _, item := range v {
+					if s, ok := item.(string); ok && s != "" {
+						parts = append(parts, s)
+					}
+				}
+				if len(parts) > 0 {
+					// If wrapped like ["bash", "-lc", "cmd"], inspect the inner script too.
+					if len(parts) >= 3 && (parts[0] == "bash" || parts[0] == "sh" || strings.HasSuffix(parts[0], "/bash") || strings.HasSuffix(parts[0], "/sh")) && strings.HasPrefix(parts[1], "-") {
+						return parts[2]
+					}
+					return strings.Join(parts, " ")
+				}
+			}
+		}
+		return ""
+	}
+	if action, ok := p["action"].(map[string]any); ok {
+		if cmd := extractCmd(action); cmd != "" {
+			return cmd
+		}
+	}
+	if args, ok := p["arguments"].(string); ok {
+		var m map[string]any
+		if json.Unmarshal([]byte(args), &m) == nil {
+			if cmd := extractCmd(m); cmd != "" {
+				return cmd
+			}
+		}
+	}
+	return extractCmd(p)
 }
 
 // codexCallFailed reads a tool call's output for a failure: a nonzero exit

@@ -93,6 +93,14 @@ func hasLetter(s string) bool {
 	return strings.IndexFunc(s, unicode.IsLetter) >= 0
 }
 
+func joinWordsCapped(words []string, limit int) string {
+	if len(words) <= limit {
+		return strings.Join(words, ", ")
+	}
+	keep := max(1, limit-2)
+	return fmt.Sprintf("%s (+%d more)", strings.Join(words[:keep], ", "), len(words)-keep)
+}
+
 // line says what the best session holds and which words it does not, so the
 // reader can tell an incidental word from a missing subject.
 func (c recallCoverage) line() string {
@@ -103,9 +111,9 @@ func (c recallCoverage) line() string {
 		}
 	}
 	s := fmt.Sprintf("No session matched every word; session %d holds %d of %d (%s)",
-		c.at+1, len(c.held), len(c.terms), recallListingLine(strings.Join(c.held, ", ")))
+		c.at+1, len(c.held), len(c.terms), recallListingLine(joinWordsCapped(c.held, 12)))
 	if len(missing) > 0 {
-		s += ", not " + recallListingLine(strings.Join(missing, ", "))
+		s += ", not " + recallListingLine(joinWordsCapped(missing, 12))
 	}
 	return s + ". Check that it describes what is happening now before acting on it."
 }
