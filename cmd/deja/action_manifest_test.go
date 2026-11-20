@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 )
@@ -43,10 +42,26 @@ func TestActionManifest(t *testing.T) {
 	if !hasRuns {
 		t.Fatal("action.yml missing runs: section")
 	}
-	runBlockRe := regexp.MustCompile(`(?ms)^\s+run:\s*\|\n(.*?)(?:^\s{4}- |\z)`)
-	for _, m := range runBlockRe.FindAllStringSubmatch(runPart, -1) {
-		if strings.Contains(m[1], "${{ inputs.") {
-			t.Errorf("run script interpolates ${{ inputs.* }} directly instead of using env vars:\n%s", m[1])
+	inRun := false
+	runBlocks := 0
+	for line := range strings.SplitSeq(runPart, "\n") {
+		if strings.TrimSpace(line) == "run: |" {
+			inRun = true
+			runBlocks++
+			continue
 		}
+		if !inRun {
+			continue
+		}
+		if line != "" && !strings.HasPrefix(line, "        ") {
+			inRun = false
+			continue
+		}
+		if strings.Contains(line, "${{ inputs.") {
+			t.Errorf("run script interpolates ${{ inputs.* }} directly instead of using env vars: %s", line)
+		}
+	}
+	if runBlocks != 2 {
+		t.Fatalf("run blocks = %d, want 2", runBlocks)
 	}
 }
