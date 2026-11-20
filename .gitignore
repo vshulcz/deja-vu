@@ -37,7 +37,6 @@ deja-stats.svg
 .deja/
 
 # One line per Go command under scripts/ (verified by `go run ./scripts/ignorecheck`).
-/amlserve
 /day0bench
 /demo
 /genlogo

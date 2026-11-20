@@ -6,9 +6,11 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"math"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -802,4 +804,350 @@ func TestAToolOutputDumpDoesNotOutrankTheAnswer(t *testing.T) {
 			t.Errorf("%q: first is %s, want %s", q, got, want)
 		}
 	}
+}
+
+func buildTestClaudeIndex(t *testing.T, docs map[string][]string) (string, Manifest) {
+	t.Helper()
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	proj := filepath.Join(claudeRoot, "-tmp-app")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for id, msgs := range docs {
+		var sb strings.Builder
+		for i, text := range msgs {
+			role := "user"
+			if i%2 == 1 {
+				role = "assistant"
+			}
+			fmt.Fprintf(&sb, `{"type":%q,"sessionId":%q,"timestamp":"2026-01-02T03:%02d:05Z","message":{"role":%q,"content":%q}}`+"\n", role, id, i, role, text)
+		}
+		if err := os.WriteFile(filepath.Join(proj, id+".jsonl"), []byte(sb.String()), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return dir, m
+}
+
+func TestAQuotedQueryWithThinStrictHeadStillAttachesRelevanceTail(t *testing.T) {
+	docs := map[string][]string{
+		"strict-head": {
+			`Need to inspect "wal checkpoint" stall during snapshot flush.`,
+			`Reproduced wal checkpoint stall while flushing snapshot buffers.`,
+		},
+		"tail-one": {
+			`How does snapshot flush interact with checkpoint and wal recovery?`,
+			`Delayed wal checkpoint flushing stalls the background snapshot writer.`,
+		},
+		"tail-two": {
+			`Snapshot flush stalls whenever the wal checkpoint lock waits on sync.`,
+			`Verified checkpoint and wal snapshot locking order fixes the stall.`,
+		},
+		"multiline-target": {
+			`Investigating tokenBucket refill regression when burst capacity underflows`,
+			`Fixed tokenBucket refill underflow by clamping negative elapsed deltas.`,
+		},
+	}
+	for i := range 16 {
+		docs[fmt.Sprintf("bg-%02d", i)] = []string{
+			fmt.Sprintf("Routine maintenance task %d on unrelated module.", i),
+			fmt.Sprintf("Completed routine check %d with no errors.", i),
+		}
+	}
+	dir, _ := buildTestClaudeIndex(t, docs)
+
+	// Embedded quotes with a thin strict head (< thinAND = 3) must still attach
+	// relevance tail sessions via withRelevanceTail quote loosening.
+	thinRes, err := SearchDetailed(dir, query.Options{Query: `snapshot "wal checkpoint" flush`})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(thinRes.Sessions) < 2 {
+		t.Fatalf("expected embedded-quote search with thin strict head to attach relevance tail, got %d session(s)", len(thinRes.Sessions))
+	}
+
+	// Unmatched or distant quotes across lines in a pasted issue must not wipe out
+	// the issue body via cross-line quotedSpanRE matching.
+	issueQ := "tokenBucket \"refill regression\"\nwhen burst capacity underflows\nand negative elapsed deltas wrap\nclosing quote later \"here"
+	issueRes, err := SearchDetailed(dir, query.Options{Query: issueQ})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issueRes.Sessions) == 0 || issueRes.Sessions[0].ID != "multiline-target" {
+		t.Fatalf("expected multiline quoted issue to match multiline-target, got %+v", issueRes.Sessions)
+	}
+
+	// Bare single-line quoted phrases without extra context words stay exact/silent.
+	bareRes, err := SearchDetailed(dir, query.Options{Query: `"nonexistent exact phrase"`})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bareRes.Sessions) != 0 {
+		t.Fatalf("expected bare unmatched quoted phrase to stay silent, got %d sessions", len(bareRes.Sessions))
+	}
+}
+
+func TestDiagonalMatrixCompoundPartsRankAndRescue(t *testing.T) {
+	docs := map[string][]string{
+		"answer": {
+			"Debugging determinant fast path when is_diagonal property holds on MatrixSymbol.",
+			"Updated MatrixSymbol is_diagonal dispatch so sparse eigenvalues skip dense fallback.",
+		},
+		"distractor": {
+			"Unrelated failure report in parser initialization path failure logs.",
+			"Added generic failure assertion for parser failure recovery.",
+		},
+	}
+	for i := range 18 {
+		docs[fmt.Sprintf("noise-%02d", i)] = []string{
+			fmt.Sprintf("General cleanup and unrelated failure check #%d.", i),
+			fmt.Sprintf("Cleanup pass #%d completed cleanly.", i),
+		}
+	}
+	dir, m := buildTestClaudeIndex(t, docs)
+
+	res, err := relevanceSearch(dir, m, query.Options{Query: "why does DiagonalMatrix failure happen"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Sessions) == 0 {
+		t.Fatal("expected compound-part rescue to return sessions")
+	}
+	if got := res.Sessions[0].ID; got != "answer" {
+		t.Fatalf("expected answer (is_diagonal + MatrixSymbol) #1, got %s", got)
+	}
+}
+
+func TestMultiLineIssueOutranksShortProseBrush(t *testing.T) {
+	docs := map[string][]string{
+		"prose-brush": {
+			"Quick question about timeout handling in worker queue.",
+			"We only noted timeout retries need backoff.",
+		},
+		"real-fix": {
+			"Investigating walSegmentCheck panic during follower catchup after snapshot truncation.",
+			"Root cause in walSegmentCheck: follower catchup computes segmentChecksum from truncated tail.",
+			"Also audited segmentChecksum bounds and raftLogOffset replay after follower catchup.",
+			"Added regression test verifying walSegmentCheck and raftLogOffset survive truncated snapshot catchup.",
+		},
+	}
+	for i := range 24 {
+		docs[fmt.Sprintf("corp-%02d", i)] = []string{
+			fmt.Sprintf("Worker queue timeout maintenance note %d.", i),
+			fmt.Sprintf("Verified worker note %d.", i),
+		}
+	}
+	dir, m := buildTestClaudeIndex(t, docs)
+
+	issueQ := strings.Join([]string{
+		"walSegmentCheck panics during follower catchup after snapshot truncation",
+		"When a follower receives a truncated snapshot during catchup,",
+		"walSegmentCheck reads stale raftLogOffset and triggers segmentChecksum mismatch.",
+		"Expected worker queue timeout retries should recover cleanly after walSegmentCheck.",
+	}, "\n")
+	res, err := relevanceSearch(dir, m, query.Options{Query: issueQ})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Sessions) == 0 {
+		t.Fatal("expected multiline issue search to return sessions")
+	}
+	if got := res.Sessions[0].ID; got != "real-fix" {
+		t.Fatalf("expected real-fix #1 over short prose brush, got %s", got)
+	}
+}
+
+func TestQuotedMultilineIssueReachesRelevanceDespiteCooccurNeighbor(t *testing.T) {
+	docs := map[string][]string{
+		"gold": {
+			"Debugging sparseEigenSolver when pivotScale \"exact\" threshold mismatches runtime config.",
+			"Fixed sparseEigenSolver pivotScale calibration and runtime threshold validation.",
+		},
+		"cooccur-bait": {
+			"Adjusting pivotScale threshold during startup calibration and runtime config check.",
+			"Updated calibration log messages for runtime config check.",
+		},
+	}
+	for i := range 16 {
+		docs[fmt.Sprintf("fill-%02d", i)] = []string{
+			fmt.Sprintf("Calibration and runtime threshold note %d with generic config details.", i),
+			fmt.Sprintf("Closed calibration check %d.", i),
+		}
+	}
+	dir, _ := buildTestClaudeIndex(t, docs)
+
+	issueQ := strings.Join([]string{
+		`sparseEigenSolver fails on "pivotScale" calibration`,
+		`When passing runtime threshold config with sparseEigenSolver,`,
+		`exact phrase "mismatches config runtime" is never printed verbatim.`,
+	}, "\n")
+	res, err := SearchDetailed(dir, query.Options{Query: issueQ})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Tier != query.TierRelevance {
+		t.Fatalf("Tier = %q, want %q (must not be hijacked by cooccur tier)", res.Tier, query.TierRelevance)
+	}
+	if len(res.Sessions) == 0 || res.Sessions[0].ID != "gold" {
+		t.Fatalf("expected gold #1 after quote loosening to relevance, got %+v", res.Sessions)
+	}
+}
+
+func TestStackTraceAndDottedCompoundPartsDisambiguateLongIssue(t *testing.T) {
+	if parts := queryCompoundParts("203.0.113.51", []string{"203.0.113.51"}); len(parts) != 0 {
+		t.Fatalf("expected IP address to produce no compound parts, got %v", parts)
+	}
+
+	docs := map[string][]string{
+		"gold": {
+			"Debugging sparse expression conversion with as_explicit in sympy/matrices/expressions/matmul.py.",
+			"Fixed as_explicit indexing in sympy/matrices/expressions/matmul.py so symbolic blocks align cleanly.",
+		},
+		"distractor": {
+			"Investigating MatrixSymbol block partitioning in sympy/matrices/expressions/blockmatrix.py.",
+			"ValueError when Matrix Symbol dimensions mismatch inside blockmatrix helpers.",
+		},
+	}
+	for i := range 10 {
+		docs[fmt.Sprintf("noise-%02d", i)] = []string{
+			fmt.Sprintf("Matrix Symbol ValueError troubleshooting note %d for general expression evaluation.", i),
+			fmt.Sprintf("Verified expression check %d passed.", i),
+		}
+	}
+	dir, _ := buildTestClaudeIndex(t, docs)
+
+	issueQ := strings.Join([]string{
+		"Conversion fails on product expressions during symbolic evaluation",
+		`File "/Users/alex/venv/lib/python3.11/site-packages/sympy/matrices/expressions/matmul.py", line 42, in evaluate`,
+		"Triggering expr_tmp.as_explicit() raises ValueError when Matrix and Symbol dimensions interact",
+		"while otherMatrixSymbol checks report generic ValueError messages on Matrix inputs.",
+	}, "\n")
+	res, err := SearchDetailed(dir, query.Options{Query: issueQ})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Tier != query.TierRelevance {
+		t.Fatalf("Tier = %q, want %q", res.Tier, query.TierRelevance)
+	}
+	if len(res.Sessions) == 0 || res.Sessions[0].ID != "gold" {
+		t.Fatalf("expected gold (as_explicit + matmul) #1 on long traceback issue, got %+v", res.Sessions)
+	}
+}
+
+func TestIssueQueryStripsCommentsURLsAndPopulatesSessionIDF(t *testing.T) {
+	extraMsgs := make([]string, 0, 25)
+	for i := range 25 {
+		extraMsgs = append(extraMsgs, fmt.Sprintf("Checked archive message %d about forums/topic/thread alignment.", i))
+	}
+	docs := map[string][]string{
+		"gold": {
+			"Investigating queryPlanner.defer() failure when deferred columns alias outer table.",
+			"Fixed defer() alias tracking in planner columns projection so deferred fields load properly.",
+		},
+		"url-bait": append([]string{
+			"Discussion from https://forums.example.org/archive/#!topic/dev-list/abc123 about forums topic layout.",
+			"See release notes and fixes template references for contributing guide columns.",
+		}, extraMsgs...),
+	}
+	for i := range 10 {
+		docs[fmt.Sprintf("cols-%02d", i)] = []string{
+			fmt.Sprintf("General columns maintenance check %d for standard tables.", i),
+			fmt.Sprintf("Routine maintenance message %d.", i),
+		}
+	}
+	for i := range 20 {
+		docs[fmt.Sprintf("other-%02d", i)] = append([]string{
+			fmt.Sprintf("Unrelated storage check %d without table projection.", i),
+		}, extraMsgs[:8]...)
+	}
+	dir, m := buildTestClaudeIndex(t, docs)
+
+	issueQ := strings.Join([]string{
+		"queryPlanner.defer() failure when deferred columns compute per table instead per alias",
+		"<!-- Please search existing issues and CONTRIBUTING.md before filing -->",
+		"Calling outer_qs.defer('title') fails when columns use select_related failure path.",
+		"More background in https://forums.example.org/archive/#!topic/dev-list/xyz987.",
+	}, "\n")
+	if parts := queryCompoundParts(cleanIssueQuery(issueQ), RelevanceTerms(cleanIssueQuery(issueQ))); containsAny(parts, "forums", "topic", "contributing") {
+		t.Fatalf("expected URL/HTML-comment tokens excluded from compound parts, got %v", parts)
+	}
+
+	res, err := relevanceSearch(dir, m, query.Options{Query: issueQ})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Sessions) == 0 || res.Sessions[0].ID != "gold" {
+		t.Fatalf("expected gold #1 on cleaned multiline issue, got %+v", res.Sessions)
+	}
+	sessIDF, ok := res.SessionIDF["columns"]
+	if !ok {
+		t.Fatalf("expected SessionIDF entry for \"columns\", got %v", res.SessionIDF)
+	}
+	wantSessIDF := rankIDF(len(m.Sessions), 12)
+	if math.Abs(sessIDF-wantSessIDF) > 1e-6 {
+		t.Fatalf("SessionIDF[columns] = %v, want %v (whole-session IDF)", sessIDF, wantSessIDF)
+	}
+	if res.TermIDF["columns"] <= sessIDF {
+		t.Fatalf("expected message-capped TermIDF[columns] (%v) > SessionIDF[columns] (%v)", res.TermIDF["columns"], sessIDF)
+	}
+}
+
+func TestTitleRepeatedModerateDomainTermsLiftMatchingSession(t *testing.T) {
+	docs := map[string][]string{
+		"gold": {
+			"Updating GridSolver shape handling inside gridmod.py during sparse broadcast.",
+			"Fixed GridSolver shape validation so broadcast matches gridmod conventions.",
+		},
+		"template-distractor": {
+			"Updated release notes and fixes list with references and other minor comments.",
+			"Added release notes and references section for changelog cleanup.",
+		},
+	}
+	// Make gridsolver/shape appear across enough sessions that 0.45 <= rankIDF < 2.0.
+	for i := range 8 {
+		docs[fmt.Sprintf("domain-%02d", i)] = []string{
+			fmt.Sprintf("Reviewing GridSolver shape behavior for routine scenario %d.", i),
+			fmt.Sprintf("Recorded GridSolver shape note %d.", i),
+		}
+	}
+	for i := range 12 {
+		docs[fmt.Sprintf("misc-%02d", i)] = []string{
+			fmt.Sprintf("Release notes and fixes checklist %d with unrelated references.", i),
+			fmt.Sprintf("Completed notes checklist %d.", i),
+		}
+	}
+	dir, m := buildTestClaudeIndex(t, docs)
+
+	issueQ := strings.Join([]string{
+		"GridSolver shape mismatch during broadcast in gridmod",
+		"Notes: release fixes references comments below describe reproduction.",
+		"Repeated GridSolver check shows GridSolver computes wrong shape after GridSolver resize.",
+	}, "\n")
+	res, err := relevanceSearch(dir, m, query.Options{Query: issueQ})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Sessions) == 0 || res.Sessions[0].ID != "gold" {
+		t.Fatalf("expected gold #1 via title/repeated moderate-IDF domain terms, got %+v", res.Sessions)
+	}
+}
+
+func containsAny(items []string, targets ...string) bool {
+	for _, it := range items {
+		if slices.Contains(targets, it) {
+			return true
+		}
+	}
+	return false
 }

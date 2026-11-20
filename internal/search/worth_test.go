@@ -134,3 +134,16 @@ func TestHasIdentifierTerm(t *testing.T) {
 		}
 	}
 }
+
+func TestRecallWorthShowingNamingRejectsUnmatchedSubject(t *testing.T) {
+	if !RecallWorthShowingNaming([]string{"build", "tests"}, 2, 0, 0, nil) {
+		t.Fatal("ordinary vocabulary with matched >= 2 must fire")
+	}
+	known := map[string]float64{"build": 0.5, "tests": 0.5, "plan": 0.5}
+	if RecallWorthShowingNaming([]string{"pgbouncer", "build", "tests"}, 2, 0, 0, known) {
+		t.Fatal("expected prompt naming unmatched identifier pgbouncer (naming=0) not to fire")
+	}
+	if !RecallWorthShowingNaming([]string{"pgbouncer", "build", "tests"}, 2, 0, 1, known) {
+		t.Fatal("expected naming >= 1 to allow fire")
+	}
+}

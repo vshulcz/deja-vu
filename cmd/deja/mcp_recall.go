@@ -742,7 +742,7 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 	// A fork quoting the turns its source holds said everything twice, the
 	// same as on the search screen (#5320, #5335).
 	hits = dropCopiedHits(dir, hits)
-	hits = diversifyUncoveredTerms(hits, q, result.TermIDF, added)
+	hits = diversifyUncoveredTerms(hits, quoteLoosenedQuery(q, result.Tier), result.TermIDF, added)
 	return rankedRecall{result: result, o: o, hits: hits, policyHidden: policyHidden, unread: unread, about: about, cov: cov, added: added}, nil
 }
 
@@ -760,11 +760,12 @@ func recallPage(dir, q string, budget, offset, limit, total, demoted int, about 
 	}
 	var b strings.Builder
 	served, pageFull := 0, false
+	qRel := quoteLoosenedQuery(q, result.Tier)
 	// One answer for both lines: the lead and the count used to be able to
 	// disagree, and a page that says "the first one names what you asked"
 	// above "none about it" is worse than either alone (#2827).
 	namesTheAsked := result.Tier == search.TierRelevance && len(hits) > 0 &&
-		sessionNamesTheAsked(hits[0].Session, q, result.TermIDF)
+		sessionNamesTheAsked(hits[0].Session, qRel, result.TermIDF)
 	if cov.Stale {
 		fmt.Fprintln(&b, "("+coverageLine(cov)+")")
 	}
@@ -788,14 +789,14 @@ func recallPage(dir, q string, budget, offset, limit, total, demoted int, about 
 	// most of a long query is an answer in part even when a word was dropped
 	// or the query's rarest word is one nothing holds.
 	lead, skipped := leadHits(hits, added)
-	cover := bestCoverage(lead, q, result.TermIDF)
+	cover := bestCoverage(lead, qRel, result.TermIDF)
 	if skipped >= 0 && cover.at >= skipped {
 		cover.at++
 	}
 	covered := result.Tier == search.TierRelevance && strictShown == 0 && result.Directory == "" &&
 		!namesTheAsked && cover.aboutIt()
 	var lb strings.Builder
-	namesTheAsked, nothing := writeRecallLead(&lb, result, lead, q, strictShown, absent, namesTheAsked, cover, covered)
+	namesTheAsked, nothing := writeRecallLead(&lb, result, lead, qRel, strictShown, absent, namesTheAsked, cover, covered)
 	b.WriteString(lb.String())
 	if !nothing {
 		decorateRecallHits(dir, hits)
@@ -822,7 +823,7 @@ func recallPage(dir, q string, budget, offset, limit, total, demoted int, about 
 		case lone:
 			writeLoneWordHit(&hb, h, i)
 		default:
-			writeRecallHitHead(&hb, h, i, twins)
+			writeRecallHitHeadBudgeted(&hb, h, i, len(hits), budget-headerRoom-hb.Len(), budget, twins)
 		}
 		// Under the best hit only, and only when there is budget left: the
 		// excerpts say where the query words appear, which is not the same as
@@ -832,7 +833,7 @@ func recallPage(dir, q string, budget, offset, limit, total, demoted int, about 
 		// recall itself. Later hits stay excerpt-only; they are candidates to
 		// choose between, not answers.
 		if i == 0 && !lone && !nothing {
-			writeRecallConclusions(&hb, dir, q, h, o, budget, headerRoom, len(hits) > 1)
+			writeRecallConclusions(&hb, dir, q, h, o, budget, headerRoom, len(hits)-1)
 		}
 		served++
 		if headerRoom+hb.Len() >= budget {

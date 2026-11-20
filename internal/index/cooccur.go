@@ -449,6 +449,9 @@ func CooccurNeighbors(dir, term string) []string {
 // neighbor. The swap is narrated through the variants channel and results
 // land in the close tier like every other recovery.
 func cooccurSearch(dir string, m Manifest, o query.Options) (SearchResult, error) {
+	if strings.Contains(o.Query, "\"") || o.Regex {
+		return SearchResult{}, nil
+	}
 	terms, _ := query.QueryParts(o.Query)
 	if len(terms) < 2 {
 		return SearchResult{}, nil
@@ -467,6 +470,9 @@ func cooccurSearch(dir string, m Manifest, o query.Options) (SearchResult, error
 // better. Below the ranked tier it costs nothing and reaches what nothing else
 // does.
 func cooccurNarrowedSearch(dir string, m Manifest, o query.Options) (SearchResult, error) {
+	if strings.Contains(o.Query, "\"") || o.Regex {
+		return SearchResult{}, nil
+	}
 	terms, _ := query.QueryParts(o.Query)
 	if len(terms) < 2 {
 		return SearchResult{}, nil

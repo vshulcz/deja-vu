@@ -128,7 +128,7 @@ func relevanceOverClose(dir string, m Manifest, o query.Options, rel SearchResul
 	// which is still the only thing that withheld
 	// anything here.
 	tail := len(merged) - len(rel.Sessions)
-	return relevanceResult(merged, rel.Total+tail, rel.TermIDF), true
+	return relevanceResult(merged, rel.Total+tail, rel.TermIDF, rel.SessionIDF), true
 }
 
 // noPostingsLadder answers a query whose words matched no postings at all.
