@@ -6,7 +6,7 @@
 
 **[deja-vu](https://github.com/vshulcz/deja-vu)** 扩展（LongMemEval-S **97.2% R@5**）· [文档](https://vshulcz.github.io/deja-vu/zh/) · [在线演示](https://vshulcz.github.io/deja-vu/view/) · [评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-OpenClaw 记得自己的会话。这个插件回答的是另一个问题：这台机器上 Claude Code、Codex、Cursor、Gemini、Zed 等其他四十九个编程智能体里做过什么，包括装 OpenClaw 之前的那几个月。完全依赖单文件 Go 二进制 `deja` 与本地 BM25 索引在本地运行，无需额外 LLM 或嵌入模型（设置 `DEJA_OFFLINE=1` 可关闭每日检查）。
+OpenClaw 记得自己的会话。这个插件回答的是另一个问题：这台机器上 Claude Code、Codex、Cursor、Gemini、Zed 等其他五十个编程智能体里做过什么，包括装 OpenClaw 之前的那几个月。完全依赖单文件 Go 二进制 `deja` 与本地 BM25 索引在本地运行，无需额外 LLM 或嵌入模型（设置 `DEJA_OFFLINE=1` 可关闭每日检查）。
 
 ![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 

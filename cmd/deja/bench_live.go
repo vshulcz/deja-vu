@@ -590,6 +590,7 @@ func detectLocalHarnessRoots(sig *benchHarnessSignals) {
 		{"gemini", sources.GeminiRoot()},
 		{"opencode", sources.OpencodeDB()},
 		{"codearts", sources.CodeArtsRoot()},
+		{"doubao", sources.DoubaoRoot()},
 		{"qoder", sources.QoderRoot()},
 	} {
 		if statExists(pair.path) {

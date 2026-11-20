@@ -1818,6 +1818,138 @@
       }
     },
     {
+      "id": "doubao",
+      "store_paths": [
+        "%LOCALAPPDATA%\\Doubao\\User Data\\<profile>\\IndexedDB\\chrome_doubao-chat_0.indexeddb.leveldb\\",
+        "~/Library/Application Support/Doubao/<profile>/IndexedDB/chrome_doubao-chat_0.indexeddb.leveldb/",
+        "~/.config/Doubao/<profile>/IndexedDB/chrome_doubao-chat_0.indexeddb.leveldb/",
+        "${DEJA_DOUBAO_ROOT}/<profile>/IndexedDB/chrome_doubao-chat_0.indexeddb.leveldb/"
+      ],
+      "format_kind": "chromium-indexeddb-leveldb",
+      "fixture_paths": [
+        "fixtures/registry/doubao/chrome_doubao-chat_0.indexeddb.leveldb"
+      ],
+      "parser_source": "internal/sources/doubao.go",
+      "last_verified": "2026-11-21",
+      "display_name": "Doubao",
+      "capabilities": {
+        "mcp": false,
+        "auto": false,
+        "skill": false,
+        "command": false,
+        "resume": false,
+        "handoff": "paste",
+        "prereq": ""
+      },
+      "gaps": {
+        "mcp": {
+          "state": "blocked",
+          "why": "Doubao Desktop has no MCP client to register deja's server with; its history is still indexed and searchable from every other agent deja serves",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/123"
+        },
+        "auto": {
+          "state": "blocked",
+          "why": "the desktop app exposes no hook surface, so recall cannot be wired into its turns; sessions still answer through the MCP server and the index",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/123"
+        },
+        "skill": {
+          "state": "blocked",
+          "why": "the desktop app has no skill catalogue an agent picks from, so there is no place to install a shared skill file; deja can only read its transcripts",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/123"
+        },
+        "command": {
+          "state": "blocked",
+          "why": "the desktop app has no user-definable slash commands, so a /deja command cannot be registered there; recall stays one MCP tool call away",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/123"
+        },
+        "resume": {
+          "state": "impossible",
+          "why": "the desktop app has no CLI that reopens one past session by id, so there is no command to hand back for resuming a session",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/123"
+        }
+      },
+      "surfaces": {
+        "digest": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "the desktop app has no prompt log or status surface a hook could serve a digest into",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/123"
+        },
+        "prompt": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "there is no UserPromptSubmit hook to serve recall on; the app exposes no hook runner at all",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/123"
+        },
+        "pre_tool": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "no PreToolUse hook exists, so a file or command decision cannot reach the model before it acts",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/123"
+        },
+        "failure": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "no PostToolUse hook exists, so a failed command cannot be answered from past runs",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/123"
+        },
+        "compaction_reset": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "the app has no compaction hook to observe; the transcript records summaries the index still reads",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/123"
+        },
+        "compaction_capture": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "no hook surface to capture a compaction event from",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/123"
+        },
+        "compaction_packet": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "no hook surface to deliver a compaction packet through",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/123"
+        },
+        "mcp": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "the app has no MCP client to register deja's server with; its history is still searchable from every other agent",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/123"
+        },
+        "handoff": {
+          "status": "partial",
+          "proof": "stand",
+          "note": "paste only: the desktop app has no CLI to reopen a session, so deja prints the packet to paste",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/123"
+        },
+        "session_end": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "no SessionEnd hook exists to deliver a handoff or digest at",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/123"
+        },
+        "rules": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "the app reads no rules file a third party can write; the runtime's own scope is the only instructions file",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/123"
+        },
+        "statusline": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "the desktop app has no status line, footer or toast a third party can write to",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/123"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "internal/sources/doubao.go reads the chat window's IndexedDB database",
+          "source": "https://github.com/Nwflower/dsh-chat-import/pull/123"
+        }
+      }
+    },
+    {
       "id": "gemini",
       "store_paths": [
         "${GEMINI_CLI_HOME:-~}/.gemini/tmp/*/chats/**/*.{json,jsonl}",
