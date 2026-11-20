@@ -281,7 +281,7 @@ func TestIsTestCommandAndFailureOutputs(t *testing.T) {
 		"uv run pytest",
 		"manage.py test",
 		"./bin/test",
-		"python -W ignore -m pytest",
+		"python -u -m pytest",
 		"python -m flake8 && python -u tests/test_core.py",
 		"python manage.py test",
 	}
@@ -395,12 +395,12 @@ func TestStructuredClaudeAndScratchFiltering(t *testing.T) {
 }
 
 func TestInlinePrettyJSONAndUnpackVariants(t *testing.T) {
-	pretty := "[tool_use Edit]\n{\n  \"file_path\": \"a.py\",\n  \"old_string\": \"1\",\n  \"new_string\": \"2\"\n}\n[thinking]\ncheck\n[tool_result]\nExit code 2\nbad"
+	pretty := "[tool_use Bad] {\n  \"unclosed\": 1\n[thinking]\ncheck\n[tool_use B2] {\n  \"unclosed2\": 1\n[tool_result]\nok\n[tool_use Edit] {\n  \"file_path\": \"a.py\",\n  \"old_string\": \"1\",\n  \"new_string\": \"2\"\n}\n[tool_result]\nExit code 2\nbad"
 	blks, speech := splitInlineBlocks(pretty)
-	if speech != "" || len(blks) != 3 {
-		t.Fatalf("got %d blocks speech=%q, want 3 blocks", len(blks), speech)
+	if speech != "[tool_use Bad] {\n  \"unclosed\": 1" || len(blks) != 4 {
+		t.Fatalf("got %d blocks speech=%q, want 4 blocks", len(blks), speech)
 	}
-	if blks[0].typ != "tool_use" || blks[1].typ != "thinking" || blks[2].typ != "tool_result" || !blks[2].isErr {
+	if blks[0].typ != "thinking" || blks[1].typ != "tool_result" || blks[1].isErr || blks[2].typ != "tool_use" || blks[3].typ != "tool_result" || !blks[3].isErr {
 		t.Fatalf("unexpected pretty inline blocks: %#v", blks)
 	}
 
