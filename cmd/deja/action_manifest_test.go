@@ -12,7 +12,14 @@ func TestActionManifest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read action.yml: %v", err)
 	}
-	src := string(b)
+	checkActionManifest(t, string(b))
+	crlf := strings.ReplaceAll(strings.ReplaceAll(string(b), "\r\n", "\n"), "\n", "\r\n")
+	checkActionManifest(t, crlf)
+}
+
+func checkActionManifest(t *testing.T, raw string) {
+	t.Helper()
+	src := strings.ReplaceAll(raw, "\r\n", "\n")
 
 	required := []string{
 		"name: Setup deja",
