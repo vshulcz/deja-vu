@@ -177,6 +177,7 @@ var flagsOfOtherCommands = map[string]string{
 	"--from":             "last",
 	"--last":             "log",
 	"--seed":             "bench",
+	"--delivery":         "bench live",
 	"--settle":           "friction",
 	"--unsettle":         "friction",
 	"--state":            "promote",

@@ -150,6 +150,9 @@ func collectPromptDirectAdvisories(dir, cwd, sessionID, asked string, readOnly b
 	if fxLine, fxTok := promptErrorFixLine(dir, cwd, asked, seen); fxLine != "" {
 		items = append(items, promptAdvisoryItem{line: fxLine, tokens: nonEmptyTokens(fxTok)})
 	}
+	if isSpawnedReader(sessionID) {
+		return items
+	}
 	namedSourceFile := false
 	if fbLine, fbToks := promptFileBriefLineIn(dir, cwd, asked, seen, skip); fbLine != "" {
 		items = append(items, promptAdvisoryItem{line: fbLine, tokens: nonEmptyTokens(fbToks...)})
@@ -512,7 +515,7 @@ func liveRecallBriefScoped(dir, cwd, project string, offset int, query string) s
 		parts = append(parts, strings.TrimSpace(sb))
 	}
 	if len(parts) == 0 {
-		if loc, _ := promptTaskTargetsLine(dir, cwd, query, nil, nil); loc != "" {
+		if loc, _ := promptTaskTargetsLine(dir, cwd, query, nil, nil); loc != "" && liveLikelyTargetMatchesQuery(loc, query) {
 			parts = append(parts, strings.TrimSpace(loc))
 		}
 	}
@@ -527,6 +530,68 @@ func liveRecallBriefScoped(dir, cwd, project string, offset int, query string) s
 		return ""
 	}
 	return "live repo brief: " + strings.Join(parts, " — ")
+}
+
+// liveLikelyTargetMatchesQuery drops speculative localized targets whose
+// path/stem does not share concrete tokens with the recall query.
+func liveLikelyTargetMatchesQuery(loc, query string) bool {
+	const prefix = "likely target: "
+	rest, ok := strings.CutPrefix(strings.TrimSpace(loc), prefix)
+	if !ok {
+		return true
+	}
+	if head, _, hasSep := strings.Cut(rest, " — "); hasSep {
+		rest = head
+	}
+	lowQuery := strings.ToLower(query)
+	qTokens := map[string]bool{}
+	for _, tok := range extractPromptASCIIWords(lowQuery) {
+		if len(tok) >= 3 && !localizeStopWords[tok] {
+			qTokens[tok] = true
+		}
+	}
+	for rawTarget := range strings.SplitSeq(rest, ",") {
+		rel := strings.TrimSpace(rawTarget)
+		if rel == "" {
+			continue
+		}
+		lowRel := strings.ToLower(filepath.ToSlash(rel))
+		base := strings.ToLower(filepath.Base(lowRel))
+		stem := strings.TrimSuffix(base, filepath.Ext(base))
+		if len(stem) >= 4 && (strings.Contains(lowQuery, lowRel) || strings.Contains(lowQuery, base) || strings.Contains(lowQuery, stem)) {
+			return true
+		}
+		var stemMatched int
+		var longMatch bool
+		seenTok := map[string]bool{}
+		for _, tok := range splitTargetStemTokens(stem) {
+			if seenTok[tok] || !qTokens[tok] {
+				continue
+			}
+			seenTok[tok] = true
+			stemMatched++
+			if len(tok) >= 6 {
+				longMatch = true
+			}
+		}
+		if stemMatched >= 2 || longMatch {
+			return true
+		}
+	}
+	return false
+}
+
+func splitTargetStemTokens(stem string) []string {
+	parts := strings.FieldsFunc(stem, func(r rune) bool {
+		return r == '_' || r == '-' || r == '.' || r == '/'
+	})
+	var out []string
+	for _, p := range parts {
+		if len(p) >= 3 && !localizeStopWords[p] {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func cwdMatchesRecallProject(cwd, project string) bool {

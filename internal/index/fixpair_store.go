@@ -421,6 +421,7 @@ func FixesForCommand(dir, command, text string, limit int, allow func(project st
 		return nil
 	}
 	shell := shellOnlySigs(text, command, sigs)
+	timeoutOnly := timeoutOnlySigs(text, sigs)
 	var out, alsoOut, held, alsoHeld []FixPair
 	isIgnored := fixIgnoreGate(dir)
 	for _, p := range ReadFixes(dir) {
@@ -428,6 +429,9 @@ func FixesForCommand(dir, command, text string, limit int, allow func(project st
 			continue
 		}
 		if len(shell) > 0 && !p.answers(without(sigs, shell)) && !sameFailingCommand(p, command) {
+			continue
+		}
+		if len(timeoutOnly) > 0 && !p.answers(without(sigs, timeoutOnly)) && !sameFailingCommand(p, command) {
 			continue
 		}
 		if remedyIsTheFailure(p) || remedyIsIrreversible(p.Command) || (p.Edit != "" && !looksLikeEditedPath(p.Edit)) {

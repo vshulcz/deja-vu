@@ -715,7 +715,7 @@ func pluginScriptOutdated(name, text string) bool {
 	}
 	switch name {
 	case "opencode", "kilocode", "mimo":
-		return !strings.Contains(text, "hook-tool-after") || !strings.Contains(text, "hook-session-end")
+		return !strings.Contains(text, "hook-tool-after") || !strings.Contains(text, "hook-session-end") || !strings.Contains(text, `.includes("patch")`)
 	case "deepseek":
 		return !strings.Contains(text, "hook-tool-after")
 	case "hermes":
@@ -723,7 +723,7 @@ func pluginScriptOutdated(name, text string) bool {
 	case "pi", "senpi", "gjc", "kimchi":
 		return !strings.Contains(text, "hook-prompt") || !strings.Contains(text, "hook-tool-after")
 	case "cline", "omp", "amp", "prime":
-		return !strings.Contains(text, "hook-prompt")
+		return !strings.Contains(text, "hook-prompt") || !strings.Contains(text, "hook-tool-after")
 	}
 	return false
 }

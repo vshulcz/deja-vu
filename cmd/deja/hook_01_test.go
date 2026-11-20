@@ -404,6 +404,11 @@ func TestToolHookReadVsEditSiblingTestTargetAndAnonDedup(t *testing.T) {
 		t.Fatalf("expected read-only call without guardrail to stay silent, got:\n%s", got)
 	}
 
+	// 1b. Warm file with zero decisions/co-change/historical commands stays silent on PostToolUse read_file/Read.
+	if got := fileHookLineOutsideWithMode(dir, proj, srcFile, "", true, nil); got != "" {
+		t.Fatalf("expected readOnly mode with no guardrails to suppress bare test target, got %q", got)
+	}
+
 	// 2. Edit call with empty session_id surfaces the sibling test target once and deduplicates repeat calls.
 	editAnon := fmt.Sprintf(`{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":%q,"old_string":"return id","new_string":"return id + \"!\""},"cwd":%q}`, srcFile, proj)
 	first := toolHookRun(t, editAnon)

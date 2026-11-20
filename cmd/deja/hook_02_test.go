@@ -1112,6 +1112,14 @@ func TestTurn0PromptTaskLocalizationAndRecallBrief(t *testing.T) {
 			t.Errorf("false-positive localization on negative prompt %q: got %q", neg, got)
 		}
 	}
+
+	// 5. liveRecallBrief rejects speculative targets whose stem/path is absent from the query.
+	if liveLikelyTargetMatchesQuery("likely target: payment_worker.go — test target: go test ./...", "retry budget backoff") {
+		t.Fatalf("expected liveLikelyTargetMatchesQuery to reject unrelated target payment_worker.go")
+	}
+	if !liveLikelyTargetMatchesQuery("likely target: settlement_relay.go — test target: go test ./...", "settlement relay") {
+		t.Fatalf("expected liveLikelyTargetMatchesQuery to accept stem-matched target settlement_relay.go")
+	}
 }
 
 func TestSessionActionMapAndWeakPointerSurfaceEditedFiles(t *testing.T) {

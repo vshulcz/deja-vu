@@ -85,9 +85,21 @@ func PutCompaction(dir string, next CompactionState) (CompactionState, error) {
 		return CompactionState{}, err
 	}
 	if !locked {
-		return CompactionState{}, ErrCompactionBusy
+		return putCompactionSidecar(dir, next)
 	}
 	defer unlock()
+
+	var slocked bool
+	if _, statErr := os.Stat(compactionSidecarPath(dir)); statErr == nil || !errors.Is(statErr, fs.ErrNotExist) {
+		sunlock, ok, serr := tryLockSidecarFor(dir, 500*time.Millisecond)
+		if serr != nil {
+			return CompactionState{}, serr
+		}
+		if ok {
+			slocked = true
+			defer sunlock()
+		}
+	}
 
 	core, err := readCompactionCore(dir)
 	if err != nil {
@@ -99,32 +111,35 @@ func PutCompaction(dir string, next CompactionState) (CompactionState, error) {
 		// session data exists; Ensure will rebuild it on the next pass.
 		core = manifestCore{Version: 0}
 	}
-	if core.Compactions == nil {
-		core.Compactions = map[string]CompactionState{}
+	sidecar, sideErr := readCompactionSidecar(dir)
+	if sideErr != nil {
+		return CompactionState{}, sideErr
+	}
+	merged := mergeCompactionMaps(core.Compactions, sidecar)
+	if merged == nil {
+		merged = map[string]CompactionState{}
 	}
 	key := compactionKey(next.SessionID, next.Workspace)
-	if current, ok := core.Compactions[key]; ok {
-		if current.Harness != "" && current.Harness != next.Harness {
-			return CompactionState{}, errors.New("compaction session identity belongs to another harness")
+	updated, changed, err := upsertCompactionState(merged, key, next)
+	if err != nil {
+		return updated, err
+	}
+	if !changed && len(sidecar) == 0 {
+		return updated, nil
+	}
+	if changed {
+		merged[key] = updated
+		trimCompactions(merged)
+		if _, kept := merged[key]; !kept {
+			// The input is necessarily one of the newest captures, so this can only
+			// happen with a clock so malformed that preserving an older packet is
+			// safer than saying the new packet was stored.
+			return CompactionState{}, ErrCompactionStale
 		}
-		if next.SourceDigest != "" && next.SourceDigest == current.SourceDigest {
-			return current, nil
-		}
-		if compactionIsOlder(next, current) {
-			return current, ErrCompactionStale
-		}
-		next.Revision = current.Revision + 1
 	} else {
-		next.Revision = 1
+		trimCompactions(merged)
 	}
-	core.Compactions[key] = next
-	trimCompactions(core.Compactions)
-	if _, kept := core.Compactions[key]; !kept {
-		// The input is necessarily one of the newest captures, so this can only
-		// happen with a clock so malformed that preserving an older packet is
-		// safer than saying the new packet was stored.
-		return CompactionState{}, ErrCompactionStale
-	}
+	core.Compactions = merged
 	if err := mkdirIndexAll(dir); err != nil {
 		return CompactionState{}, err
 	}
@@ -132,11 +147,14 @@ func PutCompaction(dir string, next CompactionState) (CompactionState, error) {
 		return CompactionState{}, err
 	}
 	invalidateManifestCache(dir)
-	return next, nil
+	if slocked && len(sidecar) > 0 {
+		_ = os.Remove(compactionSidecarPath(dir))
+	}
+	return updated, nil
 }
 
 // Compaction retrieves exactly one native session/workspace packet. It reads
-// only manifest.gob, not sessions.gob or records.bin, keeping the compaction
+// only manifest.gob (and any busy-rebuild sidecar), keeping the compaction
 // continuation path independent of index size.
 func Compaction(dir, sessionID, workspace string) (CompactionState, bool, error) {
 	if dir == "" {
@@ -149,14 +167,11 @@ func Compaction(dir, sessionID, workspace string) (CompactionState, bool, error)
 	if strings.TrimSpace(sessionID) == "" || strings.ContainsRune(sessionID, '\x00') {
 		return CompactionState{}, false, nil
 	}
-	core, err := readCompactionCore(dir)
+	states, err := readMergedCompactions(dir)
 	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return CompactionState{}, false, nil
-		}
 		return CompactionState{}, false, err
 	}
-	state, ok := core.Compactions[compactionKey(sessionID, workspace)]
+	state, ok := states[compactionKey(sessionID, workspace)]
 	if !ok || compactionExcluded(state) ||
 		readTombstones()[state.Key()] {
 		return CompactionState{}, false, nil
@@ -267,14 +282,14 @@ func cloneCompactions(states map[string]CompactionState) map[string]CompactionSt
 	return out
 }
 
-// compactionsForRebuild reads the core directly, so a first compaction stored
-// before sessions.gob existed survives the first searchable-index build.
+// compactionsForRebuild reads the core and busy sidecar directly, so a
+// compaction captured before sessions.gob existed or while a rebuild held the
+// index lock survives the next searchable-index build.
 func compactionsForRebuild(dir string, dead map[string]bool) map[string]CompactionState {
-	core, err := readCompactionCore(dir)
-	if err != nil {
+	states, err := readMergedCompactions(dir)
+	if err != nil || len(states) == 0 {
 		return nil
 	}
-	states := cloneCompactions(core.Compactions)
 	for key, state := range states {
 		if dead[state.Key()] || compactionExcluded(state) {
 			delete(states, key)
@@ -316,17 +331,190 @@ func removeMatchingCompactions(m *Manifest, o ForgetOptions, exact string) []str
 	return keys
 }
 
-// compactionOnlyManifest recognizes exactly the minimal manifest PutCompaction
-// creates before deja has indexed its first transcript. Forget needs to remove
-// that packet, but a normal corrupted index must remain an error rather than
-// being mistaken for an empty store.
+// compactionOnlyManifest recognizes exactly the minimal manifest or sidecar
+// state PutCompaction creates before deja has indexed its first transcript.
+// Forget needs to remove that packet, but a normal corrupted index must remain
+// an error rather than being mistaken for an empty store.
 func compactionOnlyManifest(dir string) (Manifest, bool) {
-	core, err := readCompactionCore(dir)
-	if err != nil || core.Version != 0 || len(core.Compactions) == 0 {
+	core, coreErr := readCompactionCore(dir)
+	if coreErr != nil && !errors.Is(coreErr, fs.ErrNotExist) {
+		return Manifest{}, false
+	}
+	if coreErr == nil && core.Version != 0 {
+		return Manifest{}, false
+	}
+	sidecar, sideErr := readCompactionSidecar(dir)
+	if sideErr != nil {
+		return Manifest{}, false
+	}
+	merged := mergeCompactionMaps(core.Compactions, sidecar)
+	if len(merged) == 0 {
 		return Manifest{}, false
 	}
 	if _, err := os.Stat(filepath.Join(dir, "sessions.gob")); !errors.Is(err, fs.ErrNotExist) {
 		return Manifest{}, false
 	}
-	return Manifest{Version: 0, Compactions: cloneCompactions(core.Compactions), Sessions: map[string]SessionMeta{}}, true
+	return Manifest{Version: 0, Compactions: merged, Sessions: map[string]SessionMeta{}}, true
+}
+
+func compactionSidecarPath(dir string) string { return dir + ".compactions.gob" }
+
+func compactionSidecarLockPath(dir string) string { return dir + ".compactions.lock" }
+
+func tryLockSidecarFor(dir string, patience time.Duration) (func(), bool, error) {
+	lockPath := compactionSidecarLockPath(dir)
+	deadline := time.Now().Add(patience)
+	for {
+		unlock, ok, err := tryLockWriteFile(lockPath)
+		if ok || err != nil || !time.Now().Before(deadline) {
+			return unlock, ok, err
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+}
+
+func readCompactionSidecar(dir string) (map[string]CompactionState, error) {
+	var states map[string]CompactionState
+	if err := readGob(compactionSidecarPath(dir), &states); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return map[string]CompactionState{}, nil
+		}
+		return nil, err
+	}
+	return states, nil
+}
+
+func compactionSidecarNewer(cand, cur CompactionState) bool {
+	if compactionIsOlder(cand, cur) {
+		return false
+	}
+	if compactionIsOlder(cur, cand) {
+		return true
+	}
+	return cand.Revision > cur.Revision
+}
+
+func mergeCompactionMaps(base, extra map[string]CompactionState) map[string]CompactionState {
+	if len(base) == 0 && len(extra) == 0 {
+		return nil
+	}
+	out := cloneCompactions(base)
+	if out == nil {
+		out = make(map[string]CompactionState, len(extra))
+	}
+	for key, cand := range extra {
+		if cur, ok := out[key]; !ok || compactionSidecarNewer(cand, cur) {
+			out[key] = cand
+		}
+	}
+	return out
+}
+
+func readMergedCompactions(dir string) (map[string]CompactionState, error) {
+	core, err := readCompactionCore(dir)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, err
+	}
+	sidecar, sideErr := readCompactionSidecar(dir)
+	if sideErr != nil {
+		return nil, sideErr
+	}
+	return mergeCompactionMaps(core.Compactions, sidecar), nil
+}
+
+func upsertCompactionState(states map[string]CompactionState, key string, next CompactionState) (CompactionState, bool, error) {
+	if current, ok := states[key]; ok {
+		if current.Harness != "" && current.Harness != next.Harness {
+			return CompactionState{}, false, errors.New("compaction session identity belongs to another harness")
+		}
+		if next.SourceDigest != "" && next.SourceDigest == current.SourceDigest {
+			return current, false, nil
+		}
+		if compactionIsOlder(next, current) {
+			return current, false, ErrCompactionStale
+		}
+		next.Revision = current.Revision + 1
+	} else {
+		next.Revision = 1
+	}
+	return next, true, nil
+}
+
+func putCompactionSidecar(dir string, next CompactionState) (CompactionState, error) {
+	unlock, locked, err := tryLockSidecarFor(dir, 1500*time.Millisecond)
+	if err != nil {
+		return CompactionState{}, err
+	}
+	if !locked {
+		return CompactionState{}, ErrCompactionBusy
+	}
+	defer unlock()
+
+	core, _ := readCompactionCore(dir)
+	sidecar, sideErr := readCompactionSidecar(dir)
+	if sideErr != nil {
+		return CompactionState{}, sideErr
+	}
+	if sidecar == nil {
+		sidecar = map[string]CompactionState{}
+	}
+	merged := mergeCompactionMaps(core.Compactions, sidecar)
+	key := compactionKey(next.SessionID, next.Workspace)
+	updated, changed, err := upsertCompactionState(merged, key, next)
+	if err != nil {
+		return updated, err
+	}
+	if !changed {
+		return updated, nil
+	}
+	sidecar[key] = updated
+	trimCompactions(sidecar)
+	if _, kept := sidecar[key]; !kept {
+		return CompactionState{}, ErrCompactionStale
+	}
+	path := compactionSidecarPath(dir)
+	if err := mkdirIndexAll(filepath.Dir(path)); err != nil {
+		return CompactionState{}, err
+	}
+	if err := writeGobAtomic(path, sidecar); err != nil {
+		return CompactionState{}, err
+	}
+	return updated, nil
+}
+
+func forgetCompactionSidecar(dir string, o ForgetOptions, exact string) error {
+	pre, err := readCompactionSidecar(dir)
+	if err != nil || len(pre) == 0 {
+		return err
+	}
+	if len(removeMatchingCompactions(&Manifest{Compactions: cloneCompactions(pre)}, o, exact)) == 0 {
+		return nil
+	}
+
+	unlock, locked, err := tryLockSidecarFor(dir, 1500*time.Millisecond)
+	if err != nil {
+		return err
+	}
+	if !locked {
+		return ErrCompactionBusy
+	}
+	defer unlock()
+
+	sidecar, err := readCompactionSidecar(dir)
+	if err != nil || len(sidecar) == 0 {
+		return err
+	}
+	m := Manifest{Compactions: sidecar}
+	removed := removeMatchingCompactions(&m, o, exact)
+	if len(removed) == 0 {
+		return nil
+	}
+	path := compactionSidecarPath(dir)
+	if len(m.Compactions) == 0 {
+		if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+		return nil
+	}
+	return writeGobAtomic(path, m.Compactions)
 }

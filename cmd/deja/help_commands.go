@@ -299,7 +299,7 @@ var helpEntries = []helpEntry{
 	{name: "bench", group: groupSetup,
 		usage: []string{
 			"deja bench recall|context|prompt|block|ingest|read [--json] [--seed n]",
-			"deja bench live [--json]",
+			"deja bench live [--delivery] [--json]",
 		},
 		desc:     "benchmarks of recall, indexing, and live coverage",
 		examples: []string{"deja bench recall", "deja bench live", "deja bench ingest --json"}},
