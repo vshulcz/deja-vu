@@ -192,15 +192,16 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 		// than throwing away a megabyte that begins with the error.
 		out = sources.UnwrapShellReport(salvageFromPayload(string(raw)))
 	}
-	if out == "" {
-		return nil
-	}
 	// Out of the raw bytes for a cut payload, the way the tool name is: the
 	// line keeps to the project it names, and the harness sends cwd ahead of
 	// the output.
 	cwd := input.CWD
 	if cwd == "" && truncated {
 		cwd, _ = jsonStringAfter(after(string(raw), `"cwd"`))
+	}
+	coordRecordAfterCommand(dir, hookCWD(cwd), input.ToolInput.Command, out, raw, input.SessionID)
+	if out == "" {
+		return nil
 	}
 	line := fixPairLineFor(dir, hookCWD(cwd), input.ToolInput.Command, out)
 	if line == "" {

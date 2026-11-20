@@ -71,6 +71,7 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	tailSteps := transcriptTailSteps(input.TranscriptPath)
 	projectWorkspace := antigravityProjectWorkspace(workspace, tailSteps)
 	syncAntigravitySessionRules(dir, projectWorkspace, input.ConversationID, tailSteps)
+	coordRecordAntigravitySteps(dir, projectWorkspace, input.ConversationID, tailSteps)
 	// A compaction throws away the blocks this conversation was shown while the
 	// record of having sent them outlives them, so the memory it just lost is
 	// the memory recall refuses to send again.

@@ -386,44 +386,11 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	// other than the caller, so it answers in its own shape. See hook_spawn.go.
 	if isSpawnTool(input.ToolName) {
 		if !planIndexReady(dir) {
-			// Ask, do not build. #777 gave the per-prompt and session-start hooks
-			// this: an index in a format this build cannot read answers nothing,
-			// which reads as a user with no history, and nothing else asks for the
-			// rebuild that fixes it. A spawned subagent reaches only these hooks —
-			// install.go says so where it wires Task and Agent — so without this a
-			// fleet works against a stale index until its parent types something
-			// (#2567). requestWarmup writes a sentinel and detaches a child; the
-			// action pays neither the read nor the wait.
 			requestWarmup(dir)
-			return nil
 		}
-		// Spawn recall runs the prompt hook, which handles its own commit lock.
+		// Run spawn coordination even on cold stores so live parent briefs reach subagents.
 		return runHookSpawn(dir, input, raw, stdout)
 	}
-	// Never build or repair from here. This runs inside an action the user is
-	// waiting on, and a miss costs nothing while a rebuild costs seconds.
-	if !planIndexReady(dir) {
-		// Ask, do not build. #777 gave the per-prompt and session-start hooks
-		// this: an index in a format this build cannot read answers nothing,
-		// which reads as a user with no history, and nothing else asks for the
-		// rebuild that fixes it. A spawned subagent reaches only these hooks —
-		// install.go says so where it wires Task and Agent — so without this a
-		// fleet works against a stale index until its parent types something
-		// (#2567). requestWarmup writes a sentinel and detaches a child; the
-		// action pays neither the read nor the wait.
-		// Keep running index-free repo-memory and AST checks on cold stores.
-		requestWarmup(dir)
-		if hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)) == "" {
-			return nil
-		}
-	}
-	// A PreToolUse hook fires on every action, so the same fact must not be
-	// re-injected turn after turn. Dedupe per agent session on the fact, the
-	// way hook-plan and hook-prompt dedupe what they inject.
-	//
-	// The walk is told what has already gone out rather than being filtered
-	// after the fact: it returns one line, and dropping that line used to end
-	// the call, so a repeated fact took the line behind it with it (#3603).
 	if strings.TrimSpace(input.SessionID) == "" {
 		switch {
 		case strings.TrimSpace(input.TranscriptPath) != "":
@@ -435,30 +402,81 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 		}
 	}
 	cwd := hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots))
-	var line string
-	for range 3 {
-		injected := alreadyInjected(dir, input.SessionID)
-		used := func(candidate string) bool { return injected["tool:"+shortHash(dedupeFact(candidate))] }
-		candidate := toolHookLineSkipping(dir, cwd, input, used)
-		if candidate == "" {
+	var coordLine string
+	if isCommandTool(input.ToolName) {
+		fileWarn := coordHandleToolFile(dir, cwd, input, raw)
+		gitWarn := coordCheckMutatingGit(dir, cwd, input, raw)
+		coordRecordPreCommand(dir, cwd, input, raw)
+		switch {
+		case fileWarn != "" && gitWarn != "":
+			coordLine = fileWarn + "\n" + gitWarn
+		case fileWarn != "":
+			coordLine = fileWarn
+		case gitWarn != "":
+			coordLine = gitWarn
+		}
+	} else {
+		coordLine = coordHandleToolFile(dir, cwd, input, raw)
+	}
+	// Never build or repair from here. This runs inside an action the user is
+	// waiting on, and a miss costs nothing while a rebuild costs seconds.
+	indexReady := planIndexReady(dir)
+	if !indexReady {
+		// Ask, do not build. #777 gave the per-prompt and session-start hooks
+		// this: an index in a format this build cannot read answers nothing,
+		// which reads as a user with no history, and nothing else asks for the
+		// rebuild that fixes it. A spawned subagent reaches only these hooks —
+		// install.go says so where it wires Task and Agent — so without this a
+		// fleet works against a stale index until its parent types something
+		// (#2567). requestWarmup writes a sentinel and detaches a child; the
+		// action pays neither the read nor the wait.
+		// Keep running index-free coordination, repo-memory and AST checks on cold stores.
+		requestWarmup(dir)
+		if coordLine == "" && cwd == "" {
 			return nil
 		}
-		token := "tool:" + shortHash(dedupeFact(candidate))
-		releaseSeenLock, _ := holdHookseenLock(dir)
-		latest := alreadyInjected(dir, input.SessionID)
-		if latest[token] {
+	}
+	// A PreToolUse hook fires on every action, so the same fact must not be
+	// re-injected turn after turn. Dedupe per agent session on the fact, the
+	// way hook-plan and hook-prompt dedupe what they inject.
+	//
+	// The walk is told what has already gone out rather than being filtered
+	// after the fact: it returns one line, and dropping that line used to end
+	// the call, so a repeated fact took the line behind it with it (#3603).
+	var line string
+	if indexReady || cwd != "" {
+		for range 3 {
+			injected := alreadyInjected(dir, input.SessionID)
+			used := func(candidate string) bool { return injected["tool:"+shortHash(dedupeFact(candidate))] }
+			candidate := toolHookLineSkipping(dir, cwd, input, used)
+			if candidate == "" {
+				break
+			}
+			token := "tool:" + shortHash(dedupeFact(candidate))
+			releaseSeenLock, _ := holdHookseenLock(dir)
+			latest := alreadyInjected(dir, input.SessionID)
+			if latest[token] {
+				releaseSeenLock()
+				continue
+			}
+			rememberInjectedIDs(dir, input.SessionID, token)
 			releaseSeenLock()
-			continue
+			line = candidate
+			break
 		}
-		rememberInjectedIDs(dir, input.SessionID, token)
-		releaseSeenLock()
-		line = candidate
-		break
+	}
+	if line != "" {
+		line = truncateToolLine(line, toolHookMaxBytes)
+	}
+	switch {
+	case line != "" && coordLine != "":
+		line = line + "\n" + coordLine
+	case coordLine != "":
+		line = coordLine
 	}
 	if line == "" {
 		return nil
 	}
-	line = truncateToolLine(line, toolHookMaxBytes)
 	out := frameRecall(line)
 	// Record the injection so deja's most frequent surface is not invisible to
 	// stats and the receipt. Deduped above, so this counts a distinct fact
