@@ -76,6 +76,7 @@ describe("@vshulcz/magpie-deja", () => {
       });
       assert.ok(allowed);
       assert.ok(allowed.messages[0].content.includes("<deja-memory"));
+      assert.ok(allowed.messages[0].content.includes("Verify technical facts against current code before applying"));
     } finally {
       stub.cleanup();
     }

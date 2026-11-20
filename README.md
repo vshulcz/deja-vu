@@ -24,6 +24,10 @@ Local inverted index in a single Go binary — zero LLM calls, 0.7–0.8 ms in-p
 ```sh
 npx @vshulcz/deja-vu install --auto                # install and wire detected agents
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
+claude plugin marketplace add vshulcz/deja-vu && claude plugin install deja-vu@deja-vu
+codex plugin marketplace add https://github.com/vshulcz/deja-vu && codex plugin add deja-vu@deja-vu
+gemini extensions install https://github.com/vshulcz/deja-vu
+opencode plugin add opencode-deja
 ```
 
 ```sh

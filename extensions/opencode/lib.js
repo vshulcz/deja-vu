@@ -284,6 +284,7 @@ export function v1Messages(messages, sessionID) {
 // resultText is the text a finished 2.x tool call returned: `content` is a
 // string or a list of blocks, and a tool may leave only `output`.
 export function resultText(result) {
+  if (typeof result === "string") return result
   const r = result || {}
   if (typeof r.content === "string") return r.content
   if (Array.isArray(r.content)) {

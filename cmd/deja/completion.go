@@ -110,7 +110,7 @@ _deja_completion() {
             elif [[ "$prev" == "--seed" ]]; then
                 COMPREPLY=()
             elif [[ "$action" == "live" ]]; then
-                COMPREPLY=( $(compgen -W "--json" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--delivery --json" -- "$cur") )
             elif [[ "$action" == "recall" || "$action" == "context" || "$action" == "prompt"|| "$action" == "block" || "$action" == "ingest" || "$action" == "read" ]]; then
                 COMPREPLY=( $(compgen -W "--json --seed" -- "$cur") )
             fi
@@ -460,7 +460,7 @@ _deja() {
       if (( CURRENT == 3 )); then
         _values 'benchmark' recall context prompt block ingest read live
       elif [[ "$words[3]" == "live" ]]; then
-        _arguments '--json[print JSON]'
+        _arguments '--delivery[audit harness delivery wiring and push/pull efficiency]' '--json[print JSON]'
       else
         _arguments '--json[print JSON]' '--seed=[benchmark seed]:seed:'
       fi
@@ -663,6 +663,7 @@ complete -c deja -n '__fish_seen_subcommand_from origin review' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from origin review' -l limit -r
 complete -c deja -n '__fish_seen_subcommand_from bench; and not __fish_seen_subcommand_from recall context prompt block ingest read live' -a 'recall context prompt block ingest read live'
 complete -c deja -n '__fish_seen_subcommand_from bench; and __fish_seen_subcommand_from recall context prompt block ingest read live' -l json
+complete -c deja -n '__fish_seen_subcommand_from bench; and __fish_seen_subcommand_from live' -l delivery -d 'Audit harness delivery wiring and push/pull efficiency'
 complete -c deja -n '__fish_seen_subcommand_from bench; and __fish_seen_subcommand_from recall context prompt block ingest read' -l seed -r
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l json
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l offline
@@ -852,7 +853,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
             'bench' {
                 if ($argumentPosition -eq 1) { @('recall', 'context', 'prompt', 'block', 'ingest', 'read', 'live') }
                 elseif ($previous -eq '--seed') { @() }
-                elseif ($action -eq 'live') { @('--json') }
+                elseif ($action -eq 'live') { @('--delivery', '--json') }
                 else { @('--json', '--seed') }
             }
             'completion' { @('bash', 'zsh', 'fish', 'powershell', 'pwsh') }

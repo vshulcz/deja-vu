@@ -135,6 +135,7 @@ test("worker resolves workspace cwd, injects recall, stands down, and runs comma
   }
 
   let owned = false
+  const promptSessions = []
   const activate = createWorker({
     owns: () => owned,
     run: async (args, opts) => {
@@ -142,6 +143,7 @@ test("worker resolves workspace cwd, injects recall, stands down, and runs comma
       if (args[0] === "hook-prompt") {
         const payload = JSON.parse(opts.stdin)
         assert.equal(payload.cwd, "/Users/alex/repo")
+        promptSessions.push(payload.session_id)
         return { ok: true, stdout: '<deja-recall source="deja">use node --test</deja-recall>\n' }
       }
       if (args[0] === "hook-context") {
@@ -179,6 +181,7 @@ test("worker resolves workspace cwd, injects recall, stands down, and runs comma
   )
   assert.equal(agentOut.input.prompt, 'check schema\n\n<deja-recall source="deja">use node --test</deja-recall>')
   assert.equal(hookCalls, 2)
+  assert.deepEqual(promptSessions, ["t-1", "ws-1"])
 
   owned = true
   const stoodDown = await hooks.get("agent.prompt.before")(

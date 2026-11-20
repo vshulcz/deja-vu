@@ -446,3 +446,26 @@ func TestRepairedPairAnswersSharedSecondaryLineOnlyWhenActionable(t *testing.T) 
 		t.Fatalf("FixesForCommand sameFailingCommand = %+v, want $ deploy-tool stage-west", cmdGot)
 	}
 }
+
+func TestFixesForCommandGatesTimeoutOnSameCommand(t *testing.T) {
+	now := time.Now().Add(-time.Hour).UTC()
+	msgs := []model.Message{
+		{Role: roleCommand, Text: "$ go test ./slow/...  → exit 124", Time: now},
+		{Role: roleToolOutput, Text: "Command timed out after 2m 0.0s", Time: now.Add(time.Second)},
+		{Role: roleCommand, Text: "$ go test -timeout 5m ./slow/...  → exit 0", Time: now.Add(2 * time.Second)},
+		{Role: roleToolOutput, Text: "ok", Time: now.Add(3 * time.Second)},
+	}
+	dir := t.TempDir()
+	buildFixes(dir, []model.Session{{Harness: "claude", ID: "to-1", Messages: msgs}}, func(s model.Session) string {
+		return s.Harness + ":" + s.ID
+	})
+	if got := FixesFor(dir, "Command timed out after 2m 0.0s", 3, nil); len(got) != 0 {
+		t.Fatalf("generic timeout matched without failing command: %+v", got)
+	}
+	if got := FixesForCommand(dir, "npm run build", "Command timed out after 2m 0.0s", 3, nil); len(got) != 0 {
+		t.Fatalf("generic timeout matched different command: %+v", got)
+	}
+	if got := FixesForCommand(dir, "go test ./slow/...", "Command timed out after 2m 0.0s", 3, nil); len(got) == 0 || got[0].Command != "$ go test -timeout 5m ./slow/..." {
+		t.Fatalf("generic timeout failed to match same command: %+v", got)
+	}
+}

@@ -1,0 +1,159 @@
+name: Setup deja
+description: Install the deja binary from GitHub Releases and optionally run a deja command.
+branding:
+  icon: search
+  color: blue
+
+inputs:
+  version:
+    description: Release tag to install (for example v0.24.3 or 0.24.3), or latest.
+    required: false
+    default: latest
+  args:
+    description: Optional arguments to pass to deja after installation.
+    required: false
+    default: ''
+  token:
+    description: GitHub token used for Release API requests and asset downloads.
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  version:
+    description: Resolved release tag that was installed.
+    value: ${{ steps.install.outputs.version }}
+  binary-path:
+    description: Absolute path to the installed deja executable.
+    value: ${{ steps.install.outputs.binary-path }}
+
+runs:
+  using: composite
+  steps:
+    - id: install
+      name: Install deja
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_TOKEN: ${{ inputs.token }}
+      run: |
+        set -euo pipefail
+
+        case "${RUNNER_OS:-}" in
+          Linux) os="linux" ;;
+          macOS) os="darwin" ;;
+          Windows) os="windows" ;;
+          *)
+            case "$(uname -s | tr '[:upper:]' '[:lower:]')" in
+              linux) os="linux" ;;
+              darwin) os="darwin" ;;
+              msys*|mingw*|cygwin*) os="windows" ;;
+              *) echo "unsupported OS: ${RUNNER_OS:-$(uname -s)}" >&2; exit 1 ;;
+            esac
+            ;;
+        esac
+
+        case "${RUNNER_ARCH:-}" in
+          X64) arch="amd64" ;;
+          ARM64) arch="arm64" ;;
+          *)
+            case "$(uname -m)" in
+              x86_64|amd64) arch="amd64" ;;
+              arm64|aarch64) arch="arm64" ;;
+              *) echo "unsupported arch: ${RUNNER_ARCH:-$(uname -m)}" >&2; exit 1 ;;
+            esac
+            ;;
+        esac
+
+        curl_args=(-fsSL)
+        if [ -n "${INPUT_TOKEN:-}" ]; then
+          curl_args+=(-H "Authorization: Bearer ${INPUT_TOKEN}")
+        fi
+
+        version_in="${INPUT_VERSION:-latest}"
+        if [ -z "$version_in" ] || [ "$version_in" = "latest" ]; then
+          api="https://api.github.com/repos/vshulcz/deja-vu/releases/latest"
+          tag=$(curl "${curl_args[@]}" "$api" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | sed -n '1p')
+          if [ -z "$tag" ]; then
+            echo "could not resolve latest release tag" >&2
+            exit 1
+          fi
+        else
+          case "$version_in" in
+            v*) tag="$version_in" ;;
+            *) tag="v$version_in" ;;
+          esac
+        fi
+
+        version="${tag#v}"
+        ext="tar.gz"
+        bin_name="deja"
+        if [ "$os" = "windows" ]; then
+          ext="zip"
+          bin_name="deja.exe"
+        fi
+
+        archive="deja-vu_${version}_${os}_${arch}.${ext}"
+        base="https://github.com/vshulcz/deja-vu/releases/download/${tag}"
+
+        tmp=$(mktemp -d "${RUNNER_TEMP:-/tmp}/deja-action.XXXXXX")
+        trap 'rm -rf "$tmp"' EXIT
+
+        curl "${curl_args[@]}" "${base}/${archive}" -o "${tmp}/${archive}"
+        curl "${curl_args[@]}" "${base}/checksums.txt" -o "${tmp}/checksums.txt"
+
+        expected=$(awk -v f="$archive" '$2 == f {print $1}' "${tmp}/checksums.txt")
+        if [ -z "$expected" ]; then
+          echo "checksum entry not found for ${archive}" >&2
+          exit 1
+        fi
+
+        if command -v sha256sum >/dev/null 2>&1; then
+          actual=$(sha256sum "${tmp}/${archive}" | awk '{print $1}')
+        elif command -v shasum >/dev/null 2>&1; then
+          actual=$(shasum -a 256 "${tmp}/${archive}" | awk '{print $1}')
+        else
+          echo "missing sha256sum or shasum" >&2
+          exit 1
+        fi
+
+        if [ "$actual" != "$expected" ]; then
+          echo "checksum mismatch for ${archive}: got ${actual}, want ${expected}" >&2
+          exit 1
+        fi
+
+        install_dir="${RUNNER_TEMP:-/tmp}/deja-bin"
+        mkdir -p "$install_dir"
+        if [ "$ext" = "zip" ]; then
+          if command -v unzip >/dev/null 2>&1; then
+            unzip -oq "${tmp}/${archive}" "$bin_name" -d "$install_dir"
+          else
+            tar -xf "${tmp}/${archive}" -C "$install_dir" "$bin_name"
+          fi
+        else
+          tar -xzf "${tmp}/${archive}" -C "$install_dir" "$bin_name"
+          chmod 0755 "${install_dir}/${bin_name}"
+        fi
+
+        if [ ! -f "${install_dir}/${bin_name}" ]; then
+          echo "archive ${archive} did not produce ${bin_name}" >&2
+          exit 1
+        fi
+
+        echo "$install_dir" >> "$GITHUB_PATH"
+        {
+          echo "version=${tag}"
+          echo "binary-path=${install_dir}/${bin_name}"
+        } >> "$GITHUB_OUTPUT"
+
+    - id: run
+      name: Run deja
+      if: inputs.args != ''
+      shell: bash
+      env:
+        BIN_PATH: ${{ steps.install.outputs.binary-path }}
+        INPUT_ARGS: ${{ inputs.args }}
+      run: |
+        set -euo pipefail
+        set -f
+        read -r -a arg_list <<< "$INPUT_ARGS"
+        "$BIN_PATH" "${arg_list[@]}"

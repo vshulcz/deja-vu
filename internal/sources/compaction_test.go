@@ -1134,3 +1134,58 @@ func TestMatchesCompactionBoundaryRejectsRewrittenTail(t *testing.T) {
 		t.Fatal("rewritten boundary was accepted")
 	}
 }
+
+func TestReadGeminiCompactionLargeTruncatedTranscriptStaysMetricComplete(t *testing.T) {
+	pad := strings.Repeat("p", 700)
+	records := make([]map[string]any, 0, 7004)
+	records = append(records, geminiHeader, gSet(geminiCtx))
+	for i := range 7000 {
+		records = append(records, gTurn(fmt.Sprintf("pad-%d", i), "gemini", pad))
+	}
+	records = append(records,
+		gSet(geminiCtx, geminiSummary, geminiAck, gTurn("k1", "user", gText("run test")), gCall("k2", "go test ./...")),
+		gTurn("tail", "gemini", "done."),
+	)
+	path, _ := writeGeminiChat(t, records...)
+	tr, found, err := ReadGeminiCompaction(path, "g-1")
+	if err != nil || !found {
+		t.Fatalf("compaction not found: found=%v err=%v", found, err)
+	}
+	if !tr.Truncated {
+		t.Fatalf("expected Truncated=true for oversized transcript (size=%d)", tr.SourceSize)
+	}
+	if !tr.MetricComplete {
+		t.Fatalf("expected MetricComplete=true when all retained tail JSONL lines are valid")
+	}
+
+	agRoot := t.TempDir()
+	agDir := filepath.Join(agRoot, "brain", "ag-large-1", ".system_generated", "logs")
+	if mkdirErr := os.MkdirAll(agDir, 0o755); mkdirErr != nil {
+		t.Fatal(mkdirErr)
+	}
+	agPath := filepath.Join(agDir, "transcript.jsonl")
+	af, err := os.Create(agPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = af.Close() }()
+	_, _ = af.WriteString(`{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-07-08T14:18:27Z","content":"<USER_REQUEST>\nfix build\n</USER_REQUEST>"}` + "\n")
+	for i := range 7000 {
+		_, _ = fmt.Fprintf(af, `{"step_index":%d,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-07-08T14:19:00Z","content":"%s"}`+"\n", i+1, pad)
+	}
+	_, _ = af.WriteString(`{"step_index":7001,"source":"MODEL","type":"CHECKPOINT","status":"DONE","created_at":"2026-07-08T14:20:00Z","content":"{{ CHECKPOINT 1 }}\n# USER Objective:\nfix build"}` + "\n")
+	_, _ = af.WriteString(`{"step_index":7002,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-07-08T14:21:00Z","content":"continuing"}` + "\n")
+	if closeErr := af.Close(); closeErr != nil {
+		t.Fatal(closeErr)
+	}
+	agTr, found, err := ReadAntigravityCompactionIfNew(agPath, "ag-large-1", "/Users/alex/proj", nil)
+	if err != nil || !found {
+		t.Fatalf("antigravity compaction not found: found=%v err=%v", found, err)
+	}
+	if !agTr.Truncated {
+		t.Fatalf("expected antigravity Truncated=true for oversized transcript (size=%d)", agTr.SourceSize)
+	}
+	if !agTr.MetricComplete {
+		t.Fatalf("expected antigravity MetricComplete=true when all retained tail JSONL lines are valid")
+	}
+}

@@ -335,6 +335,45 @@ func TestDropCopiedHitsRetainsForkAttribution(t *testing.T) {
 	}
 }
 
+func TestDropCopiedHitsDropsIdenticalImportedTwin(t *testing.T) {
+	t0 := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
+	local := search.Hit{
+		Session: model.Session{
+			ID:      "orig-42",
+			Harness: "claude",
+			Messages: []model.Message{
+				{Role: "user", Time: t0, Text: "keep   timeout   at 5s"},
+				{Role: "assistant", Time: t0.Add(time.Second), Text: "Updated retry budget."},
+			},
+		},
+	}
+	identicalTwin := search.Hit{
+		Session: model.Session{
+			ID:      "imported-orig-42-1",
+			OrigID:  "orig-42",
+			Harness: "claude",
+			Messages: []model.Message{
+				// Whitespace & zero-timestamp drift must still collapse into local twin.
+				{Role: "user", Text: "keep timeout at 5s"},
+			},
+		},
+	}
+	divergentTwin := search.Hit{
+		Session: model.Session{
+			ID:      "imported-orig-42-2",
+			OrigID:  "orig-42",
+			Harness: "claude",
+			Messages: []model.Message{
+				{Role: "user", Time: t0.Add(2 * time.Second), Text: "actually use 10s on staging"},
+			},
+		},
+	}
+	got := dropCopiedHits("", []search.Hit{local, identicalTwin, divergentTwin})
+	if len(got) != 2 || got[0].Session.ID != "orig-42" || got[1].Session.ID != "imported-orig-42-2" {
+		t.Fatalf("dropCopiedHits kept %#v, want local + divergent twin only", got)
+	}
+}
+
 func BenchmarkDropCopiedHitsCollisions(b *testing.B) {
 	for _, unique := range []bool{false, true} {
 		for _, n := range []int{5, 20, 100, 800} {

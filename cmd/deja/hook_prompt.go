@@ -212,7 +212,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	prevAssistant := syncLiveSessionRules(dir, cwd, input, asked)
 	seenFile := loadSeen(dir)
 	seen := seenFile.injected(input.SessionID)
-	advisories := collectPromptDirectAdvisories(dir, cwd, input.SessionID, asked, false, seen, nil, prevAssistant)
+	advisories := collectPromptDirectAdvisories(dir, cwd, input.SessionID, asked, isSpawnedReader(input.SessionID), seen, nil, prevAssistant)
 	failNudge := failureNudge(dir, asked)
 	// Nobody asked. A harness delivers its own plumbing as the next user turn —
 	// a finished background task, a system reminder, a slash command's envelope

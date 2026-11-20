@@ -85,6 +85,72 @@ func antigravityProjectWorkspace(workspace string, steps []transcriptStep) strin
 	return workspace
 }
 
+func selectAntigravityWorkspaces(paths []string, convFallback string, steps []transcriptStep) (string, string) {
+	seen := make(map[string]bool, len(paths))
+	cands := make([]string, 0, len(paths))
+	for _, raw := range paths {
+		ws := strings.TrimSpace(raw)
+		if ws != "" && !seen[ws] {
+			seen[ws] = true
+			cands = append(cands, ws)
+		}
+	}
+	if len(cands) == 0 && strings.TrimSpace(convFallback) != "" {
+		cands = append(cands, strings.TrimSpace(convFallback))
+	}
+	if len(cands) == 0 {
+		return "", ""
+	}
+	hasExistingProject := false
+	for _, ws := range cands {
+		if fi, err := os.Stat(ws); err == nil && fi.IsDir() && len(digest.ProjectNameCandidates(ws)) > 0 {
+			hasExistingProject = true
+			break
+		}
+	}
+	for _, st := range slices.Backward(steps) {
+		calls, ok := st.ToolCalls.([]any)
+		if !ok {
+			continue
+		}
+		for _, rawCall := range calls {
+			call, _ := rawCall.(map[string]any)
+			args, _ := call["args"].(map[string]any)
+			if args == nil {
+				continue
+			}
+			for _, p := range antigravityCallPaths(args) {
+				for _, ws := range cands {
+					if repo := antigravityRepoRootFromPath(ws, p); repo != "" {
+						return repo, repo
+					}
+				}
+				if !hasExistingProject {
+					if repo := antigravityRepoRootFromPath("", p); repo != "" {
+						return repo, repo
+					}
+				}
+			}
+		}
+	}
+	for _, ws := range cands {
+		if fi, err := os.Stat(ws); err == nil && fi.IsDir() && len(digest.ProjectNameCandidates(ws)) > 0 && sources.RepoRoot(ws) != "" {
+			return ws, ws
+		}
+	}
+	for _, ws := range cands {
+		if fi, err := os.Stat(ws); err == nil && fi.IsDir() && len(digest.ProjectNameCandidates(ws)) > 0 {
+			return ws, ws
+		}
+	}
+	for _, ws := range cands {
+		if fi, err := os.Stat(ws); err == nil && fi.IsDir() {
+			return ws, antigravityProjectWorkspace(ws, steps)
+		}
+	}
+	return cands[0], antigravityProjectWorkspace(cands[0], steps)
+}
+
 func antigravityCallPaths(args map[string]any) []string {
 	var out []string
 	for _, k := range []string{"TargetFile", "AbsolutePath", "Path", "cwd", "Cwd", "where"} {

@@ -486,7 +486,11 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 	// searchable SessionMeta row. It still answers to the same privacy
 	// selectors: otherwise a session that compacted before its transcript was
 	// indexed could survive `deja forget` in manifest.gob.
-	for _, key := range removeMatchingCompactions(&Manifest{Compactions: cloneCompactions(m.Compactions)}, o, exact) {
+	sidecar, sidecarErr := readCompactionSidecar(dir)
+	if sidecarErr != nil {
+		return ForgetResult{}, sidecarErr
+	}
+	for _, key := range removeMatchingCompactions(&Manifest{Compactions: mergeCompactionMaps(m.Compactions, sidecar)}, o, exact) {
 		if matched[key] {
 			continue
 		}
@@ -553,10 +557,20 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 	// compactions through an index swap, so leaving the packet in the old core
 	// would faithfully resurrect the state this command just removed.
 	if removed := removeMatchingCompactions(&m, o, exact); len(removed) > 0 {
-		if err := writeManifestOnly(dir, m); err != nil {
-			return result, err
+		hasCore := !compactionOnly
+		if !hasCore {
+			_, statErr := os.Stat(filepath.Join(dir, "manifest.gob"))
+			hasCore = statErr == nil
 		}
-		invalidateManifestCache(dir)
+		if hasCore {
+			if err := writeManifestOnly(dir, m); err != nil {
+				return result, err
+			}
+			invalidateManifestCache(dir)
+		}
+	}
+	if err := forgetCompactionSidecar(dir, o, exact); err != nil {
+		return result, err
 	}
 	if compactionOnly {
 		// This path has no rebuild to recreate the index-local mirror below.

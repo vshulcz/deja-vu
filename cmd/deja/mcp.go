@@ -522,6 +522,103 @@ func spreadQ(mode string, raw json.RawMessage) json.RawMessage {
 	return out
 }
 
+func isAllDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func candidatePathWithoutLine(s string) string {
+	if head, tail, ok := strings.Cut(s, "#L"); ok && head != "" && tail != "" {
+		start, end, hasRange := strings.Cut(tail, "-")
+		end = strings.TrimPrefix(end, "L")
+		if isAllDigits(start) && (!hasRange || isAllDigits(end)) {
+			return head
+		}
+	}
+	cur := s
+	for range 2 {
+		i := strings.LastIndexByte(cur, ':')
+		if i <= 0 {
+			break
+		}
+		suf := cur[i+1:]
+		start, end, hasDash := strings.Cut(suf, "-")
+		if isAllDigits(suf) || (hasDash && isAllDigits(start) && isAllDigits(end)) {
+			cur = cur[:i]
+			continue
+		}
+		break
+	}
+	return cur
+}
+
+func looksLikeExistingFileForBlame(subj string) bool {
+	if strings.ContainsAny(subj, "\r\n") {
+		return false
+	}
+	cand := candidatePathWithoutLine(strings.TrimSpace(subj))
+	if cand == "" || (!strings.ContainsAny(cand, "/\\") && filepath.Ext(cand) == "") {
+		return false
+	}
+	p := cand
+	if !filepath.IsAbs(p) {
+		cwd := howCwd()
+		if cwd == "" {
+			return false
+		}
+		p = filepath.Join(cwd, p)
+	}
+	fi, err := os.Stat(p)
+	return err == nil && !fi.IsDir()
+}
+
+func inferAutoMCPMode(raw json.RawMessage) string {
+	var args map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return "orient"
+	}
+	var subj string
+	for _, key := range []string{"q", "query", "path", "file_path", "filepath", "file", "error", "output", "stderr", "what", "command", "cmd", "session", "session_id", "id"} {
+		v, ok := args[key]
+		if !ok || !nonEmptyJSONValue(v) {
+			continue
+		}
+		var s string
+		if json.Unmarshal(v, &s) == nil {
+			if s = strings.TrimSpace(s); s != "" {
+				subj = s
+				break
+			}
+		}
+	}
+	if subj == "" {
+		return "orient"
+	}
+	if looksLikeExistingFileForBlame(subj) {
+		return "blame"
+	}
+	if _, ok := index.FrictionLine(subj); ok {
+		return "fix"
+	}
+	if strings.ContainsRune(subj, '\n') {
+		for line := range strings.SplitSeq(subj, "\n") {
+			if trimmed := strings.TrimSpace(line); trimmed != "" {
+				if _, ok := index.FrictionLine(trimmed); ok {
+					return "fix"
+				}
+			}
+		}
+	}
+	return "recall"
+}
+
 func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 	return callMCPToolServed(dir, name, raw, nil)
 }
@@ -595,6 +692,9 @@ func callMCPToolRaw(dir, name string, raw json.RawMessage, served *int) (string,
 			return "", err
 		}
 		mode := strings.ToLower(strings.TrimSpace(a.Mode))
+		if mode == "" || mode == "auto" {
+			mode = inferAutoMCPMode(raw)
+		}
 		target, ok := dispatcherModes[mode]
 		if !ok {
 			// Named, not guessed at: a model that invents a mode gets the list
@@ -930,10 +1030,10 @@ func keepsQuery(shorter, longer, query string) bool {
 // passed 4096-recallFrameOverhead; this path passed no budget at all, so the
 // digest header — which carries a project name and a session id, neither of
 // them bounded — pushed an ordinary reply to 8221 bytes and a long-named one to
-// 8335 (#1797). The frame's header grew by 270 bytes when it started saying
-// which recalled lines to follow, and the budget grew with it, or the digest
-// lost its own end note to the trim.
-const contextMCPBudget = 8192 + 270
+// 8335 (#1797). The frame's header grew by 339 bytes when it started saying
+// which recalled lines to follow and how to verify recalled facts, and the
+// budget grew with it, or the digest lost its own end note to the trim.
+const contextMCPBudget = 8192 + 339
 
 // recordedMCPAnswer journals what a tool handed the agent, whatever it was:
 // "no session ran a command after that error" is an answer the agent acts on

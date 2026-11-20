@@ -501,10 +501,35 @@ func parseCoordPayloadView(raw []byte, fallbackCWD string, fallback toolHookInpu
 			out.Command = firstJSONString(doc, "command")
 		}
 		out.ToolInputCmd = out.Command
-		out.Patch = firstJSONString(ti, "patch", "patchText", "patch_text", "diff", "input")
+		out.Patch = coordExtractPatchText(out.ToolName, ti)
 		out.Paths = collectToolInputPaths(ti)
 	}
 	return out
+}
+
+func isEphemeralMCPHelperSession(id string) bool {
+	return strings.Contains(strings.ToLower(strings.TrimSpace(id)), "-mcp-")
+}
+
+func coordExtractPatchText(toolName string, ti map[string]any) string {
+	if patch := firstJSONString(ti, "patch", "patchText", "patch_text", "diff"); patch != "" {
+		return patch
+	}
+	raw := firstJSONString(ti, "input")
+	if raw == "" {
+		return ""
+	}
+	if strings.Contains(strings.ToLower(toolName), "patch") || looksLikePatchText(raw) {
+		return raw
+	}
+	return ""
+}
+
+func looksLikePatchText(s string) bool {
+	return strings.Contains(s, "*** Begin Patch") ||
+		strings.Contains(s, "diff --git ") ||
+		strings.Contains(s, "\n--- ") ||
+		strings.HasPrefix(s, "--- ")
 }
 
 func extractToolInputMap(doc map[string]any) map[string]any {
@@ -677,7 +702,7 @@ func coordHandleToolFile(dir, cwd string, input toolHookInput, raw []byte) strin
 		return ""
 	}
 	view := parseCoordPayloadView(raw, cwd, input)
-	if view.SessionID == "" || !coordPolicyAllows(view.CWD, view.TranscriptPath) {
+	if view.SessionID == "" || isEphemeralMCPHelperSession(view.SessionID) || !coordPolicyAllows(view.CWD, view.TranscriptPath) {
 		return ""
 	}
 	action, paths := coordActionPaths(view.CWD, view)
@@ -1421,7 +1446,7 @@ func coordResetFailStreak(dir, sessionID, cwd string) {
 }
 
 func coordRecordCommandOutcome(dir, cwd, sessionID, cmd string, failed bool) int {
-	if dir == "" || recallIsOff() || !coordPolicyAllows(cwd, "") {
+	if dir == "" || recallIsOff() || isEphemeralMCPHelperSession(sessionID) || !coordPolicyAllows(cwd, "") {
 		if failed {
 			return 1
 		}

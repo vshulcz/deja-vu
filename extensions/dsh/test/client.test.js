@@ -93,7 +93,7 @@ const idle = (selector) => selector({ running: false });
 const STAND = [
   "deja recalled 3 prior sessions from this project · today: memory arrived 3 times",
   "deja indexed 13 sessions (1 agent) · docs: vshulcz.github.io/deja-vu",
-  "if deja is useful, a GitHub star helps others find it — github.com/vshulcz/deja-vu",
+  "if deja saved you time, a GitHub star helps more developers find it — github.com/vshulcz/deja-vu",
   'deja-vu — from Codex CLI, 3d ago: "how should the zorbit queue drain on deploy" (via grace)',
 ];
 
@@ -116,7 +116,7 @@ test("the card leads with the receipt and drops deja's name from each line", asy
   ]);
   // The docs address at the end of the built note goes to the link row.
   assert.deepEqual(p.links, [{ label: "Docs", href: "https://vshulcz.github.io/deja-vu" }]);
-  assert.deepEqual(p.linked, [{ text: "if deja is useful, a GitHub star helps others find it", href: "https://github.com/vshulcz/deja-vu" }]);
+  assert.deepEqual(p.linked, [{ text: "if deja saved you time, a GitHub star helps more developers find it", href: "https://github.com/vshulcz/deja-vu" }]);
   // A line of nothing but links, as `deja install` prints it, is all link row.
   const older = mod.parseNotes(["docs: vshulcz.github.io/deja-vu · issues: github.com/vshulcz/deja-vu/issues"]);
   assert.deepEqual(older.links.map((l) => l.label), ["Docs", "Issues"]);
@@ -157,7 +157,7 @@ test("the card keeps to the receipt and one note, the rest behind more, links in
   assert.match(shown, /a GitHub star/);
   assert.doesNotMatch(shown, /github\.com/);
   const links = find(tree, (n) => n.type === "a");
-  assert.deepEqual(links.map((a) => text(a)), ["deja-vu", "Docs", "if deja is useful, a GitHub star helps others find it"]);
+  assert.deepEqual(links.map((a) => text(a)), ["deja-vu", "Docs", "if deja saved you time, a GitHub star helps more developers find it"]);
   for (const a of links) {
     assert.equal(a.props.target, "_blank");
     assert.match(a.props.rel, /noopener/);

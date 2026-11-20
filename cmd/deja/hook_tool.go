@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -227,6 +228,32 @@ func (i *toolHookInput) normalizeEditStrings() {
 	)
 }
 
+var ompReadSelectorRe = regexp.MustCompile(`(?i):(?:raw|-?[0-9]+(?:[-+][0-9]*)?(?:,[0-9]+(?:[-+][0-9]*)?)*)$`)
+
+// stripReadPathSelectors peels omp-style line/raw selectors off a read tool
+// path unless the literal path exists on disk, so already-installed extensions
+// and direct hook-tool callers resolve the bare file (#6106).
+func stripReadPathSelectors(cwd, p string) string {
+	if p == "" || !strings.Contains(p, ":") {
+		return p
+	}
+	check := p
+	if !filepath.IsAbs(check) && cwd != "" {
+		check = filepath.Join(cwd, check)
+	}
+	if _, err := os.Stat(check); err == nil {
+		return p
+	}
+	for ompReadSelectorRe.MatchString(p) {
+		next := ompReadSelectorRe.ReplaceAllString(p, "")
+		if next == "" || next == p {
+			break
+		}
+		p = next
+	}
+	return p
+}
+
 // adopt fills in what grok spells differently. Without the tool name and its
 // command this hook cannot tell a spawn from an edit, and has nothing to look
 // the action up by.
@@ -257,6 +284,9 @@ func (i *toolHookInput) adopt() {
 	}
 	if isCommandTool(i.ToolName) && strings.TrimSpace(i.ToolInput.Command) != "" {
 		i.ToolInput.Command += sources.CommandArgs(i.ToolInput.Args)
+	}
+	if strings.EqualFold(strings.TrimSpace(i.ToolName), "read") && i.ToolInput.FilePath != "" {
+		i.ToolInput.FilePath = stripReadPathSelectors(hookProjectPath(i.CWD, i.WorkspaceRoots), i.ToolInput.FilePath)
 	}
 	i.normalizeEditStrings()
 }
@@ -719,7 +749,7 @@ func fileLineFor(dir, cwd string, input toolHookInput) string {
 		input.ToolInput.PatchText,
 		input.ToolInput.Patch,
 	}, "\n")
-	line := fileHookLineOutsideWithEdit(dir, cwd, path, editText, askerSkip(dir, input))
+	line := fileHookLineOutsideWithMode(dir, cwd, path, editText, isReadOnlyFileTool(input.ToolName), askerSkip(dir, input))
 	if missing := missingFileHintLine(cwd, path, input.ToolName); missing != "" {
 		if line == "" {
 			line = search.SafePath(baseName(path)) + missing
@@ -751,6 +781,15 @@ func fileLineFor(dir, cwd string, input toolHookInput) string {
 		}
 	}
 	return line
+}
+
+// isReadOnlyFileTool reports whether toolName is a file-read PostToolUse channel.
+func isReadOnlyFileTool(toolName string) bool {
+	switch strings.TrimSpace(toolName) {
+	case "read", "read_file", "Read":
+		return true
+	}
+	return false
 }
 
 // isSearchReplaceEditTool reports whether toolName is a search-and-replace edit tool.

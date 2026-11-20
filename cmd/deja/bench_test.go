@@ -11,6 +11,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/usage"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -763,6 +764,147 @@ func TestBenchLiveOpeningPromptFromIndex(t *testing.T) {
 	got := liveOpeningPrompt(idxDir, index.SessionMeta{Harness: "claude", ID: "s1", Title: "ignored"})
 	if !strings.Contains(got, "connection pool starvation") {
 		t.Errorf("liveOpeningPrompt from index = %q", got)
+	}
+}
+
+func TestBenchLiveDeliveryReportIsReadOnly(t *testing.T) {
+	opts, err := parseBenchLiveArgs([]string{"--delivery", "--json"})
+	if err != nil || !opts.delivery || !opts.jsonOutput {
+		t.Fatalf("parseBenchLiveArgs(--delivery --json) = (%+v, %v)", opts, err)
+	}
+	if _, argErr := parseBenchLiveArgs([]string{"--bogus"}); argErr == nil {
+		t.Fatal("parseBenchLiveArgs(--bogus) succeeded; want error")
+	}
+
+	tmp := hermeticEnv(t)
+	idxDir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", idxDir)
+	work := filepath.Join(tmp, "work", "payments")
+	if mkdirErr := os.MkdirAll(filepath.Join(work, ".git"), 0o755); mkdirErr != nil {
+		t.Fatal(mkdirErr)
+	}
+	t.Chdir(work)
+
+	if _, runErr := captureRun(t, "bench", "live", "--delivery"); runErr != nil {
+		t.Fatalf("bench live --delivery on empty dir failed: %v", runErr)
+	}
+	for _, sideEffect := range []string{".hookseen", ".injections.jsonl", ".usage.jsonl", ".hook.lock"} {
+		if _, statErr := os.Stat(idxDir + sideEffect); !os.IsNotExist(statErr) {
+			t.Errorf("bench live --delivery created side-effect file %s", sideEffect)
+		}
+		if _, statErr := os.Stat(filepath.Join(idxDir, sideEffect)); !os.IsNotExist(statErr) {
+			t.Errorf("bench live --delivery created side-effect file in indexDir: %s", sideEffect)
+		}
+	}
+
+	usage.RecordResult(idxDir, usage.KindRecall, 400, 1, false)
+	usage.RecordResult(idxDir, usage.KindRecall, 0, 0, true)
+	usage.RecordResult(idxDir, usage.KindHook, 320, 1, false)
+	usage.Record(idxDir, usage.KindTool, 90)
+	usage.RecordCompactionCapture(idxDir, usage.CompactionCapture{
+		Key:       usage.CompactionKey{Session: "ses-1", Workspace: work, Revision: "rev1"},
+		ToolCalls: 5,
+	})
+
+	snapLines := strings.Join([]string{
+		`{"t":"2026-04-01T10:00:00Z","kind":"dejavu","bytes":220,"digest":"repeated identical recall line here\nrepeated identical recall line here"}`,
+		`{"t":"2026-04-01T10:01:00Z","kind":"context","bytes":180,"digest":"unique recall line that appears once"}`,
+	}, "\n") + "\n"
+	if writeErr := os.WriteFile(idxDir+".injections.jsonl", []byte(snapLines), 0o644); writeErr != nil {
+		t.Fatal(writeErr)
+	}
+
+	jsonOut, err := captureRun(t, "bench", "live", "--delivery", "--json")
+	if err != nil {
+		t.Fatalf("bench live --delivery --json: %v", err)
+	}
+	var rep liveDeliveryReport
+	if unmarshalErr := json.Unmarshal([]byte(jsonOut), &rep); unmarshalErr != nil {
+		t.Fatalf("unmarshal liveDeliveryReport: %v\n%s", unmarshalErr, jsonOut)
+	}
+	if rep.Repo != "payments" || rep.Recalls != 2 || rep.EmptyResultRate != 0.5 ||
+		rep.Injections != 2 || rep.ToolLines != 1 || rep.PushToPullRatio != 1.0 ||
+		rep.DuplicateDigestSnapshots != 1 || rep.Snapshots.Total != 2 {
+		t.Fatalf("unexpected delivery JSON report: %+v", rep)
+	}
+	if rep.Compaction == nil || rep.Compaction.Captures != 1 {
+		t.Fatalf("expected compaction captures=1, got %+v", rep.Compaction)
+	}
+	if rep.Harnesses.Catalog < 50 {
+		t.Fatalf("expected harness catalog >= 50, got %+v", rep.Harnesses)
+	}
+	if rep.Harnesses.Detected != 0 || len(rep.Wirings) != 0 {
+		t.Fatalf("expected 0 detected harnesses on clean env, got %+v %+v", rep.Harnesses, rep.Wirings)
+	}
+
+	textOut, err := captureRun(t, "bench", "live", "--delivery")
+	if err != nil {
+		t.Fatalf("bench live --delivery text: %v", err)
+	}
+	for _, want := range []string{"repo: payments", "harnesses:", "wirings: none", "pull: 2 recalls", "push/pull 1.00", "duplicate lines 1"} {
+		if !strings.Contains(textOut, want) {
+			t.Errorf("text report missing %q:\n%s", want, textOut)
+		}
+	}
+
+	home := homeDir()
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	if claudeRoot == "" {
+		claudeRoot = filepath.Join(home, ".claude", "projects")
+	}
+	seedFiles := map[string]string{
+		filepath.Join(home, ".codex", "config.toml"):          "model = \"gpt-5\"\n",
+		filepath.Join(home, ".gemini", "settings.json"):       "{}\n",
+		filepath.Join(gooseConfigDir(), "config.yaml"):        "{}\n",
+		filepath.Join(claudeRoot, "payments", "sess-1.jsonl"): "{\"type\":\"user\",\"timestamp\":\"2026-11-20T10:00:00Z\",\"sessionId\":\"sess-1\",\"cwd\":\"" + filepath.ToSlash(work) + "\",\"message\":{\"role\":\"user\",\"content\":\"fix payments webhook signature\"}}\n{\"type\":\"assistant\",\"timestamp\":\"2026-11-20T10:00:02Z\",\"sessionId\":\"sess-1\",\"cwd\":\"" + filepath.ToSlash(work) + "\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"checked hmac verification\"}]}}\n",
+	}
+	for p, body := range seedFiles {
+		if mkErr := os.MkdirAll(filepath.Dir(p), 0o755); mkErr != nil {
+			t.Fatal(mkErr)
+		}
+		if wErr := os.WriteFile(p, []byte(body), 0o644); wErr != nil {
+			t.Fatal(wErr)
+		}
+	}
+	if _, idxErr := captureRun(t, "index"); idxErr != nil {
+		t.Fatalf("deja index seeded session: %v", idxErr)
+	}
+
+	jsonMulti, err := captureRun(t, "bench", "live", "--delivery", "--json")
+	if err != nil {
+		t.Fatalf("bench live --delivery --json multi: %v", err)
+	}
+	var repMulti liveDeliveryReport
+	if unmarshalErr := json.Unmarshal([]byte(jsonMulti), &repMulti); unmarshalErr != nil {
+		t.Fatalf("unmarshal multi liveDeliveryReport: %v\n%s", unmarshalErr, jsonMulti)
+	}
+	if repMulti.Harnesses.Detected < 4 || repMulti.Harnesses.WithSessions < 1 {
+		t.Fatalf("expected >=4 detected harnesses and >=1 with sessions, got %+v", repMulti.Harnesses)
+	}
+	byName := map[string]liveDeliveryWiring{}
+	for _, hw := range repMulti.Wirings {
+		byName[hw.Harness] = hw
+	}
+	for _, wantName := range []string{"codex", "gemini", "goose", "claude-code"} {
+		if _, ok := byName[wantName]; !ok {
+			t.Fatalf("missing seeded harness %q in %+v", wantName, repMulti.Wirings)
+		}
+	}
+	if byName["claude-code"].Sessions < 1 {
+		t.Fatalf("expected indexed claude-code sessions >= 1, got %+v", byName["claude-code"])
+	}
+
+	textMulti, err := captureRun(t, "bench", "live", "--delivery")
+	if err != nil {
+		t.Fatalf("bench live --delivery multi text: %v", err)
+	}
+	if strings.Contains(textMulti, "wirings: none") {
+		t.Fatalf("expected populated wirings line, got:\n%s", textMulti)
+	}
+	for _, want := range []string{"claude-code=", "codex=", "gemini=", "goose="} {
+		if !strings.Contains(textMulti, want) {
+			t.Errorf("multi text report missing %q:\n%s", want, textMulti)
+		}
 	}
 }
 

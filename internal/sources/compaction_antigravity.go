@@ -71,8 +71,11 @@ func ReadAntigravityCompactionIfNew(path, conversationID, workspace string, seen
 		return CompactionTranscript{}, false, fmt.Errorf("%w: no parseable antigravity conversation", ErrUnsupportedCompactionTranscript)
 	}
 	var calls []TranscriptToolCall
-	metricComplete := !truncated
+	metricComplete := len(records[:cut]) > 0
 	for _, r := range records[:cut] {
+		if !json.Valid(bytes.TrimSpace(r.line)) {
+			metricComplete = false
+		}
 		got, _ := antigravityCompactionToolCalls(r.line, r.off, r.off+int64(len(r.line))+1)
 		calls = append(calls, got...)
 	}
