@@ -746,6 +746,8 @@ func codexSplitExternalAgentEnvelopes(text string) ([]codexExtSegment, int) {
 		}
 		buf = nil
 	}
+	noCallTail := false
+	noResultTail := false
 	for i := 0; i < len(lines); i++ {
 		head := strings.TrimSpace(strip(lines[i]))
 		call := codexExtCallHead.FindStringSubmatch(head)
@@ -758,14 +760,21 @@ func codexSplitExternalAgentEnvelopes(text string) ([]codexExtSegment, int) {
 			continue
 		}
 		tail := codexExtResultTail
+		noTail := &noResultTail
 		if call != nil {
 			tail = codexExtCallTail
+			noTail = &noCallTail
 		}
 		end := -1
-		for j := i + 1; j < len(lines); j++ {
-			if strings.TrimSpace(strip(lines[j])) == tail {
-				end = j
-				break
+		if !*noTail {
+			for j := i + 1; j < len(lines); j++ {
+				if strings.TrimSpace(strip(lines[j])) == tail {
+					end = j
+					break
+				}
+			}
+			if end == -1 {
+				*noTail = true
 			}
 		}
 		if end == -1 {
