@@ -30,7 +30,13 @@ import (
 	"unicode/utf16"
 )
 
-const idbObjectStoreDataIndexID = 1
+const (
+	idbObjectStoreDataIndexID = 1
+	maxIDBKeyDepth            = 32
+	maxV8Depth                = 128
+	maxV8Allocs               = 1 << 20
+	maxV8SparsePrealloc       = 1 << 16
+)
 
 // v8Obj is a JavaScript plain object with its written key order kept.
 type v8Obj struct {
@@ -98,6 +104,13 @@ func decodeIDBKeyPrefix(key []byte) (idbKeyPrefix, bool) {
 // strings are UTF-16BE; 2/3 dates and numbers are float64; 4 arrays nest;
 // 6 is binary.
 func decodeIDBUserKey(buf []byte, pos int) (any, int, error) {
+	return decodeIDBUserKeyDepth(buf, pos, 0)
+}
+
+func decodeIDBUserKeyDepth(buf []byte, pos, depth int) (any, int, error) {
+	if depth > maxIDBKeyDepth {
+		return nil, pos, errors.New("idb key: nesting limit exceeded")
+	}
 	if pos >= len(buf) {
 		return nil, pos, errors.New("idb key: empty")
 	}
@@ -135,7 +148,7 @@ func decodeIDBUserKey(buf []byte, pos int) (any, int, error) {
 		items := make([]any, 0, ln)
 		for range ln {
 			var v any
-			v, p, err = decodeIDBUserKey(buf, p)
+			v, p, err = decodeIDBUserKeyDepth(buf, p, depth+1)
 			if err != nil {
 				return nil, p, err
 			}
@@ -264,9 +277,11 @@ func leFloat64(b []byte) float64 {
 // v8Reader walks one V8 structured serialization stream. The methods share
 // the position and the object table the stream refers back into.
 type v8Reader struct {
-	buf   []byte
-	pos   int
-	table []any
+	buf    []byte
+	pos    int
+	table  []any
+	depth  int
+	allocs int
 }
 
 // varint reads one varint, advancing the reader.
@@ -371,10 +386,11 @@ func (r *v8Reader) readDenseArray() (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if length > uint64(len(r.buf)) {
+	ln, ok := varintLen(length, len(r.buf)-r.pos)
+	if !ok || ln > maxV8Allocs-r.allocs {
 		return nil, errors.New("v8: dense array out of bounds")
 	}
-	ln, _ := varintLen(length, len(r.buf))
+	r.allocs += ln
 	arr := make([]any, ln)
 	r.table = append(r.table, arr)
 	for i := range arr {
@@ -397,7 +413,12 @@ func (r *v8Reader) readSparseArray() (any, error) {
 		return nil, errors.New("v8: sparse array out of bounds")
 	}
 	ln, _ := varintLen(length, len(r.buf))
-	arr := make([]any, ln)
+	allocLen := min(ln, maxV8SparsePrealloc)
+	if allocLen > maxV8Allocs-r.allocs {
+		return nil, errors.New("v8: sparse array allocation limit exceeded")
+	}
+	r.allocs += allocLen
+	arr := make([]any, allocLen)
 	r.table = append(r.table, arr)
 	for {
 		if r.pos >= len(r.buf) {
@@ -556,19 +577,32 @@ func (r *v8Reader) readError() (any, error) {
 // readValue reads one value from the stream. An unknown tag errors: the value
 // is counted as unread rather than guessed at.
 func (r *v8Reader) readValue() (any, error) {
-	if r.pos >= len(r.buf) {
-		return nil, errors.New("v8: stream truncated")
+	if r.depth >= maxV8Depth {
+		return nil, errors.New("v8: nesting limit exceeded")
 	}
-	tag := r.buf[r.pos]
-	r.pos++
-	switch tag {
-	case v8TagVersion, v8TagVerifyCount:
-		if _, err := r.varint(); err != nil {
-			return nil, err
+	r.depth++
+	defer func() { r.depth-- }()
+
+	var tag byte
+	for {
+		if r.pos >= len(r.buf) {
+			return nil, errors.New("v8: stream truncated")
 		}
-		return r.readValue()
-	case v8TagPadding:
-		return r.readValue()
+		tag = r.buf[r.pos]
+		r.pos++
+		switch tag {
+		case v8TagVersion, v8TagVerifyCount:
+			if _, err := r.varint(); err != nil {
+				return nil, err
+			}
+			continue
+		case v8TagPadding:
+			continue
+		}
+		break
+	}
+
+	switch tag {
 	case v8TagUndefined, v8TagTheHole, v8TagNull:
 		return v8Null{}, nil
 	case v8TagTrue:
@@ -589,8 +623,14 @@ func (r *v8Reader) readValue() (any, error) {
 		return int64(v & 0xffffffff), nil
 	case v8TagDouble:
 		return r.readDouble()
-	case v8TagBigInt, v8TagBigIntObject:
+	case v8TagBigInt:
 		return r.readBigInt()
+	case v8TagBigIntObject:
+		v, err := r.readBigInt()
+		if err != nil {
+			return nil, err
+		}
+		return r.keepValue(v), nil
 	case v8TagUTF8String, v8TagOneByteString, v8TagTwoByteString:
 		return r.readString(tag)
 	case v8TagObjectRef:
@@ -616,7 +656,11 @@ func (r *v8Reader) readValue() (any, error) {
 		}
 		return r.keepValue(v), nil
 	case v8TagStringObject:
-		return r.readValue()
+		v, err := r.readValue()
+		if err != nil {
+			return nil, err
+		}
+		return r.keepValue(v), nil
 	case v8TagRegExp:
 		return r.readRegExp()
 	case v8TagBeginMap:
@@ -650,34 +694,37 @@ func (r *v8Reader) readString(tag byte) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	width := 1
-	if tag == v8TagTwoByteString {
-		width = 2
-	}
 	raw, err := r.readStringBody(n)
 	if err != nil {
 		return nil, err
 	}
-	if width == 1 {
+	switch tag {
+	case v8TagUTF8String:
+		return string(raw), nil
+	case v8TagOneByteString:
 		runes := make([]rune, len(raw))
 		for i := range runes {
 			runes[i] = rune(raw[i])
 		}
 		return string(runes), nil
+	case v8TagTwoByteString:
+		if len(raw)%2 != 0 {
+			return nil, errors.New("v8: odd two-byte string length")
+		}
+		units := make([]uint16, len(raw)/2)
+		for i := range units {
+			units[i] = uint16(raw[2*i]) | uint16(raw[2*i+1])<<8
+		}
+		return string(utf16.Decode(units)), nil
+	default:
+		return nil, fmt.Errorf("v8: unexpected string tag 0x%x", tag)
 	}
-	units := make([]uint16, len(raw)/2)
-	for i := range units {
-		units[i] = uint16(raw[2*i]) | uint16(raw[2*i+1])<<8
-	}
-	return string(utf16.Decode(units)), nil
 }
 
-// deserializeV8 reads one V8 structured serialization stream starting at
-// start, returning the value, the position consumed to, and the error.
-func deserializeV8(buf []byte, start int) (any, int, error) {
+// deserializeV8 reads one V8 structured serialization stream starting at start.
+func deserializeV8(buf []byte, start int) (any, error) {
 	r := &v8Reader{buf: buf, pos: start}
-	v, err := r.readValue()
-	return v, r.pos, err
+	return r.readValue()
 }
 
 // decodeIDBValue turns one stored value into a Go value, trying the SSV
@@ -699,7 +746,7 @@ func decodeIDBValue(value []byte) (any, bool) {
 		}
 	}
 	for _, off := range candidates {
-		if v, _, err := deserializeV8(body, off); err == nil {
+		if v, err := deserializeV8(body, off); err == nil {
 			return v, true
 		}
 	}

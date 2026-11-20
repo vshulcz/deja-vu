@@ -11,18 +11,25 @@
     <name>vshulcz</name>
   </author>
   <entry>
-    <title>deja-vu: local memory, session search &amp; handoff across 50 coding agents</title>
+    <title>deja-vu: local memory, session search &amp; handoff across 51 coding agents</title>
     <id>https://vshulcz.github.io/deja-vu/</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
     <updated>2026-11-20T00:00:00Z</updated>
-    <summary>Shared local memory, session history search, cross-agent handoff, and uncommitted code recovery across 50 coding agents (Claude Code, Codex, Cursor, OpenCode, Gemini CLI, OpenClaw and 44 more agents). One Go binary, zero LLM calls.</summary>
+    <summary>Shared local memory, session history search, cross-agent handoff, and uncommitted code recovery across 51 coding agents (Claude Code, Codex, Cursor, OpenCode, Gemini CLI, OpenClaw and 45 more agents). One Go binary, zero LLM calls.</summary>
+  </entry>
+  <entry>
+    <title>claude-mem alternative for Codex, Cursor, opencode — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html"></link>
+    <updated>2026-11-20T00:00:00Z</updated>
+    <summary>No API key or daemon: deja-vu (97.2% R@5 LongMemEval-S) indexes Claude Code, Codex, Cursor, opencode and 45 other agents via hooks and MCP.</summary>
   </entry>
   <entry>
     <title>Compare Claude Code, Codex and Cursor memory — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/compare.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/compare.html"></link>
     <updated>2026-11-20T00:00:00Z</updated>
-    <summary>Compare deja-vu (97.2% R@5 LongMemEval-S, 50 agents) against claude-mem, MemPalace, agentmemory, Mem0, Letta, MCP Memory, CASS, ctx, and agentsview.</summary>
+    <summary>Compare deja-vu (97.2% R@5 LongMemEval-S, 51 agents) against claude-mem, MemPalace, agentmemory, Mem0, Letta, MCP Memory, CASS, ctx, and agentsview.</summary>
   </entry>
   <entry>
     <title>Search Claude Code, Codex &amp; Cursor sessions — deja-vu</title>
@@ -32,11 +39,11 @@
     <summary>Search past chat history across Claude Code, Codex, Cursor and 46 other agents by the error string, function name, file path or flag you remember.</summary>
   </entry>
   <entry>
-    <title>Claude Code, Codex, Cursor and 47 more agents — deja-vu</title>
+    <title>Claude Code, Codex, Cursor and 48 more agents — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/harnesses.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/harnesses.html"></link>
     <updated>2026-11-20T00:00:00Z</updated>
-    <summary>The fifty coding agents deja indexes today, where each stores its history, and how to add a new one.</summary>
+    <summary>The fifty-one coding agents deja indexes today, where each stores its history, and how to add a new one.</summary>
   </entry>
   <entry>
     <title>Recover files overwritten by an AI agent — deja-vu</title>
@@ -51,6 +58,13 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/resume-a-session.html"></link>
     <updated>2026-11-20T00:00:00Z</updated>
     <summary>Find the session across every agent on the machine, then reopen it in the tool that owns it — or take the digest instead of the whole conversation.</summary>
+  </entry>
+  <entry>
+    <title>SpecStory alternative for CLI &amp; 51 agents — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html"></link>
+    <updated>2026-11-20T00:00:00Z</updated>
+    <summary>Index the transcripts Claude Code, Codex, Cursor and 46 other agents already keep on disk into one local SQLite search index, with no account or extension.</summary>
   </entry>
   <entry>
     <title>Where coding agents store their history — session format registry</title>
@@ -95,25 +109,11 @@
     <summary>怎么在整台机器的所有智能体里同时搜聊天记录：按你记得的那个词搜，而不是按你记不清的话题搜，然后用会话 id 继续那次对话。</summary>
   </entry>
   <entry>
-    <title>claude-mem alternative for Codex, Cursor, opencode — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html"></link>
-    <updated>2026-11-19T00:00:00Z</updated>
-    <summary>No API key or daemon: deja-vu (97.2% R@5 LongMemEval-S) indexes Claude Code, Codex, Cursor, opencode and 45 other agents via hooks and MCP.</summary>
-  </entry>
-  <entry>
     <title>deja CLI reference: search, recall, blame, stats — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/commands.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/commands.html"></link>
     <updated>2026-11-19T00:00:00Z</updated>
     <summary>Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
-  </entry>
-  <entry>
-    <title>SpecStory alternative for CLI &amp; 50 agents — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/specstory-alternative.html"></link>
-    <updated>2026-11-19T00:00:00Z</updated>
-    <summary>Index the transcripts Claude Code, Codex, Cursor and 46 other agents already keep on disk into one local SQLite search index, with no account or extension.</summary>
   </entry>
   <entry>
     <title>接着昨天的 Claude Code 或 Codex 会话继续 — deja-vu</title>
@@ -281,13 +281,13 @@
     <id>https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html"></link>
     <updated>2026-11-16T00:00:00Z</updated>
-    <summary>Give Claude Code automatic recall across 50 coding agents: 7 settings.json hooks, 477-token MCP server, .deja/memory.jsonl, and 97.2% R@5 LongMemEval-S.</summary>
+    <summary>Give Claude Code automatic recall across 51 coding agents: 7 settings.json hooks, 477-token MCP server, .deja/memory.jsonl, and 97.2% R@5 LongMemEval-S.</summary>
   </entry>
   <entry>
     <title>Add memory to Claw Code: search past sessions — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/memory-for-claw-code.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-claw-code.html"></link>
     <updated>2026-11-16T00:00:00Z</updated>
-    <summary>Claw Code writes session logs under ~/.claw/sessions and cannot search old runs. deja indexes them locally alongside the other forty-nine agents.</summary>
+    <summary>Claw Code writes session logs under ~/.claw/sessions and cannot search old runs. deja indexes them locally alongside the other fifty agents.</summary>
   </entry>
 </feed>

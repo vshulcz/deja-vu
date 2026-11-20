@@ -34,7 +34,7 @@ import (
 
 const (
 	leveldbBlockSize    = 32768
-	snappyMaxOutputSize = 512 * 1024 * 1024
+	snappyMaxOutputSize = 64 * 1024 * 1024
 )
 
 // leveldbVersion is one write of one key. value is nil for a deletion seen in
@@ -46,7 +46,7 @@ type leveldbVersion struct {
 	seq   uint64
 }
 
-// crc32c is the Castagnoli polynomial LevelDB frames are checksummed with.
+// crc32cTable holds the Castagnoli lookup table LevelDB frames are checksummed with.
 var crc32cTable = func() (t [256]uint32) {
 	for i := range 256 {
 		c := uint32(i)
@@ -157,15 +157,16 @@ func snappyUncompress(input []byte) ([]byte, error) {
 				opos++
 			}
 		default:
-			if pos+3 >= len(input) {
+			if pos+4 > len(input) {
 				return nil, errors.New("snappy: truncated copy4")
 			}
 			length := int(tag>>2) + 1
-			offset := int(input[pos]) | int(input[pos+1])<<8 | int(input[pos+2])<<16 | int(input[pos+3])<<24
+			off32 := binary.LittleEndian.Uint32(input[pos : pos+4])
 			pos += 4
-			if offset == 0 || offset > opos || opos+length > len(out) {
+			if off32 == 0 || uint64(off32) > uint64(opos) || opos+length > len(out) {
 				return nil, errors.New("snappy: copy out of bounds")
 			}
+			offset := int(off32)
 			for range length {
 				out[opos] = out[opos-offset]
 				opos++
@@ -267,7 +268,7 @@ func sstBlockEntries(block []byte) []leveldbEntry {
 		if !ok {
 			break
 		}
-		sh, ok := varintLen(shared, pos)
+		sh, ok := varintLen(shared, len(key))
 		if !ok {
 			break
 		}

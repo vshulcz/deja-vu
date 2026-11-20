@@ -755,3 +755,65 @@ func TestDoubaoWriteFixture(t *testing.T) {
 	batch := encodeWriteBatch(20, []wbOp{{key: idbTestStringKey(doubaoProtocolKey), value: encodeSSV(doubaoProtocolValue(vk("task-1", taskFull)))}})
 	writeDoubaoStore(t, dir, entries, [][]byte{batch}, true)
 }
+
+func TestDoubaoSSTBlockCorruptSharedLength(t *testing.T) {
+	// shared=10 fits pos (>= 10 after restart/prefix) while key is still empty.
+	block := []byte{0, 1, 1, 'k', 'v', 10, 1, 1, 'x', 'y', 0, 0, 0}
+	entries := sstBlockEntries(block)
+	if len(entries) != 1 || string(entries[0].key) != "k" {
+		t.Fatalf("entries = %+v, want only the first valid entry", entries)
+	}
+}
+
+func TestDoubaoV8UTF8String(t *testing.T) {
+	const want = "你好，豆包"
+	stream := append([]byte{v8TagUTF8String}, uvarint(uint64(len(want)))...)
+	stream = append(stream, want...)
+	got, err := deserializeV8(stream, 0)
+	if err != nil {
+		t.Fatalf("deserializeV8 UTF8 string: %v", err)
+	}
+	if s, _ := v8AsString(got); s != want {
+		t.Fatalf("decoded = %q, want %q", s, want)
+	}
+}
+
+func TestDoubaoV8StringObjectBackref(t *testing.T) {
+	strObj := append([]byte{v8TagStringObject}, encodeV8OneByteString("doubao")...)
+	bigObj := []byte{v8TagBigIntObject, 0x02, 1, 0, 0, 0, 0, 0, 0, 0}
+	refStr := append([]byte{v8TagObjectRef}, uvarint(1)...)
+	refBig := append([]byte{v8TagObjectRef}, uvarint(2)...)
+	stream := vobj(
+		vk("wrap", strObj),
+		vk("big", bigObj),
+		vk("refWrap", refStr),
+		vk("refBig", refBig),
+	)
+	got, err := deserializeV8(stream, 0)
+	if err != nil {
+		t.Fatalf("deserializeV8 object refs: %v", err)
+	}
+	obj, ok := v8AsObj(got)
+	if !ok {
+		t.Fatalf("decoded = %T, want *v8Obj", got)
+	}
+	if s, _ := v8StringAt(obj, "refWrap"); s != "doubao" {
+		t.Fatalf("refWrap = %q, want %q", s, "doubao")
+	}
+	if b, _ := v8StringAt(obj, "refBig"); b != "(bigint)" {
+		t.Fatalf("refBig = %q, want %q", b, "(bigint)")
+	}
+}
+
+func TestDoubaoV8PaddingNoStackOverflow(t *testing.T) {
+	suffix := encodeV8OneByteString("ok")
+	stream := make([]byte, 10000+len(suffix))
+	copy(stream[10000:], suffix)
+	got, err := deserializeV8(stream, 0)
+	if err != nil {
+		t.Fatalf("deserializeV8 padded stream: %v", err)
+	}
+	if s, _ := v8AsString(got); s != "ok" {
+		t.Fatalf("decoded = %q, want %q", s, "ok")
+	}
+}

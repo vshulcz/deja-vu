@@ -1790,6 +1790,9 @@ func TestDoctorJSONGolden(t *testing.T) {
 	// Orca's userData directory on macOS and Windows normalises to ~/.config/orca.
 	got = strings.ReplaceAll(got, "<tmp>/home/Library/Application Support/orca", "<tmp>/home/.config/orca")
 	got = strings.ReplaceAll(got, "<tmp>/home/AppData/Roaming/orca", "<tmp>/home/.config/orca")
+	// Doubao Desktop's user data directory normalises across macOS and Windows to ~/.config/Doubao.
+	got = strings.ReplaceAll(got, "<tmp>/home/Library/Application Support/Doubao", "<tmp>/home/.config/Doubao")
+	got = strings.ReplaceAll(got, "<tmp>/home/AppData/Local/Doubao/User Data", "<tmp>/home/.config/Doubao")
 	wantRaw, err := os.ReadFile(filepath.Join("testdata", "doctor.json"))
 	if err != nil {
 		t.Fatal(err)

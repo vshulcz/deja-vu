@@ -33,7 +33,7 @@
       "name": "doubao",
       "state": "missing",
       "paths": [
-        "<tmp>/home/AppData/Local/Doubao/User Data"
+        "<tmp>/home/.config/Doubao"
       ],
       "files": 0,
       "indexed_sessions": 0
