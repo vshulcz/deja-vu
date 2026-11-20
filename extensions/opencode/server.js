@@ -86,9 +86,13 @@ async function setup(ctx) {
       const text = resultText(event.result)
       const output = { output: text }
       await after({ tool: v1ToolName(event.tool), sessionID: event.sessionID, args: event.input || {} }, output)
-      if (output.output === text || !output.output.startsWith(text)) return
+      if (typeof output.output !== "string" || output.output === text || !output.output.startsWith(text)) return
       const extra = output.output.slice(text.length).trim()
-      const result = event.result || {}
+      if (!extra) return
+      const result =
+        event.result && typeof event.result === "object" && !Array.isArray(event.result)
+          ? event.result
+          : {}
       const content = Array.isArray(result.content)
         ? result.content
         : typeof result.content === "string"

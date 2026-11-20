@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -83,27 +84,43 @@ type liveBenchOptions struct {
 	delivery   bool
 }
 
-// liveDeliveryWiring summarizes read-only installation wiring state for one harness.
+// liveHarnessCatalogSummary summarizes memory delivery coverage across all supported harnesses.
+type liveHarnessCatalogSummary struct {
+	Catalog          int `json:"catalog"`
+	Detected         int `json:"detected"`
+	AutoWired        int `json:"auto_wired"`
+	MCPConfigured    int `json:"mcp_configured"`
+	GuidanceWritten  int `json:"guidance_written"`
+	WithSessions     int `json:"with_sessions"`
+	ImportedSessions int `json:"imported_sessions,omitempty"`
+}
+
+// liveDeliveryWiring summarizes read-only installation wiring state for one active harness.
 type liveDeliveryWiring struct {
-	Harness string `json:"harness"`
-	State   string `json:"state"`
+	Harness  string `json:"harness"`
+	State    string `json:"state"`
+	MCP      string `json:"mcp,omitempty"`
+	Guidance string `json:"guidance,omitempty"`
+	Sessions int    `json:"sessions,omitempty"`
+	Detected bool   `json:"detected,omitempty"`
 }
 
 // liveDeliveryReport summarizes delivery effectiveness across harnesses and retained telemetry.
 type liveDeliveryReport struct {
-	Repo                     string                   `json:"repo"`
-	Wirings                  []liveDeliveryWiring     `json:"wirings"`
-	Recalls                  int                      `json:"recalls"`
-	EmptyResultRate          float64                  `json:"empty_result_rate"`
-	Injections               int                      `json:"injections"`
-	DejaVuMoments            int                      `json:"dejavu_moments"`
-	ToolLines                int                      `json:"tool_lines"`
-	FixesServed              int                      `json:"fixes_served"`
-	PushToPullRatio          float64                  `json:"push_to_pull_ratio"`
-	Compaction               *usage.CompactionSummary `json:"compaction,omitempty"`
-	Snapshots                liveInjectionAudit       `json:"snapshots"`
-	DuplicateDigestSnapshots int                      `json:"duplicate_digest_snapshots"`
-	WallMS                   float64                  `json:"wall_ms"`
+	Repo                     string                    `json:"repo"`
+	Harnesses                liveHarnessCatalogSummary `json:"harnesses"`
+	Wirings                  []liveDeliveryWiring      `json:"wirings"`
+	Recalls                  int                       `json:"recalls"`
+	EmptyResultRate          float64                   `json:"empty_result_rate"`
+	Injections               int                       `json:"injections"`
+	DejaVuMoments            int                       `json:"dejavu_moments"`
+	ToolLines                int                       `json:"tool_lines"`
+	FixesServed              int                       `json:"fixes_served"`
+	PushToPullRatio          float64                   `json:"push_to_pull_ratio"`
+	Compaction               *usage.CompactionSummary  `json:"compaction,omitempty"`
+	Snapshots                liveInjectionAudit        `json:"snapshots"`
+	DuplicateDigestSnapshots int                       `json:"duplicate_digest_snapshots"`
+	WallMS                   float64                   `json:"wall_ms"`
 }
 
 // runBenchLive evaluates hook-tool recall on the current repository against the live index.
@@ -446,9 +463,11 @@ func measureLiveDelivery(indexDir, cwd string) liveDeliveryReport {
 	if tot.Recalls > 0 {
 		ratio = math.Round((float64(push)/float64(tot.Recalls))*100) / 100
 	}
+	harnesses, wirings := collectLiveDeliveryWirings(indexDir)
 	return liveDeliveryReport{
 		Repo:                     filepath.Base(root),
-		Wirings:                  collectLiveDeliveryWirings(),
+		Harnesses:                harnesses,
+		Wirings:                  wirings,
 		Recalls:                  tot.Recalls,
 		EmptyResultRate:          math.Round(tot.EmptyResultRate*1000) / 1000,
 		Injections:               tot.Injections,
@@ -463,41 +482,266 @@ func measureLiveDelivery(indexDir, cwd string) liveDeliveryReport {
 	}
 }
 
-func collectLiveDeliveryWirings() []liveDeliveryWiring {
-	claudeSt := claudeHookWiringState()
-	claudeState := claudeSt.state
-	if claudeSt.absent || claudeState == "" {
-		claudeState = "missing"
+func canonicalBenchHarness(name string) string {
+	switch name {
+	case "", "deja":
+		return ""
+	case "codex-hook":
+		return "codex"
+	case "claude":
+		return "claude-code"
+	case "copilot-chat":
+		return "vscode"
+	case "trae-ide":
+		return "trae"
+	default:
+		return name
 	}
-	out := []liveDeliveryWiring{{Harness: "claude-code", State: claudeState}}
-	seen := map[string]bool{"claude-code": true}
+}
 
-	core := map[string]bool{"opencode": true, "antigravity": true, "hermes": true}
-	var extras []liveDeliveryWiring
-	byCore := map[string]string{}
-	for _, w := range autoWirings() {
-		if seen[w.name] {
-			continue
+func normalizeBenchAutoState(harness, state string, switchedOff, binaryMissing, isSharedSkill bool) string {
+	if switchedOff || state == "disabled" {
+		return "switched-off"
+	}
+	if state == "" || state == "absent" {
+		return "missing"
+	}
+	if binaryMissing && (state == "wired" || state == "plugin") {
+		return "binary-missing"
+	}
+	if state == "out of date" {
+		return "partial"
+	}
+	if state == "wired" {
+		if isSharedSkill {
+			return "guidance-only"
 		}
-		st, _ := autoWiringState(w)
-		if core[w.name] {
-			if _, ok := byCore[w.name]; !ok {
-				byCore[w.name] = st
-			}
-			continue
-		}
-		if st == "wired" || st == "stale" || st == "partial" {
-			seen[w.name] = true
-			extras = append(extras, liveDeliveryWiring{Harness: w.name, State: st})
+		switch harness {
+		case "aider":
+			return "context-file"
+		case "roo":
+			return "guidance-only"
 		}
 	}
-	for _, name := range []string{"opencode", "antigravity", "hermes"} {
-		if st, ok := byCore[name]; ok {
-			out = append(out, liveDeliveryWiring{Harness: name, State: st})
+	return state
+}
+
+func normalizeBenchMCPState(state string, binaryMissing, switchedOff, pluginMissing bool) string {
+	if switchedOff || state == "switched-off" || state == "disabled" {
+		return "switched-off"
+	}
+	if pluginMissing || state == "plugin-missing" {
+		return "plugin-missing"
+	}
+	if binaryMissing && (state == "ok" || state == "configured" || state == "installed" || state == "wired") {
+		return "binary-missing"
+	}
+	switch state {
+	case "", "missing", "absent", "config-missing", "not-wired", "not configured", "none":
+		return "missing"
+	case "ok", "configured", "installed", "wired":
+		return "configured"
+	case "out of date":
+		return "stale"
+	default:
+		return state
+	}
+}
+
+func statExists(p string) bool {
+	if p == "" {
+		return false
+	}
+	_, err := os.Stat(p)
+	return err == nil
+}
+
+type benchHarnessSignals struct {
+	catalog    map[string]bool
+	detected   map[string]bool
+	autoStates map[string]string
+	mcpStates  map[string]string
+	sessions   map[string]int
+	imported   int
+}
+
+func detectLocalHarnessRoots(sig *benchHarnessSignals) {
+	for raw := range existingTargetChecks() {
+		if name := canonicalBenchHarness(raw); name != "" {
+			sig.catalog[name] = true
 		}
 	}
-	out = append(out, extras...)
-	return out
+	for _, raw := range existingTargets() {
+		if name := canonicalBenchHarness(raw); name != "" {
+			sig.catalog[name] = true
+			sig.detected[name] = true
+		}
+	}
+	if slices.ContainsFunc(sources.ClaudeRoots(), statExists) {
+		sig.detected["claude-code"] = true
+	}
+	if slices.ContainsFunc(sources.CodexRoots(), statExists) {
+		sig.detected["codex"] = true
+	}
+	for _, pair := range []struct {
+		name string
+		path string
+	}{
+		{"gemini", sources.GeminiRoot()},
+		{"opencode", sources.OpencodeDB()},
+		{"codearts", sources.CodeArtsRoot()},
+		{"qoder", sources.QoderRoot()},
+	} {
+		if statExists(pair.path) {
+			sig.detected[pair.name] = true
+		}
+	}
+	for _, pair := range []struct {
+		name string
+		ok   bool
+	}{
+		{"kimi", kimiPluginInstalled()},
+		{"grok", grokPluginInstalled()},
+		{"codex", codexPluginInstalled()},
+	} {
+		if pair.ok {
+			sig.detected[pair.name] = true
+		}
+	}
+}
+
+func collectDoctorHarnessSignals(sig *benchHarnessSignals, indexDir string) {
+	shared := sharedSkillPath()
+	for _, a := range collectDoctorAutoRecall() {
+		name := canonicalBenchHarness(a.Name)
+		if name == "" {
+			continue
+		}
+		sig.catalog[name] = true
+		isSharedSkill := shared != "" && a.Path == shared
+		st := normalizeBenchAutoState(name, a.State, a.SwitchedOff, a.BinaryMissing, isSharedSkill)
+		if prev, ok := sig.autoStates[name]; !ok || prev == "missing" || prev == "guidance-only" {
+			sig.autoStates[name] = st
+		}
+		if st != "missing" && !isSharedSkill {
+			sig.detected[name] = true
+		}
+	}
+	for _, m := range collectDoctorMCP() {
+		name := canonicalBenchHarness(m.Name)
+		if name == "" {
+			continue
+		}
+		sig.catalog[name] = true
+		st := normalizeBenchMCPState(m.State, m.BinaryMissing, m.SwitchedOff, m.PluginMissing)
+		if prev, ok := sig.mcpStates[name]; !ok || prev == "missing" {
+			sig.mcpStates[name] = st
+		}
+		if m.State != "config-missing" && m.State != "" && m.State != "missing" {
+			sig.detected[name] = true
+		}
+	}
+	for raw, count := range index.HarnessSessionCounts(indexDir) {
+		if count <= 0 {
+			continue
+		}
+		if name := canonicalBenchHarness(raw); name != "" && sig.catalog[name] {
+			sig.sessions[name] += count
+			continue
+		}
+		sig.imported += count
+	}
+}
+
+func collectLiveDeliveryWirings(indexDir string) (liveHarnessCatalogSummary, []liveDeliveryWiring) {
+	sig := benchHarnessSignals{
+		catalog: map[string]bool{
+			"claude-code": true,
+			"codex":       true,
+			"gemini":      true,
+			"opencode":    true,
+			"codearts":    true,
+			"qoder":       true,
+			"kimi":        true,
+			"grok":        true,
+		},
+		detected:   map[string]bool{},
+		autoStates: map[string]string{},
+		mcpStates:  map[string]string{},
+		sessions:   map[string]int{},
+	}
+	detectLocalHarnessRoots(&sig)
+	collectDoctorHarnessSignals(&sig, indexDir)
+
+	summary := liveHarnessCatalogSummary{
+		Catalog:          len(sig.catalog),
+		ImportedSessions: sig.imported,
+	}
+	names := make([]string, 0, len(sig.catalog))
+	for name := range sig.catalog {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+
+	var out []liveDeliveryWiring
+	for _, name := range names {
+		isDetected := sig.detected[name]
+		autoSt := sig.autoStates[name]
+		if autoSt == "" {
+			autoSt = "missing"
+		}
+		mcpSt := sig.mcpStates[name]
+		sessCount := sig.sessions[name]
+		autoActive := autoSt != "missing" && autoSt != "guidance-only"
+		mcpActive := mcpSt != "" && mcpSt != "missing"
+		if !isDetected && sessCount == 0 && !autoActive && !mcpActive {
+			continue
+		}
+
+		var guidance string
+		switch guidanceStatus(name) {
+		case "written":
+			guidance = "written"
+			summary.GuidanceWritten++
+		case "missing", "absent":
+			guidance = "missing"
+		}
+
+		if isDetected {
+			summary.Detected++
+		}
+		if autoSt == "wired" || autoSt == "plugin" {
+			summary.AutoWired++
+		}
+		if mcpSt == "configured" {
+			summary.MCPConfigured++
+		}
+		if sessCount > 0 {
+			summary.WithSessions++
+		}
+
+		w := liveDeliveryWiring{
+			Harness:  name,
+			State:    autoSt,
+			Guidance: guidance,
+			Sessions: sessCount,
+			Detected: isDetected,
+		}
+		if mcpSt != "" && mcpSt != "missing" {
+			w.MCP = mcpSt
+		} else if mcpSt == "missing" && isDetected {
+			w.MCP = "missing"
+		}
+		out = append(out, w)
+	}
+
+	slices.SortFunc(out, func(a, b liveDeliveryWiring) int {
+		if c := cmp.Compare(b.Sessions, a.Sessions); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.Harness, b.Harness)
+	})
+	return summary, out
 }
 
 func hasDuplicateDigestLines(digestText string) bool {
@@ -527,11 +771,38 @@ func hasDuplicateDigestLines(digestText string) bool {
 // printLiveDeliveryReport formats liveDeliveryReport for terminal output.
 func printLiveDeliveryReport(w io.Writer, r liveDeliveryReport) {
 	_, _ = fmt.Fprintf(w, "repo: %s  wall %.0f ms\n", r.Repo, r.WallMS)
-	parts := make([]string, 0, len(r.Wirings))
-	for _, hw := range r.Wirings {
-		parts = append(parts, hw.Harness+"="+hw.State)
+	_, _ = fmt.Fprintf(w, "harnesses: %d catalog  %d detected  %d auto-wired  %d mcp  %d guidance  %d with sessions\n",
+		r.Harnesses.Catalog, r.Harnesses.Detected, r.Harnesses.AutoWired, r.Harnesses.MCPConfigured,
+		r.Harnesses.GuidanceWritten, r.Harnesses.WithSessions)
+	if r.Harnesses.ImportedSessions > 0 {
+		_, _ = fmt.Fprintf(w, "imported: %d sessions\n", r.Harnesses.ImportedSessions)
 	}
-	_, _ = fmt.Fprintf(w, "wirings: %s\n", strings.Join(parts, "  "))
+	if len(r.Wirings) == 0 {
+		_, _ = fmt.Fprintln(w, "wirings: none")
+	} else {
+		parts := make([]string, 0, len(r.Wirings))
+		for _, hw := range r.Wirings {
+			var meta []string
+			if hw.MCP != "" {
+				meta = append(meta, "mcp:"+hw.MCP)
+			}
+			if hw.Guidance != "" {
+				meta = append(meta, "guidance:"+hw.Guidance)
+			}
+			if hw.Sessions > 0 {
+				meta = append(meta, fmt.Sprintf("%ds", hw.Sessions))
+			}
+			if !hw.Detected && hw.Sessions > 0 {
+				meta = append(meta, "sessions-only")
+			}
+			item := hw.Harness + "=" + hw.State
+			if len(meta) > 0 {
+				item += "(" + strings.Join(meta, ",") + ")"
+			}
+			parts = append(parts, item)
+		}
+		_, _ = fmt.Fprintf(w, "wirings: %s\n", strings.Join(parts, "  "))
+	}
 	_, _ = fmt.Fprintf(w, "pull: %d recalls (empty %.1f%%)  fixes served: %d\n",
 		r.Recalls, r.EmptyResultRate*100, r.FixesServed)
 	_, _ = fmt.Fprintf(w, "push: %d total (%d dejavu, %d tool lines)  push/pull %.2f\n",

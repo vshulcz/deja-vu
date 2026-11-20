@@ -830,17 +830,85 @@ func TestBenchLiveDeliveryReportIsReadOnly(t *testing.T) {
 	if rep.Compaction == nil || rep.Compaction.Captures != 1 {
 		t.Fatalf("expected compaction captures=1, got %+v", rep.Compaction)
 	}
-	if len(rep.Wirings) < 4 {
-		t.Fatalf("expected core harness wirings in report, got %+v", rep.Wirings)
+	if rep.Harnesses.Catalog < 50 {
+		t.Fatalf("expected harness catalog >= 50, got %+v", rep.Harnesses)
+	}
+	if rep.Harnesses.Detected != 0 || len(rep.Wirings) != 0 {
+		t.Fatalf("expected 0 detected harnesses on clean env, got %+v %+v", rep.Harnesses, rep.Wirings)
 	}
 
 	textOut, err := captureRun(t, "bench", "live", "--delivery")
 	if err != nil {
 		t.Fatalf("bench live --delivery text: %v", err)
 	}
-	for _, want := range []string{"repo: payments", "wirings:", "pull: 2 recalls", "push/pull 1.00", "duplicate lines 1"} {
+	for _, want := range []string{"repo: payments", "harnesses:", "wirings: none", "pull: 2 recalls", "push/pull 1.00", "duplicate lines 1"} {
 		if !strings.Contains(textOut, want) {
 			t.Errorf("text report missing %q:\n%s", want, textOut)
+		}
+	}
+
+	home := os.Getenv("HOME")
+	cfgBase := os.Getenv("XDG_CONFIG_HOME")
+	if cfgBase == "" {
+		cfgBase = filepath.Join(home, ".config")
+	}
+	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
+	if claudeRoot == "" {
+		claudeRoot = filepath.Join(home, ".claude", "projects")
+	}
+	seedFiles := map[string]string{
+		filepath.Join(home, ".codex", "config.toml"):           "model = \"gpt-5\"\n",
+		filepath.Join(home, ".gemini", "settings.json"):        "{}\n",
+		filepath.Join(home, ".config", "goose", "config.yaml"): "{}",
+		filepath.Join(cfgBase, "goose", "config.yaml"):         "{}\n",
+		filepath.Join(claudeRoot, "payments", "sess-1.jsonl"):  "{\"type\":\"user\",\"timestamp\":\"2026-11-20T10:00:00Z\",\"sessionId\":\"sess-1\",\"cwd\":\"" + filepath.ToSlash(work) + "\",\"message\":{\"role\":\"user\",\"content\":\"fix payments webhook signature\"}}\n{\"type\":\"assistant\",\"timestamp\":\"2026-11-20T10:00:02Z\",\"sessionId\":\"sess-1\",\"cwd\":\"" + filepath.ToSlash(work) + "\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"checked hmac verification\"}]}}\n",
+	}
+	for p, body := range seedFiles {
+		if mkErr := os.MkdirAll(filepath.Dir(p), 0o755); mkErr != nil {
+			t.Fatal(mkErr)
+		}
+		if wErr := os.WriteFile(p, []byte(body), 0o644); wErr != nil {
+			t.Fatal(wErr)
+		}
+	}
+	if _, idxErr := captureRun(t, "index"); idxErr != nil {
+		t.Fatalf("deja index seeded session: %v", idxErr)
+	}
+
+	jsonMulti, err := captureRun(t, "bench", "live", "--delivery", "--json")
+	if err != nil {
+		t.Fatalf("bench live --delivery --json multi: %v", err)
+	}
+	var repMulti liveDeliveryReport
+	if unmarshalErr := json.Unmarshal([]byte(jsonMulti), &repMulti); unmarshalErr != nil {
+		t.Fatalf("unmarshal multi liveDeliveryReport: %v\n%s", unmarshalErr, jsonMulti)
+	}
+	if repMulti.Harnesses.Detected < 4 || repMulti.Harnesses.WithSessions < 1 {
+		t.Fatalf("expected >=4 detected harnesses and >=1 with sessions, got %+v", repMulti.Harnesses)
+	}
+	byName := map[string]liveDeliveryWiring{}
+	for _, hw := range repMulti.Wirings {
+		byName[hw.Harness] = hw
+	}
+	for _, wantName := range []string{"codex", "gemini", "goose", "claude-code"} {
+		if _, ok := byName[wantName]; !ok {
+			t.Fatalf("missing seeded harness %q in %+v", wantName, repMulti.Wirings)
+		}
+	}
+	if byName["claude-code"].Sessions < 1 {
+		t.Fatalf("expected indexed claude-code sessions >= 1, got %+v", byName["claude-code"])
+	}
+
+	textMulti, err := captureRun(t, "bench", "live", "--delivery")
+	if err != nil {
+		t.Fatalf("bench live --delivery multi text: %v", err)
+	}
+	if strings.Contains(textMulti, "wirings: none") {
+		t.Fatalf("expected populated wirings line, got:\n%s", textMulti)
+	}
+	for _, want := range []string{"claude-code=", "codex=", "gemini=", "goose="} {
+		if !strings.Contains(textMulti, want) {
+			t.Errorf("multi text report missing %q:\n%s", want, textMulti)
 		}
 	}
 }
