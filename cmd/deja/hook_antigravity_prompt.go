@@ -86,8 +86,8 @@ func antigravityProjectWorkspace(workspace string, steps []transcriptStep) strin
 }
 
 func selectAntigravityWorkspaces(paths []string, convFallback string, steps []transcriptStep) (string, string) {
-	seen := make(map[string]bool, len(paths)+1)
-	cands := make([]string, 0, len(paths)+1)
+	seen := make(map[string]bool, len(paths))
+	cands := make([]string, 0, len(paths))
 	for _, raw := range paths {
 		ws := strings.TrimSpace(raw)
 		if ws != "" && !seen[ws] {

@@ -847,21 +847,16 @@ func TestBenchLiveDeliveryReportIsReadOnly(t *testing.T) {
 		}
 	}
 
-	home := os.Getenv("HOME")
-	cfgBase := os.Getenv("XDG_CONFIG_HOME")
-	if cfgBase == "" {
-		cfgBase = filepath.Join(home, ".config")
-	}
+	home := homeDir()
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	if claudeRoot == "" {
 		claudeRoot = filepath.Join(home, ".claude", "projects")
 	}
 	seedFiles := map[string]string{
-		filepath.Join(home, ".codex", "config.toml"):           "model = \"gpt-5\"\n",
-		filepath.Join(home, ".gemini", "settings.json"):        "{}\n",
-		filepath.Join(home, ".config", "goose", "config.yaml"): "{}",
-		filepath.Join(cfgBase, "goose", "config.yaml"):         "{}\n",
-		filepath.Join(claudeRoot, "payments", "sess-1.jsonl"):  "{\"type\":\"user\",\"timestamp\":\"2026-11-20T10:00:00Z\",\"sessionId\":\"sess-1\",\"cwd\":\"" + filepath.ToSlash(work) + "\",\"message\":{\"role\":\"user\",\"content\":\"fix payments webhook signature\"}}\n{\"type\":\"assistant\",\"timestamp\":\"2026-11-20T10:00:02Z\",\"sessionId\":\"sess-1\",\"cwd\":\"" + filepath.ToSlash(work) + "\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"checked hmac verification\"}]}}\n",
+		filepath.Join(home, ".codex", "config.toml"):          "model = \"gpt-5\"\n",
+		filepath.Join(home, ".gemini", "settings.json"):       "{}\n",
+		filepath.Join(gooseConfigDir(), "config.yaml"):        "{}\n",
+		filepath.Join(claudeRoot, "payments", "sess-1.jsonl"): "{\"type\":\"user\",\"timestamp\":\"2026-11-20T10:00:00Z\",\"sessionId\":\"sess-1\",\"cwd\":\"" + filepath.ToSlash(work) + "\",\"message\":{\"role\":\"user\",\"content\":\"fix payments webhook signature\"}}\n{\"type\":\"assistant\",\"timestamp\":\"2026-11-20T10:00:02Z\",\"sessionId\":\"sess-1\",\"cwd\":\"" + filepath.ToSlash(work) + "\",\"message\":{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"checked hmac verification\"}]}}\n",
 	}
 	for p, body := range seedFiles {
 		if mkErr := os.MkdirAll(filepath.Dir(p), 0o755); mkErr != nil {
