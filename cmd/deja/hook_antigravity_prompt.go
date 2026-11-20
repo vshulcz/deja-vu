@@ -390,6 +390,27 @@ func isAntigravityToolFailure(body string) bool {
 	return false
 }
 
+func latestToolStepSucceededFromSteps(steps []transcriptStep) bool {
+	for _, step := range steps {
+		if step.Type == "USER_INPUT" {
+			return false
+		}
+		if step.Type != "GENERIC" {
+			continue
+		}
+		body := step.Content
+		if isAntigravityToolFailure(body) {
+			return false
+		}
+		return strings.Contains(body, exitedWithCode+" 0.") ||
+			strings.Contains(body, exitedWithCode+" 0\n") ||
+			strings.Contains(body, commandExitedWithCode+" 0.") ||
+			strings.Contains(body, commandExitedWithCode+" 0\n") ||
+			strings.Contains(body, "| exit=0")
+	}
+	return false
+}
+
 const (
 	exitedWithCode        = "The command exited with code"
 	commandExitedWithCode = "Command exited with code"

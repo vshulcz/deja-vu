@@ -296,7 +296,10 @@ func TestVSCodeTerminalFailureGetsTheFixPairNested(t *testing.T) {
 		"tool_input":    map[string]any{"command": "make", "explanation": "build", "isBackground": false},
 		"tool_response": "panic: sql: database is closed\nCommand exited with code 2",
 	})
-	var out bytes.Buffer
+	var strike1, out bytes.Buffer
+	if err := runHookToolAfterMode(os.Getenv("DEJA_INDEX_DIR"), bytes.NewReader(payload), &strike1, false); err != nil {
+		t.Fatal(err)
+	}
 	if err := runHookToolAfterMode(os.Getenv("DEJA_INDEX_DIR"), bytes.NewReader(payload), &out, false); err != nil {
 		t.Fatal(err)
 	}
@@ -318,7 +321,10 @@ func TestCursorToolFailureGetsTheFixPair(t *testing.T) {
 		"tool_name": "Shell", "tool_input": map[string]any{"command": "make"},
 		"error_message": "panic: sql: database is closed", "failure_type": "error",
 	})
-	var out bytes.Buffer
+	var strike1, out bytes.Buffer
+	if err := runHookToolAfterMode(os.Getenv("DEJA_INDEX_DIR"), bytes.NewReader(payload), &strike1, false); err != nil {
+		t.Fatal(err)
+	}
 	if err := runHookToolAfterMode(os.Getenv("DEJA_INDEX_DIR"), bytes.NewReader(payload), &out, false); err != nil {
 		t.Fatal(err)
 	}

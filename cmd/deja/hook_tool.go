@@ -963,7 +963,7 @@ func commandFailureLine(dir, cwd, cmd string) string {
 			if p.Candidate {
 				continue
 			}
-			if p.Project != "" && !hookProjectIs(cwd, p.Project) {
+			if p.Project == "" || cwd == "" || !hookProjectIs(cwd, p.Project) {
 				continue
 			}
 			cleanCmd, ok := withoutFailedExit(orientCommand(strings.TrimPrefix(strings.TrimSpace(search.SafeCommand(p.Command)), "$ ")))
@@ -980,14 +980,14 @@ func commandFailureLine(dir, cwd, cmd string) string {
 	return line
 }
 
-func missingProgramLineWithRemedy(dir, cmd string) string {
+func missingProgramLineWithRemedy(dir, cwd, cmd string) string {
 	line := missingProgramLine(dir, cmd)
-	if line == "" || strings.Contains(line, " — ") {
+	if line == "" || strings.Contains(line, "The same command ran without it.") || strings.Contains(line, "next command that worked:") || cwd == "" {
 		return line
 	}
 	pol := policy.Load()
 	allow := func(project string) bool {
-		return pol.Allows(policy.ActivationAuto, project)
+		return project != "" && hookProjectIs(cwd, project) && pol.Allows(policy.ActivationAuto, project)
 	}
 	for _, prog := range commandPrograms(cmd) {
 		for _, p := range index.FixesForCommand(dir, cmd, "command not found: "+prog, 4, allow) {
@@ -1098,7 +1098,7 @@ func confirmedCommandTrapLine(dir, cwd, cmd string) string {
 		if !matched {
 			continue
 		}
-		if p.Candidate && frictionCount(dir, p, pol) < 2 {
+		if p.Candidate {
 			continue
 		}
 		errLine := truncateToolLine(search.SafeLine(p.Error), 160)
@@ -1400,7 +1400,7 @@ func promotedCommandHookLine(dir, cwd, cmd, self string, used func(string) bool)
 		}
 	}
 	if planIndexReady(dir) {
-		if line := missingProgramLineWithRemedy(dir, cmd); line != "" {
+		if line := missingProgramLineWithRemedy(dir, cwd, cmd); line != "" {
 			if !used(line) {
 				return line
 			}

@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -444,7 +445,7 @@ func parseCoordPayloadView(raw []byte, fallbackCWD string, fallback toolHookInpu
 		return out
 	}
 	if out.SessionID == "" {
-		out.SessionID = firstJSONString(doc, "session_id", "sessionId", "conversation_id")
+		out.SessionID = firstJSONString(doc, "session_id", "sessionId", "conversation_id", "conversationId")
 	}
 	out.ParentSessionID = firstJSONString(doc, "parent_session_id", "parentSessionId")
 	if out.TranscriptPath == "" {
@@ -456,20 +457,40 @@ func parseCoordPayloadView(raw []byte, fallbackCWD string, fallback toolHookInpu
 		out.ToolName = firstJSONString(doc, "tool_name", "toolName", "tool")
 	}
 	if out.CWD == "" {
-		out.CWD = firstJSONString(doc, "cwd")
+		out.CWD = firstJSONString(doc, "cwd", "workspaceRoot")
+		if out.CWD == "" {
+			if roots, ok := doc["workspace_roots"].([]any); ok && len(roots) > 0 {
+				if first, ok := roots[0].(string); ok {
+					out.CWD = strings.TrimSpace(first)
+				}
+			}
+		}
 	}
-	if strings.EqualFold(out.EventName, "PostToolUseFailure") || jsonBool(doc["is_error"]) {
+	if strings.EqualFold(out.EventName, "PostToolUseFailure") ||
+		jsonBool(doc["is_error"]) || jsonBool(doc["isError"]) || jsonBool(doc["tool_result_is_error"]) ||
+		strings.EqualFold(firstJSONString(doc, "failure_type", "failureType"), "error") ||
+		coordValueNonEmpty(doc["error"]) || coordValueNonEmpty(doc["tool_error"]) || coordValueNonEmpty(doc["error_message"]) {
 		out.IsFailure = true
 	}
-	if resp, ok := doc["tool_response"].(map[string]any); ok {
-		if jsonBool(resp["is_error"]) || jsonBool(resp["isError"]) {
+	for _, key := range []string{"tool_response", "toolResult", "tool_output"} {
+		resp := coordAsObject(doc[key])
+		if resp == nil {
+			continue
+		}
+		if jsonBool(resp["is_error"]) || jsonBool(resp["isError"]) ||
+			coordValueNonEmpty(resp["error"]) || coordValueNonEmpty(resp["tool_error"]) {
 			out.IsFailure = true
 		}
-		if code, hasCode := coordJSONInt(resp["exit_code"]); hasCode && code != 0 {
-			out.IsFailure = true
+		if rt, ok := resp["resultType"].(string); ok {
+			rt = strings.TrimSpace(rt)
+			if rt != "" && !strings.EqualFold(rt, "success") {
+				out.IsFailure = true
+			}
 		}
-		if code, hasCode := coordJSONInt(resp["exitCode"]); hasCode && code != 0 {
-			out.IsFailure = true
+		for _, ck := range []string{"exit_code", "exitCode", "exit_status", "exitStatus"} {
+			if coordNonZeroStatus(resp[ck]) {
+				out.IsFailure = true
+			}
 		}
 	}
 
@@ -1209,41 +1230,216 @@ func normalizeVerifyCmdForBrief(cmd, cwd string) string {
 	return cmd
 }
 
+func coordAsObject(v any) map[string]any {
+	switch x := v.(type) {
+	case map[string]any:
+		return x
+	case string:
+		trimmed := strings.TrimSpace(x)
+		if strings.HasPrefix(trimmed, "{") {
+			var nested map[string]any
+			if json.Unmarshal([]byte(trimmed), &nested) == nil {
+				return nested
+			}
+		}
+	}
+	return nil
+}
+
+func coordValueNonEmpty(v any) bool {
+	switch x := v.(type) {
+	case string:
+		t := strings.TrimSpace(x)
+		return t != "" && !strings.EqualFold(t, "(none)") && !strings.EqualFold(t, "null")
+	case map[string]any:
+		for _, k := range []string{"message", "error", "code", "detail", "reason"} {
+			if coordValueNonEmpty(x[k]) {
+				return true
+			}
+		}
+		return len(x) > 0 && x["message"] == nil && x["error"] == nil && x["code"] == nil
+	}
+	return false
+}
+
+func coordNonZeroStatus(v any) bool {
+	if code, ok := coordJSONInt(v); ok {
+		return code != 0
+	}
+	if s, ok := v.(string); ok {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return false
+		}
+		n, err := strconv.Atoi(s)
+		return err == nil && n != 0
+	}
+	return false
+}
+
+func coordRawHeadIndicatesFailure(raw []byte) bool {
+	if len(raw) == 0 {
+		return false
+	}
+	head := strings.ToLower(string(raw[:min(len(raw), 4096)]))
+	for _, needle := range []string{
+		"posttoolusefailure",
+		`"tool_result_is_error":true`,
+		`"is_error":true`,
+		`"iserror":true`,
+		`"failure_type":"error"`,
+		`"tool_error":"`,
+		`"error_message":"`,
+	} {
+		if strings.Contains(head, needle) {
+			return true
+		}
+	}
+	return false
+}
+
+func coordOutputHasNonZeroExit(text string) bool {
+	if text == "" {
+		return false
+	}
+	markers := []string{
+		"exited with code ",
+		"exit code: ",
+		"exit code ",
+		"exit_code: ",
+		"exit: ",
+		"| exit=",
+		"→ exit ",
+	}
+	for rawLine := range strings.SplitSeq(text, "\n") {
+		low := strings.ToLower(strings.TrimSpace(rawLine))
+		if low == "" {
+			continue
+		}
+		if rest, ok := strings.CutPrefix(low, "exit "); ok {
+			if code, parsed := parseLeadingExitInt(rest); parsed && code != 0 {
+				return true
+			}
+		}
+		for _, marker := range markers {
+			idx := 0
+			for {
+				pos := strings.Index(low[idx:], marker)
+				if pos < 0 {
+					break
+				}
+				rest := low[idx+pos+len(marker):]
+				if code, ok := parseLeadingExitInt(rest); ok && code != 0 {
+					return true
+				}
+				idx += pos + len(marker)
+			}
+		}
+	}
+	return false
+}
+
+func parseLeadingExitInt(s string) (int, bool) {
+	s = strings.TrimLeft(s, " \t")
+	if s == "" {
+		return 0, false
+	}
+	end := 0
+	if s[0] == '-' || s[0] == '+' {
+		end++
+	}
+	digitsStart := end
+	for end < len(s) && s[end] >= '0' && s[end] <= '9' {
+		end++
+	}
+	if end == digitsStart {
+		return 0, false
+	}
+	if end < len(s) {
+		switch s[end] {
+		case '.', '>', ',', ')', ' ', '\t', '\r':
+		default:
+			return 0, false
+		}
+	}
+	n, err := strconv.Atoi(s[:end])
+	return n, err == nil
+}
+
 func coordHasFriction(text string) bool {
 	if text == "" {
 		return false
 	}
-	_, ok := index.FrictionLine(text)
-	return ok
+	return index.OutputReadsAsFailure(text)
 }
 
-// coordRecordAfterCommand records passing verification commands in .coord when
-// a PostToolUse command finishes without failure or friction signals.
-func coordRecordAfterCommand(dir, cwd, cmd, output string, raw []byte, fallbackSessionID string) {
-	if dir == "" || recallIsOff() || !coordPolicyAllows(cwd, "") {
-		return
+func coordStreakStampKey(sessionID, cwd string) string {
+	if sid := strings.TrimSpace(sessionID); sid != "" {
+		return "fail-streak:sid:" + sid
 	}
+	clean := coordCanonicalPath("", cwd)
+	if clean == "" {
+		clean = filepath.Clean(strings.TrimSpace(cwd))
+	}
+	if clean == "" || clean == "." {
+		return ""
+	}
+	return "fail-streak:cwd:" + clean
+}
+
+// coordRecordAfterCommand updates per-session command failure streaks and
+// records passing verification commands in .coord. It returns the updated
+// failure streak (0 on clean commands).
+func coordRecordAfterCommand(dir, cwd, cmd, output string, raw []byte, fallbackSessionID string) int {
 	view := parseCoordPayloadView(raw, cwd, toolHookInput{SessionID: fallbackSessionID})
-	if view.SessionID == "" || !coordPolicyAllows(view.CWD, view.TranscriptPath) {
-		return
-	}
-	if view.IsFailure {
-		return
-	}
-	if coordHasFriction(output) {
-		return
-	}
 	if strings.TrimSpace(cmd) == "" {
 		cmd = view.Command
 	}
-	if !isCoordVerifyCommand(cmd) {
-		return
+	if view.CWD == "" {
+		view.CWD = strings.TrimSpace(cwd)
 	}
-	norm := normalizeVerifyCmdForBrief(cmd, view.CWD)
-	if norm == "" {
-		return
+	failed := view.IsFailure || coordRawHeadIndicatesFailure(raw) || coordHasFriction(output) || isDetEnvFailureOutput(output) || coordOutputHasNonZeroExit(output)
+	if !coordPolicyAllows(view.CWD, view.TranscriptPath) {
+		if failed {
+			return 1
+		}
+		return 0
 	}
-	wt, _ := resolveCoordGitWorktree(view.CWD)
+	return coordRecordCommandOutcome(dir, view.CWD, view.SessionID, cmd, failed)
+}
+
+// coordRecordShellAfter updates the command failure streak for non-JSON shell
+// hooks (deja shell -c / postexec) and returns the updated streak.
+func coordRecordShellAfter(dir, cwd, sessionID, cmd string, failed bool) int {
+	return coordRecordCommandOutcome(dir, cwd, sessionID, cmd, failed)
+}
+
+// coordResetFailStreak clears a session's consecutive failure streak when an
+// external signal (such as an Antigravity transcript tool step) shows exit 0.
+func coordResetFailStreak(dir, sessionID, cwd string) {
+	coordRecordCommandOutcome(dir, cwd, sessionID, "", false)
+}
+
+func coordRecordCommandOutcome(dir, cwd, sessionID, cmd string, failed bool) int {
+	if dir == "" || recallIsOff() || !coordPolicyAllows(cwd, "") {
+		if failed {
+			return 1
+		}
+		return 0
+	}
+	streakKey := coordStreakStampKey(sessionID, cwd)
+	verifyNorm := ""
+	if !failed && sessionID != "" && isCoordVerifyCommand(cmd) {
+		verifyNorm = normalizeVerifyCmdForBrief(cmd, cwd)
+	}
+	if !failed && verifyNorm == "" {
+		if streakKey == "" {
+			return 0
+		}
+		if _, statErr := os.Stat(coordPath(dir)); statErr != nil {
+			return 0
+		}
+	}
 	now := coordNow()
 	nowUnix := now.UTC().Unix()
 
@@ -1252,11 +1448,35 @@ func coordRecordAfterCommand(dir, cwd, cmd, output string, raw []byte, fallbackS
 
 	st := loadCoordState(dir)
 	pruneCoordState(&st, now)
-	sess := ensureCoordSession(&st, view.SessionID, nowUnix)
-	if wt != "" {
-		sess.Worktree = wt
+	if failed {
+		if streakKey == "" {
+			return 1
+		}
+		next := int(st.Stamps[streakKey].Val) + 1
+		st.Stamps[streakKey] = coordStamp{AtUnix: nowUnix, Val: int64(next)}
+		saveCoordState(dir, st)
+		return next
 	}
-	sess.VerifyCmd = norm
-	sess.VerifyAt = nowUnix
-	saveCoordState(dir, st)
+
+	dirty := false
+	if streakKey != "" {
+		if _, exists := st.Stamps[streakKey]; exists {
+			delete(st.Stamps, streakKey)
+			dirty = true
+		}
+	}
+	if verifyNorm != "" {
+		wt, _ := resolveCoordGitWorktree(cwd)
+		sess := ensureCoordSession(&st, sessionID, nowUnix)
+		if wt != "" {
+			sess.Worktree = wt
+		}
+		sess.VerifyCmd = verifyNorm
+		sess.VerifyAt = nowUnix
+		dirty = true
+	}
+	if dirty {
+		saveCoordState(dir, st)
+	}
+	return 0
 }

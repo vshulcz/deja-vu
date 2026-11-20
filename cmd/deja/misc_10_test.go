@@ -1240,7 +1240,10 @@ func TestFixPairReadsQwensFramedFailure(t *testing.T) {
 	payload := `{"session_id":"qwen-1","cwd":"/work/app","hook_event_name":"PostToolUseFailure",` +
 		`"tool_name":"run_shell_command","tool_input":{"command":"go build ./..."},` +
 		`"error":"Command: go build ./...\nDirectory: (root)\nOutput: ./main.go:9:2: undefined: glimwraxHelper\nError: (none)\nExit Code: 1\n"}`
-	var out bytes.Buffer
+	var strike1, out bytes.Buffer
+	if err := runHookToolAfterMode(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(payload), &strike1, true); err != nil {
+		t.Fatal(err)
+	}
 	if err := runHookToolAfterMode(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(payload), &out, true); err != nil {
 		t.Fatal(err)
 	}

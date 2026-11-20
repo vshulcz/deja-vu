@@ -1357,13 +1357,21 @@ insert into messages values ('r1','c1','tool',` + parts([]map[string]any{{"type"
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build store: %v: %s", err, out)
 	}
+	// Seed Strike 1 in .coord so Crush's single FailureID post-tool pass delivers on Strike 2.
+	strike1Payload := `{"hook_event_name":"PostToolUseFailure","session_id":"c1","cwd":"/work/app","tool_name":"bash","tool_input":{"command":"make"},"error":"panic: sql: database is closed"}`
+	var s1Out bytes.Buffer
+	if err := runHookToolAfter(dir, strings.NewReader(strike1Payload), &s1Out); err != nil {
+		t.Fatal(err)
+	}
 	tool := `{"event":"PreToolUse","session_id":"c1","cwd":"/work/app","tool_name":"view","tool_input":{"file_path":"/work/app/main.go"}}`
 	got := runDeferredHook(t, dir, "hook-tool", []string{"--crush"}, tool)
 	var resp struct {
 		Version int    `json:"version"`
 		Context string `json:"context"`
 	}
-	if err := json.Unmarshal([]byte(got), &resp); err != nil || resp.Version != 1 || !strings.Contains(resp.Context, "make clean && make CGO_ENABLED=0") {
+	if err := json.Unmarshal([]byte(got), &resp); err != nil || resp.Version != 1 ||
+		!strings.Contains(resp.Context, "what followed it") ||
+		!strings.Contains(resp.Context, "make clean && make CGO_ENABLED=0") {
 		t.Fatalf("the next tool call did not carry the fix pair in Crush's shape: %q (%v)", got, err)
 	}
 	if again := runDeferredHook(t, dir, "hook-tool", []string{"--crush"}, tool); strings.Contains(again, "CGO_ENABLED=0") {
@@ -2177,8 +2185,12 @@ func TestCodeWhaleFixPairRidesTheNextToolCall(t *testing.T) {
 	receipt := `{"schema_version":1,"event":"tool_call_after","tool_name":"exec_shell","session_id":"sess_1","tool_call_id":"call_1",` +
 		`"execution_receipt":{"schema_version":1,"command":"make","cwd":"/work/app","completion":"failed","exit_code":2,` +
 		`"stdout":"","stderr":"goroutine 1 [running]:\npanic: sql: database is closed","output_mode":"separate"}}`
+	// Strike 1 is held by the 2-strike gate; Strike 2 parks the confirmed pair for tool_call_before.
 	if out := codewhaleHook(t, dir, "tool_call_after", receipt); strings.TrimSpace(out) != "" {
-		t.Fatalf("tool_call_after printed what CodeWhale discards: %q", out)
+		t.Fatalf("tool_call_after strike 1 printed what CodeWhale discards: %q", out)
+	}
+	if out := codewhaleHook(t, dir, "tool_call_after", receipt); strings.TrimSpace(out) != "" {
+		t.Fatalf("tool_call_after strike 2 printed what CodeWhale discards: %q", out)
 	}
 	codewhaleEnv(t, "/work/app", map[string]string{"DEEPSEEK_TOOL_NAME": "read", "DEEPSEEK_TOOL_ARGS": `{"path":"README.md"}`, "DEEPSEEK_TOOL_CALL_ID": "call_2"})
 	got := codewhaleHook(t, dir, "tool_call_before", "")
@@ -2205,8 +2217,9 @@ func TestCodeWhaleBashFailureWithoutReceiptParksThePair(t *testing.T) {
 		"DEEPSEEK_TOOL_RESULT": "Failed to execute tool: panic: sql: database is closed",
 	})
 	codewhaleHook(t, dir, "tool_call_after", "")
+	codewhaleHook(t, dir, "tool_call_after", "")
 	got := codewhaleHook(t, dir, "message_submit", `{"event":"message_submit","text":"next","session_id":"sess_1","workspace":"/work/app"}`)
-	if !strings.Contains(got, "CGO_ENABLED=0") {
+	if !strings.Contains(got, "what followed it") || !strings.Contains(got, "CGO_ENABLED=0") {
 		t.Fatalf("the next message did not carry the fix pair: %q", got)
 	}
 }
@@ -2311,8 +2324,12 @@ func TestKimiFixPairRidesTheNextPrompt(t *testing.T) {
 		"tool_name": "Bash", "tool_input": map[string]any{"command": "make"}, "tool_call_id": "call_1",
 		"error": map[string]any{"code": "TOOL_ERROR", "message": "goroutine 1 [running]:\npanic: sql: database is closed"},
 	})
+	// Strike 1 is held; Strike 2 parks the confirmed pair for the next prompt.
 	if out := runDeferredHook(t, dir, "hook-tool-after", []string{"--defer"}, string(failure)); strings.TrimSpace(out) != "" {
-		t.Fatalf("a deferred hook printed what Kimi would drop: %q", out)
+		t.Fatalf("a deferred hook strike 1 printed what Kimi would drop: %q", out)
+	}
+	if out := runDeferredHook(t, dir, "hook-tool-after", []string{"--defer"}, string(failure)); strings.TrimSpace(out) != "" {
+		t.Fatalf("a deferred hook strike 2 printed what Kimi would drop: %q", out)
 	}
 	prompt := func(id string) string {
 		p := mustMarshal(t, map[string]any{"hook_event_name": "UserPromptSubmit", "session_id": id, "cwd": "/work/app", "prompt": "ok"})
@@ -2341,7 +2358,10 @@ func TestKiroFixPairRidesTheNextPromptByDirectory(t *testing.T) {
 		"tool_response": map[string]any{"exit_status": "1", "stderr": "goroutine 1 [running]:\npanic: sql: database is closed"},
 	})
 	if out := runDeferredHook(t, dir, "hook-tool-after", []string{"--defer"}, string(failure)); strings.TrimSpace(out) != "" {
-		t.Fatalf("a deferred hook printed what Kiro would drop: %q", out)
+		t.Fatalf("a deferred hook strike 1 printed what Kiro would drop: %q", out)
+	}
+	if out := runDeferredHook(t, dir, "hook-tool-after", []string{"--defer"}, string(failure)); strings.TrimSpace(out) != "" {
+		t.Fatalf("a deferred hook strike 2 printed what Kiro would drop: %q", out)
 	}
 	p := mustMarshal(t, map[string]any{"hook_event_name": "userPromptSubmit", "cwd": "/work/app", "prompt": "ok"})
 	if got := runDeferredHook(t, dir, "hook-prompt", []string{"--plain"}, string(p)); !strings.Contains(got, "CGO_ENABLED=0") {
@@ -3325,9 +3345,12 @@ func TestEveryHookInjectionSaysItIsUntrusted(t *testing.T) {
 	}
 	check("hook-tool", before.String(), "ingest.go")
 
-	var after bytes.Buffer
+	var strike1, after bytes.Buffer
 	payload := fmt.Sprintf(`{"hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"go build ./..."},`+
 		`"tool_response":{"stderr":%q},"cwd":%q,"session_id":"ses_hooks"}`, errLine, cwd)
+	if err := runHookToolAfter(dir, strings.NewReader(payload), &strike1); err != nil {
+		t.Fatal(err)
+	}
 	if err := runHookToolAfter(dir, strings.NewReader(payload), &after); err != nil {
 		t.Fatal(err)
 	}

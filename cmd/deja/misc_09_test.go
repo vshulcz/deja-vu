@@ -3429,7 +3429,10 @@ func TestTraeFailureEventCarriesTheFixPair(t *testing.T) {
 
 	seedFixPair(t, "panic: sql: database is closed", "make clean && make CGO_ENABLED=0")
 	payload := `{"session_id":"01a115db-9529-72a0-9de5-a73952a2b106","cwd":"/work/app","hook_event_name":"PostToolUseFailure","model":"stub-model","permission_mode":"bypassPermissions","tool_name":"Bash","tool_input":{"command":"make"},"error":"Exit code 1\ngoroutine 1 [running]:\npanic: sql: database is closed","tool_use_id":"call_27ada812"}`
-	var out strings.Builder
+	var strike1, out strings.Builder
+	if err := runHookToolAfter(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(payload), &strike1); err != nil {
+		t.Fatal(err)
+	}
 	if err := runHookToolAfter(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(payload), &out); err != nil {
 		t.Fatal(err)
 	}
