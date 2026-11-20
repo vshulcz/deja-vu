@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -111,8 +112,9 @@ func AnteUnderRoot(p string) bool {
 // AnteSessionFiles lists every Ante session transcript across known roots,
 // preferring events.jsonl and falling back to dialog.json only when events.jsonl is absent.
 func AnteSessionFiles() []string {
-	var out []string
-	for _, root := range AnteRoots() {
+	roots := AnteRoots()
+	out := make([]string, 0, len(roots))
+	for _, root := range roots {
 		out = append(out, walkFiles(root, anteWantFile)...)
 	}
 	return out
@@ -121,8 +123,9 @@ func AnteSessionFiles() []string {
 // AnteSidecarFiles lists Ante's metadata sidecars (meta.json and dialog.json when
 // events.jsonl exists beside it) so doctor does not report them as unread transcripts.
 func AnteSidecarFiles() []string {
-	var out []string
-	for _, root := range AnteRoots() {
+	roots := AnteRoots()
+	out := make([]string, 0, len(roots))
+	for _, root := range roots {
 		out = append(out, walkFiles(root, func(p string) bool {
 			base := filepath.Base(p)
 			if base == "meta.json" {
@@ -329,6 +332,101 @@ func anteToolOutputText(res map[string]any, fallback string) string {
 	return fallback
 }
 
+func applyAnteSessionStart(s *model.Session, cwd *string, path string, child bool, ss map[string]any) {
+	if sid, _ := ss["session_id"].(string); strings.TrimSpace(sid) != "" && !child && s.ID == filepath.Base(filepath.Dir(path)) {
+		s.ID = strings.TrimSpace(sid)
+	}
+	if ff, _ := ss["forked_from"].(string); strings.TrimSpace(ff) != "" && !child && strings.TrimSpace(ff) != s.ID && s.Parent == "" {
+		s.Kind = model.KindFork
+		s.Parent = strings.TrimSpace(ff)
+	}
+	if prov, _ := ss["provider"].(string); prov != "" || ss["model"] != nil {
+		mod, _ := ss["model"].(string)
+		s.SetModel(strings.TrimSpace(prov), strings.TrimSpace(mod))
+	}
+	if d, _ := ss["dir"].(string); strings.TrimSpace(d) != "" && *cwd == "" {
+		*cwd = strings.TrimSpace(d)
+		s.Project = projectName(*cwd)
+	}
+}
+
+func applyAnteShellOutput(s *model.Session, rawSO any, t time.Time) {
+	switch so := rawSO.(type) {
+	case map[string]any:
+		cmd, _ := so["command"].(string)
+		cmd = strings.TrimSpace(cmd)
+		code, hasCode := anyExitCode(so["exit_code"])
+		if cmd != "" {
+			s.AddToolCall("Bash", hasCode && code != 0)
+			if IndexCommands() {
+				msg := model.Message{Role: model.RoleCommand, Text: cmd, Time: t}
+				if hasCode && code > 0 {
+					msg.Text += "  → exit " + strconv.Itoa(code)
+				}
+				s.Messages = append(s.Messages, msg)
+			}
+		} else if hasCode && code != 0 {
+			s.ToolErrors++
+		}
+		if IndexToolOutput() {
+			if out := anteToolOutputText(so, ""); out != "" {
+				s.Messages = append(s.Messages, model.Message{Role: model.RoleToolOutput, Text: out, Time: t})
+			}
+		}
+	case string:
+		if IndexToolOutput() && strings.TrimSpace(so) != "" {
+			s.Messages = append(s.Messages, model.Message{Role: model.RoleToolOutput, Text: strings.TrimSpace(so), Time: t})
+		}
+	}
+}
+
+func applyAnteToolStart(s *model.Session, exits *commandExits, cwd string, ts map[string]any, t time.Time) {
+	callID, _ := ts["id"].(string)
+	name, _ := ts["name"].(string)
+	if name != "" {
+		s.AddToolCall(name, false)
+	}
+	args, _ := ts["args"].(map[string]any)
+	if args == nil {
+		args = map[string]any{}
+	}
+	args = anteResolveArgs(args, cwd)
+	part := []any{map[string]any{
+		"type":  "tool_use",
+		"id":    callID,
+		"name":  name,
+		"input": args,
+	}}
+	from := len(s.Messages)
+	s.Messages = append(s.Messages, dialectWorkRecords(part, nil, claudeDialect, t)...)
+	exits.note(s.Messages, from, commandCallsIn(part, claudeDialect))
+}
+
+func applyAnteToolEnd(s *model.Session, exits *commandExits, te map[string]any, t time.Time) {
+	callID, _ := te["tool_use_id"].(string)
+	status, _ := te["status"].(string)
+	if status == "Failed" {
+		s.ToolErrors++
+	}
+	res, fallback := anteUnwrapResult(te["result_json"])
+	code, hasCode := anyExitCode(nil)
+	if res != nil {
+		code, hasCode = anyExitCode(res["exit_code"])
+	}
+	if !hasCode && status == "Failed" {
+		code = 1
+		hasCode = true
+	}
+	if hasCode && code != 0 {
+		exits.stamp(s.Messages, callID, "", code)
+	}
+	if IndexToolOutput() {
+		if out := anteToolOutputText(res, fallback); out != "" {
+			s.Messages = append(s.Messages, model.Message{Role: model.RoleToolOutput, Text: out, Time: t})
+		}
+	}
+}
+
 func parseAnteEvents(path string, offset int64) ([]model.Session, error) {
 	s, meta, cwd, child := anteBaseSession(path)
 	exits := commandExits{}
@@ -344,21 +442,7 @@ func parseAnteEvents(path string, offset int64) ([]model.Session, error) {
 		s.Touch(t)
 
 		if ss, ok := ev["SessionStart"].(map[string]any); ok {
-			if sid, _ := ss["session_id"].(string); strings.TrimSpace(sid) != "" && !child && s.ID == filepath.Base(filepath.Dir(path)) {
-				s.ID = strings.TrimSpace(sid)
-			}
-			if ff, _ := ss["forked_from"].(string); strings.TrimSpace(ff) != "" && !child && strings.TrimSpace(ff) != s.ID && s.Parent == "" {
-				s.Kind = model.KindFork
-				s.Parent = strings.TrimSpace(ff)
-			}
-			if prov, _ := ss["provider"].(string); prov != "" || ss["model"] != nil {
-				mod, _ := ss["model"].(string)
-				s.SetModel(strings.TrimSpace(prov), strings.TrimSpace(mod))
-			}
-			if d, _ := ss["dir"].(string); strings.TrimSpace(d) != "" && cwd == "" {
-				cwd = strings.TrimSpace(d)
-				s.Project = projectName(cwd)
-			}
+			applyAnteSessionStart(&s, &cwd, path, child, ss)
 		}
 
 		if txt, ok := ev["UserInput"].(string); ok {
@@ -383,80 +467,15 @@ func parseAnteEvents(path string, offset int64) ([]model.Session, error) {
 		}
 
 		if rawSO, exists := ev["ShellOutput"]; exists {
-			switch so := rawSO.(type) {
-			case map[string]any:
-				cmd, _ := so["command"].(string)
-				cmd = strings.TrimSpace(cmd)
-				code, hasCode := anyExitCode(so["exit_code"])
-				if cmd != "" {
-					s.AddToolCall("Bash", hasCode && code != 0)
-					if IndexCommands() {
-						msg := model.Message{Role: model.RoleCommand, Text: cmd, Time: t}
-						if hasCode && code > 0 {
-							msg.Text += "  → exit " + strconv.Itoa(code)
-						}
-						s.Messages = append(s.Messages, msg)
-					}
-				} else if hasCode && code != 0 {
-					s.ToolErrors++
-				}
-				if IndexToolOutput() {
-					if out := anteToolOutputText(so, ""); out != "" {
-						s.Messages = append(s.Messages, model.Message{Role: model.RoleToolOutput, Text: out, Time: t})
-					}
-				}
-			case string:
-				if IndexToolOutput() && strings.TrimSpace(so) != "" {
-					s.Messages = append(s.Messages, model.Message{Role: model.RoleToolOutput, Text: strings.TrimSpace(so), Time: t})
-				}
-			}
+			applyAnteShellOutput(&s, rawSO, t)
 		}
 
 		if ts, ok := ev["ToolStart"].(map[string]any); ok {
-			callID, _ := ts["id"].(string)
-			name, _ := ts["name"].(string)
-			if name != "" {
-				s.AddToolCall(name, false)
-			}
-			args, _ := ts["args"].(map[string]any)
-			if args == nil {
-				args = map[string]any{}
-			}
-			args = anteResolveArgs(args, cwd)
-			part := []any{map[string]any{
-				"type":  "tool_use",
-				"id":    callID,
-				"name":  name,
-				"input": args,
-			}}
-			from := len(s.Messages)
-			s.Messages = append(s.Messages, dialectWorkRecords(part, nil, claudeDialect, t)...)
-			exits.note(s.Messages, from, commandCallsIn(part, claudeDialect))
+			applyAnteToolStart(&s, &exits, cwd, ts, t)
 		}
 
 		if te, ok := ev["ToolEnd"].(map[string]any); ok {
-			callID, _ := te["tool_use_id"].(string)
-			status, _ := te["status"].(string)
-			if status == "Failed" {
-				s.ToolErrors++
-			}
-			res, fallback := anteUnwrapResult(te["result_json"])
-			code, hasCode := anyExitCode(nil)
-			if res != nil {
-				code, hasCode = anyExitCode(res["exit_code"])
-			}
-			if !hasCode && status == "Failed" {
-				code = 1
-				hasCode = true
-			}
-			if hasCode && code != 0 {
-				exits.stamp(s.Messages, callID, "", code)
-			}
-			if IndexToolOutput() {
-				if out := anteToolOutputText(res, fallback); out != "" {
-					s.Messages = append(s.Messages, model.Message{Role: model.RoleToolOutput, Text: out, Time: t})
-				}
-			}
+			applyAnteToolEnd(&s, &exits, te, t)
 		}
 
 		if uu, ok := ev["UsageUpdate"].(map[string]any); ok {

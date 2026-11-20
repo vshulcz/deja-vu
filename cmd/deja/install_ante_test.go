@@ -43,8 +43,8 @@ func TestAnteInstallAndUninstall(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := json.Unmarshal(b, &cfg); err != nil {
-		t.Fatal(err)
+	if unmarshalErr := json.Unmarshal(b, &cfg); unmarshalErr != nil {
+		t.Fatal(unmarshalErr)
 	}
 	if cfg.Model != "claude-sonnet-4-5" {
 		t.Fatalf("existing model lost: %q", cfg.Model)
@@ -53,8 +53,9 @@ func TestAnteInstallAndUninstall(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing mcp_servers.deja in %s", b)
 	}
-	if entry["command"] != exe {
-		t.Fatalf("command = %v, want %q", entry["command"], exe)
+	wantCommand, _ := mcpCommandArgs(exe)
+	if entry["command"] != wantCommand {
+		t.Fatalf("command = %v, want %q", entry["command"], wantCommand)
 	}
 
 	// Idempotent second install.
@@ -67,20 +68,20 @@ func TestAnteInstallAndUninstall(t *testing.T) {
 	}
 
 	// CLI install writes shared skill beside settings.json.
-	if _, err := captureRun(t, "install", "ante", "--no-index"); err != nil {
-		t.Fatalf("deja install ante: %v", err)
+	if _, cliErr := captureRun(t, "install", "ante", "--no-index"); cliErr != nil {
+		t.Fatalf("deja install ante: %v", cliErr)
 	}
 	skillPath := filepath.Join(home, "home", ".agents", "skills", "deja-history", "SKILL.md")
 	if got := guidancePath("ante"); got != skillPath {
 		t.Fatalf("guidancePath(ante) = %q, want %q", got, skillPath)
 	}
-	if _, err := os.Stat(skillPath); err != nil {
-		t.Fatalf("missing shared skill %s: %v", skillPath, err)
+	if _, statErr := os.Stat(skillPath); statErr != nil {
+		t.Fatalf("missing shared skill %s: %v", skillPath, statErr)
 	}
 
 	// Uninstall removes deja entry while keeping other keys and mcp_servers absent if added by deja.
-	if _, err := captureRun(t, "uninstall", "ante"); err != nil {
-		t.Fatalf("deja uninstall ante: %v", err)
+	if _, unErr := captureRun(t, "uninstall", "ante"); unErr != nil {
+		t.Fatalf("deja uninstall ante: %v", unErr)
 	}
 	b, err = os.ReadFile(wantSettings)
 	if err != nil {
@@ -94,10 +95,10 @@ func TestAnteInstallAndUninstall(t *testing.T) {
 	}
 
 	// Malformed settings.json propagates error.
-	if err := os.WriteFile(wantSettings, []byte("{broken"), 0o600); err != nil {
-		t.Fatal(err)
+	if writeErr := os.WriteFile(wantSettings, []byte("{broken"), 0o600); writeErr != nil {
+		t.Fatal(writeErr)
 	}
-	if _, err := installAnte(exe, false); err == nil {
+	if _, malErr := installAnte(exe, false); malErr == nil {
 		t.Fatal("expected error on malformed settings.json")
 	}
 }

@@ -242,8 +242,8 @@ func TestAnteResumesAndSubagentAndDialogFallback(t *testing.T) {
 	}
 
 	dialogDir := filepath.Join(root, "ses_DIALOG")
-	if err := os.MkdirAll(dialogDir, 0o755); err != nil {
-		t.Fatal(err)
+	if mkErr := os.MkdirAll(dialogDir, 0o755); mkErr != nil {
+		t.Fatal(mkErr)
 	}
 	anteWriteFile(t, filepath.Join(dialogDir, "meta.json"), `{"id":"ses_DIALOG","cwd":"/Users/alex/payments-api","usage":{"input_tokens":50,"output_tokens":10},"started_time":"2026-08-14T12:00:00Z","last_active_time":"2026-08-14T12:01:00Z"}`)
 	dialogPath := anteWriteFile(t, filepath.Join(dialogDir, "dialog.json"), `{
