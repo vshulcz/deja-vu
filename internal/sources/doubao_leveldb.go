@@ -376,7 +376,9 @@ func leveldbLogRecords(buf []byte, stats *leveldbFrameStats) [][]byte {
 		}
 		payload := buf[pos+7 : pos+7+length]
 		if unmaskCrc(masked) == crc32c(buf[pos+6:pos+7+length]) {
-			stats.goodFrames++
+			if stats != nil {
+				stats.goodFrames++
+			}
 		} else if stats != nil {
 			stats.badFrames++
 		}

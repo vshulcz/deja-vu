@@ -817,3 +817,431 @@ func TestDoubaoV8PaddingNoStackOverflow(t *testing.T) {
 		t.Fatalf("decoded = %q, want %q", s, "ok")
 	}
 }
+
+func TestDoubaoV8TypesAndContainers(t *testing.T) {
+	errStream := make([]byte, 0, 64)
+	errStream = append(errStream, v8TagError, v8TagErrorMessage)
+	errStream = append(errStream, encodeV8OneByteString("boom")...)
+	errStream = append(errStream, v8TagErrorStack)
+	errStream = append(errStream, encodeV8OneByteString("trace")...)
+	errStream = append(errStream, v8TagErrorCause)
+	errStream = append(errStream, encodeV8OneByteString("root")...)
+	errStream = append(errStream, 0x01, v8TagErrorEnd)
+
+	sparse := make([]byte, 0, 16)
+	sparse = append(sparse, v8TagBeginSparse, 0x04, v8TagUint32, 0x02)
+	sparse = append(sparse, encodeV8OneByteString("two")...)
+	sparse = append(sparse, v8TagEndSparse, 0x01, 0x04)
+
+	v8Map := make([]byte, 0, 16)
+	v8Map = append(v8Map, v8TagBeginMap)
+	v8Map = append(v8Map, encodeV8OneByteString("mk")...)
+	v8Map = append(v8Map, encodeV8OneByteString("mv")...)
+	v8Map = append(v8Map, v8TagEndMap, 0x02)
+
+	v8Set := make([]byte, 0, 16)
+	v8Set = append(v8Set, v8TagBeginSet)
+	v8Set = append(v8Set, encodeV8OneByteString("item")...)
+	v8Set = append(v8Set, v8TagEndSet, 0x01)
+
+	paddedTwoByte := []byte{v8TagTwoByteString, v8TagPadding, 0x04, 0x46, 0x8c, 0x05, 0x53}
+
+	reStream := make([]byte, 0, 16)
+	reStream = append(reStream, v8TagRegExp)
+	reStream = append(reStream, encodeV8OneByteString("foo.*")...)
+	reStream = append(reStream, uvarint(1)...)
+
+	// Object table indices inside the outer vobj:
+	// 0: outer vobj, 1: regexp kept via keepValue, 2: target vobj, ...
+	stream := make([]byte, 0, 512)
+	stream = append(stream, v8TagVersion, 15, v8TagVerifyCount, 1)
+	stream = append(stream, vobj(
+		vk("re", reStream),
+		vk("target", vobj(vk("k", encodeV8OneByteString("v")))),
+		vk("refTarget", append([]byte{v8TagObjectRef}, uvarint(2)...)),
+		vk("undef", []byte{v8TagUndefined}),
+		vk("hole", []byte{v8TagTheHole}),
+		vk("nul", []byte{v8TagNull}),
+		vk("tr", []byte{v8TagTrue}),
+		vk("fa", []byte{v8TagFalse}),
+		vk("trObj", []byte{v8TagTrueObject}),
+		vk("faObj", []byte{v8TagFalseObject}),
+		vk("i32", encodeV8Int32(-42)),
+		vk("u32", []byte{v8TagUint32, 99}),
+		vk("numObj", append([]byte{v8TagNumberObject}, leBytesFloat(3.5)...)),
+		vk("dt", append([]byte{v8TagDate}, leBytesFloat(1792575407000)...)),
+		vk("bi", []byte{v8TagBigInt, 0x00, 0, 0, 0, 0, 0, 0, 0, 0}),
+		vk("tb", paddedTwoByte),
+		vk("sp", sparse),
+		vk("mp", v8Map),
+		vk("st", v8Set),
+		vk("ab", []byte{v8TagArrayBuffer, 0x02, 0xaa, 0xbb}),
+		vk("iab", []byte{v8TagImmutableAB, 0x02, 0xcc, 0xdd}),
+		vk("rab", []byte{v8TagResizableAB, 0x02, 0x04, 0xee, 0xff}),
+		vk("err", errStream),
+		vk("host", []byte{v8TagHostObject}),
+		vk("shared", []byte{v8TagSharedObject, 0x00}),
+	)...)
+
+	got, err := deserializeV8(stream, 0)
+	if err != nil {
+		t.Fatalf("deserializeV8 containers: %v", err)
+	}
+	obj, ok := v8AsObj(got)
+	if !ok {
+		t.Fatalf("decoded = %T, want *v8Obj", got)
+	}
+	if re, _ := v8StringAt(obj, "re"); re != "foo.*" {
+		t.Fatalf("re = %q, want %q", re, "foo.*")
+	}
+	refObj, ok := v8AsObjAt(obj, "refTarget")
+	if !ok {
+		t.Fatalf("refTarget missing or wrong type")
+	}
+	if s, _ := v8StringAt(refObj, "k"); s != "v" {
+		t.Fatalf("refTarget.k = %q, want %q", s, "v")
+	}
+	if n, ok := func() (int64, bool) { v, _ := obj.get("i32"); return v8AsInt(v) }(); !ok || n != -42 {
+		t.Fatalf("i32 = (%d, %v), want (-42, true)", n, ok)
+	}
+	if n, ok := func() (int64, bool) { v, _ := obj.get("u32"); return v8AsInt(v) }(); !ok || n != 99 {
+		t.Fatalf("u32 = (%d, %v), want (99, true)", n, ok)
+	}
+	if tb, _ := v8StringAt(obj, "tb"); tb != "豆包" {
+		t.Fatalf("tb = %q, want %q", tb, "豆包")
+	}
+	if sp, ok := v8ArrAt(obj, "sp"); !ok || len(sp) != 4 || sp[2] != "two" {
+		t.Fatalf("sp = (%+v, %v), want len 4 with sp[2]=two", sp, ok)
+	}
+	if ev, _ := obj.get("err"); ev == nil {
+		t.Fatalf("expected error object")
+	}
+
+	// Malformed V8 streams must return errors cleanly.
+	badStreams := [][]byte{
+		{v8TagTwoByteString, 0x03, 'a', 'b', 'c'},
+		{v8TagBeginDense, 0x10, v8TagNull},
+		{v8TagBeginSparse, 0x01},
+		{v8TagBeginMap},
+		{v8TagBeginSet},
+		{v8TagArrayBuffer, 0x10, 0x01},
+		{v8TagError, v8TagErrorMessage},
+		{v8TagObjectRef, 0x05},
+		{v8TagBigInt, 0x00, 0x01, 0x02},
+		{0xee},
+		{},
+	}
+	for i, bad := range badStreams {
+		if _, err := deserializeV8(bad, 0); err == nil {
+			t.Fatalf("badStreams[%d] = %x: expected error", i, bad)
+		}
+	}
+
+	// Direct value-helper checks.
+	if s := v8KeyString(nil); s != "null" {
+		t.Fatalf("v8KeyString(nil) = %q", s)
+	}
+	if s := v8KeyString(true); s != "true" {
+		t.Fatalf("v8KeyString(true) = %q", s)
+	}
+	if s := v8KeyString(false); s != "false" {
+		t.Fatalf("v8KeyString(false) = %q", s)
+	}
+	if s := v8KeyString(int64(7)); s != "7" {
+		t.Fatalf("v8KeyString(7) = %q", s)
+	}
+	if got := v8AsNumber(idbKeyDouble(2.5)); got != 2.5 {
+		t.Fatalf("v8AsNumber(idbKeyDouble) = %v", got)
+	}
+	if got := v8AsNumber("bad"); got != 0 {
+		t.Fatalf("v8AsNumber(string) = %v, want 0", got)
+	}
+	if n, ok := v8AsInt(float64(8)); !ok || n != 8 {
+		t.Fatalf("v8AsInt(float64) = (%d, %v)", n, ok)
+	}
+	if n, ok := v8AsInt(idbKeyDouble(9)); !ok || n != 9 {
+		t.Fatalf("v8AsInt(idbKeyDouble) = (%d, %v)", n, ok)
+	}
+	if _, ok := v8AsInt("bad"); ok {
+		t.Fatalf("v8AsInt(string) = true, want false")
+	}
+	if _, ok := v8AsObjAt(nil, "a"); ok {
+		t.Fatalf("v8AsObjAt(nil) = true")
+	}
+	if _, ok := v8ArrAt(nil, "a"); ok {
+		t.Fatalf("v8ArrAt(nil) = true")
+	}
+	if _, ok := v8StringAt(nil, "a"); ok {
+		t.Fatalf("v8StringAt(nil) = true")
+	}
+	if _, ok := v8TimeAt(nil, "a"); ok {
+		t.Fatalf("v8TimeAt(nil) = true")
+	}
+	emptyObj := newV8Obj()
+	if _, ok := v8AsObjAt(emptyObj, "missing"); ok {
+		t.Fatalf("v8AsObjAt(missing) = true")
+	}
+	if _, ok := v8ArrAt(emptyObj, "missing"); ok {
+		t.Fatalf("v8ArrAt(missing) = true")
+	}
+	if _, ok := v8StringAt(emptyObj, "missing"); ok {
+		t.Fatalf("v8StringAt(missing) = true")
+	}
+	if _, ok := v8TimeAt(emptyObj, "missing"); ok {
+		t.Fatalf("v8TimeAt(missing) = true")
+	}
+}
+
+func TestDoubaoIDBKeyAndSSVVariants(t *testing.T) {
+	if _, _, err := decodeIDBUserKey(nil, 0); err == nil {
+		t.Fatalf("empty key should error")
+	}
+	for _, tag := range []byte{0, 5} {
+		v, p, err := decodeIDBUserKey([]byte{tag}, 0)
+		if err != nil || v != nil || p != 1 {
+			t.Fatalf("tag %d => (%v, %d, %v)", tag, v, p, err)
+		}
+	}
+	for _, tag := range []byte{2, 3} {
+		k := append([]byte{tag}, leBytesFloat(42.5)...)
+		v, p, err := decodeIDBUserKey(k, 0)
+		if err != nil || p != 9 || v != idbKeyDouble(42.5) {
+			t.Fatalf("number tag %d => (%v, %d, %v)", tag, v, p, err)
+		}
+		if _, _, err := decodeIDBUserKey([]byte{tag, 1, 2}, 0); err == nil {
+			t.Fatalf("truncated number tag %d should error", tag)
+		}
+	}
+
+	// Nested array: [string, number, binary].
+	strElem := []byte{1, 2, 0, 'h', 0, 'i'}
+	numElem := append([]byte{2}, leBytesFloat(7)...)
+	binElem := []byte{6, 2, 0xca, 0xfe}
+	arrKey := make([]byte, 0, 2+len(strElem)+len(numElem)+len(binElem))
+	arrKey = append(arrKey, 4, 3)
+	arrKey = append(arrKey, strElem...)
+	arrKey = append(arrKey, numElem...)
+	arrKey = append(arrKey, binElem...)
+	v, _, err := decodeIDBUserKey(arrKey, 0)
+	if err != nil {
+		t.Fatalf("array key: %v", err)
+	}
+	items, ok := v.([]any)
+	if !ok || len(items) != 3 || items[0] != "hi" || items[1] != idbKeyDouble(7) {
+		t.Fatalf("items = %+v", items)
+	}
+	if b, ok := items[2].([]byte); !ok || string(b) != "\xca\xfe" {
+		t.Fatalf("binary item = %x", b)
+	}
+
+	// Nesting limit and invalid keys.
+	deep := make([]byte, 0, 71)
+	for range 35 {
+		deep = append(deep, 4, 1)
+	}
+	deep = append(deep, 0)
+	for _, bad := range [][]byte{
+		deep,
+		{1, 10, 0, 'a'},
+		{4, 10, 0},
+		{6, 10, 0x01},
+		{99},
+	} {
+		if _, _, err := decodeIDBUserKey(bad, 0); err == nil {
+			t.Fatalf("expected key error for %x", bad)
+		}
+	}
+
+	// unwrapIDBValue cases.
+	if _, ok := unwrapIDBValue([]byte{0xff, 0x11, 0x01}); ok {
+		t.Fatalf("spilled blob wrapper should return false")
+	}
+	if _, ok := unwrapIDBValue([]byte{0xff, 0x11, 0x02, 0xff}); ok {
+		t.Fatalf("corrupt snappy wrapper should return false")
+	}
+	if got, ok := unwrapIDBValue([]byte("plain")); !ok || string(got) != "plain" {
+		t.Fatalf("plain unwrap = (%q, %v)", got, ok)
+	}
+
+	// ssvPayloadOffset cases.
+	withTrailer := append([]byte{0xff, 0x01, 0xfe}, make([]byte, 12)...)
+	if off := ssvPayloadOffset(withTrailer); off != 15 {
+		t.Fatalf("ssvPayloadOffset(withTrailer) = %d, want 15", off)
+	}
+	if off := ssvPayloadOffset([]byte{0xff, 0x01, 0xfe, 1, 2}); off != -1 {
+		t.Fatalf("ssvPayloadOffset(short trailer) = %d, want -1", off)
+	}
+	if off := ssvPayloadOffset([]byte{0xff, 0x01, 0x6f}); off != 2 {
+		t.Fatalf("ssvPayloadOffset(bare version) = %d, want 2", off)
+	}
+	if off := ssvPayloadOffset([]byte("no-header")); off != -1 {
+		t.Fatalf("ssvPayloadOffset(none) = %d, want -1", off)
+	}
+}
+
+func TestDoubaoSnappyAndLevelDBEdges(t *testing.T) {
+	// Valid stream exercising tag 0 (1-byte extra literal), copy1, copy2, copy4.
+	validSnappy := []byte{
+		0x10,                    // outLen = 16
+		60 << 2, 0x01, 'a', 'b', // literal len 2 (extra=1, byte=1 -> 2)
+		1 << 2, 'c', 'd', // literal len 2
+		0x01, 0x04, // copy1 len=4 off=4 -> "abcd"
+		0x0e, 0x04, 0x00, // copy2 len=4 off=4 -> "abcd"
+		0x0f, 0x04, 0x00, 0x00, 0x00, // copy4 len=4 off=4 -> "abcd"
+	}
+	gotSnappy, err := snappyUncompress(validSnappy)
+	if err != nil || string(gotSnappy) != "abcdabcdabcdabcd" {
+		t.Fatalf("snappyUncompress = (%q, %v)", gotSnappy, err)
+	}
+
+	badSnappy := [][]byte{
+		{},
+		{0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x01},
+		{0x80, 0x80, 0x80, 0x80, 0x01}, // > 64MiB max output
+		{0x04, 60 << 2},
+		{0x02, 0x08, 'a', 'b', 'c'},
+		{0x04, 0x01},
+		{0x05, 0x01, 0x08}, // copy1 OOB
+		{0x05, 0x02, 0x00}, // truncated copy2
+		{0x05, 0x0e, 0x08, 0x00},
+		{0x05, 0x03, 0x00, 0x00}, // truncated copy4
+		{0x05, 0x0f, 0x08, 0x00, 0x00, 0x00},
+		{0x08, 0x00, 'a'}, // length mismatch (expected 8, decoded 1)
+	}
+	for i, bad := range badSnappy {
+		if _, err := snappyUncompress(bad); err == nil {
+			t.Fatalf("badSnappy[%d] = %x: expected error", i, bad)
+		}
+	}
+
+	// leveldbBlock cases.
+	if b := leveldbBlock([]byte{'x', 'y', 0}, 0, 2); string(b) != "xy" {
+		t.Fatalf("plain block = %q", b)
+	}
+	compressed := append(snappyLiteral([]byte("hi")), 1)
+	if b := leveldbBlock(compressed, 0, len(compressed)-1); string(b) != "hi" {
+		t.Fatalf("snappy block = %q", b)
+	}
+	if b := leveldbBlock([]byte{0xff, 0x01}, 0, 1); b != nil {
+		t.Fatalf("corrupt snappy block = %x, want nil", b)
+	}
+	if b := leveldbBlock([]byte{'x', 'y', 2}, 0, 2); b != nil {
+		t.Fatalf("unknown block type = %x, want nil", b)
+	}
+	if b := leveldbBlock([]byte{'x'}, -1, 1); b != nil {
+		t.Fatalf("negative offset block = %x, want nil", b)
+	}
+
+	// sstEntries invalid shapes.
+	if e := sstEntries([]byte("short")); len(e) != 0 {
+		t.Fatalf("short sst = %+v", e)
+	}
+	badFooter := make([]byte, 48)
+	badFooter[2] = 0xff // out-of-bounds index offset
+	if e := sstEntries(badFooter); len(e) != 0 {
+		t.Fatalf("badFooter sst = %+v", e)
+	}
+
+	// leveldbLogRecords: fragmentation (2/3/4), block tail skip, zero frame, bad CRC, nil stats.
+	fillBatch := make([]byte, leveldbBlockSize-10) // 7+32758=32765 leaves 3-byte block tail (<7)
+	bigBatch := make([]byte, leveldbBlockSize*2)
+	for i := range bigBatch {
+		bigBatch[i] = byte('a' + i%26)
+	}
+	wal := frameWAL([][]byte{fillBatch, bigBatch})
+	var st leveldbFrameStats
+	recs := leveldbLogRecords(wal, &st)
+	if len(recs) != 2 || st.goodFrames < 4 || st.badFrames != 0 {
+		t.Fatalf("recs=%d stats=%+v", len(recs), st)
+	}
+	// frameType 0 is skipped, and a corrupted CRC increments badFrames.
+	badWAL := []byte{0, 0, 0, 0, 2, 0, 0, 'x', 'y', 0, 0, 0, 0, 1, 0, 1, 'z'}
+	var badSt leveldbFrameStats
+	if badRecs := leveldbLogRecords(badWAL, &badSt); len(badRecs) != 1 || badSt.badFrames != 1 {
+		t.Fatalf("badWAL recs=%d stats=%+v", len(badRecs), badSt)
+	}
+	// Nil stats on valid framed batch must not panic.
+	if nilRecs := leveldbLogRecords(frameWAL([][]byte{[]byte("ok")}), nil); len(nilRecs) != 1 {
+		t.Fatalf("nil stats recs = %d, want 1", len(nilRecs))
+	}
+
+	// writeBatchEntries: short, delete+put mix, truncated varint.
+	if got := writeBatchEntries([]byte("short")); len(got) != 0 {
+		t.Fatalf("short writeBatch = %+v", got)
+	}
+	wb := encodeWriteBatch(1, []wbOp{
+		{del: true, key: []byte("gone")},
+		{key: []byte("live"), value: []byte("val")},
+	})
+	entries := writeBatchEntries(wb)
+	if len(entries) != 2 || entries[0].value != nil || string(entries[1].value) != "val" {
+		t.Fatalf("writeBatch entries = %+v", entries)
+	}
+	truncWB := make([]byte, 0, 14)
+	truncWB = append(truncWB, wb[:12]...)
+	truncWB = append(truncWB, 1, 0x80)
+	if got := writeBatchEntries(truncWB); len(got) != 0 {
+		t.Fatalf("truncated writeBatch = %+v", got)
+	}
+}
+
+func TestDoubaoTimeAndIncrementalHelpers(t *testing.T) {
+	if ms, ok := doubaoTime(int64(1700000000)); !ok || ms != 1700000000000 {
+		t.Fatalf("int64 seconds = (%d, %v)", ms, ok)
+	}
+	if ms, ok := doubaoTime(float64(1700000000123)); !ok || ms != 1700000000123 {
+		t.Fatalf("float64 ms = (%d, %v)", ms, ok)
+	}
+	if ms, ok := doubaoTime(idbKeyDouble(1700000000)); !ok || ms != 1700000000000 {
+		t.Fatalf("idbKeyDouble = (%d, %v)", ms, ok)
+	}
+	for _, in := range []string{"1700000000", "2026-11-20T12:00:00Z", "2026-11-20 12:00:00", "2026-11-20"} {
+		if _, ok := doubaoTime(in); !ok {
+			t.Fatalf("doubaoTime(%q) = false", in)
+		}
+	}
+	for _, bad := range []any{"", "   ", "not-a-date", math.NaN(), math.Inf(1), 1e18, struct{}{}} {
+		if _, ok := doubaoTime(bad); ok {
+			t.Fatalf("doubaoTime(%v) = true, want false", bad)
+		}
+	}
+
+	if k := doubaoTurnKey(doubaoTask{promptTimeOK: true, promptTime: 10}); k != 10 {
+		t.Fatalf("turnKey prompt = %d", k)
+	}
+	if k := doubaoTurnKey(doubaoTask{replyTimeOK: true, replyTime: 20}); k != 20 {
+		t.Fatalf("turnKey reply = %d", k)
+	}
+	if k := doubaoTurnKey(doubaoTask{}); k != math.MaxInt64 {
+		t.Fatalf("turnKey empty = %d", k)
+	}
+
+	// DoubaoRoot, DoubaoFiles, IsDoubaoLevelDbFile, ParseDoubaoFileSince.
+	t.Setenv("DEJA_DOUBAO_ROOT", "")
+	if r := DoubaoRoot(); !strings.Contains(r, "Doubao") {
+		t.Fatalf("default DoubaoRoot = %q", r)
+	}
+
+	root := doubaoBaseStore(t, false)
+	t.Setenv("DEJA_DOUBAO_ROOT", root)
+	files := DoubaoFiles()
+	if len(files) != 1 {
+		t.Fatalf("DoubaoFiles() = %+v, want 1 file", files)
+	}
+	if !IsDoubaoLevelDbFile(files[0]) || IsDoubaoLevelDbFile(files[0]+".bak") || IsDoubaoLevelDbFile(filepath.Join(root, "other", "000001.ldb")) {
+		t.Fatalf("IsDoubaoLevelDbFile unexpected result on %s", files[0])
+	}
+
+	all, err := ParseDoubaoFileSince(files[0], time.Time{})
+	if err != nil || len(all) != 1 {
+		t.Fatalf("ParseDoubaoFileSince(zero) = (%d, %v)", len(all), err)
+	}
+	recent, err := ParseDoubaoFileSince(files[0], time.UnixMilli(0))
+	if err != nil || len(recent) != 1 {
+		t.Fatalf("ParseDoubaoFileSince(epoch) = (%d, %v)", len(recent), err)
+	}
+	none, err := ParseDoubaoFileSince(files[0], time.Now().Add(3650*24*time.Hour))
+	if err != nil || len(none) != 0 {
+		t.Fatalf("ParseDoubaoFileSince(future) = (%d, %v)", len(none), err)
+	}
+}

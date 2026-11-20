@@ -466,7 +466,7 @@ func (r *v8Reader) readRegExp() (any, error) {
 	if _, err := r.varint(); err != nil {
 		return nil, err
 	}
-	return v8KeyString(pattern), nil
+	return r.keepValue(v8KeyString(pattern)), nil
 }
 
 // readMap reads key/value pairs up to the end tag.
