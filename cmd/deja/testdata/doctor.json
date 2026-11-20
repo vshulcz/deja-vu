@@ -30,6 +30,15 @@
       "indexed_sessions": 0
     },
     {
+      "name": "doubao",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/AppData/Local/Doubao/User Data"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "trae",
       "state": "missing",
       "paths": [

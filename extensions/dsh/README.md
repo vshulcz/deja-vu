@@ -10,7 +10,7 @@ DeepSeek Harness (and DSH Desktop, `anywhere-labs/dsh-desktop`, which bundles th
 `session-query` subsystem does. This plugin answers the other question: what you
 did in the *other* agents on this machine.
 
-deja indexes the session files that forty-eight other coding agents — Claude Code,
+deja indexes the session files that forty-nine other coding agents — Claude Code,
 Codex, Cursor, opencode, Antigravity, Grok Build, Kimi, Cline and Zed among
 them — already write to disk. Nothing has to have been recorded ahead of time: the history is already
 there, including the months before deja was installed. If you moved to dsh last
@@ -222,7 +222,7 @@ errors, empty queries, disabling the feature and cleanup.
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents |
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 50 coding agents |
 
 ## Repository memory & handoff
 

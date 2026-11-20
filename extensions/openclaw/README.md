@@ -6,7 +6,7 @@ English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions
 
 Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S) · [Documentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Live demo](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-OpenClaw remembers its own sessions. When you move work between interactive terminals and background OpenClaw channels, this plugin answers the other question: what was done in the forty-eight other coding agents on this machine — Claude Code, Codex, Cursor, Gemini and Zed among them — including the months before OpenClaw was installed.
+OpenClaw remembers its own sessions. When you move work between interactive terminals and background OpenClaw channels, this plugin answers the other question: what was done in the forty-nine other coding agents on this machine — Claude Code, Codex, Cursor, Gemini and Zed among them — including the months before OpenClaw was installed.
 
 It runs [deja](https://github.com/vshulcz/deja-vu), a single local Go binary with a local BM25 index over transcripts already on disk: no LLM, no embeddings required, and no network path besides a daily release check that `DEJA_OFFLINE=1` turns off.
 
@@ -115,7 +115,7 @@ install locations, and last the copy bundled through `@vshulcz/deja-vu`.
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents |
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 50 coding agents |
 
 ## Repository memory & handoff
 
@@ -125,6 +125,6 @@ Switching tools mid-task? Run `deja handoff --to <agent>` (or use `handoff` via 
 
 ## Privacy
 
-`deja` reads session files where the agents wrote them and builds a local BM25 index under `~/.cache/deja/index.db` (or `DEJA_INDEX_DIR`). Secrets and tokens (`sk-*`, `ghp_*`, `AKIA*`, `Bearer`, private keys, URL credentials) are stripped as the index is built, and without optional semantic search (`deja embed`) indexing and search make no network calls. Pair with `deja install --auto` to wire all 49 coding agents on this machine with native MCP (`recall`, `fix`, `blame`, `handoff`).
+`deja` reads session files where the agents wrote them and builds a local BM25 index under `~/.cache/deja/index.db` (or `DEJA_INDEX_DIR`). Secrets and tokens (`sk-*`, `ghp_*`, `AKIA*`, `Bearer`, private keys, URL credentials) are stripped as the index is built, and without optional semantic search (`deja embed`) indexing and search make no network calls. Pair with `deja install --auto` to wire all 50 coding agents on this machine with native MCP (`recall`, `fix`, `blame`, `handoff`).
 
 Part of [deja-vu](https://github.com/vshulcz/deja-vu). MIT.

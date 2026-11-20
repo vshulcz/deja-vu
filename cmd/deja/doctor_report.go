@@ -552,6 +552,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"claude", sources.ClaudeRoots(), sources.ClaudeFiles, parseDoctorClaude},
 		{"codex", sources.CodexRoots(), sources.CodexFiles, parseDoctorCodex},
 		{"codearts", []string{sources.CodeArtsRoot()}, sources.CodeArtsFiles, sources.ParseCodeArtsFile},
+		{"doubao", []string{sources.DoubaoRoot()}, sources.DoubaoFiles, sources.ParseDoubaoDir},
 		{"trae", []string{sources.TraeRoot()}, sources.TraeFiles, parseDoctorTrae},
 		{"opencode", []string{sources.OpencodeDB()}, func() []string { return presentDoctorFile(sources.OpencodeDB()) }, doctorProbeOpencode},
 		{"aider", aiderPaths, sources.AiderFiles, sources.ParseAiderFile},

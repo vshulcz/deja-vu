@@ -242,6 +242,10 @@ func (r *doctorStoreRows) laterStores(sqlite bool) {
 	// CodeArts Desktop: one two-level directory tree of JSONL transcripts.
 	caRoot := sources.CodeArtsRoot()
 	r.files("codearts", caRoot, doctorExists(caRoot), sources.CodeArtsFiles())
+	// Doubao Desktop: Chromium IndexedDB LevelDB directories under the
+	// Electron user-data root.
+	doubaoRoot := sources.DoubaoRoot()
+	r.files("doubao", doubaoRoot, doctorExists(doubaoRoot), sources.DoubaoFiles())
 	senpiRoot := sources.SenpiRoot()
 	r.files("senpi", senpiRoot, doctorExists(senpiRoot), sources.SenpiSessionFiles())
 	kimchiRoot := sources.KimchiRoot()

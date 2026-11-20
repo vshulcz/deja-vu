@@ -2,7 +2,7 @@
 
 [English](../README.md) | 简体中文 | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-面向 CodeWhale 的 Claude 兼容插件包——在对话会话中直接提供 `deja` MCP 服务（包含 `recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff` 八个工具）、`deja-history` 技能指引以及 `/deja` 斜杠命令，检索范围覆盖四十九个编程工具（包含本机其他四十八个智能体已经写入磁盘的历史会话）。
+面向 CodeWhale 的 Claude 兼容插件包——在对话会话中直接提供 `deja` MCP 服务（包含 `recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff` 八个工具）、`deja-history` 技能指引以及 `/deja` 斜杠命令，检索范围覆盖五十个编程工具（包含本机其他四十九个智能体已经写入磁盘的历史会话）。
 
 ![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 

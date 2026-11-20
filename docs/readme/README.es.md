@@ -260,6 +260,7 @@ Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Ro
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
 CodeArts Desktop ·
+Doubao ·
 Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed.
 
 Qué soporta cada uno —recall por MCP, recall automático, skills, comandos, resume, handoff— está en la

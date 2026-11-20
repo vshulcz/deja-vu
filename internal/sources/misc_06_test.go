@@ -2225,6 +2225,8 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 		sessions, err = ParseCodeBuddyFile(path)
 	case "codearts":
 		sessions, err = ParseCodeArtsFile(path)
+	case "doubao":
+		sessions, err = ParseDoubaoDir(path)
 	case "reasonix":
 		// The 1.x fixture is zstd frames, which only the CLI reads.
 		if filepath.Base(path) == "events.frames" && !ZstdAvailable() {

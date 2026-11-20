@@ -212,6 +212,7 @@ func printSourcesTo(w io.Writer, dir string) {
 		{"qoder", filepath.Join(sources.QoderRoot(), "projects"), []string{filepath.Join(sources.QoderRoot(), "projects")}, sources.QoderSessionFiles, sources.LoadQoder},
 		{"codebuddy", strings.Join(sources.CodeBuddyRoots(), string(os.PathListSeparator)), sources.CodeBuddyRoots(), sources.CodeBuddySessionFiles, sources.LoadCodeBuddy},
 		{"codearts", sources.CodeArtsRoot(), []string{sources.CodeArtsRoot()}, sources.CodeArtsFiles, sources.LoadCodeArts},
+		{"doubao", sources.DoubaoRoot(), []string{sources.DoubaoRoot()}, sources.DoubaoFiles, sources.LoadDoubao},
 		{"kimi", filepath.Join(sources.KimiRoot(), "sessions"), []string{filepath.Join(sources.KimiRoot(), "sessions")}, sources.KimiSessionFiles, sources.LoadKimi},
 		{"goose", filepath.Join(sources.GooseRoot(), "sessions"), sources.GooseSessionsDirs(), sources.GooseSessionFiles, sources.LoadGoose},
 		{"hermes", sources.HermesProfilesRoot(), []string{sources.HermesProfilesRoot()}, sources.HermesSessionFiles, sources.LoadHermes},

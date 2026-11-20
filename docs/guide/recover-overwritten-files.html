@@ -196,7 +196,7 @@
 </ol>
 <p>Do not delete or clear the agent session yet. Every tool call input and output that touched the file is still in the transcript directory.</p>
 
-<h2>Option 1: Recover with <code>deja restore</code> (across 49 agents)</h2>
+<h2>Option 1: Recover with <code>deja restore</code> (across 50 agents)</h2>
 <p>Because <a href="day-zero.html"><code>deja</code> indexes existing local transcripts on disk</a> the moment you install it, you can install it after the accident and still pull the spans out of the session that overwrote your file:</p>
 <pre><code>brew install deja-vu
 deja restore internal/store/pool.go</code></pre>

@@ -57,6 +57,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Orca](orca.md) | SQLite journal entry and JSON block store |
 | [Claw Code](clawcode.md) | JSONL transcripts and legacy JSON snapshots under `~/.claw/sessions` |
 | [CodeArts Desktop](codearts.md) | JSONL transcript in a two-level session directory |
+| [Doubao](doubao.md) | Chromium IndexedDB in a LevelDB directory; the streaming history keeps the bodies |
 
 ## Reporting drift
 

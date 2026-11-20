@@ -1594,7 +1594,7 @@ var countWords = map[int]string{
 	37: "thirty-seven", 38: "thirty-eight", 39: "thirty-nine", 40: "forty",
 	41: "forty-one", 42: "forty-two", 43: "forty-three", 44: "forty-four",
 	45: "forty-five", 46: "forty-six", 47: "forty-seven", 48: "forty-eight",
-	49: "forty-nine", 50: "fifty",
+	49: "forty-nine", 50: "fifty", 51: "fifty-one",
 }
 
 // countWord is the word for a count, or a failure naming what to add.
@@ -1850,7 +1850,7 @@ func TestNpmReadmeLeadsWithWhatTheMainOneLeadsWith(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, line := range []string{
-		"Shared local memory, session history search, cross-agent handoff, and code recovery across 49 coding agents.",
+		"Shared local memory, session history search, cross-agent handoff, and code recovery across 50 coding agents.",
 	} {
 		if !strings.Contains(string(main), line) {
 			t.Fatalf("the main README no longer says %q — update this test with it", line)

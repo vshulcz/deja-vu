@@ -230,6 +230,20 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			}},
 		},
 		{
+			// Doubao Desktop keeps its conversations in a Chromium IndexedDB
+			// LevelDB directory, one store per profile. A change to any of
+			// the directory's files re-reads the store whole: records are
+			// rewritten and superseded in place, so there is no append-only
+			// tail to resume from.
+			Name: "doubao", Load: LoadDoubao, Files: DoubaoFiles,
+			Kinds: []FileKind{{
+				Name:      "doubao",
+				Match:     IsDoubaoLevelDbFile,
+				Parse:     fullParse(ParseDoubaoFile),
+				ParseFrom: dbParseFrom(ParseDoubaoFile, ParseDoubaoFileSince),
+			}},
+		},
+		{
 			Name: "codex", Load: LoadCodex, Files: CodexFiles,
 			Kinds: []FileKind{
 				{
