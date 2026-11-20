@@ -828,7 +828,8 @@ import (
 // clean exits, cross-harness model/token/tool telemetry, and deterministic
 // Antigravity multi-workspace project attribution.
 // 111: canonicalized recurring commands and per-command outcome counts.
-const version = 111
+// 112: Codex VS Code IDE setup wrappers unwrapped and Desktop imported external-agent tool envelopes restored (#6099).
+const version = 112
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
