@@ -230,6 +230,13 @@ Share vetted project decisions and dead ends through git in `.deja/memory.jsonl`
 
 Switching tools mid-task? Run `deja handoff --to <agent>` (or use `handoff` via MCP) to transfer the active session's goal, decisions, touched files, passed checks, and open work into another coding agent.
 
+## Permissions and boundaries
+
+- **Host integration:** Registers via `cordis.patch.yml` to add six MCP tools (`deja_recall`, `deja_session`, `deja_blame`, `deja_fix`, `deja_how`, `deja_remember`), the `/deja` command, optional lifecycle hooks (`autoRecall`), and the authenticated `GET /api/deja-search` route plus sidebar and shortcut UI bindings on `web`.
+- **Execution and bounds:** Invokes the local `deja` binary with direct argument arrays (no shell); `GET /api/deja-search` rejects queries longer than 500 characters and bounds calls to 20 seconds and 2 MiB of output.
+- **Filesystem and network:** Reads local agent session stores and `~/.cache/deja/index.db` (`DEJA_INDEX_DIR` overrides), writes recall state only inside the plugin data directory, and makes no outbound network requests unless you explicitly run `deja embed`.
+- **Credential redaction:** Strips common secret patterns (`sk-*`, `ghp_*`, `AKIA*`, `Bearer`, private keys, and URL credentials) during indexing before snippets reach `dsh`.
+
 ## What it does not do
 
 No LLM, no embeddings. The index is a local BM25 store under `~/.cache/deja/index.db` (`DEJA_INDEX_DIR` overrides) built over transcript files that already exist, so a query answers in about a millisecond with no network path unless you explicitly run semantic search (`deja embed`). Common secrets and tokens (`sk-*`, `ghp_*`, `AKIA*`, `Bearer`, private keys, URL credentials) are redacted at index time before any snippet reaches `dsh`.
