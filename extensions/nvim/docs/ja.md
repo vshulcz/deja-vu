@@ -5,7 +5,7 @@
 
 **[deja-vu](https://github.com/vshulcz/deja-vu)** の一部（**< 1 ms** SQLite FTS5 検索 · インデックスサイズ **~4%** · 取込時 LLM トークン **0**）· [ドキュメント](https://vshulcz.github.io/deja-vu/) · [ブラウザデモ](https://vshulcz.github.io/deja-vu/view/) · [ベンチマーク](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-Claude Code、Codex CLI、Cursor、opencode、Gemini CLI など計 49 のコーディングエージェントの過去ログ検索、行単位 AI セッション blame、エラー修正手順の想起、エージェント間引き継ぎダイジェスト生成を Neovim から直接実行できます。
+Claude Code、Codex CLI、Cursor、opencode、Gemini CLI など計 50 のコーディングエージェントの過去ログ検索、行単位 AI セッション blame、エラー修正手順の想起、エージェント間引き継ぎダイジェスト生成を Neovim から直接実行できます。
 
 ![deja-vu デモ](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -78,7 +78,7 @@ Neovim 内で `:checkhealth deja` を実行すると、バイナリの検出状�
 
 | 再現率 | トークン消費 | インデックス & 検索速度 |
 |---|---|---|
-| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1） | **トークン 58% 削減**（同一リポジトリの反復作業） | 19,195 セッションを **13.6 秒**でインデックス / 49 種のエージェント横断で **0.7 ms** 検索 |
+| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1） | **トークン 58% 削減**（同一リポジトリの反復作業） | 19,195 セッションを **13.6 秒**でインデックス / 50 種のエージェント横断で **0.7 ms** 検索 |
 
 ## リポジトリメモリとエージェント間の引き継ぎ
 

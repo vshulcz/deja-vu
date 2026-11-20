@@ -7,7 +7,7 @@
   </a>
 </p>
 
-<p align="center"><b>Memória local compartilhada, transferência entre agentes e recuperação de código para 49 agentes de código.</b></p>
+<p align="center"><b>Memória local compartilhada, transferência entre agentes e recuperação de código para 50 agentes de código.</b></p>
 
 <p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes e mais 42 agentes já salvam cada sessão em disco.<br>
 O deja indexa tudo localmente para que seus agentes mantenham o contexto após o <code>/compact</code>, passem a tarefa adiante com <code>deja handoff</code> e recuperem código sobrescrito com <code>deja restore</code> — sem LLM, um único binário em Go.</p>
@@ -137,7 +137,7 @@ indexado e qual comando rodar em seguida.
 
 ## O que você ganha
 
-**Resolvido no Codex, lembrado pelo Claude.** Quarenta e nove agentes de código escrevem cada conversa em
+**Resolvido no Codex, lembrado pelo Claude.** Cinquenta agentes de código escrevem cada conversa em
 arquivos locais, e o deja transforma esses arquivos numa camada de memória que todos eles conseguem ler.
 
 | | |
@@ -257,7 +257,7 @@ Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Ro
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
 CodeArts Desktop ·
-Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed.
+Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Ante · Zed.
 
 O que cada um suporta — recall por MCP, recall automático, skills, comandos, resume, handoff — está na
 [matriz de recursos do README em inglês](../../README.md#supported-harnesses). Locais de armazenamento customizados

@@ -87,6 +87,7 @@ func installTargetCase(target string) (installTargetFunc, bool) {
 		"commandcode-auto":  installCommandCodeAuto,
 		"clawcode":          installClawCode,
 		"clawcode-auto":     installClawCodeAuto,
+		"ante":              installAnte,
 		"zcode-auto":        installZCodeAuto,
 		"cline-auto":        installTargetClineAuto,
 		"continue":          installContinue,

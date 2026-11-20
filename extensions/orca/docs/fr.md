@@ -2,7 +2,7 @@
 
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | Français | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-Plugin `trusted-worker` Orca v2 pour `deja` — apporte la mémoire de session sur 49 outils de développement IA (Claude Code, Codex, Cursor, opencode, Gemini CLI, Orca, etc.), y compris pour les sessions antérieures à l'installation de `deja`.
+Plugin `trusted-worker` Orca v2 pour `deja` — apporte la mémoire de session sur 50 outils de développement IA (Claude Code, Codex, Cursor, opencode, Gemini CLI, Orca, etc.), y compris pour les sessions antérieures à l'installation de `deja`.
 
 ![Démo de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -36,7 +36,7 @@ Lorsque `deja install orca-auto` a déjà inscrit le hook natif `UserPromptSubmi
 
 | Rappel | Tokens | Indexation & recherche |
 |---|---|---|
-| **97.2% R@5** sur LongMemEval-S (88.9% hit@1 sur 470 questions) | **58% de tokens en moins** (sur des tâches répétées) | **13.6 s** pour indexer 19,195 sessions / **0.7 ms** par requête sur 49 agents de code |
+| **97.2% R@5** sur LongMemEval-S (88.9% hit@1 sur 470 questions) | **58% de tokens en moins** (sur des tâches répétées) | **13.6 s** pour indexer 19,195 sessions / **0.7 ms** par requête sur 50 agents de code |
 
 ## Mémoire de dépôt & transfert inter-agents
 

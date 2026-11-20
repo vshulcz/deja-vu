@@ -208,7 +208,7 @@
 <p>Everything above, plus lifecycle hooks (<code>SessionStart</code>, <code>UserPromptSubmit</code>, <code>PreToolUse</code>, <code>PostToolUse</code>, <code>PreCompact</code>, <code>SessionEnd</code>) and <code>statusLine</code> in <code>~/.omnigent/settings.json</code>.</p>
 
 <h2>The part that is not about this harness</h2>
-<p>The index covers every agent's transcripts on the machine — forty-nine of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Omnigent answers a question asked in Claude Code, Codex or opencode, and the reverse. <a href="privacy.html">Indexing and search stay local</a>, and credentials are stripped as the index is built.</p>
+<p>The index covers every agent's transcripts on the machine — fifty of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Omnigent answers a question asked in Claude Code, Codex or opencode, and the reverse. <a href="privacy.html">Indexing and search stay local</a>, and credentials are stripped as the index is built.</p>
 
 <h2>Repository memory &amp; handoff</h2>
 <p>Share vetted project decisions and dead ends through git in <code>.deja/memory.jsonl</code> (<code>deja repo candidates</code>, <code>deja repo add &lt;id&gt;</code>). Entries are redacted on write, stored sorted with <code>merge=union</code> so parallel branches merge cleanly, and loaded for any teammate who clones the repository (<code>{"activations":{"auto":{"repo":false}}}</code> in the trust policy keeps them out of hooks). See <a href="repo-memory.html">repo memory</a>.</p>

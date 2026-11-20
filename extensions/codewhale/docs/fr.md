@@ -2,7 +2,7 @@
 
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | Français | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-Bundle de plugin compatible Claude pour CodeWhale : expose le serveur MCP `deja` (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`), la skill `deja-history` et `/deja` sur vos sessions issues de 49 outils de développement IA.
+Bundle de plugin compatible Claude pour CodeWhale : expose le serveur MCP `deja` (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`), la skill `deja-history` et `/deja` sur vos sessions issues de 50 outils de développement IA.
 
 ![Démo de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -29,7 +29,7 @@ deja install codewhale-auto
 
 | Rappel | Tokens | Indexation & recherche |
 |---|---|---|
-| **97.2% R@5** sur LongMemEval-S (88.9% hit@1 sur 470 questions) | **58% de tokens en moins** (sur des tâches répétées) | **13.6 s** pour indexer 19,195 sessions / **0.7 ms** par requête sur 49 agents de code |
+| **97.2% R@5** sur LongMemEval-S (88.9% hit@1 sur 470 questions) | **58% de tokens en moins** (sur des tâches répétées) | **13.6 s** pour indexer 19,195 sessions / **0.7 ms** par requête sur 50 agents de code |
 
 ## Mémoire de dépôt & transfert inter-agents
 

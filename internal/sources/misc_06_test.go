@@ -2077,6 +2077,7 @@ func TestFormatRegistryConformance(t *testing.T) {
 		"DEJA_OMNIGENT_ROOT", "DEJA_OMNIGENT_DB", "OMNIGENT_DATA_DIR",
 		"DEJA_ORCA_ROOT", "DEJA_ORCA_DB",
 		"DEJA_CLAWCODE_ROOT", "DEJA_CLAWCODE_ROOTS", "CLAW_CONFIG_HOME",
+		"DEJA_ANTE_ROOT", "DEJA_ANTE_ROOTS", "ANTE_HOME",
 	} {
 		t.Setenv(key, "")
 	}
@@ -2485,6 +2486,8 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 		// and a registry fixture that needs an external tool to read cannot be
 		// checked on a machine that lacks it.
 		sessions, err = ParseDeepSeekFile(path)
+	case "ante":
+		sessions, err = ParseAnteFile(path)
 	default:
 		t.Fatalf("no conformance parser for %q", id)
 	}
@@ -2496,7 +2499,7 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 
 // registryFixturesWithCalls are the registry fixtures whose tool calls are
 // read into work records.
-var registryFixturesWithCalls = map[string]bool{"clawcode": true, "deepseek": true, "continue": true, "trae": true, "muse": true, "codebuddy": true, "devin": true, "junie": true, "jetbrains": true, "kimi": true, "mcode": true, "gemini": true, "omnigent": true, "orca": true}
+var registryFixturesWithCalls = map[string]bool{"clawcode": true, "deepseek": true, "continue": true, "trae": true, "muse": true, "codebuddy": true, "devin": true, "junie": true, "jetbrains": true, "kimi": true, "mcode": true, "gemini": true, "omnigent": true, "orca": true, "ante": true}
 
 func validateRegistrySessions(t *testing.T, id string, sessions []model.Session) {
 	t.Helper()

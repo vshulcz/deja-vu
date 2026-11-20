@@ -1,0 +1,13 @@
+{
+  "id": "ses_01M7WQZKYBJ61WM9H6TR6FP4CY",
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-6",
+  "dir": "/Users/alex/payments-api",
+  "first_user_message": "Fix the retry timeout in backoff.go",
+  "usage": {
+    "input_tokens": 1200,
+    "output_tokens": 340
+  },
+  "started_time": "2026-08-14T10:00:00Z",
+  "last_active_time": "2026-08-14T10:02:15Z"
+}

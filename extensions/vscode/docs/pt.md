@@ -36,7 +36,7 @@ code --install-extension vshulcz.deja-status
 |---|---|
 | Acurácia no LongMemEval-S (470 perguntas filtradas) | **97.2% R@5**, **88.9% hit@1** |
 | Custo de tokens em trabalho repetido no repositório | **58% menos tokens**|
-| Latência de consulta lexical em processo | Mediana de **0.7–0.8 ms** em 49 agentes de código |
+| Latência de consulta lexical em processo | Mediana de **0.7–0.8 ms** em 50 agentes de código |
 | Indexação inicial de 19,195 sessões reais | **13.6 s**, sem chaves de API |
 
 ## Memória do repositório e handoff entre agentes

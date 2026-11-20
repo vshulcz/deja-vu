@@ -54,7 +54,7 @@
 - `tools`：6 ツール公開の有無（既定 `true`）
 - `bin`：`deja` バイナリへのパス明示指定
 
-全 49 ツールへ 8 モード（`recall`・`fix`・`blame`・`how`・`orient`・`context`・`remember`・`handoff`）の MCP を一括設定するには `deja install --auto` を実行してください（[エージェント切り替えガイド](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)）。
+全 50 ツールへ 8 モード（`recall`・`fix`・`blame`・`how`・`orient`・`context`・`remember`・`handoff`）の MCP を一括設定するには `deja install --auto` を実行してください（[エージェント切り替えガイド](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)）。
 
 ## バイナリの優先順位
 
@@ -68,7 +68,7 @@
 
 | 再現率 | トークン消費 | インデックス & 検索速度 |
 |---|---|---|
-| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1） | **トークン 58% 削減**（同一リポジトリの反復作業） | 19,195 セッションを **13.6 秒**でインデックス / 49 種のエージェント横断で **0.7 ms** 検索 |
+| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1） | **トークン 58% 削減**（同一リポジトリの反復作業） | 19,195 セッションを **13.6 秒**でインデックス / 50 種のエージェント横断で **0.7 ms** 検索 |
 
 ## リポジトリメモリとエージェント間の引き継ぎ
 

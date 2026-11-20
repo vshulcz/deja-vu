@@ -307,6 +307,15 @@
       "indexed_sessions": 0
     },
     {
+      "name": "ante",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.ante/sessions"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "zcode",
       "state": "missing",
       "paths": [
@@ -687,6 +696,11 @@
       "path": "<tmp>/home/.claw/settings.json"
     },
     {
+      "name": "ante",
+      "state": "config-missing",
+      "path": "<tmp>/home/.ante/settings.json"
+    },
+    {
       "name": "cherrystudio",
       "state": "config-missing",
       "path": "<tmp>/home/.config/deja/cherrystudio-mcp.json"
@@ -1049,6 +1063,11 @@
       "name": "goose",
       "state": "missing",
       "path": "<tmp>/home/.config/goose/config.yaml"
+    },
+    {
+      "name": "ante",
+      "state": "missing",
+      "path": "<tmp>/home/.agents/skills/deja-history/SKILL.md"
     },
     {
       "name": "antigravity",

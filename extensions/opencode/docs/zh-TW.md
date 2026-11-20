@@ -54,7 +54,7 @@
 - `tools`：是否註冊六個工具（預設 `true`）。
 - `bin`：明確指定 `deja` 執行檔位置。
 
-如需為本機 49 款程式開發工具一次啟用完整 MCP（含 `recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff`），請執行 `deja install --auto`（詳見[切換智慧體不遺失上下文](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)）。
+如需為本機 50 款程式開發工具一次啟用完整 MCP（含 `recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff`），請執行 `deja install --auto`（詳見[切換智慧體不遺失上下文](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)）。
 
 ## 使用哪個執行檔
 
@@ -68,7 +68,7 @@
 
 | 召回率 | Token 用量 | 索引與檢索耗時 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 49 個程式設計代理的檢索僅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 50 個程式設計代理的檢索僅 **0.7 ms** |
 
 ## 儲存庫記憶與跨代理接力
 

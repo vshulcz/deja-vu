@@ -37,7 +37,7 @@ import (
 var deletable = map[string]bool{
 	"claude": true, "codex": true, "gemini": true, "qwen": true, "qoder": true, "copilot": true,
 	"cline": true, "cursor": true, "kimi": true, "grok": true, "deepseek": true,
-	"pi": true, "senpi": true, "openclaw": true, "antigravity": true,
+	"pi": true, "senpi": true, "openclaw": true, "antigravity": true, "ante": true,
 }
 
 var (

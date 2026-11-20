@@ -1103,6 +1103,11 @@ func TestSpawnHookStaysSilentWithNothingToSay(t *testing.T) {
 	if _, err := captureRun(t, "index"); err != nil {
 		t.Fatal(err)
 	}
+	cwd := filepath.Join(t.TempDir(), "src", "app")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(cwd)
 	got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Task","toolInput":`+
 		`{"prompt":"Port the kubernetes admission webhook to the new cert rotation scheme."},"session_id":"parent"}`)
 	if got != "" {

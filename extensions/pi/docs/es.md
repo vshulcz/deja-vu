@@ -47,7 +47,7 @@ La extensión resuelve el ejecutable `deja` en este orden:
 
 | Recall | Tokens | Indexado y búsqueda |
 |---|---|---|
-| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas) | **58% menos tokens** (en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 49 agentes de programación |
+| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas) | **58% menos tokens** (en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 50 agentes de programación |
 
 ## Memoria de repositorio y relevo entre agentes
 
@@ -57,7 +57,7 @@ Comparte decisiones validadas y callejones sin salida del proyecto vía git en `
 
 ## Privacidad
 
-El índice reside en `~/.cache/deja/index.db` (ajustable con `DEJA_INDEX_DIR`) y redacta automáticamente tokens `sk-*`, `ghp_*`, `AKIA*` y cabeceras `Bearer` durante la indexación. No se envía nada fuera de tu equipo salvo si ejecutas manualmente `deja embed` con un endpoint configurado. Configura las herramientas `recall`, `fix`, `blame` y `handoff` en los 49 agentes compatibles con `deja install --auto`.
+El índice reside en `~/.cache/deja/index.db` (ajustable con `DEJA_INDEX_DIR`) y redacta automáticamente tokens `sk-*`, `ghp_*`, `AKIA*` y cabeceras `Bearer` durante la indexación. No se envía nada fuera de tu equipo salvo si ejecutas manualmente `deja embed` con un endpoint configurado. Configura las herramientas `recall`, `fix`, `blame` y `handoff` en los 50 agentes compatibles con `deja install --auto`.
 
 ## Licencia
 

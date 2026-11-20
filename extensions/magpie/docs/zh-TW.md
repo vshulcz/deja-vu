@@ -18,7 +18,7 @@
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-外掛需要系統中存在可執行的 `deja`（透過 `@vshulcz/deja-vu`、`brew install deja-vu` 或 `install.sh`）並以 `deja index` 建立本地索引。若要同時為本機全部 49 款程式設計智慧體安裝原生 `recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember` 與 `handoff` 工具：
+外掛需要系統中存在可執行的 `deja`（透過 `@vshulcz/deja-vu`、`brew install deja-vu` 或 `install.sh`）並以 `deja index` 建立本地索引。若要同時為本機全部 50 款程式設計智慧體安裝原生 `recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember` 與 `handoff` 工具：
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
@@ -50,7 +50,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 | 召回率 | Token 用量 | 索引與檢索耗時 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 49 個程式設計代理的檢索僅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 50 個程式設計代理的檢索僅 **0.7 ms** |
 
 ## 儲存庫記憶與跨代理接力
 

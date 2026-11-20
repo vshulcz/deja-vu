@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Ante stores its history — session format</title>
+<meta name="description" content="Where Ante writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/ante.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where Ante stores its history — session format">
+<meta property="og:description" content="Where Ante writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/ante.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="noindex,follow">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where Ante stores its history — session format">
+<meta name="twitter:description" content="Where Ante writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Ante writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Ante session format","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/ante.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/ante.html","name":"Ante session format","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="nav-cta" href="https://github.com/vshulcz/deja-vu"><span class="star-ic" aria-hidden="true">★</span>GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="amp.html">Amp</a><a href="ante.html" aria-current="page">Ante</a><a href="antigravity.html">Antigravity</a><a href="cherrystudio.html">Cherry Studio</a><a href="claude-code.html">Claude Code</a><a href="clawcode.html">Claw Code</a><a href="cline.html">Cline</a><a href="codearts.html">CodeArts Desktop</a><a href="codebuddy.html">CodeBuddy Code</a><a href="codewhale.html">CodeWhale</a><a href="codex.html">Codex CLI</a><a href="commandcode.html">Command Code</a><a href="continue.html">Continue</a><a href="copilot.html">Copilot CLI</a><a href="crush.html">Crush</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="devin.html">Devin CLI</a><a href="gjc.html">gajae-code</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="jetbrains.html">JetBrains AI Assistant</a><a href="junie.html">Junie</a><a href="kilocode.html">Kilo Code</a><a href="kimchi.html">Kimchi Coding</a><a href="kimi.html">Kimi Code</a><a href="kiro.html">Kiro</a><a href="mimo.html">MiMo-Code</a><a href="mcode.html">MiniMax Code</a><a href="muse.html">Muse Code</a><a href="omnigent.html">Omnigent</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="orca.html">Orca</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qoder.html">Qoder</a><a href="qwen.html">Qwen Code</a><a href="reasonix.html">Reasonix</a><a href="roo.html">Roo Code</a><a href="senpi.html">Senpi</a><a href="trae.html">TRAE CLI</a><a href="copilot-chat.html">VS Code Copilot Chat</a><a href="windsurf.html">Windsurf / Devin Desktop</a><a href="zcode.html">ZCode</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>Ante session format</h1>
+<h2 id="store-and-files">Store and files</h2>
+<p>Ante (<code>AntigmaLabs/ante</code>) stores sessions under <code>${ANTE_HOME:-~/.ante}/sessions/&lt;session-id&gt;/</code></p>
+<p>with <code>&lt;session-id&gt;</code> shaped as a <code>ses_&lt;ULID&gt;</code> directory name. <code>DEJA_ANTE_ROOT</code> replaces the</p>
+<p><code>sessions/</code> directory directly, and <code>DEJA_ANTE_ROOTS</code> adds extra roots. Each session</p>
+<p>directory contains:</p>
+<ul>
+<li><code>events.jsonl</code>: append-only event stream written during live runs.</li>
+<li><code>meta.json</code>: session metadata (<code>id</code>, <code>provider</code>, <code>model</code>, <code>dir</code> / <code>cwd</code>,</li>
+</ul>
+<p><code>first_user_message</code>, <code>usage</code>, <code>started_time</code>, <code>last_active_time</code>, <code>forked_from</code>).</p>
+<ul>
+<li><code>dialog.json</code>: optional full-conversation snapshot. When <code>events.jsonl</code> exists beside</li>
+</ul>
+<p>it, <code>events.jsonl</code> is parsed and <code>dialog.json</code> is treated as a sidecar so <code>deja doctor</code></p>
+<p>does not count it twice; when <code>events.jsonl</code> is absent, <code>parseAnteDialog</code> reads <code>dialog.json</code>.</p>
+<ul>
+<li><code>subagents/&lt;subagent-id&gt;/</code>: nested subagent session directories (<code>Kind: subagent</code>,</li>
+</ul>
+<p>unless <code>DEJA_INCLUDE_SUBAGENTS=0</code>).</p>
+<h2 id="records">Records</h2>
+<p>Each line of <code>events.jsonl</code> is a JSON envelope with <code>timestamp</code>, <code>id</code>, optional <code>parent</code>,</p>
+<p>and a tagged <code>event</code> object:</p>
+<pre><code class="language-json">{&#34;timestamp&#34;:&#34;2026-08-14T10:00:05Z&#34;,&#34;id&#34;:&#34;evt_02&#34;,&#34;event&#34;:{&#34;UserInput&#34;:&#34;Fix the retry timeout in backoff.go&#34;}}</code></pre>
+<ul>
+<li><code>SessionStart</code>: fills missing <code>id</code>, <code>forked_from</code>, <code>provider</code>/<code>model</code>, and <code>dir</code>.</li>
+<li><code>UserInput</code>: <code>user</code> message; the first line seeds the session title when <code>meta.json</code> omits it.</li>
+<li><code>AgentMessage</code>: <code>assistant</code> message.</li>
+<li><code>CompactEnd</code>: <code>summary</code> record from <code>summary</code>.</li>
+<li><code>ShellOutput</code>: bash command (<code>command</code>, <code>exit_code</code>) and optional tool output.</li>
+<li><code>ToolStart</code> / <code>ToolEnd</code>: <code>tool_use</code> / completion status (<code>Success</code>, <code>Failed</code>, <code>Cancelled</code>,</li>
+</ul>
+<p><code>Denied</code>) mapped through the Claude tool dialect for file paths, edit spans, commands,</p>
+<p>and exit codes.</p>
+<ul>
+<li><code>UsageUpdate</code> / <code>SessionEnd</code>: token usage counters (falling back to <code>meta.usage</code>).</li>
+</ul>
+<p><code>dialog.json</code> snapshots store <code>reasoning_model</code> and a <code>messages</code> array (<code>role</code>: <code>user</code></p>
+<p>or <code>model</code>/<code>assistant</code>) with <code>content.Text</code> or <code>content.Parts[]</code> (<code>Text</code>, <code>ToolUse</code>, <code>ToolResult</code>).</p>
+<h2 id="wiring-and-resume">Wiring and resume</h2>
+<ul>
+<li><strong>MCP (<code>deja install ante</code>)</strong>: merges <code>mcp_servers.deja</code> (<code>command</code> + <code>args</code>) into</li>
+</ul>
+<p><code>${ANTE_HOME:-~/.ante}/settings.json</code>, matching Ante&#39;s <code>mcp.mdx</code> schema.</p>
+<ul>
+<li><strong>Skills &amp; slash commands</strong>: writes <code>~/.agents/skills/deja-history/SKILL.md</code>. Ante</li>
+</ul>
+<p>discovers skills under <code>~/.agents/skills/</code> and invokes them as <code>/&lt;skill-name&gt; [args]</code>.</p>
+<ul>
+<li><strong>Rules (<code>deja rules sync</code>)</strong>: syncs into <code>${ANTE_HOME:-~/.ante}/AGENTS.md</code> (Ante also</li>
+</ul>
+<p>falls back to <code>~/.claude/CLAUDE.md</code> when <code>~/.ante/AGENTS.md</code> is absent).</p>
+<ul>
+<li><strong>Hooks &amp; status line</strong>: <code>AntigmaLabs/ante</code> v0.3.7 exposes no user-configurable</li>
+</ul>
+<p>lifecycle hooks (<code>auto: false</code>), and <code>status_line_command</code> in <code>~/.ante/settings.json</code></p>
+<p>replaces Ante&#39;s built-in status bar with no <code>stack_with_default</code> flag, so <code>deja install ante</code></p>
+<p>does not overwrite it.</p>
+<ul>
+<li><strong>Resume &amp; handoff</strong>: <code>deja resume</code> runs <code>ante --resume &lt;id&gt;</code> in the recorded working</li>
+</ul>
+<p>directory; <code>deja handoff --to ante --exec</code> runs <code>ante -p &lt;packet&gt;</code>. <code>WriteBack</code> refuses</p>
+<p>because <code>events.jsonl</code> and <code>dialog.json</code> belong to an external active format.</p>
+<h2 id="synthetic-fixture">Synthetic fixture</h2>
+<p><a href="../../fixtures/registry/ante/sessions/ses_01M7WQZKYBJ61WM9H6TR6FP4CY/events.jsonl"><code>fixtures/registry/ante/sessions/ses_01M7WQZKYBJ61WM9H6TR6FP4CY/events.jsonl</code></a></p>
+<p>and sibling <code>meta.json</code> form the synthetic conformance sample with deterministic IDs and timestamps.</p>
+<p><strong>Last verified:</strong> 2026-11-20 against AntigmaLabs/ante v0.3.7</p>
+
+<hr>
+<p>deja reads this format and forty-nine others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
