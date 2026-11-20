@@ -152,7 +152,9 @@ func commandSkillPath(harness string) string {
 // skills with user-invocable frontmatter and an argument hint for its
 // slash-command autocomplete. Zed lists skills under `/` and invokes them by
 // their frontmatter name. TRAE CLI 0.207.1's own system prompt says "When the
-// user types /<skill-name>, invoke it via Skill". Muse 1.4.3 lists the skill
+// user types /<skill-name>, invoke it via Skill". Ante loads skills from
+// ~/.agents/skills/ and invokes any user-invocable skill as /<skill-name>.
+// Muse 1.4.3 lists the skill
 // in its slash menu as /deja-history and loads it with the arguments (stand).
 // Gemini is measured by its own complaint: with a
 // command file of deja's present it renamed one of the two (#3665).
@@ -160,6 +162,6 @@ func commandSkillPath(harness string) string {
 // One list, read by the report and by the capability test, so neither can
 // drift from the other.
 func skillIsTheCommandHarnesses() []string {
-	return []string{"antigravity", "codex", "copilot", "gemini", "grok",
+	return []string{"ante", "antigravity", "codex", "copilot", "gemini", "grok",
 		"kimi", "openclaw", "qwen", "trae", "muse", "zed"}
 }

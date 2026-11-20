@@ -6,7 +6,7 @@ English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions
 
 Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/)
 
-Search and resume coding agent sessions across Claude Code, Codex, Cursor, OpenCode, Gemini CLI and 44 more harnesses from Raycast.
+Search and resume coding agent sessions across Claude Code, Codex, Cursor, OpenCode, Gemini CLI and 45 more harnesses from Raycast.
 
 ![deja-vu demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -33,7 +33,7 @@ brew install deja-vu && deja install --auto
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents |
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 50 coding agents |
 
 ## Repository memory & handoff
 

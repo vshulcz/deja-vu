@@ -86,7 +86,7 @@ openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 
 | Recall | Tokens | Indexação e busca |
 |---|---|---|
-| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 49 agentes de código |
+| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 50 agentes de código |
 
 ## Memória do repositório e handoff entre agentes
 
@@ -96,6 +96,6 @@ Trocando de ferramenta no meio da tarefa? Execute `deja handoff --to <agent>` (o
 
 ## Privacidade
 
-Índice guardado em `~/.cache/deja/index.db` (`DEJA_INDEX_DIR`), removendo `sk-*`, `ghp_*`, `AKIA*` e `Bearer` durante a indexação. Nada sai do dispositivo sem `deja embed`. Use `deja install --auto` para configurar todos os 49 agentes.
+Índice guardado em `~/.cache/deja/index.db` (`DEJA_INDEX_DIR`), removendo `sk-*`, `ghp_*`, `AKIA*` e `Bearer` durante a indexação. Nada sai do dispositivo sem `deja embed`. Use `deja install --auto` para configurar todos os 50 agentes.
 
 Parte do [deja-vu](https://github.com/vshulcz/deja-vu). MIT.

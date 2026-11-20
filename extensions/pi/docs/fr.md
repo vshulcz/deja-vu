@@ -47,7 +47,7 @@ L'ordre de résolution du binaire `deja` est le suivant :
 
 | Rappel | Tokens | Indexation & recherche |
 |---|---|---|
-| **97.2% R@5** sur LongMemEval-S (88.9% hit@1 sur 470 questions) | **58% de tokens en moins** (sur des tâches répétées) | **13.6 s** pour indexer 19,195 sessions / **0.7 ms** par requête sur 49 agents de code |
+| **97.2% R@5** sur LongMemEval-S (88.9% hit@1 sur 470 questions) | **58% de tokens en moins** (sur des tâches répétées) | **13.6 s** pour indexer 19,195 sessions / **0.7 ms** par requête sur 50 agents de code |
 
 ## Mémoire de dépôt & transfert inter-agents
 
@@ -57,7 +57,7 @@ Vous changez d'outil en cours de route ? Exécutez `deja handoff --to <agent>` (
 
 ## Confidentialité
 
-L'index est stocké dans `~/.cache/deja/index.db` (configurable via `DEJA_INDEX_DIR`) avec masquage automatique des secrets `sk-*`, `ghp_*`, `AKIA*` et `Bearer`. Tout reste local, sauf si vous configurez volontairement `deja embed`. Déployez `recall`, `fix`, `blame` et `handoff` sur les 49 agents pris en charge via `deja install --auto`.
+L'index est stocké dans `~/.cache/deja/index.db` (configurable via `DEJA_INDEX_DIR`) avec masquage automatique des secrets `sk-*`, `ghp_*`, `AKIA*` et `Bearer`. Tout reste local, sauf si vous configurez volontairement `deja embed`. Déployez `recall`, `fix`, `blame` et `handoff` sur les 50 agents pris en charge via `deja install --auto`.
 
 ## Licence
 

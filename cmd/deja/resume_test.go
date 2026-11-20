@@ -2000,6 +2000,15 @@ func TestResumeRecordedDirectoryPresentAndGone(t *testing.T) {
 			writeResumeFile(t, p, `{"type":"session_meta","session_id":`+jsonStr(id)+`,"workspace_root":`+jsonStr(dir)+`}`+"\n")
 			return model.Session{Harness: "clawcode", ID: id, Path: p}
 		}, nil},
+		{"ante", note, func(t *testing.T, name, dir string) model.Session {
+			t.Helper()
+			id := "ses_ante-" + name
+			sesDir := filepath.Join(tmp, "ante", name, id)
+			p := filepath.Join(sesDir, "events.jsonl")
+			writeResumeFile(t, p, `{"seq":0,"ts":1760000000000,"kind":"turn_started","turn":1}`+"\n")
+			writeResumeFile(t, filepath.Join(sesDir, "meta.json"), `{"id":`+jsonStr(id)+`,"cwd":`+jsonStr(dir)+`}`)
+			return model.Session{Harness: "ante", ID: id, Path: p}
+		}, nil},
 	}
 	for _, c := range cases {
 		t.Run(c.harness, func(t *testing.T) {

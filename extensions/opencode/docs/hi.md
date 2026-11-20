@@ -54,7 +54,7 @@
 - `tools`: सभी 6 टूल्स उपलब्ध कराता है (डिफ़ॉल्ट `true`)।
 - `bin`: कस्टम `deja` बाइनरी पथ।
 
-सभी 49 टूल्स में 8 MCP मोड (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) सेट करने के लिए `deja install --auto` चलाएँ ([बिना संदर्भ खोए एजेंट बदलें](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html))।
+सभी 50 टूल्स में 8 MCP मोड (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) सेट करने के लिए `deja install --auto` चलाएँ ([बिना संदर्भ खोए एजेंट बदलें](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html))।
 
 ## कौन-सी बाइनरी उपयोग होती है
 
@@ -68,7 +68,7 @@
 
 | रिकॉल (Recall) | टोकन | इंडेक्सिंग और खोज |
 |---|---|---|
-| LongMemEval-S पर **97.2% R@5** (470 प्रश्नों पर 88.9% hit@1) | **58% कम टोकन** (दोहराए गए रेपो कार्य पर) | 19,195 सेशन इंडेक्स करने में **13.6 s** / 49 कोडिंग एजेंट्स में **0.7 ms** खोज समय |
+| LongMemEval-S पर **97.2% R@5** (470 प्रश्नों पर 88.9% hit@1) | **58% कम टोकन** (दोहराए गए रेपो कार्य पर) | 19,195 सेशन इंडेक्स करने में **13.6 s** / 50 कोडिंग एजेंट्स में **0.7 ms** खोज समय |
 
 ## रेपो मेमोरी और एजेंट हैंडऑफ़
 

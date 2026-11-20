@@ -7,7 +7,7 @@
   </a>
 </p>
 
-<p align="center"><b>49 कोडिंग एजेंट्स के लिए साझा लोकल मेमोरी, एजेंट हैंडऑफ़ और कोड रिकवरी।</b></p>
+<p align="center"><b>50 कोडिंग एजेंट्स के लिए साझा लोकल मेमोरी, एजेंट हैंडऑफ़ और कोड रिकवरी।</b></p>
 
 <p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes और 42 अन्य एजेंट्स हर सेशन पहले से डिस्क पर सेव करते हैं।<br>
 deja सब कुछ लोकल रूप से इंडेक्स करता है ताकि आपके एजेंट्स <code>/compact</code> के बाद भी कॉन्टेक्स्ट बनाए रखें, <code>deja handoff</code> से काम आगे बढ़ाएँ और <code>deja restore</code> से ओवरराइट हुआ कोड वापस पाएँ — बिना LLM, एक अकेली Go बाइनरी।</p>
@@ -136,7 +136,7 @@ skill आपके इंस्टॉल किए हुए `deja` बाइन
 
 ## इससे क्या मिलता है
 
-**Codex में हल हुआ, Claude को याद है।** उनचास कोडिंग एजेंट हर बातचीत को लोकल फ़ाइलों में लिखते हैं, और deja उन
+**Codex में हल हुआ, Claude को याद है।** पचास कोडिंग एजेंट हर बातचीत को लोकल फ़ाइलों में लिखते हैं, और deja उन
 फ़ाइलों को एक ऐसी मेमोरी परत में बदल देता है जिसे वे सब पढ़ सकते हैं।
 
 | | |
@@ -255,7 +255,7 @@ Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Ro
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
 CodeArts Desktop ·
-Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed.
+Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Ante · Zed.
 
 इनमें से हर एक क्या समर्थन करता है — MCP रिकॉल, ऑटोमैटिक रिकॉल, skills, कमांड, resume, handoff — यह
 [अंग्रेज़ी README की क्षमता तालिका](../../README.md#supported-harnesses) में है। अलग स्टोरेज जगहें `DEJA_*_ROOT`

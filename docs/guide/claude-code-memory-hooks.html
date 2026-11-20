@@ -203,7 +203,7 @@
 <thead><tr><th>Hook event</th><th>Matcher / trigger</th><th>What deja injects or updates</th></tr></thead>
 <tbody>
 <tr><td><code>SessionStart</code></td><td>New or resumed session</td><td>Loads project <code>orient</code> context and recent `.deja/memory.jsonl` entries (up to 2 KB)</td></tr>
-<tr><td><code>UserPromptSubmit</code></td><td>Every user turn</td><td>Queries local FTS5 across 49 harnesses for prior fixes and file rationale (capped at 1,536 bytes per prompt)</td></tr>
+<tr><td><code>UserPromptSubmit</code></td><td>Every user turn</td><td>Queries local FTS5 across 50 harnesses for prior fixes and file rationale (capped at 1,536 bytes per prompt)</td></tr>
 <tr><td><code>PreToolUse</code></td><td>Edit/Write/Bash matchers</td><td>Surfaces past <code>blame</code> decisions on the target file or known <code>how</code> invocations (about 4 KB per tool call)</td></tr>
 <tr><td><code>PostToolUse</code></td><td>Bash command matchers</td><td>Checks repeated friction loops across recent tool attempts</td></tr>
 <tr><td><code>PostToolUseFailure</code></td><td>Failed shell/tool execution</td><td>Looks up past <code>fix</code> runs for the emitted error string immediately</td></tr>

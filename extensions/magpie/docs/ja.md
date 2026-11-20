@@ -18,7 +18,7 @@ OpenAI（`chat`・`responses`）・Anthropic（`anthropic`）・Gemini（`gemini
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-実行環境に `deja` バイナリ（`@vshulcz/deja-vu`、`brew install deja-vu`、または `install.sh`）と `deja index` で作成されたローカルインデックスが必要です。49 エージェントすべてに MCP ツール（`recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff`）を導入する場合：
+実行環境に `deja` バイナリ（`@vshulcz/deja-vu`、`brew install deja-vu`、または `install.sh`）と `deja index` で作成されたローカルインデックスが必要です。50 エージェントすべてに MCP ツール（`recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff`）を導入する場合：
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
@@ -50,7 +50,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 | 再現率 | トークン消費 | インデックス & 検索速度 |
 |---|---|---|
-| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1） | **トークン 58% 削減**（同一リポジトリの反復作業） | 19,195 セッションを **13.6 秒**でインデックス / 49 種のエージェント横断で **0.7 ms** 検索 |
+| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1） | **トークン 58% 削減**（同一リポジトリの反復作業） | 19,195 セッションを **13.6 秒**でインデックス / 50 種のエージェント横断で **0.7 ms** 検索 |
 
 ## リポジトリメモリとエージェント間の引き継ぎ
 

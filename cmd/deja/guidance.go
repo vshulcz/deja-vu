@@ -117,6 +117,7 @@ var sharedSkillHarnesses = map[string]bool{
 	// Junie 3110.7 offers the model a skill placed only here, beside its own
 	// $JUNIE_HOME/skills (SkillsService, and a stand).
 	"junie": true,
+	"ante":  true,
 }
 
 // sharedSkillPath is the one file all of them read. Claude Code is deliberately

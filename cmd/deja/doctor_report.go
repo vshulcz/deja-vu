@@ -592,6 +592,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"kimchi", []string{sources.KimchiRoot()}, sources.KimchiSessionFiles, sources.ParseKimchiFile},
 		{"commandcode", []string{sources.CommandCodeRoot()}, sources.CommandCodeSessionFiles, sources.ParseCommandCodeFile},
 		{"clawcode", sources.ClawCodeRoots(), sources.ClawCodeSessionFiles, sources.ParseClawCodeFile},
+		{"ante", sources.AnteRoots(), sources.AnteSessionFiles, sources.ParseAnteFile},
 		// The transcripts and the database, each probed with its own reader:
 		// the transcript reader answers zero for the database, which made the
 		// row read `parsed-zero` (#3675), and leaving the database out made it

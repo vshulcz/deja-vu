@@ -49,7 +49,7 @@ Eklentiyi Zed'in eklenti listesinden kurun. İlk kullanımda Zed'den `deja --ver
 
 | İsabet (Recall) | Token | İndeksleme ve sorgu |
 |---|---|---|
-| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1) | **%58 daha az token** (tekrarlanan depo işlerinde) | 19,195 oturumu **13.6 sn**'de indeksler / 49 kodlama ajanı genelinde **0.7 ms** sorgu süresi |
+| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1) | **%58 daha az token** (tekrarlanan depo işlerinde) | 19,195 oturumu **13.6 sn**'de indeksler / 50 kodlama ajanı genelinde **0.7 ms** sorgu süresi |
 
 ## Depo belleği ve ajanlar arası devir (`handoff`)
 

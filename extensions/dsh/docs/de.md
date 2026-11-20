@@ -20,7 +20,7 @@ dsh plugin --profile web add dsh-deja
 dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 ```
 
-Fehlt `deja` noch auf dem System, `DEJA_BIN` setzen oder alle 49 Agenten samt `$DSH_HOME/plugins/deja/` einrichten:
+Fehlt `deja` noch auf dem System, `DEJA_BIN` setzen oder alle 50 Agenten samt `$DSH_HOME/plugins/deja/` einrichten:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -75,7 +75,7 @@ Eine Browser-Testdatei ohne Build-Schritt liegt unter `extensions/dsh/test/searc
 
 | Recall | Tokens | Indexierung & Suche |
 |---|---|---|
-| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 49 Coding-Agents hinweg |
+| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 50 Coding-Agents hinweg |
 
 ## Repository-Gedächtnis & Agenten-Übergabe
 

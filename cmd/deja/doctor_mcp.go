@@ -654,6 +654,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"zcode", zcodeDoctorMCPPath(), doctorZCodeWired, doctorJSONDejaKeysIn(doctorMCPServersBlock)},
 		{"commandcode", commandCodeMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"clawcode", clawCodeSettings(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"ante", anteSettingsPath(), doctorJSONWired("mcp_servers"), doctorJSONDejaKeys("mcp_servers")},
 		{"cherrystudio", cherryStudioImportPath(), doctorFileWired, nil},
 		// The server rides in deja's plugin package; the manifest Reasonix
 		// loaded it from is the file that says so.

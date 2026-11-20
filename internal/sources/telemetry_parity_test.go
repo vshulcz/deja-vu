@@ -209,6 +209,24 @@ func TestTelemetryParityAcrossParsers(t *testing.T) {
 				return ParseKiroCLIFile(writeFile(t, p, body))
 			},
 		},
+		{
+			name: "ante",
+			run: func(t *testing.T) ([]model.Session, error) {
+				t.Helper()
+				dir := filepath.Join(t.TempDir(), "ses_01TELEM")
+				if err := os.MkdirAll(dir, 0o755); err != nil {
+					t.Fatal(err)
+				}
+				writeFile(t, filepath.Join(dir, "meta.json"), `{"id":"ses_01TELEM","provider":"anthropic","model":"claude-sonnet-4-6","dir":"/Users/alex/payments-api","started_time":"2026-08-14T10:00:00Z","last_active_time":"2026-08-14T10:01:00Z"}`)
+				body := strings.Join([]string{
+					`{"timestamp":"2026-08-14T10:00:00Z","id":"e1","event":{"UserInput":"test"}}`,
+					`{"timestamp":"2026-08-14T10:00:05Z","id":"e2","event":{"ToolStart":{"id":"c1","name":"Bash","args":{"command":"go test ./..."}}}}`,
+					`{"timestamp":"2026-08-14T10:00:10Z","id":"e3","event":{"ToolEnd":{"tool_use_id":"c1","tool_name":"Bash","status":"Failed","result_json":{"Completed":{"exit_code":1,"stdout":"FAIL"}}}}}`,
+					`{"timestamp":"2026-08-14T10:00:15Z","id":"e4","event":{"UsageUpdate":{"usage":{"input_tokens":85,"output_tokens":20}}}}`,
+				}, "\n") + "\n"
+				return ParseAnteFile(writeFile(t, filepath.Join(dir, "events.jsonl"), body))
+			},
+		},
 	}
 
 	for _, tc := range cases {

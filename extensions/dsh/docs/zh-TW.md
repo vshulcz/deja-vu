@@ -20,7 +20,7 @@ dsh plugin --profile web add dsh-deja
 dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 ```
 
-若系統尚未安裝 `deja`，可透過 `DEJA_BIN` 指定路徑，或執行以下指令一併完成全機 49 款智慧體與 `$DSH_HOME/plugins/deja/` 之設定：
+若系統尚未安裝 `deja`，可透過 `DEJA_BIN` 指定路徑，或執行以下指令一併完成全機 50 款智慧體與 `$DSH_HOME/plugins/deja/` 之設定：
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -75,7 +75,7 @@ node --test extensions/dsh/test/*.test.js
 
 | 召回率 | Token 用量 | 索引與檢索耗時 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 49 個程式設計代理的檢索僅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 50 個程式設計代理的檢索僅 **0.7 ms** |
 
 ## 儲存庫記憶與跨代理接力
 

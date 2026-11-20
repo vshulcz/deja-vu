@@ -20,7 +20,7 @@ dsh plugin --profile web add dsh-deja
 dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 ```
 
-Caso ainda não tenha o `deja`, aponte `DEJA_BIN` ou configure os 49 agentes e `$DSH_HOME/plugins/deja/`:
+Caso ainda não tenha o `deja`, aponte `DEJA_BIN` ou configure os 50 agentes e `$DSH_HOME/plugins/deja/`:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -75,7 +75,7 @@ Inclui também `extensions/dsh/test/search-browser.html` via React 18 CDN para v
 
 | Recall | Tokens | Indexação e busca |
 |---|---|---|
-| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 49 agentes de código |
+| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 50 agentes de código |
 
 ## Memória do repositório e handoff entre agentes
 

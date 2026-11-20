@@ -5,14 +5,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Persistent Memory for Codex CLI (Hooks + MCP) — deja-vu</title>
-<meta name="description" content="Wire Codex CLI to 49 coding agents' local transcripts via ~/.codex/config.toml MCP and ~/.codex/hooks.json (/hooks approval), with zero LLM or API keys.">
+<meta name="description" content="Wire Codex CLI to 50 coding agents' local transcripts via ~/.codex/config.toml MCP and ~/.codex/hooks.json (/hooks approval), with zero LLM or API keys.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html">
 <link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html">
 <link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-codex.html">
 <link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Persistent Memory for Codex CLI (Hooks + MCP)">
-<meta property="og:description" content="Wire Codex CLI to 49 coding agents' local transcripts via ~/.codex/config.toml MCP and ~/.codex/hooks.json (/hooks approval), with zero LLM or API keys.">
+<meta property="og:description" content="Wire Codex CLI to 50 coding agents' local transcripts via ~/.codex/config.toml MCP and ~/.codex/hooks.json (/hooks approval), with zero LLM or API keys.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -29,13 +29,13 @@
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
 <meta name="twitter:title" content="Persistent Memory for Codex CLI (Hooks + MCP)">
-<meta name="twitter:description" content="Wire Codex CLI to 49 coding agents' local transcripts via ~/.codex/config.toml MCP and ~/.codex/hooks.json (/hooks approval), with zero LLM or API keys.">
+<meta name="twitter:description" content="Wire Codex CLI to 50 coding agents' local transcripts via ~/.codex/config.toml MCP and ~/.codex/hooks.json (/hooks approval), with zero LLM or API keys.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Persistent Memory for Codex CLI (Hooks + MCP)", "description": "Wire Codex CLI to 49 coding agents' local transcripts via ~/.codex/config.toml MCP and ~/.codex/hooks.json (/hooks approval), with zero LLM or API keys.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-24", "dateModified": "2026-11-16"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Persistent Memory for Codex CLI (Hooks + MCP)", "description": "Wire Codex CLI to 50 coding agents' local transcripts via ~/.codex/config.toml MCP and ~/.codex/hooks.json (/hooks approval), with zero LLM or API keys.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-24", "dateModified": "2026-11-16"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Memory for Codex CLI","item":"https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I add memory to Codex CLI?","acceptedAnswer":{"@type":"Answer","text":"Run deja install codex-auto to write the MCP server into ~/.codex/config.toml along with the hook, then approve the hook once under /hooks."}},{"@type":"Question","name":"Where does Codex CLI keep its sessions?","acceptedAnswer":{"@type":"Answer","text":"Under ${CODEX_HOME:-~/.codex}/sessions/YYYY/MM/DD/rollout-*.jsonl, with typed prompts in history.jsonl beside them."}},{"@type":"Question","name":"Why does nothing happen after installing the Codex hook?","acceptedAnswer":{"@type":"Answer","text":"Codex does not run a hook it has not been shown. Open Codex once and approve it under /hooks; until then nothing runs, codex exec included."}}]}</script>
 </head>
@@ -222,7 +222,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 <p>Codex also hands a hook the transcript before a compaction, so the working context is recoverable here: deja keeps the task, the files and each command with whether it passed, and hands them back once in the next turn after the summary. See <a href="after-compaction.html">after compaction</a>.</p>
 
 <h2>The part that is not about this harness</h2>
-<p>The index covers every agent's transcripts on the machine — forty-nine of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in one tool answers a question asked in another, including sessions from before any of this was installed. That is the reason to index rather than to capture.</p>
+<p>The index covers every agent's transcripts on the machine — fifty of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in one tool answers a question asked in another, including sessions from before any of this was installed. That is the reason to index rather than to capture.</p>
 <p>Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>). An injection is capped at 1,536 bytes per prompt and about 4 KB per tool call — <a href="token-cost.html">what memory costs</a> has the measured comparison.</p>
 
 <h2>Repository memory &amp; handoff</h2>
