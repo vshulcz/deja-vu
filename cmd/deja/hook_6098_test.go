@@ -66,7 +66,7 @@ func TestRepoSymbolMapDiskCachePersistenceAndInvalidation(t *testing.T) {
 	}
 
 	// Adding a new file invalidates the directory mtime and triggers a fresh scan.
-	if err := os.WriteFile(filepath.Join(repo, "beta.go"), []byte("package sample\n\nfunc BetaWorker() {}\n"), 0o644); err != nil {
+	if err = os.WriteFile(filepath.Join(repo, "beta.go"), []byte("package sample\n\nfunc BetaWorker() {}\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	repoSymbolMapCache.Delete(repo)

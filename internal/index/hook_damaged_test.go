@@ -39,7 +39,7 @@ func TestHookDamagedVsDamaged(t *testing.T) {
 
 	// Removing one bucket file triggers full Damaged() while HookDamaged() stays
 	// fast and accepts a non-empty postings directory.
-	if err := os.Remove(postings[0]); err != nil {
+	if err = os.Remove(postings[0]); err != nil {
 		t.Fatal(err)
 	}
 	invalidateManifestCache(dir)
@@ -52,7 +52,7 @@ func TestHookDamagedVsDamaged(t *testing.T) {
 
 	// Removing all remaining postings files makes HookDamaged report true.
 	for _, p := range postings[1:] {
-		if err := os.Remove(p); err != nil {
+		if err = os.Remove(p); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -62,7 +62,7 @@ func TestHookDamagedVsDamaged(t *testing.T) {
 	}
 
 	// Rebuilding restores both checks, and truncating records.bin trips HookDamaged.
-	if err := Ensure(dir, "", true, nil); err != nil {
+	if err = Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	recordsPath := filepath.Join(dir, "records.bin")
@@ -70,7 +70,7 @@ func TestHookDamagedVsDamaged(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Truncate(recordsPath, fi.Size()/2); err != nil {
+	if err = os.Truncate(recordsPath, fi.Size()/2); err != nil {
 		t.Fatal(err)
 	}
 	invalidateManifestCache(dir)
@@ -97,16 +97,16 @@ func TestWaitFreeExtendedRecordsWhileBuildLockHeld(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.WriteString("uncommitted-tail-record"); err != nil {
+	if _, werr := f.WriteString("uncommitted-tail-record"); werr != nil {
 		_ = f.Close()
-		t.Fatal(err)
+		t.Fatal(werr)
 	}
-	if err := f.Close(); err != nil {
+	if err = f.Close(); err != nil {
 		t.Fatal(err)
 	}
 
 	invalidateManifestCache(dir)
-	if _, err := readManifestCached(dir); err != nil {
+	if _, err = readManifestCached(dir); err != nil {
 		t.Fatal(err)
 	}
 	decodesBefore := manifestDecodes.Load()
