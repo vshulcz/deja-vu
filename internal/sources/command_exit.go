@@ -291,25 +291,58 @@ var gooseExitResumes = resumesUnlessSettling(`"tool`, func(m map[string]any) (ca
 
 // qwenExitResumes is the same rule for Qwen Code, which writes Gemini's parts:
 // a functionCall in one record, its functionResponse in a tool_result record.
-var qwenExitResumes = resumesUnlessAnswering(`"function`, func(m map[string]any) ([]string, string) {
+var qwenExitResumes = resumesUnlessSettling(`"function`, func(m map[string]any) (calls, failed, clean []string) {
 	msg, _ := m["message"].(map[string]any)
 	items, _ := msg["parts"].([]any)
-	var calls []string
 	for _, it := range items {
 		p, _ := it.(map[string]any)
 		if call, ok := p["functionCall"].(map[string]any); ok {
-			calls = append(calls, str(call["id"]))
+			if id := str(call["id"]); id != "" {
+				calls = append(calls, id)
+			}
 		}
 		resp, ok := p["functionResponse"].(map[string]any)
 		if !ok {
 			continue
 		}
+		id := str(resp["id"])
+		if id == "" {
+			continue
+		}
 		r, _ := resp["response"].(map[string]any)
 		out, _ := r["output"].(string)
 		errOut, _ := r["error"].(string)
-		if id := str(resp["id"]); id != "" && (geminiExitCode(out) > 0 || geminiExitCode(errOut) > 0) {
-			return calls, id
+		code, hasExit := geminiExitCodeKnown(out)
+		if !hasExit {
+			code, hasExit = geminiExitCodeKnown(errOut)
+		}
+		if !hasExit {
+			continue
+		}
+		if code != 0 {
+			failed = append(failed, id)
+		} else {
+			clean = append(clean, id)
 		}
 	}
-	return calls, ""
+	return calls, failed, clean
+}, func(line []byte) []string {
+	msg, _ := decodeJSONLine(line)["message"].(map[string]any)
+	items, _ := msg["parts"].([]any)
+	var ids []string
+	for _, it := range items {
+		p, _ := it.(map[string]any)
+		call, ok := p["functionCall"].(map[string]any)
+		if !ok {
+			continue
+		}
+		id := str(call["id"])
+		name := str(call["name"])
+		args, _ := call["args"].(map[string]any)
+		cmd, _ := args["command"].(string)
+		if id != "" && qwenDialect.isShellTool(name) && cmd != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 })

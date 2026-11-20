@@ -11,16 +11,36 @@ import (
 // Each arrived in a later goose migration, and naming one an older store lacks
 // fails the whole query, so they are probed rather than assumed.
 type gooseSchema struct {
-	sessionType bool // sessions.session_type
-	parent      bool // sessions.parent_session_id, the edge summon writes
-	messageID   bool // messages.message_id, which a fork copies
+	sessionType     bool // sessions.session_type
+	parent          bool // sessions.parent_session_id, the edge summon writes
+	messageID       bool // messages.message_id, which a fork copies
+	providerName    bool // sessions.provider_name
+	modelConfig     bool // sessions.model_config_json
+	model           bool // sessions.model
+	inputTokens     bool // sessions.input_tokens
+	outputTokens    bool // sessions.output_tokens
+	accumInputToks  bool // sessions.accumulated_input_tokens
+	accumOutputToks bool // sessions.accumulated_output_tokens
 }
 
 func gooseColumns(db string) gooseSchema {
 	var g gooseSchema
-	if out, err := sqliteOutput(db, "pragma table_info(sessions)"); err == nil {
-		g.sessionType = bytes.Contains(out, []byte("session_type"))
-		g.parent = bytes.Contains(out, []byte("parent_session_id"))
+	if out, err := sqliteOutput(db, "select name from pragma_table_info('sessions')"); err == nil {
+		cols := map[string]bool{}
+		for line := range strings.SplitSeq(string(out), "\n") {
+			if col := strings.TrimSpace(line); col != "" {
+				cols[col] = true
+			}
+		}
+		g.sessionType = cols["session_type"]
+		g.parent = cols["parent_session_id"]
+		g.providerName = cols["provider_name"]
+		g.modelConfig = cols["model_config_json"]
+		g.model = cols["model"]
+		g.inputTokens = cols["input_tokens"]
+		g.outputTokens = cols["output_tokens"]
+		g.accumInputToks = cols["accumulated_input_tokens"]
+		g.accumOutputToks = cols["accumulated_output_tokens"]
 	}
 	if out, err := sqliteOutput(db, "pragma table_info(messages)"); err == nil {
 		g.messageID = bytes.Contains(out, []byte("message_id"))

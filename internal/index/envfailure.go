@@ -70,15 +70,26 @@ func missingProgram(line string) string {
 // first line: `No module named 'requests'` names no program, and the batch it
 // came out of ran that command a few records up.
 func commandRunningBefore(ms []model.Message, i int, prog string) string {
+	outputs := 1
 	for k := i - 1; k >= 0 && k >= i-fixLookAhead; k-- {
+		if ms[k].Role == roleToolOutput {
+			outputs++
+			continue
+		}
+		if ms[k].Role == "user" {
+			return ""
+		}
 		if ms[k].Role != roleCommand {
 			continue
 		}
 		if prog == "" {
-			return strings.TrimSpace(firstLineOf(ms[k].Text))
+			if outputs > 1 && !commandBatchCovers(ms, k, outputs) && !commandFailed(ms[k].Text) && k+1 < i && ms[k+1].Role == roleToolOutput && !outputReadsAsFailure(ms[k+1].Text) {
+				return ""
+			}
+			return strings.TrimSpace(withoutExitStatus(firstLineOf(ms[k].Text)))
 		}
 		for line := range strings.SplitSeq(ms[k].Text, "\n") {
-			line = strings.TrimSpace(line)
+			line = strings.TrimSpace(withoutExitStatus(line))
 			for _, part := range commandParts(line) {
 				if commandProgram(commandTokens(part)) == prog {
 					return line

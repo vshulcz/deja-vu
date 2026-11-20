@@ -433,7 +433,7 @@ func FixesForCommand(dir, command, text string, limit int, allow func(project st
 		if remedyIsTheFailure(p) || remedyIsIrreversible(p.Command) || (p.Edit != "" && !looksLikeEditedPath(p.Edit)) {
 			continue
 		}
-		if !sigs[p.Sig] && (p.Repaired || p.Substitute) {
+		if !sigs[p.Sig] && (p.Repaired || p.Substitute) && !repairedAlsoAnswers(p, text, command) {
 			continue
 		}
 		// One session doing something after an error is not evidence that it
@@ -493,6 +493,40 @@ func FixesForCommand(dir, command, text string, limit int, allow func(project st
 		}
 	}
 	return out
+}
+
+// repairedAlsoAnswers reports whether a Repaired or Substitute pair can answer
+// a query that matched only p.Also (not p.Sig).
+//
+// A repaired test run (`go test -run TestX -v ./pkg`) or shell/env rewrite
+// (`timeout` dropped, glob quoted) entered the table on one sighting for p.Sig
+// and must not answer a generic secondary line like `FAIL\tpkg` on its own. A
+// real action remedy that shares a distinctive term with the matched secondary
+// line (such as pip's second refusal line naming the same package as a mirror
+// install) or matches the caller's failing command still answers.
+func repairedAlsoAnswers(p FixPair, text, command string) bool {
+	if sameFailingCommand(p, command) {
+		return true
+	}
+	if p.Command == "" || isShellOrEnvError(p.Error) || investigationCommand(p.Command) || VerifyCommand(p.Command) {
+		return false
+	}
+	for raw := range strings.SplitSeq(text, "\n") {
+		line, ok := FrictionLine(raw)
+		if !ok {
+			continue
+		}
+		matched := slices.Contains(p.Also, frictionHash(line))
+		if !matched {
+			if rest, ok := strings.CutPrefix(line, "FAIL "); ok {
+				matched = slices.Contains(p.Also, frictionHash("FAIL\t"+strings.TrimSpace(rest)))
+			}
+		}
+		if matched && !namedTestFailure(line) && sharesTerm(line, p.Command) {
+			return true
+		}
+	}
+	return false
 }
 
 // remedyIsTheFailure drops a pair whose remedy is the command that produced
@@ -606,7 +640,7 @@ func FixCandidateSeen(dir, text string, allow func(project string) bool) bool {
 		if remedyIsTheFailure(p) || remedyIsIrreversible(p.Command) || (p.Edit != "" && !looksLikeEditedPath(p.Edit)) {
 			continue
 		}
-		if !sigs[p.Sig] && (p.Repaired || p.Substitute) {
+		if !sigs[p.Sig] && (p.Repaired || p.Substitute) && !repairedAlsoAnswers(p, text, "") {
 			continue
 		}
 		if allow != nil && !allow(p.Project) {

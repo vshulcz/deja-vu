@@ -924,7 +924,7 @@ func TestJunieReadsTheEventLog(t *testing.T) {
 		"files: /work/retry-demo/retry.go",
 		"wrote: /work/retry-demo/retry.go",
 		"edit: /work/retry-demo/retry.go",
-		"command: $ go test ./...",
+		"command: $ go test ./...  → exit 0",
 		"tool-output: ok  \tretry-demo\t0.003s",
 		"assistant: ### Summary",
 		"user: does the backoff still double between attempts",

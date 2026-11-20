@@ -216,7 +216,7 @@ func TestQwenFailedCommandCarriesItsExitCode(t *testing.T) {
 			cmds = append(cmds, m.Text)
 		}
 	}
-	want := []string{"$ git log --oneline -1 -- retry.go  → exit 128", "$ git status --short"}
+	want := []string{"$ git log --oneline -1 -- retry.go  → exit 128", "$ git status --short  → exit 0"}
 	if strings.Join(cmds, "|") != strings.Join(want, "|") {
 		t.Fatalf("commands = %q, want %q", cmds, want)
 	}
@@ -3099,9 +3099,10 @@ func TestEachLineWalksStopAtAMissingFile(t *testing.T) {
 	}
 }
 
-// The answering rule only knows the calls the tail makes. A failed exit for
-// a call stored already sends the file back; one for a call in the same tail,
-// a clean exit, or a line that does not decode does not (#4443).
+// The answering rule only knows the calls the tail makes. Any recorded exit
+// for a call stored already sends the file back so clean exits also stamp the
+// prior command; one for a call in the same tail or a line that does not
+// decode does not.
 func TestCodexAndCopilotResumesOnlyOnAFailureForAStoredCall(t *testing.T) {
 	codexCall := func(id string) string {
 		return `{"timestamp":"2026-07-31T00:00:02Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","call_id":"` + id + `","arguments":"{\"cmd\":\"go test ./...\"}"}}` + "\n"
@@ -3122,13 +3123,15 @@ func TestCodexAndCopilotResumesOnlyOnAFailureForAStoredCall(t *testing.T) {
 		want       bool
 	}{
 		{"codex failed exit for a stored call", codexResumes, codexCall("c1"), codexOut("c1", "2"), false},
-		{"codex clean exit for a stored call", codexResumes, codexCall("c1"), codexOut("c1", "0"), true},
+		{"codex clean exit for a stored call", codexResumes, codexCall("c1"), codexOut("c1", "0"), false},
 		{"codex call and failure both in the tail", codexResumes, "", codexCall("c2") + codexOut("c2", "1"), true},
+		{"codex call and clean exit both in the tail", codexResumes, "", codexCall("c2") + codexOut("c2", "0"), true},
 		{"codex half-written answer", codexResumes, codexCall("c1"), `{"type":"response_item","payload":{"type":"function_call_output","call_id":"c1","out` + "\n", true},
 		{"codex failure then more", codexResumes, codexCall("c1"), codexOut("c1", "1") + codexCall("c3") + codexOut("c3", "0"), false},
 		{"copilot failed exit for a stored call", copilotResumes, copilotCall("k1"), copilotOut("k1", "1"), false},
-		{"copilot clean exit for a stored call", copilotResumes, copilotCall("k1"), copilotOut("k1", "0"), true},
+		{"copilot clean exit for a stored call", copilotResumes, copilotCall("k1"), copilotOut("k1", "0"), false},
 		{"copilot call and failure both in the tail", copilotResumes, "", copilotCall("k2") + copilotOut("k2", "1"), true},
+		{"copilot call and clean exit both in the tail", copilotResumes, "", copilotCall("k2") + copilotOut("k2", "0"), true},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			head := `{"type":"session_meta"}` + "\n" + c.head

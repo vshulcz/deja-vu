@@ -504,12 +504,18 @@ func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD stri
 			inheritedAt = -1
 			return
 		}
-		if trae != nil {
-			trae.record(&s, m, payload, cwd, t, calls)
-			return
-		}
 		if typ, _ := m["type"].(string); typ == "turn_context" {
 			codexTurnContext(&s, payload, modelProvider)
+			return
+		}
+		if typ, _ := m["type"].(string); typ == "event_msg" {
+			if pt, _ := payload["type"].(string); pt == "token_count" {
+				codexTokenCount(&s, payload, &lastTokenTotal)
+				return
+			}
+		}
+		if trae != nil {
+			trae.record(&s, m, payload, cwd, t, calls)
 			return
 		}
 		// A local compaction writes {"type":"compacted","payload":{"message":
@@ -521,12 +527,6 @@ func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD stri
 				s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: msg, Time: t})
 			}
 			return
-		}
-		if typ, _ := m["type"].(string); typ == "event_msg" {
-			if pt, _ := payload["type"].(string); pt == "token_count" {
-				codexTokenCount(&s, payload, &lastTokenTotal)
-				return
-			}
 		}
 		switch pt, _ := payload["type"].(string); pt {
 		case "function_call":
@@ -821,20 +821,105 @@ func leadingCD(cmd string) (target, rest string, ok bool) {
 }
 
 // codexResumes sends a rollout back for a whole read when its tail holds the
-// failed exit of a command called before it (#4443).
-var codexResumes = resumesUnlessAnswering(`_call`, func(m map[string]any) ([]string, string) {
+// resolved exit (non-zero, or 0 for a command) of a call emitted before it (#4443).
+var codexResumes = resumesUnlessSettling(`_call`, func(m map[string]any) (calls, failed, clean []string) {
 	payload, _ := m["payload"].(map[string]any)
-	id, _ := payload["call_id"].(string)
-	switch typ, _ := payload["type"].(string); typ {
-	case "function_call", "custom_tool_call":
-		return []string{id}, ""
-	case "function_call_output", "custom_tool_call_output":
-		out := textFromContent(payload["output"])
-		if c := codexExit.FindStringSubmatch(out); len(c) > 1 && c[1] != "0" {
-			return nil, id
+	if payload == nil {
+		return nil, nil, nil
+	}
+	var items []map[string]any
+	if str(m["type"]) == "history_mutation" {
+		if op := str(payload["operation"]); op != "" && op != "append" {
+			return nil, nil, nil
+		}
+		if rawItems, ok := payload["items"].([]any); ok {
+			for _, it := range rawItems {
+				if im, _ := it.(map[string]any); im != nil {
+					items = append(items, im)
+				}
+			}
+		}
+	} else {
+		items = []map[string]any{payload}
+	}
+	for _, it := range items {
+		id, _ := it["call_id"].(string)
+		if id == "" {
+			continue
+		}
+		switch typ, _ := it["type"].(string); typ {
+		case "function_call", "custom_tool_call":
+			calls = append(calls, id)
+		case "function_call_output", "custom_tool_call_output":
+			out := textFromContent(traeOutput(it)["output"])
+			if c := codexExit.FindStringSubmatch(out); len(c) > 1 {
+				if c[1] == "0" {
+					clean = append(clean, id)
+				} else {
+					failed = append(failed, id)
+				}
+			}
 		}
 	}
-	return nil, ""
+	return calls, failed, clean
+}, func(line []byte) []string {
+	var m map[string]any
+	if json.Unmarshal(line, &m) != nil {
+		return nil
+	}
+	payload, _ := m["payload"].(map[string]any)
+	if payload == nil {
+		return nil
+	}
+	var items []map[string]any
+	if str(m["type"]) == "history_mutation" {
+		if rawItems, ok := payload["items"].([]any); ok {
+			for _, it := range rawItems {
+				if im, _ := it.(map[string]any); im != nil {
+					items = append(items, im)
+				}
+			}
+		}
+	} else {
+		items = []map[string]any{payload}
+	}
+	var ids []string
+	for _, it := range items {
+		if str(it["type"]) != "function_call" {
+			continue
+		}
+		id, _ := it["call_id"].(string)
+		if id == "" {
+			continue
+		}
+		norm := traeShellCall(it)
+		name := str(norm["name"])
+		switch name {
+		case "exec_command", "shell_command":
+			var in codexShellIn
+			if args, _ := norm["arguments"].(string); json.Unmarshal([]byte(args), &in) == nil {
+				cmd := in.Cmd
+				if name == "shell_command" {
+					cmd = in.Command
+				}
+				if cmd != "" && worthIndexing(cmd) {
+					ids = append(ids, id)
+				}
+			}
+		case "Bash":
+			in := map[string]any{}
+			switch a := norm["arguments"].(type) {
+			case string:
+				_ = json.Unmarshal([]byte(a), &in)
+			case map[string]any:
+				in = a
+			}
+			if cmd := strings.TrimSpace(str(in["command"])); cmd != "" && worthIndexing(cmd) {
+				ids = append(ids, id)
+			}
+		}
+	}
+	return ids
 })
 
 // codexExit reads the outcome Codex prints above the output. exec_command says
@@ -852,10 +937,12 @@ func codexCallOutput(s *model.Session, payload map[string]any, calls map[string]
 	// that takes the whole parse down.
 	id, _ := payload["call_id"].(string)
 	if m := codexExit.FindStringSubmatch(out); m != nil {
-		if code, err := strconv.Atoi(m[1]); err == nil && code > 0 {
-			s.ToolErrors++
+		if code, err := strconv.Atoi(m[1]); err == nil && code >= 0 {
+			if code != 0 {
+				s.ToolErrors++
+			}
 			if id != "" {
-				if i, ok := calls[id]; ok && i < len(s.Messages) {
+				if i, ok := calls[id]; ok && i < len(s.Messages) && !strings.Contains(s.Messages[i].Text, "  → exit ") {
 					s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
 				}
 			}

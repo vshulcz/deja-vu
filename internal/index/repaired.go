@@ -32,7 +32,7 @@ const (
 // repairedVariant reports whether cmd is failed, corrected: the same program,
 // most of the same words, and not the same line over again.
 func repairedVariant(failed, cmd string) bool {
-	failed, cmd = strings.TrimSpace(failed), strings.TrimSpace(cmd)
+	failed, cmd = strings.TrimSpace(withoutExitStatus(failed)), strings.TrimSpace(withoutExitStatus(cmd))
 	if failed == "" || cmd == "" || failed == cmd {
 		return false
 	}

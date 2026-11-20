@@ -1,7 +1,6 @@
 package sources
 
 import (
-	"encoding/json"
 	"strconv"
 	"strings"
 	"time"
@@ -160,7 +159,7 @@ func (s *auiStep) terminalRecords() []model.Message {
 	cmd, _ := s.body["command"].(string)
 	if IndexCommands() && worthIndexing(cmd) {
 		text := "$ " + cmd
-		if code, ok := auiExitCode(s.body["exitCode"]); ok && code != 0 {
+		if code, ok := auiExitCode(s.body["exitCode"]); ok && code >= 0 {
 			text += "  → exit " + strconv.Itoa(code)
 		}
 		out = append(out, model.Message{Role: RoleCommand, Text: text, Time: s.at})
@@ -172,17 +171,9 @@ func (s *auiStep) terminalRecords() []model.Message {
 	return out
 }
 
-// auiExitCode is a block's exit code: a json.Number from scanJSONL, a float64
-// from the IDE's records.
+// auiExitCode reads a block's explicit exitCode when present.
 func auiExitCode(v any) (int, bool) {
-	switch n := v.(type) {
-	case json.Number:
-		i, err := n.Int64()
-		return int(i), err == nil
-	case float64:
-		return int(n), true
-	}
-	return 0, false
+	return anyExitCode(v)
 }
 
 func auiContent(v any) string {

@@ -216,11 +216,17 @@ func parseCopilotScan(path string, offset int64, scan func(func(map[string]any))
 				startAt = t
 			}
 			s.Touch(startAt)
+			copilotSetModel(cur, data)
 			if ctx, ok := data["context"].(map[string]any); ok {
+				copilotSetModel(cur, ctx)
 				if c, _ := ctx["cwd"].(string); c != "" {
 					cwd = c
 					s.Project = copilotProjectName(cwd)
 				}
+			}
+		case "session.model_change", "session.usage_info", "assistant.turn_end":
+			if data != nil {
+				copilotTelemetry(cur, data)
 			}
 		case "session.compaction_complete":
 			// {"success":true,"summaryContent":…} is the only record of the
@@ -241,6 +247,7 @@ func parseCopilotScan(path string, offset int64, scan func(func(map[string]any))
 			role := "user"
 			if typ == "assistant.message" {
 				role = "assistant"
+				copilotTelemetry(cur, data)
 			}
 			cur.Touch(t)
 			txt, _ := data["content"].(string)
@@ -291,6 +298,9 @@ func copilotToolStart(cur *model.Session, data map[string]any, t time.Time, cwd 
 		return
 	}
 	name, _ := data["toolName"].(string)
+	if name != "" {
+		cur.AddToolCall(name, false)
+	}
 	// With a GPT model the only edit tool is apply_patch, a freeform
 	// tool whose arguments are the patch string itself rather than an
 	// object, so every file such a session changed was dropped (#4491).
@@ -355,20 +365,26 @@ func copilotToolStart(cur *model.Session, data map[string]any, t time.Time, cwd 
 // copilotToolComplete stamps a command's exit code onto the call it completes
 // and keeps the tool's output.
 func copilotToolComplete(cur *model.Session, data map[string]any, t time.Time, commandAt map[string]copilotCmdRef) {
-	if !IndexToolOutput() || data == nil {
+	if data == nil {
 		return
 	}
 	result, _ := data["result"].(map[string]any)
 	out, _ := result["content"].(string)
-	// What the command did, which Copilot does not put in `success`:
-	// that field is true on every completion in a real store, failed
-	// runs included, and the code lives in the telemetry and in a
-	// trailer inside the output (#3369).
-	if code := copilotExitCode(data, out); code > 0 {
+	code, hasExit := copilotExitCode(data, out)
+	failed := data["error"] != nil
+	if okVal, present := data["success"]; present {
+		if b, isBool := okVal.(bool); isBool && !b {
+			failed = true
+		}
+	}
+	if (hasExit && code != 0) || failed {
+		cur.ToolErrors++
+	}
+	if hasExit && code >= 0 {
 		if id, _ := data["toolCallId"].(string); id != "" {
 			if c := commandAt[id]; c.s != nil {
 				for _, i := range c.at {
-					if i < len(c.s.Messages) {
+					if i < len(c.s.Messages) && !strings.Contains(c.s.Messages[i].Text, "  → exit ") {
 						c.s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
 					}
 				}
@@ -377,33 +393,14 @@ func copilotToolComplete(cur *model.Session, data map[string]any, t time.Time, c
 			delete(commandAt, id)
 		}
 	}
+	if !IndexToolOutput() {
+		return
+	}
 	if out = strings.TrimSpace(out); out == "" {
 		return
 	}
 	cur.Touch(t)
 	cur.Messages = append(cur.Messages, model.Message{Role: RoleToolOutput, Text: out, Time: t})
-}
-
-// jsonInt reads a number the scanner decoded with UseNumber, and the two other
-// shapes a store can hold it in.
-func jsonInt(v any) (int, bool) {
-	switch n := v.(type) {
-	case json.Number:
-		if i, err := n.Int64(); err == nil {
-			return int(i), true
-		}
-		// A store that wrote the code as 1.0 says the same thing.
-		if f, err := n.Float64(); err == nil && f == float64(int(f)) {
-			return int(f), true
-		}
-	case float64:
-		return int(n), true
-	case string:
-		if i, err := strconv.Atoi(n); err == nil {
-			return i, true
-		}
-	}
-	return 0, false
 }
 
 // copilotShellExitRe is the trailer Copilot writes under a shell run's output:
@@ -412,22 +409,86 @@ func jsonInt(v any) (int, bool) {
 // whole shape rather than the phrase.
 var copilotShellExitRe = regexp.MustCompile(`<shellId:[^>]*completed with exit code (\d+)>`)
 
+// copilotSetModel records Copilot's session or turn model when present.
+func copilotSetModel(cur *model.Session, m map[string]any) {
+	if cur == nil || m == nil {
+		return
+	}
+	prov, _ := m["provider"].(string)
+	if prov == "" {
+		prov, _ = m["modelProvider"].(string)
+	}
+	for _, k := range []string{"newModel", "model", "selectedModel", "modelId"} {
+		if id, _ := m[k].(string); id != "" {
+			cur.SetModel(prov, id)
+			return
+		}
+	}
+}
+
+// copilotTelemetry records model and token usage from Copilot events.
+func copilotTelemetry(cur *model.Session, data map[string]any) {
+	if cur == nil || data == nil {
+		return
+	}
+	copilotSetModel(cur, data)
+	usedNested := false
+	for _, k := range []string{"usage", "tokens", "tokenUsage", "token_usage"} {
+		if u, ok := data[k].(map[string]any); ok {
+			applyUsageMap(cur, u)
+			usedNested = true
+		}
+	}
+	if !usedNested {
+		applyUsageMap(cur, data)
+	}
+}
+
 // copilotExitResumes sends an event log back for a whole read when its tail
-// holds the failed exit of a command started before it (#4443).
-var copilotExitResumes = resumesUnlessAnswering(`"tool.execution_`, func(m map[string]any) ([]string, string) {
+// holds the settled exit of a command started before it (#4443, #5527).
+var copilotExitResumes = resumesUnlessSettling(`"tool.execution_`, func(m map[string]any) ([]string, []string, []string) {
 	data, _ := m["data"].(map[string]any)
 	id, _ := data["toolCallId"].(string)
+	if id == "" {
+		return nil, nil, nil
+	}
 	switch typ, _ := m["type"].(string); typ {
 	case "tool.execution_start":
-		return []string{id}, ""
+		return []string{id}, nil, nil
 	case "tool.execution_complete":
 		result, _ := data["result"].(map[string]any)
 		out, _ := result["content"].(string)
-		if copilotExitCode(data, out) > 0 {
-			return nil, id
+		code, hasExit := copilotExitCode(data, out)
+		if !hasExit {
+			return nil, nil, nil
 		}
+		if code != 0 {
+			return nil, []string{id}, nil
+		}
+		return nil, nil, []string{id}
 	}
-	return nil, ""
+	return nil, nil, nil
+}, func(line []byte) []string {
+	var ev struct {
+		Type string `json:"type"`
+		Data struct {
+			ToolCallID string `json:"toolCallId"`
+			ToolName   string `json:"toolName"`
+			Arguments  any    `json:"arguments"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(line, &ev) != nil || ev.Type != "tool.execution_start" || ev.Data.ToolCallID == "" || ev.Data.ToolName == "" {
+		return nil
+	}
+	args, ok := ev.Data.Arguments.(map[string]any)
+	if !ok {
+		return nil
+	}
+	part := []any{map[string]any{"type": "tool_use", "name": ev.Data.ToolName, "input": args}}
+	if len(commandsIn(part, copilotDialect)) == 0 {
+		return nil
+	}
+	return []string{ev.Data.ToolCallID}
 })
 
 // copilotResumes also reads the log whole when its tail closes a sub-agent
@@ -455,24 +516,26 @@ func copilotResumes(path string, offset int64) bool {
 // copilotExitCode reads what a shell call actually did. The telemetry carries
 // the number when Copilot recorded one; the trailer under the output is the
 // fallback, and both are absent for a call that is not a shell run.
-func copilotExitCode(data map[string]any, out string) int {
+func copilotExitCode(data map[string]any, out string) (int, bool) {
 	if tel, ok := data["toolTelemetry"].(map[string]any); ok {
 		if metrics, ok := tel["metrics"].(map[string]any); ok {
-			// The scanner decodes with UseNumber, so a JSON number arrives as
-			// json.Number and never as float64: asserting the latter made this
-			// whole path dead code and left every marker to the trailer below
-			// (review of #3369).
-			if code, ok := jsonInt(metrics["exit_code"]); ok {
-				return code
+			if code, ok := anyExitCode(metrics["exit_code"]); ok {
+				return code, true
+			}
+			if code, ok := anyExitCode(metrics["exitCode"]); ok {
+				return code, true
 			}
 		}
 	}
+	if code, ok := anyExitCode(data["exitCode"]); ok {
+		return code, true
+	}
 	if m := copilotShellExitRe.FindStringSubmatch(out); m != nil {
 		if code, err := strconv.Atoi(m[1]); err == nil {
-			return code
+			return code, true
 		}
 	}
-	return 0
+	return 0, false
 }
 
 // copilotHeadCWD is the cwd session.start records, read off the first lines

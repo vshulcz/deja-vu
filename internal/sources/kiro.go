@@ -140,6 +140,16 @@ func ParseKiroCLIFileFromOffset(path string, offset int64) ([]model.Session, err
 		if data == nil {
 			return
 		}
+		meta, _ := data["meta"].(map[string]any)
+		if mod := firstNonEmptyStr(str(data["model"]), str(meta["model"])); mod != "" {
+			s.SetModel("", mod)
+		}
+		for _, u := range []any{data["usage"], meta["usage"]} {
+			if um, ok := u.(map[string]any); ok {
+				applyUsageMap(&s, um)
+				break
+			}
+		}
 		text, calls, results := kiroContent(data["content"])
 		t := parseTimeAny(kiroMetaTimestamp(data))
 		if t.IsZero() {
@@ -165,6 +175,11 @@ func ParseKiroCLIFileFromOffset(path string, offset int64) ([]model.Session, err
 		// The work rides beside the talk: toolUse parts in an AssistantMessage,
 		// toolResult parts in a ToolResults record. Read as text only, a Kiro
 		// CLI session had no command, no file and no tool output (#4299).
+		for _, c := range calls {
+			if cm, ok := c.(map[string]any); ok {
+				s.AddToolCall(str(cm["name"]), false)
+			}
+		}
 		from := len(s.Messages)
 		if work := kiroWorkRecords(calls, results, t); len(work) > 0 {
 			s.Touch(t)
@@ -175,8 +190,13 @@ func ParseKiroCLIFileFromOffset(path string, offset int64) ([]model.Session, err
 		for _, part := range parts {
 			if p, _ := part.(map[string]any); p["kind"] == "toolResult" {
 				d, _ := p["data"].(map[string]any)
-				if code, ok := kiroExitStatus(d["content"]); ok {
+				code, hasExit := kiroExitStatus(d["content"])
+				if hasExit {
 					exits.stamp(s.Messages, str(d["toolUseId"]), "", code)
+				}
+				st := str(d["status"])
+				if st == "error" || st == "failed" || (hasExit && code != 0) {
+					s.ToolErrors++
 				}
 			}
 		}
@@ -279,12 +299,16 @@ func applyKiroCLIHeader(s *model.Session, path string) {
 	if header.CWD != "" {
 		s.Project = projectName(header.CWD)
 	}
+	if header.Model != "" {
+		s.SetModel("", header.Model)
+	}
 	header.applyParent(s)
 }
 
 type kiroCLIHeader struct {
 	SessionID string `json:"session_id"`
 	CWD       string `json:"cwd"`
+	Model     string `json:"model"`
 	// Set on the session a sub-agent runs in (the subagent tool, 2.32): the
 	// session that spawned it. session_created_reason says "subagent" on
 	// top-level sessions too, so it is not read.
@@ -555,6 +579,13 @@ func ParseKiroIDEFileFromOffset(path string, offset int64) ([]model.Session, err
 	applyKiroIDEHeader(&s, filepath.Join(dir, "session.json"))
 
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
+		payload, _ := m["payload"].(map[string]any)
+		if mod := firstNonEmptyStr(str(payload["model"]), str(m["model"])); mod != "" {
+			s.SetModel("", mod)
+		}
+		if um, ok := payload["usage"].(map[string]any); ok {
+			applyUsageMap(&s, um)
+		}
 		t := parseTimeAny(m["timestamp"])
 		// A tool_call record has no content, only the call: read as text it
 		// was skipped, and the session kept no command, file or edit (#4506).
@@ -562,6 +593,7 @@ func ParseKiroIDEFileFromOffset(path string, offset int64) ([]model.Session, err
 			if call == nil {
 				return
 			}
+			s.AddToolCall(str(call["name"]), failed)
 			work := kiroWorkRecords([]any{call}, nil, t)
 			if failed {
 				work = kiroDropChanges(work)

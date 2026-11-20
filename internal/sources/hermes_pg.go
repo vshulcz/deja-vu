@@ -151,9 +151,17 @@ func hermesPGSessionMeta(dsn string) map[string]hermesMeta {
 	}
 	fields := "id::text as id"
 	var fieldsSb159 strings.Builder
-	for col, key := range map[string]string{"cwd": "cwd", "source": "source", "parent_session_id": "parent"} {
+	for col, key := range map[string]string{
+		"cwd": "cwd", "source": "source", "parent_session_id": "parent",
+		"model": "model", "billing_provider": "provider", "provider": "provider_fallback",
+	} {
 		if cols[col] {
 			fmt.Fprintf(&fieldsSb159, ", %s::text as %s", col, key)
+		}
+	}
+	for _, col := range []string{"input_tokens", "output_tokens", "reasoning_tokens", "cache_read_tokens"} {
+		if cols[col] {
+			fmt.Fprintf(&fieldsSb159, ", %s", col)
 		}
 	}
 	fields += fieldsSb159.String()
@@ -169,8 +177,9 @@ func hermesPGSessionMeta(dsn string) map[string]hermesMeta {
 		return nil
 	}
 	var rows []struct {
-		ID          string `json:"id"`
-		ModelConfig string `json:"model_config"`
+		ID               string `json:"id"`
+		ModelConfig      string `json:"model_config"`
+		ProviderFallback string `json:"provider_fallback"`
 		hermesMeta
 	}
 	if json.Unmarshal([]byte(strings.TrimSpace(string(out))), &rows) != nil {
@@ -180,15 +189,38 @@ func hermesPGSessionMeta(dsn string) map[string]hermesMeta {
 	for _, r := range rows {
 		if r.ID != "" {
 			branched, delegated := hermesModelConfigMarks(r.ModelConfig)
-			meta[r.ID] = hermesMeta{Cwd: strings.TrimSpace(r.Cwd), Source: strings.TrimSpace(r.Source), Parent: strings.TrimSpace(r.Parent), Branched: branched, Delegated: delegated}
+			cfgModel, cfgProvider := hermesModelConfigModel(r.ModelConfig)
+			modelID := strings.TrimSpace(r.Model)
+			if modelID == "" {
+				modelID = cfgModel
+			}
+			prov := strings.TrimSpace(r.Provider)
+			if prov == "" {
+				prov = strings.TrimSpace(r.ProviderFallback)
+			}
+			if prov == "" {
+				prov = cfgProvider
+			}
+			meta[r.ID] = hermesMeta{
+				Cwd:          strings.TrimSpace(r.Cwd),
+				Source:       strings.TrimSpace(r.Source),
+				Parent:       strings.TrimSpace(r.Parent),
+				Branched:     branched,
+				Delegated:    delegated,
+				Provider:     prov,
+				Model:        modelID,
+				TokensIn:     r.TokensIn,
+				TokensOut:    r.TokensOut,
+				TokensReason: r.TokensReason,
+				TokensCache:  r.TokensCache,
+			}
 		}
 	}
 	return meta
 }
 
 // hermesModelConfigMarks reads _branched_from and _delegate_from off a
-// session's model_config, "" for either when it is absent or the config is
-// not a JSON object.
+// session's model_config, "" for any absent mark.
 func hermesModelConfigMarks(config string) (branched, delegated string) {
 	var m map[string]any
 	if json.Unmarshal([]byte(config), &m) != nil {
@@ -199,6 +231,20 @@ func hermesModelConfigMarks(config string) (branched, delegated string) {
 		return strings.TrimSpace(v)
 	}
 	return mark("_branched_from"), mark("_delegate_from")
+}
+
+// hermesModelConfigModel reads optional model and provider fallbacks off a
+// session's model_config.
+func hermesModelConfigModel(config string) (modelID, provider string) {
+	var m map[string]any
+	if json.Unmarshal([]byte(config), &m) != nil {
+		return "", ""
+	}
+	strField := func(key string) string {
+		v, _ := m[key].(string)
+		return strings.TrimSpace(v)
+	}
+	return strField("model"), strField("provider")
 }
 
 // hermesPGRead is the index's read of the Postgres store, recorded as unread
