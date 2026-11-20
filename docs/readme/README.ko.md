@@ -135,7 +135,7 @@ skill은 이미 설치된 `deja` 바이너리를 호출하며, 자체 바이너�
 
 ## 무엇을 얻나
 
-**Codex에서 해결하면 Claude가 기억합니다.** 쉰 개의 코딩 에이전트가 모든 대화를 로컬 파일에 쓰고,
+**Codex에서 해결하면 Claude가 기억합니다.** 마흔아홉 개의 코딩 에이전트가 모든 대화를 로컬 파일에 쓰고,
 deja는 그 파일들을 모두가 읽을 수 있는 하나의 기억 계층으로 바꿉니다.
 
 | | |
@@ -251,7 +251,9 @@ Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Ro
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
 CodeArts Desktop ·
-Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Ante · Zed.
+Ante ·
+Doubao ·
+Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed.
 
 각 도구가 MCP 회상, 자동 회상, skill, 명령, resume, handoff 중 무엇을 지원하는지는
 [영문 README의 기능 표](../../README.md#supported-harnesses)에 있습니다. 저장 위치를 바꿨다면 `DEJA_*_ROOT`

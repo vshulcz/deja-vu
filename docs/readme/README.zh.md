@@ -7,7 +7,7 @@
   </a>
 </p>
 
-<p align="center"><b>跨 50 个编程智能体的本地共享记忆、跨智能体交接与代码恢复。</b></p>
+<p align="center"><b>跨 49 个编程智能体的本地共享记忆、跨智能体交接与代码恢复。</b></p>
 
 <p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 42 个智能体本来就把每次会话写在磁盘上。<br>
 deja 在本地索引全部历史，让智能体跨 <code>/compact</code> 保住上下文、用 <code>deja handoff</code> 中途换智能体接着做、用 <code>deja restore</code> 找回被覆盖的代码——无需 LLM，单个 Go 二进制。</p>
@@ -135,7 +135,7 @@ skill 调用的是上面装好的 `deja` 二进制，自己不带。
 
 ## 能得到什么
 
-**在 Codex 里解决，Claude 记得。** 五十个编程智能体把每一次对话都写进本地文件，
+**在 Codex 里解决，Claude 记得。** 五十一个编程智能体把每一次对话都写进本地文件，
 deja 把这些文件变成一层它们都能读的记忆。
 
 | | |
@@ -237,7 +237,9 @@ Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Ro
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
 CodeArts Desktop ·
-Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Ante · Zed。
+Ante ·
+Doubao ·
+Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed。
 
 每个工具分别支持 MCP 召回、自动召回、技能、命令、resume 和 handoff 中的哪些，见
 [英文 README 的能力矩阵](../../README.md#supported-harnesses)。自定义存储位置通过 `DEJA_*_ROOT`

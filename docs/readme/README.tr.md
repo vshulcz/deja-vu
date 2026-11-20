@@ -7,7 +7,7 @@
   </a>
 </p>
 
-<p align="center"><b>50 kodlama ajanı arasında paylaşılan yerel bellek, ajanlar arası görev devri ve kod kurtarma.</b></p>
+<p align="center"><b>49 kodlama ajanı arasında paylaşılan yerel bellek, ajanlar arası görev devri ve kod kurtarma.</b></p>
 
 <p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes ve 42 ajan daha her oturumu zaten diske kaydediyor.<br>
 deja tüm geçmişi yerel olarak indeksler; böylece ajanlarınız <code>/compact</code> sonrasında bağlamı korur, <code>deja handoff</code> ile görevi devreder ve <code>deja restore</code> ile üzerine yazılmış kodu kurtarır — LLM yok, tek bir Go ikilisi.</p>
@@ -137,7 +137,7 @@ bağlıyken neyin indekslendiğini ve sırada hangi komutun çalıştırılacağ
 
 ## Ne kazandırıyor
 
-**Codex'te çözüldü, Claude hatırlıyor.** Elli kodlama ajanı her konuşmayı yerel dosyalara yazıyor; deja
+**Codex'te çözüldü, Claude hatırlıyor.** Kırk dokuz kodlama ajanı her konuşmayı yerel dosyalara yazıyor; deja
 bu dosyaları hepsinin okuyabildiği bir bellek katmanına dönüştürüyor.
 
 | | |
@@ -258,7 +258,9 @@ Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Ro
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
 CodeArts Desktop ·
-Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Ante · Zed.
+Ante ·
+Doubao ·
+Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed.
 
 Her birinin neyi desteklediği — MCP geri çağırma, otomatik geri çağırma, skill'ler, komutlar, resume, handoff —
 [İngilizce README'deki yetenek tablosunda](../../README.md#supported-harnesses). Özel depolama konumları `DEJA_*_ROOT`

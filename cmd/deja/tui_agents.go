@@ -10,7 +10,7 @@ import (
 // interactive screen prints in place of ids. TestAgentNamesMatchRegistry keeps
 // the two in step.
 var agentNames = map[string]string{
-	"aider": "aider", "amp": "Amp", "codearts": "CodeArts Desktop", "antigravity": "Antigravity", "claude": "Claude Code",
+	"aider": "aider", "amp": "Amp", "codearts": "CodeArts Desktop", "doubao": "Doubao", "antigravity": "Antigravity", "claude": "Claude Code",
 	"cline": "Cline", "codex": "Codex CLI", "copilot": "Copilot CLI", "copilot-chat": "VS Code Copilot Chat",
 	"cursor": "Cursor", "deepseek": "DeepSeek Harness", "gemini": "Gemini CLI", "goose": "Goose",
 	"grok": "Grok Build", "hermes": "Hermes", "kimi": "Kimi Code", "omp": "omp (Oh My Pi)",

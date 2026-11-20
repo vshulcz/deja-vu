@@ -7,7 +7,7 @@
   </a>
 </p>
 
-<p align="center"><b>跨 50 個編碼代理的本地共享記憶、跨代理交接與程式碼復原。</b></p>
+<p align="center"><b>跨 49 個編碼代理的本地共享記憶、跨代理交接與程式碼復原。</b></p>
 
 <p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 42 個代理本來就把每次會話寫在磁碟上。<br>
 deja 在本地索引全部歷史，讓代理跨 <code>/compact</code> 保住上下文、用 <code>deja handoff</code> 中途換代理接著做、用 <code>deja restore</code> 找回被覆寫的程式碼——無需 LLM，單個 Go 二進位檔。</p>
@@ -240,7 +240,9 @@ Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Ro
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
 CodeArts Desktop ·
-Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Ante · Zed。
+Ante ·
+Doubao ·
+Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed。
 
 每個工具分別支援 MCP 召回、自動召回、skill、指令、resume 和 handoff 中的哪些，見
 [英文 README 的能力矩陣](../../README.md#supported-harnesses)。自訂儲存位置透過 `DEJA_*_ROOT`
