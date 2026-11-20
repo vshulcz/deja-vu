@@ -1035,15 +1035,16 @@ func confirmedCommandTrapLine(dir, cwd, cmd string) string {
 		return ""
 	}
 	pol := policy.Load()
+	here := hookProjectMatcher(cwd)
 	allow := func(project string) bool {
-		return pol.Allows(policy.ActivationAuto, project) && hookProjectIs(cwd, project)
+		return pol.Allows(policy.ActivationAuto, project) && here(project)
 	}
-	if fail, ok := index.CommandFailedBefore(dir, cmd, allow); ok && fail.Project != "" && hookProjectIs(cwd, fail.Project) && !isUnitTestFailureLine(fail.Line) {
+	if fail, ok := index.CommandFailedBefore(dir, cmd, allow); ok && fail.Project != "" && here(fail.Project) && !isUnitTestFailureLine(fail.Line) {
 		for _, p := range index.FixesForCommand(dir, cmd, fail.Line, 4, allow) {
 			if p.Candidate || p.Command == "" {
 				continue
 			}
-			if p.Project != "" && !hookProjectIs(cwd, p.Project) {
+			if p.Project != "" && !here(p.Project) {
 				continue
 			}
 			cleanCmd, ok := withoutFailedExit(orientCommand(strings.TrimPrefix(strings.TrimSpace(search.SafeCommand(p.Command)), "$ ")))
@@ -1119,7 +1120,21 @@ func hookProjectIs(cwd, project string) bool {
 	if project == "" {
 		return false
 	}
-	return namesInclude(digest.ProjectNameCandidates(cwd), project)
+	return namesInclude(projectNameCandidates(cwd), project)
+}
+
+// projectNameCandidates is a seam for the test that counts the working-out.
+var projectNameCandidates = digest.ProjectNameCandidates
+
+// hookProjectMatcher is hookProjectIs for a caller that asks it about every
+// stored pair. cwd's names are worked out once rather than per pair: each
+// working-out resolves every worktree root of the repository on disk, and a
+// repository with hundreds of worktrees held the tool hook for minutes.
+func hookProjectMatcher(cwd string) func(project string) bool {
+	names := sync.OnceValue(func() []string { return projectNameCandidates(cwd) })
+	return func(project string) bool {
+		return project != "" && namesInclude(names(), project)
+	}
 }
 
 // namesInclude is hookProjectIs over names already asked for.

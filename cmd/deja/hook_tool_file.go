@@ -1177,6 +1177,7 @@ func fileBreakageLineForSkipping(dir, cwd, path string, editSymbols []string, me
 	var bestTest, bestSym, bestWhy string
 	bestRank := 0
 	var panicLine, panicSym, panicWhy string
+	here := hookProjectMatcher(cwd)
 	for _, p := range pairs {
 		if p.Edit == "" || p.Error == "" {
 			continue
@@ -1190,7 +1191,7 @@ func fileBreakageLineForSkipping(dir, cwd, path string, editSymbols []string, me
 			}
 		}
 		if !inScopeKeys[p.Key] {
-			if p.Project == "" || !pol.Allows(policy.ActivationAuto, p.Project) || !hookProjectIs(cwd, p.Project) {
+			if p.Project == "" || !pol.Allows(policy.ActivationAuto, p.Project) || !here(p.Project) {
 				continue
 			}
 		}
