@@ -880,7 +880,8 @@ func TestToolAfterSalvagesACutGeminiOrQwenPayload(t *testing.T) {
 	}
 	payload := func(shape string, pad int) []byte {
 		body := knownErr + "\n" + strings.Repeat("build: checking package\n", pad)
-		head := `{"session_id":"` + shape + `","cwd":"/work/app","tool_input":{"command":"make deploy"},"tool_name":"run_shell_command",`
+		sid := fmt.Sprintf("%s-%d", shape, pad)
+		head := `{"session_id":"` + sid + `","cwd":"/work/app","tool_input":{"command":"make deploy"},"tool_name":"run_shell_command",`
 		switch shape {
 		case "gemini":
 			return []byte(head + `"tool_response":{"llmContent":` + str("<untrusted_context>\nOutput: "+body+"Exit Code: 1\nProcess Group PGID: 4242\n</untrusted_context>") +
@@ -895,7 +896,10 @@ func TestToolAfterSalvagesACutGeminiOrQwenPayload(t *testing.T) {
 			if pad > 3 && len(raw) <= 1<<20 {
 				t.Fatalf("%s: the cut payload is %d bytes, under the stdin bound", shape, len(raw))
 			}
-			var out bytes.Buffer
+			var strike1, out bytes.Buffer
+			if err := runHookToolAfter(dir, bytes.NewReader(raw), &strike1); err != nil {
+				t.Fatal(err)
+			}
 			if err := runHookToolAfter(dir, bytes.NewReader(raw), &out); err != nil {
 				t.Fatal(err)
 			}
@@ -3706,7 +3710,12 @@ func TestShellPreexecAndPostexec(t *testing.T) {
 	seedFixPair(t, "panic: sql: database is closed", "make clean && make CGO_ENABLED=0")
 	dir = os.Getenv("DEJA_INDEX_DIR")
 	t.Setenv("CLAUDE_PROJECT_DIR", "/work/app")
-	var afterOut, afterErr bytes.Buffer
+	var strike1Out, strike1Err, afterOut, afterErr bytes.Buffer
+	if err := runShell(dir, []string{
+		"postexec", "sh-test-2", "2", "make", "panic: sql: database is closed",
+	}, &strike1Out, &strike1Err); err != nil {
+		t.Fatal(err)
+	}
 	if err := runShell(dir, []string{
 		"postexec", "sh-test-2", "2", "make", "panic: sql: database is closed",
 	}, &afterOut, &afterErr); err != nil {
@@ -3727,7 +3736,10 @@ func TestShellCommandWrapper(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		failCmd = "echo panic: sql: database is closed 1>&2 & exit /b 2"
 	}
-	var stdout, stderr bytes.Buffer
+	var stdout1, stderr1, stdout, stderr bytes.Buffer
+	if err := runShell(dir, []string{"-c", failCmd}, &stdout1, &stderr1); err == nil {
+		t.Fatal("expected non-zero exit from failing -c command (strike 1)")
+	}
 	err := runShell(dir, []string{"-c", failCmd}, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("expected non-zero exit from failing -c command")
@@ -3801,7 +3813,10 @@ func assertShellReportPair(t *testing.T, errLine string, response map[string]any
 	if err != nil {
 		t.Fatal(err)
 	}
-	var out bytes.Buffer
+	var strike1, out bytes.Buffer
+	if err = runHookToolAfterMode(dir, bytes.NewReader(raw), &strike1, true); err != nil {
+		t.Fatal(err)
+	}
 	if err = runHookToolAfterMode(dir, bytes.NewReader(raw), &out, true); err != nil {
 		t.Fatal(err)
 	}

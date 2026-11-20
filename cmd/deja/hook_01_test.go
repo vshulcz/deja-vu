@@ -900,7 +900,10 @@ func TestLiveSessionStatuslineAndToolReceiptAttribution(t *testing.T) {
 		"tool_input":      map[string]any{"command": "make"},
 		"error":           "panic: sql: database is closed",
 	})
-	var claudeOut bytes.Buffer
+	var claudeStrike1, claudeOut bytes.Buffer
+	if err := runHookToolAfterMode(dir, bytes.NewReader(claudePayload), &claudeStrike1, false); err != nil {
+		t.Fatal(err)
+	}
 	if err := runHookToolAfterMode(dir, bytes.NewReader(claudePayload), &claudeOut, false); err != nil {
 		t.Fatal(err)
 	}
@@ -921,7 +924,10 @@ func TestLiveSessionStatuslineAndToolReceiptAttribution(t *testing.T) {
 		"tool_input":      map[string]any{"command": "make"},
 		"error_message":   "panic: sql: database is closed",
 	})
-	var cursorOut bytes.Buffer
+	var cursorStrike1, cursorOut bytes.Buffer
+	if err := runHookToolAfterMode(dir, bytes.NewReader(cursorPayload), &cursorStrike1, false); err != nil {
+		t.Fatal(err)
+	}
 	if err := runHookToolAfterMode(dir, bytes.NewReader(cursorPayload), &cursorOut, false); err != nil {
 		t.Fatal(err)
 	}
@@ -1794,7 +1800,10 @@ func TestGrokFailedCommandGetsTheFixPair(t *testing.T) {
 		`{"hook_event_name":"PostToolUse","session_id":"g-snake","cwd":"/work/app","tool_name":"run_terminal_command","tool_input":{"command":"make"},` +
 			`"tool_response":{"type":"Bash","exit_code":1,"output_for_prompt":"exit: 1\npanic: sql: database is closed\n","output":[112,97,110]}}`,
 	} {
-		var out bytes.Buffer
+		var strike1, out bytes.Buffer
+		if err := runHookToolAfter(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(payload), &strike1); err != nil {
+			t.Fatal(err)
+		}
 		if err := runHookToolAfter(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(payload), &out); err != nil {
 			t.Fatal(err)
 		}
@@ -1847,7 +1856,10 @@ func TestHookToolAfterReadsPostToolUseFailureToolError(t *testing.T) {
 		// Truncated tool_response object carrying tool_error triggers salvageToolOutput("tool_error").
 		`{"hook_event_name":"PostToolUseFailure","session_id":"claw-3","cwd":"/work/app","tool_name":"bash","tool_input":{"command":"make"},"tool_response":{"tool_error":"exit 1\npanic: sql: database is closed\n` + strings.Repeat("x", 1024),
 	} {
-		var out bytes.Buffer
+		var strike1, out bytes.Buffer
+		if err := runHookToolAfter(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(payload), &strike1); err != nil {
+			t.Fatal(err)
+		}
 		if err := runHookToolAfter(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(payload), &out); err != nil {
 			t.Fatal(err)
 		}

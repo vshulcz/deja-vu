@@ -103,7 +103,11 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 		// A command that just failed is the more urgent memory, and it is only
 		// reachable from here: PostToolUse is handed the error and its contract
 		// allows no answer at all.
-		block := antigravityFixPair(dir, latestToolFailureFromSteps(tailSteps),
+		failedOut := latestToolFailureFromSteps(tailSteps)
+		if failedOut == "" && latestToolStepSucceededFromSteps(tailSteps) {
+			coordResetFailStreak(dir, input.ConversationID, projectWorkspace)
+		}
+		block := antigravityFixPair(dir, failedOut,
 			input.ConversationID, projectWorkspace)
 		if block == "" {
 			block = antigravityPromptBlock(dir, latestUserRequestFromSteps(tailSteps),
@@ -171,7 +175,11 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 			policy.Load().Describe(policy.ActivationAuto), ids, projects)
 		steps = append(steps, antigravityInjectStep{EphemeralMessage: digest})
 	} else {
-		block := antigravityFixPair(dir, latestToolFailureFromSteps(tailSteps),
+		failedOut := latestToolFailureFromSteps(tailSteps)
+		if failedOut == "" && latestToolStepSucceededFromSteps(tailSteps) {
+			coordResetFailStreak(dir, input.ConversationID, projectWorkspace)
+		}
+		block := antigravityFixPair(dir, failedOut,
 			input.ConversationID, projectWorkspace)
 		if block == "" {
 			block = antigravityPromptBlock(dir, latestUserRequestFromSteps(tailSteps),

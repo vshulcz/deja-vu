@@ -781,7 +781,10 @@ func TestFixPairReadsHermesTerminalResult(t *testing.T) {
 	if jerr != nil {
 		t.Fatal(jerr)
 	}
-	var out bytes.Buffer
+	var strike1, out bytes.Buffer
+	if err := runHookToolAfterMode(os.Getenv("DEJA_INDEX_DIR"), bytes.NewReader(payload), &strike1, true); err != nil {
+		t.Fatal(err)
+	}
 	if err := runHookToolAfterMode(os.Getenv("DEJA_INDEX_DIR"), bytes.NewReader(payload), &out, true); err != nil {
 		t.Fatal(err)
 	}

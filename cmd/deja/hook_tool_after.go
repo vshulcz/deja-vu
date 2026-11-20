@@ -79,9 +79,11 @@ type toolAfterInput struct {
 	// Claw Code PostToolUseFailure puts the failure string in tool_error.
 	ToolError json.RawMessage `json:"tool_error"`
 	// Cursor's postToolUseFailure names the failure here (2026.09.02).
-	ErrorMessage json.RawMessage `json:"error_message"`
-	SessionID    string          `json:"session_id"`
-	CWD          string          `json:"cwd"`
+	ErrorMessage   json.RawMessage `json:"error_message"`
+	SessionID      string          `json:"session_id"`
+	ConversationID string          `json:"conversation_id"`
+	CWD            string          `json:"cwd"`
+	WorkspaceRoots []string        `json:"workspace_roots"`
 	// Grok spells the rest in camelCase and puts the result under
 	// toolResult (#4499). See hook_grok.go.
 	grokEnvelope
@@ -91,11 +93,15 @@ type toolAfterInput struct {
 }
 
 func (i *toolAfterInput) adopt() {
+	i.SessionID, _, i.WorkspaceRoots = i.adoptCommon(i.SessionID, i.ConversationID, "", i.WorkspaceRoots)
+	if i.CWD == "" && len(i.WorkspaceRoots) > 0 {
+		i.CWD = i.WorkspaceRoots[0]
+	}
 	i.ToolName = adoptGrok(adoptGrok(i.ToolName, i.grokEnvelope.ToolName), i.LLMToolName)
-	i.SessionID = adoptGrok(i.SessionID, i.grokEnvelope.SessionID)
 
 	cmd := firstNonEmpty(
 		i.ToolInput.Command,
+		i.grokEnvelope.ToolInput.Command,
 		i.ToolInput.CommandLine,
 		i.ToolInput.CmdLine,
 		i.ToolInput.Cmd,
@@ -159,6 +165,9 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 	if truncated {
 		name, _ = jsonStringAfter(after(string(raw), `"tool_name"`))
 		if name == "" {
+			name, _ = jsonStringAfter(after(string(raw), `"toolName"`))
+		}
+		if name == "" {
 			name, _ = jsonStringAfter(after(string(raw), `"llm_tool_name"`))
 		}
 	}
@@ -193,27 +202,54 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 		out = sources.UnwrapShellReport(salvageFromPayload(string(raw)))
 	}
 	// Out of the raw bytes for a cut payload, the way the tool name is: the
-	// line keeps to the project it names, and the harness sends cwd ahead of
-	// the output.
+	// line keeps to the project it names, and the harness sends cwd and session
+	// ahead of the output.
 	cwd := input.CWD
-	if cwd == "" && truncated {
-		cwd, _ = jsonStringAfter(after(string(raw), `"cwd"`))
+	sessionID := input.SessionID
+	cmdStr := input.ToolInput.Command
+	if truncated {
+		head := string(raw[:min(len(raw), 4096)])
+		if cwd == "" {
+			for _, key := range []string{`"cwd"`, `"workspaceRoot"`} {
+				if v, _ := jsonStringAfter(after(head, key)); v != "" {
+					cwd = v
+					break
+				}
+			}
+		}
+		if sessionID == "" {
+			for _, key := range []string{`"session_id"`, `"sessionId"`, `"conversation_id"`, `"conversationId"`} {
+				if v, _ := jsonStringAfter(after(head, key)); v != "" {
+					sessionID = v
+					break
+				}
+			}
+		}
+		if cmdStr == "" {
+			for _, key := range []string{`"command"`, `"cmd"`} {
+				if v, _ := jsonStringAfter(after(head, key)); v != "" {
+					cmdStr = v
+					break
+				}
+			}
+		}
 	}
-	coordRecordAfterCommand(dir, hookCWD(cwd), input.ToolInput.Command, out, raw, input.SessionID)
+	resolvedCWD := hookCWD(cwd)
+	streak := coordRecordAfterCommand(dir, resolvedCWD, cmdStr, out, raw, sessionID)
 	if out == "" {
 		return nil
 	}
-	line := fixPairLineFor(dir, hookCWD(cwd), input.ToolInput.Command, out)
+	line := fixPairLineForStreak(dir, resolvedCWD, cmdStr, out, streak)
 	if line == "" {
 		return nil
 	}
 	token := "fix:" + shortHash(line)
 	releaseSeenLock, _ := holdHookseenLock(dir)
-	if alreadyInjected(dir, input.SessionID)[token] {
+	if alreadyInjected(dir, sessionID)[token] {
 		releaseSeenLock()
 		return nil
 	}
-	rememberInjectedIDs(dir, input.SessionID, token)
+	rememberInjectedIDs(dir, sessionID, token)
 	releaseSeenLock()
 	payload := frameRecall(truncateToolLine(line, toolAfterMaxBytes))
 	// The receiving session too: this is the repair delivered at the failure,
@@ -221,7 +257,7 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 	// could not be followed (#1494 gave the per-prompt hook the same field).
 	// The text too, for the reason the pre-tool hook keeps it: a fix pair
 	// delivered at a failure is the one injection worth reading back.
-	usage.RecordDigestInto(dir, usage.KindTool, payload, input.SessionID, 1, 0, nil)
+	usage.RecordDigestInto(dir, usage.KindTool, payload, sessionID, 1, 0, nil)
 	if plain {
 		fmt.Fprint(stdout, payload)
 		return nil
@@ -507,33 +543,32 @@ func fixPairLine(dir, cwd, output string) string {
 }
 
 // fixPairLineFor is fixPairLine knowing the command that failed, "" when the
-// host does not say (index.FixesForCommand).
+// host does not say (index.FixesForCommand). Direct callers outside live
+// command streaks treat the failure as confirmed past the first-strike gate.
 func fixPairLineFor(dir, cwd, command, output string) string {
+	return fixPairLineForStreak(dir, cwd, command, output, 2)
+}
+
+func fixPairLineForStreak(dir, cwd, command, output string, streak int) string {
 	pol := policy.Load()
-	// A pair that names another project is what that project ran next, and
-	// that is almost never about this failure: over 396 hints on one machine,
-	// 2 of 67 from another project addressed the error and 59 had nothing to
-	// do with it, against 109 of 324 from the project itself. A pair with no
-	// project is a machine fact and stays.
-	// The project's names are asked for once, and only if a pair needs them:
-	// each ask runs `git worktree list`, and the filter runs per candidate.
 	names := sync.OnceValue(func() []string { return digest.ProjectNameCandidates(cwd) })
 	here := func(project string) bool { return project != "" && namesInclude(names(), project) }
-	others := func(project string) bool {
-		return cwd != "" && project != "" && !here(project)
-	}
-	// A few, not one: the newest pair for an error can be a remedy that failed,
-	// and silence is the wrong answer when the one behind it worked.
 	ready := planIndexReady(dir)
+	// Restrict auto-injected fix pairs strictly to the current project:
+	// unscoped calls (cwd == "" or $HOME) and cross-project pairs stay silent
+	// in auto-hooks while remaining available to explicit `deja fix` queries.
 	allowHere := func(project string) bool {
-		return pol.Allows(policy.ActivationAuto, project) && !others(project)
+		return cwd != "" && here(project) && pol.Allows(policy.ActivationAuto, project)
 	}
 	var pairs []index.FixPair
-	if ready {
+	if ready && cwd != "" {
 		pairs = index.FixesForCommand(dir, command, output, 4, allowHere)
 	}
 	for _, p := range pairs {
 		if p.Candidate || orientSkipFixPairForHook(p) {
+			continue
+		}
+		if streak < 2 && !fixPairAllowedOnFirstStrike(p, output) {
 			continue
 		}
 		if line := fixLineIn(p, frictionCount(dir, p, pol), cwd); line != "" {
@@ -549,16 +584,8 @@ func fixPairLineFor(dir, cwd, command, output string) string {
 	if line := failingTestSourceLine(cwd, output, pol); line != "" {
 		return line
 	}
-	if !ready {
+	if !ready || cwd == "" {
 		return ""
-	}
-	for _, p := range pairs {
-		if !p.Candidate || orientSkipFixPairForHook(p) {
-			continue
-		}
-		if line := fixLineIn(p, frictionCount(dir, p, pol), cwd); line != "" {
-			return line
-		}
 	}
 	for _, probe := range nearErrorProbesFromOutput(output) {
 		near := nearestRecordedError(dir, probe, allowHere)
@@ -566,7 +593,10 @@ func fixPairLineFor(dir, cwd, command, output string) string {
 			continue
 		}
 		for _, p := range index.FixesForCommand(dir, command, near, 4, allowHere) {
-			if orientSkipFixPairForHook(p) {
+			if p.Candidate || orientSkipFixPairForHook(p) {
+				continue
+			}
+			if streak < 2 && !fixPairAllowedOnFirstStrike(p, output) {
 				continue
 			}
 			if line := fixLineIn(p, frictionCount(dir, p, pol), cwd); line != "" {
@@ -574,23 +604,47 @@ func fixPairLineFor(dir, cwd, command, output string) string {
 			}
 		}
 	}
-	// Except a program this machine does not have, or a command line the
-	// shell itself refused (#5986). `timeout` missing or zsh refusing an
-	// unquoted `--include=*.py` in one checkout is the same in all of them,
-	// and the command that worked was learned wherever the agent happened to be.
-	isShellErr := index.IsShellDiagnostic(output)
-	elsewhere := index.FixesForCommand(dir, command, output, 4, func(project string) bool {
-		return pol.Allows(policy.ActivationAuto, project) && project != "" && !here(project)
-	})
-	for _, p := range elsewhere {
-		if (!p.MachineFact() && !isShellErr) || orientSkipFixPairForHook(p) {
-			continue
-		}
-		if line := fixLineIn(p, frictionCount(dir, p, pol), cwd); line != "" {
-			return line
+	return ""
+}
+
+func fixPairAllowedOnFirstStrike(p index.FixPair, output string) bool {
+	return p.Repaired || p.Substitute || isDetEnvFailureOutput(output)
+}
+
+func isDetEnvFailureOutput(output string) bool {
+	if output == "" {
+		return false
+	}
+	if index.IsShellDiagnostic(output) {
+		return true
+	}
+	low := strings.ToLower(output)
+	for _, needle := range []string{
+		"command not found",
+		"no such file or directory",
+		"executable file not found",
+		"no module named",
+		"modulenotfounderror",
+		"cannot find module",
+		"unknown flag",
+		"flag provided but not defined",
+		"unknown shorthand",
+		"unrecognized arguments",
+		"usage:",
+		"permission denied",
+		"eacces",
+		"unauthorized",
+		"api key",
+	} {
+		if strings.Contains(low, needle) {
+			return true
 		}
 	}
-	return ""
+	if strings.Contains(low, "token") &&
+		(strings.Contains(low, "expired") || strings.Contains(low, "invalid") || strings.Contains(low, "missing")) {
+		return true
+	}
+	return false
 }
 
 // failingTestSourceLine extracts the exact failing source line from a test file

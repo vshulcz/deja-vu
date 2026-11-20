@@ -450,10 +450,10 @@ var genericFailure = []string{
 	"Traceback (most recent", "Error: ", "error: ", "FAIL\t", "--- FAIL", "panic: ",
 }
 
-// outputReadsAsFailure reports whether what a command printed is a failure:
+// OutputReadsAsFailure reports whether what a command printed is a failure:
 // either a friction line, which is specific enough to be one, or one of the
 // shapes friction declines to name.
-func outputReadsAsFailure(text string) bool {
+func OutputReadsAsFailure(text string) bool {
 	if _, _, ok := firstFrictionLine(text); ok {
 		return true
 	}
@@ -466,6 +466,10 @@ func outputReadsAsFailure(text string) bool {
 		}
 	}
 	return false
+}
+
+func outputReadsAsFailure(text string) bool {
+	return OutputReadsAsFailure(text)
 }
 
 // A child run's cut keeps the output lines this reads as failures, so the

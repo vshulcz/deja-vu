@@ -149,7 +149,7 @@ func runShellPostexec(dir string, args []string, stderr io.Writer) error {
 	if len(args) > 3 {
 		output = strings.Join(args[3:], " ")
 	}
-	if cmdStr == "" || exitCode == 0 {
+	if cmdStr == "" {
 		return nil
 	}
 	runHookShellAfter(dir, sessionID, cmdStr, exitCode, output, stderr)
@@ -180,6 +180,7 @@ func runShellCommand(dir, cmdStr string, stdout, stderr io.Writer) error {
 		runHookShellAfter(dir, sessionID, cmdStr, code, captured.String(), stderr)
 		return exitStatus(code)
 	}
+	runHookShellAfter(dir, sessionID, cmdStr, 0, "", stderr)
 	return nil
 }
 
@@ -246,11 +247,15 @@ func runHookShellBefore(dir, sessionID, cmdStr string, stderr io.Writer) {
 }
 
 func runHookShellAfter(dir, sessionID, cmdStr string, exitCode int, output string, stderr io.Writer) {
-	if !filepath.IsAbs(dir) || exitCode == 0 || isDejaInvocation(cmdStr) || !planIndexReady(dir) {
+	if !filepath.IsAbs(dir) || isDejaInvocation(cmdStr) || recallIsOff() {
 		return
 	}
 	cwd := hookCWD("")
-	line := fixPairLineFor(dir, cwd, cmdStr, output)
+	streak := coordRecordShellAfter(dir, cwd, sessionID, cmdStr, exitCode != 0)
+	if exitCode == 0 || !planIndexReady(dir) {
+		return
+	}
+	line := fixPairLineForStreak(dir, cwd, cmdStr, output, streak)
 	if line == "" {
 		return
 	}
