@@ -3635,8 +3635,8 @@ func TestOmpReadAsksAboutTheBarePath(t *testing.T) {
 	stub, calls := answeringDeja(t)
 	paths := []string{
 		"/w/config.go:12-40", "/w/config.go:-12", "/w/config.go:12-", "/w/config.go:12",
-		"/w/config.go:50+150", "/w/config.go:5-16,960-973", "/w/config.go:2-4:raw",
-		"/w/config.go:raw:2-4", "/w/config.go:RAW", "/w/config.go",
+		"/w/config.go:50+150", "/w/config.go:5-16,960-973", "/w/config.go:5-16,960+20",
+		"/w/config.go:2-4:raw", "/w/config.go:raw:2-4", "/w/config.go:RAW", "/w/config.go",
 	}
 	driver := `
 const mod = await import("PLUGIN");
@@ -3649,7 +3649,10 @@ for (let i = 0; i < paths.length; i++) {
 await handlers.tool_result[0]({ toolName: "read", toolCallId: "win", input: { path: "C:\\w\\config.go:7-9" }, content: [], isError: false });
 console.log("done");
 `
-	b, _ := json.Marshal(paths)
+	b, err := json.Marshal(paths)
+	if err != nil {
+		t.Fatal(err)
+	}
 	out := runNodeDriver(t, "index.js", ompExtensionJS(stub), strings.Replace(driver, "PATHS", string(b), 1))
 	if !strings.Contains(out, "done") {
 		t.Fatalf("driver: %s", out)
@@ -3665,6 +3668,46 @@ console.log("done");
 	}
 	if p := inputPath(got[len(paths)]); p != `C:\w\config.go` {
 		t.Errorf("Windows read asked about %q, want the drive letter kept", p)
+	}
+}
+
+func TestHookToolReadStripsPathSelectors(t *testing.T) {
+	dir := t.TempDir()
+	cases := []struct {
+		name     string
+		tool     string
+		filePath string
+		want     string
+	}{
+		{name: "range", tool: "read", filePath: "/w/config.go:7-12", want: "/w/config.go"},
+		{name: "comma plus", tool: "read", filePath: "/w/config.go:5-16,960+20", want: "/w/config.go"},
+		{name: "stacked raw", tool: "Read", filePath: "/w/config.go:2-4:raw", want: "/w/config.go"},
+		{name: "windows drive", tool: "read", filePath: `C:\w\config.go:7-9`, want: `C:\w\config.go`},
+		{name: "edit untouched", tool: "edit", filePath: "/w/config.go:7-12", want: "/w/config.go:7-12"},
+	}
+	for _, tc := range cases {
+		var in toolHookInput
+		in.ToolName = tc.tool
+		in.CWD = dir
+		in.ToolInput.FilePath = tc.filePath
+		in.adopt()
+		if in.ToolInput.FilePath != tc.want {
+			t.Errorf("%s: got %q, want %q", tc.name, in.ToolInput.FilePath, tc.want)
+		}
+	}
+	if runtime.GOOS != "windows" {
+		literal := filepath.Join(dir, "file:1")
+		if err := os.WriteFile(literal, []byte("ok"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		var in toolHookInput
+		in.ToolName = "read"
+		in.CWD = dir
+		in.ToolInput.FilePath = "file:1"
+		in.adopt()
+		if in.ToolInput.FilePath != "file:1" {
+			t.Errorf("existing colon file stripped: got %q, want file:1", in.ToolInput.FilePath)
+		}
 	}
 }
 
