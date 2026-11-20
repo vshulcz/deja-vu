@@ -110,6 +110,11 @@ func TestCodexIdeSetupVariants(t *testing.T) {
 			want: "大小写不敏感",
 		},
 		{
+			name: "my request for codex",
+			line: `{"timestamp":"2026-10-19T10:34:30.100Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"# Context from my IDE setup:\n\n## Active file: src/main.go\n\n## My request for Codex:\ncheck the handler\n"}]}}`,
+			want: "check the handler",
+		},
+		{
 			// Plain text passes through untouched.
 			name: "plain text",
 			line: `{"timestamp":"2026-10-19T10:35:00.100Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"普通提问"}]}}`,

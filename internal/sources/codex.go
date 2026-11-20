@@ -647,7 +647,7 @@ var codexIdeSetupPrefix = "# context from my ide setup:"
 // Go's '$' matches before '\n' only; JS multiline '$' also matched before
 // '\r', which is how the reference converter tolerated CRLF rollouts. The
 // trailing class eats the '\r' explicitly instead.
-var codexMyRequestRe = regexp.MustCompile(`(?i)^[ \t]*##[ \t]*my request[ \t]*:[ \t\r]*$`)
+var codexMyRequestRe = regexp.MustCompile(`(?i)^[ \t]*##[ \t]*my request(?:[ \t]+for[ \t]+codex)?[ \t]*:[ \t\r]*$`)
 
 func codexStripIdeSetupPreamble(text string) string {
 	if !strings.HasPrefix(strings.ToLower(text), codexIdeSetupPrefix) {
@@ -810,7 +810,7 @@ func codexSplitExternalAgentEnvelopes(text string) ([]codexExtSegment, int) {
 // copies the foreign tool_use input verbatim, single- or multi-line JSON),
 // `key: value` lines (Bash's command, Read/Edit/Write's file — values may
 // span lines until the next key line), and anything else, which becomes
-// {"input": <原文>} and reports malformed rather than dropping the payload.
+// {"input": <raw>} and reports malformed rather than dropping the payload.
 // Key lines need an identifier followed by a colon, so a Windows path line
 // (`D:\…`) is never read as a key.
 func codexExternalAgentArguments(payload string) (string, bool) {
