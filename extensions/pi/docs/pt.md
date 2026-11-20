@@ -47,7 +47,7 @@ A resolução do binário `deja` segue esta ordem:
 
 | Recall | Tokens | Indexação e busca |
 |---|---|---|
-| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 49 agentes de código |
+| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 50 agentes de código |
 
 ## Memória do repositório e handoff entre agentes
 
@@ -57,7 +57,7 @@ Trocando de ferramenta no meio da tarefa? Execute `deja handoff --to <agent>` (o
 
 ## Privacidade
 
-O índice fica em `~/.cache/deja/index.db` (configurável por `DEJA_INDEX_DIR`) e remove credenciais como `sk-*`, `ghp_*`, `AKIA*` e `Bearer` antes de salvar. Nada sai da máquina, exceto se você rodar `deja embed` manualmente. Configure `recall`, `fix`, `blame` e `handoff` em todos os 49 agentes com `deja install --auto`.
+O índice fica em `~/.cache/deja/index.db` (configurável por `DEJA_INDEX_DIR`) e remove credenciais como `sk-*`, `ghp_*`, `AKIA*` e `Bearer` antes de salvar. Nada sai da máquina, exceto se você rodar `deja embed` manualmente. Configure `recall`, `fix`, `blame` e `handoff` em todos os 50 agentes com `deja install --auto`.
 
 ## Licença
 

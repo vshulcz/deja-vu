@@ -853,11 +853,11 @@ func TestTUIContinueRecentAndFold(t *testing.T) {
 	a := newTestTUI(t, dir)
 	a.openContinue()
 	ts := a.shownTargets()
-	if len(ts) != 4 || ts[0].id != "codex" || ts[1].id != "gemini" || ts[2].id != "claude" || ts[3].more != 47 {
+	if len(ts) != 4 || ts[0].id != "codex" || ts[1].id != "gemini" || ts[2].id != "claude" || ts[3].more != 48 {
 		t.Fatalf("shown = %+v", ts)
 	}
 	s := screen(a.frame(80, 24))
-	wantOnScreen(t, s, "Codex CLI  last used", "+47 not installed here", "Copy for Codex CLI")
+	wantOnScreen(t, s, "Codex CLI  last used", "+48 not installed here", "Copy for Codex CLI")
 	if strings.Contains(s, "RECENT") || strings.Contains(s, "ON THIS MACHINE") {
 		t.Error("the picker draws no section labels")
 	}
@@ -1906,7 +1906,7 @@ func TestTUIContinueIn(t *testing.T) {
 		t.Fatal("ctrl-o opens continue-in")
 	}
 	s := screen(a.frame(120, 40))
-	wantOnScreen(t, s, "Continue this session in…", "+50 not installed here", "Show them")
+	wantOnScreen(t, s, "Continue this session in…", "+51 not installed here", "Show them")
 	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyEnter})
 	wantOnScreen(t, screen(a.frame(120, 40)), "Copy for")
 	for _, k := range []tui.Key{tui.KeyDown, tui.KeyRight, tui.KeyLeft, tui.KeyUp, tui.KeyTab} {
@@ -1945,7 +1945,7 @@ func TestTUIAgentsFilter(t *testing.T) {
 	a := newTestTUI(t, dir)
 	a.listFocus = true
 	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyRune, Rune: 'a'})
-	wantOnScreen(t, screen(a.frame(120, 36)), "Agents", "50 supported")
+	wantOnScreen(t, screen(a.frame(120, 36)), "Agents", "51 supported")
 	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyRune, Rune: ' '})
 	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyRune, Rune: ' '})
 	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyRune, Rune: 'x'})

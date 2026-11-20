@@ -370,10 +370,19 @@ func appendedRow(m *Manifest, key string, s model.Session, p string, of, now Fil
 		meta.Shared = true
 	}
 	// A tail with no files of its own names only the directory the
-	// session started in; the row already holds what the whole file
-	// said, which a rebuild also takes.
-	if s.Project != "" && s.Project != "-" && owns && (!known || !named || !s.ProjectFromDir || (sources.IsHomeOrEmptyProject(meta.Project) && !sources.IsHomeOrEmptyProject(s.Project))) {
-		meta.Project = s.Project
+	// session started in; a tail touching another repository sees only
+	// that tail. Re-read whole when the tail proposes a different
+	// non-home project so incremental append matches a cold rebuild.
+	if s.Project != "" && s.Project != "-" && owns {
+		if !known || !named || (sources.IsHomeOrEmptyProject(meta.Project) && !sources.IsHomeOrEmptyProject(s.Project)) {
+			meta.Project = s.Project
+		} else if !s.ProjectFromDir && s.Project != meta.Project && !sources.IsHomeOrEmptyProject(s.Project) {
+			if whole, ok := wholeSession(p, s); ok && whole.Project != "" && whole.Project != "-" {
+				meta.Project = whole.Project
+			} else if _, err := os.Stat(p); err != nil {
+				meta.Project = s.Project
+			}
+		}
 	}
 	if s.Path != "" && owns {
 		meta.Path = s.Path

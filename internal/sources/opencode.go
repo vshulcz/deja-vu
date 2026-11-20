@@ -747,18 +747,13 @@ func opencodeToolRow(harness string, s *model.Session, r map[string]any) bool {
 				out = rest
 			}
 		}
-		if exitCode(r["exit"]) > 0 && !opencodeSynthetic(r["refused"]) {
+		code, hasExit := anyExitCode(r["exit"])
+		if hasExit && code > 0 && !opencodeSynthetic(r["refused"]) {
 			s.ToolErrors++
 		}
 		if IndexCommands() && worthIndexing(cmd) {
-			// A non-zero exit rides with the command. opencode records it on
-			// 99% of runs, which is the one thing Claude's transcripts
-			// cannot give: there the verdict has to be inferred from output
-			// text and only ~17% of runs can be scored. Zero is left off —
-			// it is the common case, and saying so on 18,000 records would
-			// be noise rather than information.
 			line := "$ " + cmd
-			if code := exitCode(r["exit"]); code > 0 {
+			if hasExit && code >= 0 {
 				line += fmt.Sprintf("  → exit %d", code)
 			}
 			s.Touch(t)

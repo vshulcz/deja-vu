@@ -18,7 +18,7 @@ OpenAI (`chat`, `responses`), Anthropic (`anthropic`) ve Gemini (`gemini`) proto
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-Sistemde `deja` (`@vshulcz/deja-vu`, `brew install deja-vu` veya `install.sh`) kurulu olmalı ve `deja index` ile dizin oluşturulmalıdır. 49 kodlama ajanının tamamında `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember` ve `handoff` araçlarını bağlamak için:
+Sistemde `deja` (`@vshulcz/deja-vu`, `brew install deja-vu` veya `install.sh`) kurulu olmalı ve `deja index` ile dizin oluşturulmalıdır. 50 kodlama ajanının tamamında `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember` ve `handoff` araçlarını bağlamak için:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
@@ -50,7 +50,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 | İsabet (Recall) | Token | İndeksleme ve sorgu |
 |---|---|---|
-| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1) | **%58 daha az token** (tekrarlanan depo işlerinde) | 19,195 oturumu **13.6 sn**'de indeksler / 49 kodlama ajanı genelinde **0.7 ms** sorgu süresi |
+| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1) | **%58 daha az token** (tekrarlanan depo işlerinde) | 19,195 oturumu **13.6 sn**'de indeksler / 50 kodlama ajanı genelinde **0.7 ms** sorgu süresi |
 
 ## Depo belleği ve ajanlar arası devir (`handoff`)
 

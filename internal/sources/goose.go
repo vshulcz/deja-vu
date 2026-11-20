@@ -197,6 +197,7 @@ func parseGooseFileFromOffset(path string, offset int64) ([]model.Session, error
 			t = parseTimeAny(m["timestamp"])
 		}
 		parts := gooseParts(m["content"])
+		applyGoosePartsTelemetry(&s, parts)
 		if parts.empty() {
 			return
 		}
@@ -231,8 +232,56 @@ func applyGooseHeader(s *model.Session, m map[string]any) {
 	if wd, _ := m["working_dir"].(string); wd != "" {
 		s.Project = projectName(wd)
 	}
+	applyGooseMeta(s, m)
 	s.Touch(parseTimeAny(m["created_at"]))
 	s.Touch(parseTimeAny(m["updated_at"]))
+}
+
+// applyGooseMeta records model and session-level token totals from a goose
+// header record or database row.
+func applyGooseMeta(s *model.Session, r map[string]any) {
+	if s == nil || r == nil {
+		return
+	}
+	prov := str(r["provider_name"])
+	if prov == "" {
+		prov = str(r["provider"])
+	}
+	modelID := str(r["model"])
+	for _, k := range []string{"model_config_json", "model_config"} {
+		var mc map[string]any
+		switch v := r[k].(type) {
+		case string:
+			if strings.TrimSpace(v) != "" {
+				_ = json.Unmarshal([]byte(v), &mc)
+			}
+		case map[string]any:
+			mc = v
+		}
+		if len(mc) > 0 {
+			if prov == "" {
+				prov = str(mc["provider"])
+			}
+			if modelID == "" {
+				modelID = str(mc["model_name"])
+			}
+			if modelID == "" {
+				modelID = str(mc["model"])
+			}
+		}
+	}
+	if modelID != "" {
+		s.SetModel(prov, modelID)
+	}
+	inTok := int64Of(r["accumulated_input_tokens"])
+	outTok := int64Of(r["accumulated_output_tokens"])
+	if inTok == 0 && outTok == 0 {
+		inTok = int64Of(r["input_tokens"])
+		outTok = int64Of(r["output_tokens"])
+	}
+	if inTok > 0 || outTok > 0 {
+		s.AddTokens(inTok, outTok, 0, 0)
+	}
 }
 
 func gooseText(v any) string {
@@ -257,8 +306,17 @@ type goosePartsOf struct {
 	edits, wrote []string
 	// callIDs is the request each command came from, one per command, and
 	// exits the code each response in the row reported, by request.
-	callIDs []string
-	exits   map[string]int
+	callIDs    []string
+	exits      map[string]int
+	toolNames  []string
+	toolErrors int
+}
+
+func applyGoosePartsTelemetry(s *model.Session, p goosePartsOf) {
+	for _, name := range p.toolNames {
+		s.AddToolCall(name, false)
+	}
+	s.ToolErrors += p.toolErrors
 }
 
 func (p goosePartsOf) empty() bool {
@@ -446,6 +504,9 @@ func gooseParts(v any) goosePartsOf {
 			}
 		case "toolRequest":
 			name, args := gooseToolCall(m)
+			if name != "" {
+				p.toolNames = append(p.toolNames, name)
+			}
 			if cmd := strings.TrimSpace(str(args["command"])); cmd != "" && worthIndexing(cmd) {
 				p.commands = append(p.commands, "$ "+cmd)
 				p.callIDs = append(p.callIDs, str(m["id"]))
@@ -482,7 +543,16 @@ func gooseParts(v any) goosePartsOf {
 			if t := gooseToolResult(m); t != "" {
 				out = append(out, t)
 			}
-			if code, ok := gooseExitCode(m); ok && str(m["id"]) != "" {
+			res, _ := m["toolResult"].(map[string]any)
+			value, _ := res["value"].(map[string]any)
+			isErr, _ := value["isError"].(bool)
+			_, errObj := res["error"].(map[string]any)
+			errStr := strings.TrimSpace(str(res["error"]))
+			code, hasExit := gooseExitCode(m)
+			if isErr || errObj || errStr != "" || str(res["status"]) == "error" || (hasExit && code != 0) {
+				p.toolErrors++
+			}
+			if hasExit && str(m["id"]) != "" {
 				if p.exits == nil {
 					p.exits = map[string]int{}
 				}
@@ -636,6 +706,27 @@ func parseGooseDBWhere(db, where string) ([]model.Session, error) {
 	if g.messageID {
 		extra += `,'message_id',cast(m.message_id as text)`
 	}
+	if g.providerName {
+		extra += `,'provider_name',cast(s.provider_name as text)`
+	}
+	if g.modelConfig {
+		extra += `,'model_config_json',cast(s.model_config_json as text)`
+	}
+	if g.model {
+		extra += `,'model',cast(s.model as text)`
+	}
+	if g.inputTokens {
+		extra += `,'input_tokens',s.input_tokens`
+	}
+	if g.outputTokens {
+		extra += `,'output_tokens',s.output_tokens`
+	}
+	if g.accumInputToks {
+		extra += `,'accumulated_input_tokens',s.accumulated_input_tokens`
+	}
+	if g.accumOutputToks {
+		extra += `,'accumulated_output_tokens',s.accumulated_output_tokens`
+	}
 	q := `select json_object('id',cast(s.id as text),'working_dir',cast(s.working_dir as text),` +
 		`'description',cast(s.description as text),'created_at',s.created_at,'updated_at',s.updated_at,` +
 		`'role',cast(m.role as text),'content_json',cast(m.content_json as text),` +
@@ -680,6 +771,7 @@ func parseGooseDBWhere(db, where string) ([]model.Session, error) {
 				Started: parseTimeAny(r["created_at"]),
 				Updated: parseTimeAny(r["updated_at"]),
 			}
+			applyGooseMeta(s, r)
 			if s.Project == "" {
 				s.Project = "goose"
 			}
@@ -705,6 +797,7 @@ func parseGooseDBWhere(db, where string) ([]model.Session, error) {
 			t = s.Updated
 		}
 		parts := gooseParts(r["content_json"])
+		applyGoosePartsTelemetry(s, parts)
 		if parts.empty() {
 			continue
 		}

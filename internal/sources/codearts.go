@@ -177,6 +177,35 @@ func codeartsLineInto(s *model.Session, m map[string]any, exits commandExits) {
 	if len(speeches) == 0 && len(blocks) == 0 && len(results) == 0 {
 		return
 	}
+	if role == "assistant" {
+		if id := str(m["model"]); id != "" {
+			s.SetModel(str(m["provider"]), id)
+		}
+		for _, k := range []string{"usage", "tokens", "token_usage"} {
+			if u, ok := m[k].(map[string]any); ok && len(u) > 0 {
+				applyUsageMap(s, u)
+				break
+			}
+		}
+	}
+	for _, it := range blocks {
+		b, ok := it.(map[string]any)
+		if !ok {
+			continue
+		}
+		switch b["type"] {
+		case "tool_use":
+			if name := str(b["name"]); name != "" {
+				s.AddToolCall(name, false)
+			}
+		case "tool_result":
+			isErr, _ := b["is_error"].(bool)
+			code, hasCode := flatRoleResultExitCode(b)
+			if isErr || (hasCode && code != 0) {
+				s.ToolErrors++
+			}
+		}
+	}
 	if !t.IsZero() {
 		s.Touch(t)
 	}

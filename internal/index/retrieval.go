@@ -35,31 +35,43 @@ func SearchDetailed(dir string, o query.Options) (SearchResult, error) {
 	// tier so the loosening is visible. A bare quoted phrase with no words
 	// of its own stays silent — reversed or misremembered phrases must not
 	// dissolve into bag-of-words matches.
-	if strings.Contains(o.Query, "\"") {
-		outside := quotedSpanRE.ReplaceAllString(o.Query, " ")
-		if len(RelevanceTerms(outside)) >= 2 {
-			o2 := o
-			o2.Query = strings.ReplaceAll(o.Query, "\"", " ")
-			r2, err2 := searchDetailedOnce(dir, o2)
-			if err2 == nil && len(r2.Sessions) > 0 {
-				// The retry can land on the exact tier — the words are all
-				// there, only the phrase was not — and the label about to be
-				// put on it means nothing matched. Say how many did, the same
-				// way a thin strict answer does (#3815).
-				if r2.Strict == 0 && r2.Tier != query.TierRelevance {
-					r2.Strict, r2.StrictIDs = len(r2.Sessions), sessionKeySet(r2.Sessions)
-				}
-				r2.Tier = query.TierRelevance
-				// Found for another query than the caller's.
-				r2.Fell = 0
-				return r2, nil
+	if canLoosenEmbeddedQuotes(o.Query) {
+		o2 := o
+		o2.Query = strings.ReplaceAll(o.Query, "\"", " ")
+		r2, err2 := searchDetailedOnce(dir, o2)
+		if err2 == nil && len(r2.Sessions) > 0 {
+			// The retry can land on the exact tier — the words are all
+			// there, only the phrase was not — and the label about to be
+			// put on it means nothing matched. Say how many did, the same
+			// way a thin strict answer does (#3815).
+			if r2.Strict == 0 && r2.Tier == query.TierExact && !droppedAWord(r2.Variants) {
+				r2.Strict, r2.StrictIDs = len(r2.Sessions), sessionKeySet(r2.Sessions)
 			}
+			r2.Tier = query.TierRelevance
+			// Found for another query than the caller's.
+			r2.Fell = 0
+			return r2, nil
 		}
 	}
 	return withDirectorySessions(dir, o, r), nil
 }
 
 var quotedSpanRE = regexp.MustCompile(`"[^"]*"`)
+
+// canLoosenEmbeddedQuotes reports whether a failed or thin strict search can
+// fall back to bag-of-words relevance with quotes stripped. Single-line queries
+// need >=2 non-quoted terms so bare phrases stay exact; pasted multi-line
+// issues (>=3 lines, >=8 terms) can span unmatched quotes across lines.
+func canLoosenEmbeddedQuotes(q string) bool {
+	if !strings.Contains(q, "\"") {
+		return false
+	}
+	outside := quotedSpanRE.ReplaceAllString(q, " ")
+	if len(RelevanceTerms(outside)) >= 2 {
+		return true
+	}
+	return strings.Count(q, "\n") >= 2 && len(RelevanceTerms(strings.ReplaceAll(q, "\"", " "))) >= 8
+}
 
 // searchDetailedOnce answers from one generation of the index. A search that
 // runs without the lock, while a rebuild swaps the directory or a pass
@@ -267,7 +279,11 @@ func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Opti
 	// relevanceSearch declines quoted phrases, regex, and queries with fewer
 	// than two informative words, which is exactly the set that wants its
 	// strict answer left alone.
-	rel, err := once.get(dir, m, o)
+	oTail := o
+	if canLoosenEmbeddedQuotes(o.Query) {
+		oTail.Query = strings.ReplaceAll(o.Query, "\"", " ")
+	}
+	rel, err := once.get(dir, m, oTail)
 	if err != nil || len(rel.Sessions) == 0 {
 		// A tail is an improvement, not a requirement: if ranking the whole
 		// store fails, the strict answer is still a correct answer.
@@ -306,7 +322,8 @@ func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Opti
 	// rather than their best message, nor for a head whose AND dropped a word.
 	byMsg := map[string]int{}
 	var outside []model.Session
-	if !isLongQuery(RelevanceTermsWithTime(o.Query, o.Now)) && !droppedAWord(res.Variants) {
+	tailTerms := RelevanceTermsWithTime(oTail.Query, oTail.Now)
+	if !isLongQuery(tailTerms) && !droppedAWord(res.Variants) {
 		for _, s := range ss {
 			if _, ok := relRank[s.Key()]; !ok {
 				outside = append(outside, s)
@@ -314,7 +331,7 @@ func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Opti
 		}
 	}
 	if len(outside) > 0 {
-		mt := newMessageTerms(RelevanceTermsWithTime(o.Query, o.Now), rel.TermIDF, true)
+		mt := newMessageTerms(tailTerms, rel.TermIDF, true)
 		pool := make([]float64, len(rel.Sessions))
 		parallelForRanked(len(pool), func(i int) { pool[i] = mt.best(rel.Sessions[i]) })
 		for _, s := range outside {
@@ -393,7 +410,7 @@ func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Opti
 	// a term the ranking derives rather than reads, a date from a relative
 	// word, which the AND never had to match; the floor keeps the total from
 	// claiming fewer sessions than were handed back.
-	out := relevanceResult(merged, max(rel.Total, len(merged)), rel.TermIDF)
+	out := relevanceResult(merged, max(rel.Total, len(merged)), rel.TermIDF, rel.SessionIDF)
 	// Keep the word-form annotations the ladder earned: the caller still tells
 	// the user it fell back to stems or close spellings, even though the order
 	// is now this tier's to keep.
@@ -420,14 +437,16 @@ func withRelevanceTail(once *relevanceOnce, dir string, m Manifest, o query.Opti
 // relevanceOnce is relevanceSearch for one pass of the ladder, run the first
 // time it is asked for and handed back after that.
 type relevanceOnce struct {
-	done bool
-	res  SearchResult
-	err  error
+	done      bool
+	lastQuery string
+	res       SearchResult
+	err       error
 }
 
 func (r *relevanceOnce) get(dir string, m Manifest, o query.Options) (SearchResult, error) {
-	if !r.done {
+	if !r.done || r.lastQuery != o.Query {
 		r.res, r.err = relevanceSearch(dir, m, o)
+		r.lastQuery = o.Query
 		r.done = true
 	}
 	return r.res, r.err
@@ -460,7 +479,8 @@ func RelevanceTerms(q string) []string { return query.RelevanceTerms(q) }
 // that says "camping") otherwise rendered as "0 matches" with no snippet,
 // because the raw term appears nowhere in its text.
 func RelevanceMatchTerms(q string) []string {
-	terms := RelevanceTerms(q)
+	qClean := cleanIssueQuery(q)
+	terms := RelevanceTerms(qClean)
 	out := make([]string, 0, len(terms))
 	seen := map[string]bool{}
 	for _, t := range terms {
@@ -475,6 +495,12 @@ func RelevanceMatchTerms(q string) []string {
 				seen[f] = true
 				out = append(out, f)
 			}
+		}
+	}
+	for _, p := range queryCompoundParts(qClean, terms) {
+		if !seen[p] {
+			seen[p] = true
+			out = append(out, p)
 		}
 	}
 	return out
@@ -504,11 +530,12 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 	if strings.Contains(o.Query, "\"") || o.Regex {
 		return SearchResult{}, nil
 	}
-	terms := RelevanceTermsWithTime(o.Query, o.Now)
+	qClean := cleanIssueQuery(o.Query)
+	terms := RelevanceTermsWithTime(qClean, o.Now)
 	if len(terms) < 2 {
 		return SearchResult{}, nil
 	}
-	rank, rerr := relevantMetasCounts(dir, m, nil, terms, relevanceWindow, func(meta SessionMeta) bool {
+	rank, rerr := relevantMetasCountsForQuery(dir, m, nil, qClean, terms, relevanceWindow, true, func(meta SessionMeta) bool {
 		return sessionMetaMatches(meta, o)
 	})
 	metas, anyMatched, strong := rank.metas, rank.any, rank.strong
@@ -520,7 +547,7 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 	}
 	if len(metas) == 0 {
 		if bridged := crossScriptBridgeTerms(terms); len(bridged) > 0 {
-			rank, rerr = relevantMetasCounts(dir, m, nil, append(append([]string{}, terms...), bridged...), relevanceWindow, func(meta SessionMeta) bool {
+			rank, rerr = relevantMetasCountsForQuery(dir, m, nil, qClean, append(append([]string{}, terms...), bridged...), relevanceWindow, true, func(meta SessionMeta) bool {
 				return sessionMetaMatches(meta, o)
 			})
 			if rerr != nil {
@@ -572,7 +599,7 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 		if err != nil {
 			return SearchResult{}, err
 		}
-		return relevanceResult(ss, matched, rank.idf), nil
+		return relevanceResult(ss, matched, rank.idf, rank.sessionIDF), nil
 	}
 	// Single-term sessions ride BEHIND every strong candidate: they widen
 	// deep recall without letting a lucky word outrank a real match.
@@ -593,7 +620,7 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 	if day, ok := pointInTime(o.Query, o.Now); ok {
 		ss = rerankByDayProximity(ss, day)
 	}
-	return relevanceResult(ss, matched, rank.idf), nil
+	return relevanceResult(ss, matched, rank.idf, rank.sessionIDF), nil
 }
 
 // relevanceResult labels a relevance answer with the pool it was drawn from:
@@ -601,13 +628,14 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 // trimmed it, so capped can say plainly whether the caller is holding all of
 // them. Reporting len(ss) as the total was the bug in #497 — the window is
 // exactly the thing the number was supposed to see past.
-func relevanceResult(ss []model.Session, matched int, idf map[string]float64) SearchResult {
+func relevanceResult(ss []model.Session, matched int, idf, sessionIDF map[string]float64) SearchResult {
 	return SearchResult{
-		Sessions: ss,
-		Tier:     query.TierRelevance,
-		Total:    matched,
-		Capped:   matched > len(ss),
-		TermIDF:  idf,
+		Sessions:   ss,
+		Tier:       query.TierRelevance,
+		Total:      matched,
+		Capped:     matched > len(ss),
+		TermIDF:    idf,
+		SessionIDF: sessionIDF,
 	}
 }
 
@@ -928,7 +956,8 @@ type relevanceRanking struct {
 	// idf is what each query term was worth, so a caller choosing which message
 	// to show can weigh it the same way the ranking weighed the session rather
 	// than approximating it.
-	idf map[string]float64
+	idf        map[string]float64
+	sessionIDF map[string]float64
 	// scores is the whole-query score the ranking gave each kept session, in
 	// the order of metas. The focused view is not here: what reads this is the
 	// doubt gate, and the two views already meet in fuseFocus.
@@ -1149,6 +1178,10 @@ func ProjectInScope(project, want string) bool { return query.ProjectInScope(pro
 // any-frequency term counts, how many query terms the corpus knows at all,
 // and that pre-truncation total.
 func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int, keep func(SessionMeta) bool) (relevanceRanking, error) {
+	return relevantMetasCountsForQuery(dir, m, projects, "", terms, n, false, keep)
+}
+
+func relevantMetasCountsForQuery(dir string, m Manifest, projects []string, rawQuery string, terms []string, n int, allowRescue bool, keep func(SessionMeta) bool) (relevanceRanking, error) {
 	views := viewsFor(m)
 	all := views.allMeta()
 	if len(all) == 0 {
@@ -1194,16 +1227,21 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	br := newBucketReader(dir)
 	defer br.close()
 	a := newRelevanceAcc(m, all, metaIdx, place, br)
+	long := isLongQuery(terms)
+	if rawQuery != "" && (long || strings.Count(rawQuery, "\n") >= 2) {
+		a.docWeights, a.titleTerms = docQueryTermWeights(rawQuery, terms)
+	}
 	for _, term := range terms {
 		a.addTerm(term)
 	}
+	rescue := allowRescue && (len(terms) <= 14 || len(a.credited) == 0)
+	a.addCompoundParts(queryCompoundParts(rawQuery, terms), rescue)
 	a.addAssociativeTerms(dir, terms)
 	a.bestMessages()
 	// A query this long is a pasted document — an issue, a log, a spec — and
 	// ranking it is finding the documents most like it, so a session's score
 	// pays for its length the way BM25 does and is summed over the session
 	// rather than read off its best message.
-	long := isLongQuery(terms)
 	var sumWords, nWords float64
 	if long {
 		for p := range nMetas {
@@ -1289,6 +1327,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		termsKnown:  a.termsKnown,
 		total:       matchedTotal,
 		idf:         a.idfOf,
+		sessionIDF:  a.sessionIDF,
 		offsets:     offsets,
 		scores:      scores,
 	}, a.readErr

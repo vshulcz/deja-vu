@@ -18,7 +18,7 @@ Funciona en los protocolos OpenAI (`chat`, `responses`), Anthropic (`anthropic`)
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-Requiere el binario `deja` (`@vshulcz/deja-vu`, `brew install deja-vu` o `install.sh`) y un índice generado con `deja index`. Para habilitar además las herramientas `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember` y `handoff` en los 49 agentes compatibles:
+Requiere el binario `deja` (`@vshulcz/deja-vu`, `brew install deja-vu` o `install.sh`) y un índice generado con `deja index`. Para habilitar además las herramientas `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember` y `handoff` en los 50 agentes compatibles:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
@@ -50,7 +50,7 @@ Si la petición ya contiene `<deja-memory>` o `<deja-recall>`, el plugin omite l
 
 | Recall | Tokens | Indexado y búsqueda |
 |---|---|---|
-| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas) | **58% menos tokens** (en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 49 agentes de programación |
+| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas) | **58% menos tokens** (en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 50 agentes de programación |
 
 ## Memoria de repositorio y relevo entre agentes
 

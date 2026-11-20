@@ -99,15 +99,19 @@ func LoadCrush() []model.Session {
 }
 
 type crushRow struct {
-	ID        string `json:"id"`
-	SessionID string `json:"session_id"`
-	Title     string `json:"title"`
-	Parent    string `json:"parent_session_id"`
-	Role      string `json:"role"`
-	Parts     string `json:"parts"`
-	CreatedAt int64  `json:"created_at"`
-	UpdatedAt int64  `json:"updated_at"`
-	Summary   bool   `json:"summary"`
+	ID               string `json:"id"`
+	SessionID        string `json:"session_id"`
+	Title            string `json:"title"`
+	Parent           string `json:"parent_session_id"`
+	Role             string `json:"role"`
+	Parts            string `json:"parts"`
+	CreatedAt        int64  `json:"created_at"`
+	UpdatedAt        int64  `json:"updated_at"`
+	Summary          bool   `json:"summary"`
+	PromptTokens     int64  `json:"prompt_tokens"`
+	CompletionTokens int64  `json:"completion_tokens"`
+	Model            string `json:"model"`
+	Provider         string `json:"provider"`
 }
 
 // crushSummaryExpr says in SQL whether a message is a summary Crush wrote when
@@ -158,13 +162,45 @@ func ParseCrushDBSince(db string, t time.Time) ([]model.Session, error) {
 	return parseCrushWhere(db, where)
 }
 
+func crushOptionalCols(db string) (promptTok, compTok, modelCol, provCol bool) {
+	out, _ := sqliteOutput(db, "select 's:'||name from pragma_table_info('sessions') where name in ('prompt_tokens','completion_tokens')"+
+		" union all select 'm:'||name from pragma_table_info('messages') where name in ('model','provider')")
+	for col := range strings.FieldsSeq(string(out)) {
+		switch col {
+		case "s:prompt_tokens":
+			promptTok = true
+		case "s:completion_tokens":
+			compTok = true
+		case "m:model":
+			modelCol = true
+		case "m:provider":
+			provCol = true
+		}
+	}
+	return promptTok, compTok, modelCol, provCol
+}
+
 func parseCrushWhere(db, where string) ([]model.Session, error) {
+	promptTok, compTok, modelCol, provCol := crushOptionalCols(db)
+	var extra strings.Builder
+	if promptTok {
+		extra.WriteString(",'prompt_tokens',coalesce(s.prompt_tokens,0)")
+	}
+	if compTok {
+		extra.WriteString(",'completion_tokens',coalesce(s.completion_tokens,0)")
+	}
+	if modelCol {
+		extra.WriteString(",'model',cast(coalesce(m.model,'') as text)")
+	}
+	if provCol {
+		extra.WriteString(",'provider',cast(coalesce(m.provider,'') as text)")
+	}
 	// json_object rather than the shell's -json mode, which is quadratic in
 	// what it escapes — see sqliteRows. A parts column is stored JSON.
 	q := "select json_object('session_id',cast(s.id as text),'title',cast(s.title as text)," +
 		"'parent_session_id',cast(coalesce(s.parent_session_id,'') as text),'updated_at',s.updated_at," +
 		"'id',cast(m.id as text),'role',cast(m.role as text),'parts',cast(m.parts as text),'created_at',m.created_at," +
-		"'summary'," + crushSummaryExpr(db) + ") " +
+		"'summary'," + crushSummaryExpr(db) + extra.String() + ") " +
 		"from sessions s join messages m on m.session_id = s.id" + where + " order by s.id, m.created_at"
 	rows, err := crushRows(db, q)
 	if err != nil {
@@ -187,10 +223,15 @@ func parseCrushWhere(db, where string) ([]model.Session, error) {
 				s.Kind = "subagent"
 				s.Parent = r.Parent
 			}
+			s.AddTokens(r.PromptTokens, r.CompletionTokens, 0, 0)
 			byID[r.SessionID] = s
 			joins[r.SessionID] = &crushJoin{exits: commandExits{}, changes: map[string][]int{}, calls: map[string][]int{}, dropped: map[int]bool{}}
 			order = append(order, r.SessionID)
 		}
+		if r.Model != "" {
+			s.SetModel(r.Provider, r.Model)
+		}
+		crushPartsTelemetry(s, r.Parts)
 		at := unixGuess(r.CreatedAt)
 		role := r.Role
 		if r.Summary {
@@ -312,8 +353,12 @@ func (j *crushJoin) add(s *model.Session, recs []crushRecord, results []crushRes
 				j.dropped[i] = true
 			}
 		}
-		if code, ok := statusCode(lastLine(crushStripCWD(r.content)), "Exit code ", ""); ok {
+		code, ok := statusCode(lastLine(crushStripCWD(r.content)), "Exit code ", "")
+		if ok {
 			j.exits.stamp(s.Messages, r.call, "", code)
+		}
+		if !r.denied() && (r.failed || (ok && code > 0)) {
+			s.ToolErrors++
 		}
 		// A result answers the call before it, once: a provider that numbers
 		// calls per turn reuses the id, and a later failure under it is not
@@ -437,6 +482,18 @@ func crushMessages(role, parts string, at time.Time) ([]crushRecord, []crushResu
 		}
 	}
 	return out, results
+}
+
+func crushPartsTelemetry(s *model.Session, parts string) {
+	var list []crushPart
+	if json.Unmarshal([]byte(parts), &list) != nil {
+		return
+	}
+	for _, p := range list {
+		if p.Type == "tool_call" && p.Data.Name != "" {
+			s.AddToolCall(p.Data.Name, false)
+		}
+	}
 }
 
 // crushReplacedSymbol is the replaced side of an lsp_replace_symbol, as

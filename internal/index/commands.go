@@ -35,6 +35,8 @@ const (
 type CommandUse struct {
 	Command  string
 	Runs     int
+	Outcomes int
+	Failures int
 	Sessions int
 	Last     time.Time
 	// ByProject holds the per-project split, so a caller can apply the trust
@@ -50,6 +52,8 @@ type CommandUse struct {
 // ran it there and when it last did.
 type ProjectUse struct {
 	Sessions int
+	Outcomes int
+	Failures int
 	Last     time.Time
 	// LastSession is the key of the newest session in this project that ran the
 	// command, so a caller can reach what that session settled — SessionMeta
@@ -71,6 +75,8 @@ const commandProjectCap = 24
 // command during a build.
 type projAcc struct {
 	sessions map[string]bool
+	outcomes int
+	failures int
 	last     time.Time
 	// lastKey is the session behind last, kept so ProjectUse can name it.
 	lastKey string
@@ -104,7 +110,7 @@ func buildCommands(tmp string, ss []model.Session) {
 			if m.Role != roleCommand {
 				continue
 			}
-			cmd := withoutExitStatus(strings.TrimSpace(firstTextLine(m.Text)))
+			cmd, code, hasExit := canonicalCommandOutcome(m.Text)
 			if cmd == "" || len(cmd) > commandTextMax {
 				continue
 			}
@@ -118,6 +124,12 @@ func buildCommands(tmp string, ss []model.Session) {
 				by[low] = a
 			}
 			a.use.Runs++
+			if hasExit {
+				a.use.Outcomes++
+				if code != 0 {
+					a.use.Failures++
+				}
+			}
 			a.sessions[key] = true
 			pa := a.byProject[s.Project]
 			if pa == nil {
@@ -125,6 +137,12 @@ func buildCommands(tmp string, ss []model.Session) {
 				a.byProject[s.Project] = pa
 			}
 			pa.sessions[key] = true
+			if hasExit {
+				pa.outcomes++
+				if code != 0 {
+					pa.failures++
+				}
+			}
 			if newerRun(m.Time, key, pa) {
 				pa.last, pa.lastKey = m.Time, key
 			}
@@ -180,7 +198,13 @@ func cappedProjects(byProject map[string]*projAcc) map[string]ProjectUse {
 	out := make(map[string]ProjectUse, len(names))
 	for _, proj := range names {
 		pa := byProject[proj]
-		out[proj] = ProjectUse{Sessions: len(pa.sessions), Last: pa.last, LastSession: pa.lastKey}
+		out[proj] = ProjectUse{
+			Sessions:    len(pa.sessions),
+			Outcomes:    pa.outcomes,
+			Failures:    pa.failures,
+			Last:        pa.last,
+			LastSession: pa.lastKey,
+		}
 	}
 	return out
 }
@@ -417,9 +441,234 @@ func FileSessions(dir, path string) []SessionMeta {
 // the first line, without the "$ " every parser prefixes a stored invocation
 // with, lowercased.
 func normalizeCommand(s string) string {
-	s = withoutExitStatus(strings.TrimSpace(firstTextLine(s)))
-	s = strings.TrimPrefix(s, "$ ")
-	return strings.ToLower(strings.TrimSpace(s))
+	line, _, _ := canonicalCommandOutcome(s)
+	line = strings.TrimPrefix(line, "$ ")
+	return strings.ToLower(strings.TrimSpace(line))
+}
+
+func canonicalCommandOutcome(raw string) (cmd string, code int, hasExit bool) {
+	body, code, hasExit := CommandExitOutcome(strings.TrimRight(raw, " \t\r\n"))
+	line := CanonicalRecurringCommand(strings.TrimSpace(firstTextLine(body)))
+	if line == "" {
+		return "", 0, false
+	}
+	return line, code, hasExit
+}
+
+// HighFailRate reports whether at least half of recorded outcomes failed.
+func HighFailRate(outcomes, failures int) bool {
+	return outcomes > 0 && failures*2 >= outcomes
+}
+
+// StripViewerPipe drops trailing head or tail slicing pipes and an immediately
+// preceding stderr-to-stdout merge so command grouping merges sliced views.
+func StripViewerPipe(cmd string) string {
+	cur := strings.TrimSpace(cmd)
+	for {
+		idx := lastUnquotedPipe(cur)
+		if idx <= 0 {
+			return cur
+		}
+		after := strings.TrimSpace(cur[idx+1:])
+		if !isViewerPipeStage(after) {
+			return cur
+		}
+		lhs := strings.TrimRight(cur[:idx], " \t")
+		if cut, ok := strings.CutSuffix(lhs, "2>&1"); ok {
+			lhs = strings.TrimRight(cut, " \t")
+		}
+		if lhs == "" || strings.TrimSpace(lhs) == "$" {
+			return cur
+		}
+		cur = lhs
+	}
+}
+
+func lastUnquotedPipe(s string) int {
+	var quote byte
+	escaped := false
+	last := -1
+	for i := range len(s) {
+		c := s[i]
+		if escaped {
+			escaped = false
+			continue
+		}
+		if quote != '\'' && c == '\\' {
+			escaped = true
+			continue
+		}
+		if quote != 0 {
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		if c == '\'' || c == '"' {
+			quote = c
+			continue
+		}
+		if c == '|' {
+			if (i > 0 && s[i-1] == '|') || (i+1 < len(s) && s[i+1] == '|') {
+				continue
+			}
+			last = i
+		}
+	}
+	return last
+}
+
+func isViewerPipeStage(after string) bool {
+	if strings.ContainsAny(after, ";&<>|`$") {
+		return false
+	}
+	fields := strings.Fields(after)
+	if len(fields) == 0 {
+		return false
+	}
+	prog := strings.ToLower(fields[0])
+	if prog != "tail" && prog != "head" {
+		return false
+	}
+	for _, arg := range fields[1:] {
+		if strings.HasPrefix(arg, "-") || isViewerLineCount(arg) {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func isViewerLineCount(arg string) bool {
+	arg = strings.TrimPrefix(arg, "+")
+	if arg == "" {
+		return false
+	}
+	for i := range len(arg) {
+		if arg[i] < '0' || arg[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// CanonicalRecurringCommand drops viewer pipes, dot-worktree directory changes,
+// and absolute checkout prefixes on verify commands while keeping relative
+// subdirectories and leading prompt markers intact.
+func CanonicalRecurringCommand(line string) string {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return ""
+	}
+	hasPrompt := strings.HasPrefix(line, "$ ")
+	s := strings.TrimSpace(strings.TrimPrefix(line, "$ "))
+	s = StripViewerPipe(s)
+	s = stripCanonicalCDPrefix(s)
+	s = StripViewerPipe(s)
+	if s == "" {
+		return ""
+	}
+	if hasPrompt {
+		return "$ " + s
+	}
+	return s
+}
+
+func stripCanonicalCDPrefix(s string) string {
+	for {
+		head, rest, ok := cutShellChain(s)
+		if !ok || rest == "" {
+			break
+		}
+		target, ok := cdTargetArg(head)
+		if !ok {
+			break
+		}
+		strip := isDotWorktreePath(target) || (isAbsOrHomeCDTarget(target) && VerifyCommand(rest))
+		if !strip {
+			break
+		}
+		s = rest
+	}
+	return s
+}
+
+func cutShellChain(s string) (head, rest string, ok bool) {
+	var quote byte
+	escaped := false
+	for i := range len(s) {
+		c := s[i]
+		if escaped {
+			escaped = false
+			continue
+		}
+		if quote != '\'' && c == '\\' {
+			escaped = true
+			continue
+		}
+		if quote != 0 {
+			if c == quote {
+				quote = 0
+			}
+			continue
+		}
+		if c == '\'' || c == '"' {
+			quote = c
+			continue
+		}
+		if c == ';' {
+			return strings.TrimSpace(s[:i]), strings.TrimSpace(s[i+1:]), true
+		}
+		if c == '&' && i+1 < len(s) && s[i+1] == '&' {
+			return strings.TrimSpace(s[:i]), strings.TrimSpace(s[i+2:]), true
+		}
+	}
+	return "", "", false
+}
+
+func cdTargetArg(head string) (string, bool) {
+	if len(head) < 3 || !strings.EqualFold(head[:2], "cd") || (head[2] != ' ' && head[2] != '\t') {
+		return "", false
+	}
+	arg := strings.TrimSpace(head[3:])
+	for _, flag := range []string{"-P ", "-L ", "/d ", "/D "} {
+		if strings.HasPrefix(arg, flag) {
+			arg = strings.TrimSpace(arg[len(flag):])
+		}
+	}
+	arg = strings.Trim(arg, "\"'")
+	return arg, arg != ""
+}
+
+func isDotWorktreePath(target string) bool {
+	p := strings.ToLower(strings.ReplaceAll(target, "\\", "/"))
+	segs := strings.Split(p, "/")
+	for i, seg := range segs {
+		if seg == ".worktrees" {
+			return true
+		}
+		if i > 0 && seg == "worktrees" {
+			prev := segs[i-1]
+			if len(prev) > 1 && prev[0] == '.' && prev != ".." {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isAbsOrHomeCDTarget(target string) bool {
+	if target == "" {
+		return false
+	}
+	if strings.HasPrefix(target, "/") || strings.HasPrefix(target, `\\`) ||
+		target == "~" || strings.HasPrefix(target, "~/") || strings.HasPrefix(target, `~\`) ||
+		target == "$HOME" || strings.HasPrefix(target, "$HOME/") || strings.HasPrefix(target, `${HOME}`) {
+		return true
+	}
+	return len(target) >= 3 &&
+		((target[0] >= 'a' && target[0] <= 'z') || (target[0] >= 'A' && target[0] <= 'Z')) &&
+		target[1] == ':' && (target[2] == '/' || target[2] == '\\')
 }
 
 // withoutExitStatus drops the outcome codex and opencode append to the command

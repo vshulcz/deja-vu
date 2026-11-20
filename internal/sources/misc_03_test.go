@@ -1624,8 +1624,8 @@ func commandCodeExitStore(result string) func(*testing.T, string) string {
 func TestClawCodeFailedCommandKeepsItsExitCode(t *testing.T) {
 	runExitRows(t, []exitRow{
 		{"failed", "clawcode", clawCodeExitStore(`{"stdout":"--- FAIL: TestRetry (0.00s)\nFAIL","stderr":"","interrupted":false,"returnCodeInterpretation":"exit_code:1"}`, true), "$ go test ./...  → exit 1"},
-		{"clean", "clawcode", clawCodeExitStore(`{"stdout":"ok  \tproj\t0.01s","stderr":"","interrupted":false}`, false), "$ go test ./..."},
-		{"quoting", "clawcode", clawCodeExitStore(`{"stdout":"ok\nExit code: 1","stderr":"","interrupted":false}`, false), "$ go test ./..."},
+		{"clean", "clawcode", clawCodeExitStore(`{"stdout":"ok  \tproj\t0.01s","stderr":"","interrupted":false}`, false), "$ go test ./...  → exit 0"},
+		{"quoting", "clawcode", clawCodeExitStore(`{"stdout":"ok\nExit code: 1","stderr":"","interrupted":false}`, false), "$ go test ./...  → exit 0"},
 	})
 }
 

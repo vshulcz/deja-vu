@@ -996,3 +996,104 @@ func TestAntigravityRecordsTheWrittenSideOfADiffBlock(t *testing.T) {
 		t.Errorf("hashes = %d, want %d", len(strings.Fields(hashes)), len(want))
 	}
 }
+
+func TestAntigravityRecordsAgyRunCommandExits(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "brain", "conv-agy-exits", ".system_generated", "logs")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := strings.Join([]string{
+		`{"source":"USER_EXPLICIT","type":"USER_INPUT","created_at":"2026-07-01T10:00:00Z","content":"run tests"}`,
+		`{"source":"MODEL","type":"PLANNER_RESPONSE","created_at":"2026-07-01T10:00:01Z","content":"running ok","tool_calls":[{"name":"run_command","args":{"CommandLine":"go test ./..."}}]}`,
+		`{"source":"MODEL","type":"RUN_COMMAND","created_at":"2026-07-01T10:00:02Z","content":"Command exited with code 0.\nCommand output:\nok"}`,
+		`{"source":"MODEL","type":"PLANNER_RESPONSE","created_at":"2026-07-01T10:00:03Z","content":"running fail","tool_calls":[{"name":"run_command","args":{"CommandLine":"go test ./fail"}}]}`,
+		`{"source":"MODEL","type":"RUN_COMMAND","created_at":"2026-07-01T10:00:04Z","content":"Command exited with code 2.\nCommand output:\nFAIL"}`,
+	}, "\n") + "\n"
+	p := filepath.Join(dir, "transcript.jsonl")
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_ANTIGRAVITY_ROOT", root)
+	ss, err := ParseAntigravityFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ss) != 1 {
+		t.Fatalf("sessions = %d, want 1", len(ss))
+	}
+	var cmds []string
+	for _, m := range ss[0].Messages {
+		if m.Role == RoleCommand {
+			cmds = append(cmds, m.Text)
+		}
+	}
+	want := []string{
+		"$ go test ./...  → exit 0",
+		"$ go test ./fail  → exit 2",
+	}
+	if !slices.Equal(cmds, want) {
+		t.Fatalf("commands = %q, want %q", cmds, want)
+	}
+}
+
+func TestAntigravityDeniedToolCallDoesNotCountAsToolError(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "brain", "conv-denied", ".system_generated", "logs")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := strings.Join([]string{
+		`{"source":"USER_EXPLICIT","type":"USER_INPUT","created_at":"2026-07-01T10:00:00Z","content":"run command"}`,
+		`{"source":"MODEL","type":"PLANNER_RESPONSE","created_at":"2026-07-01T10:00:01Z","content":"trying","tool_calls":[{"name":"run_command","args":{"CommandLine":"rm -rf /tmp/x"}},{"name":"run_command","args":{"CommandLine":"go test ./..."}}]}`,
+		`{"source":"MODEL","type":"RUN_COMMAND","status":"ERROR","created_at":"2026-07-01T10:00:02Z","content":"Encountered error in step execution: tool call denied"}`,
+		`{"source":"MODEL","type":"RUN_COMMAND","status":"ERROR","created_at":"2026-07-01T10:00:03Z","content":"Command exited with code 1.\nCommand output:\nboom"}`,
+	}, "\n") + "\n"
+	p := filepath.Join(dir, "transcript.jsonl")
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_ANTIGRAVITY_ROOT", root)
+	ss, err := ParseAntigravityFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ss) != 1 {
+		t.Fatalf("sessions = %d, want 1", len(ss))
+	}
+	if ss[0].ToolErrors != 1 {
+		t.Fatalf("ToolErrors = %d, want 1 (denied step must not count as error)", ss[0].ToolErrors)
+	}
+}
+
+func TestAntigravityProjectDeterministicAcrossWorkspaces(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "Users", "alex")
+	if err := os.MkdirAll(home, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	root := t.TempDir()
+	cache := filepath.Join(root, "cache")
+	if err := os.MkdirAll(cache, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	last, err := json.Marshal(map[string]string{
+		home:               "conv-multi",
+		"/tmp/work/repo-b": "conv-multi",
+		"/tmp/work/repo-a": "conv-multi",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cache, "last_conversations.json"), last, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_ANTIGRAVITY_ROOT", root)
+	for range 5 {
+		if got := antigravityProject("conv-multi"); got != "work/repo-a" {
+			t.Fatalf("antigravityProject = %q, want %q", got, "work/repo-a")
+		}
+	}
+}

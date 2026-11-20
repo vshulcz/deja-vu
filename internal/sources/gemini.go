@@ -230,11 +230,14 @@ func ParseGeminiFile(path string) ([]model.Session, error) {
 }
 
 type geminiMessage struct {
-	ID        string          `json:"id"`
-	Timestamp string          `json:"timestamp"`
-	Type      string          `json:"type"`
-	Content   json.RawMessage `json:"content"`
-	Model     string          `json:"model"`
+	ID            string          `json:"id"`
+	Timestamp     string          `json:"timestamp"`
+	Type          string          `json:"type"`
+	Content       json.RawMessage `json:"content"`
+	Model         string          `json:"model"`
+	Tokens        map[string]any  `json:"tokens"`
+	UsageMetadata map[string]any  `json:"usageMetadata"`
+	Usage         map[string]any  `json:"usage"`
 	// ToolCalls is what the model ran: id, name, args and the result the
 	// tool answered with. The reply also arrives as the next user record,
 	// content [{functionResponse}], which is where the output is read from
@@ -501,6 +504,7 @@ func appendGeminiMessages(s *model.Session, msgs []geminiMessage) {
 	// A shell call's command record, by call id, so the exit status its
 	// result reports can ride on it.
 	shellAt := map[string]int{}
+	errCounted := map[string]bool{}
 	// The directory the session ran in, read once and only when a call
 	// names a relative path.
 	dir, dirRead := "", false
@@ -524,6 +528,20 @@ func appendGeminiMessages(s *model.Session, msgs []geminiMessage) {
 		if t.IsZero() {
 			t = s.Started
 		}
+		if role == "assistant" {
+			if m.Model != "" {
+				s.SetModel("", m.Model)
+			}
+			switch {
+			case len(m.Tokens) > 0:
+				applyUsageMap(s, m.Tokens)
+			case len(m.UsageMetadata) > 0:
+				applyUsageMap(s, m.UsageMetadata)
+			case len(m.Usage) > 0:
+				applyUsageMap(s, m.Usage)
+			}
+			geminiCountToolCalls(s, m, errCounted)
+		}
 		// The work rides on the same records as the talk: a gemini record's
 		// toolCalls name the command and the file, a user record made of
 		// functionResponse parts carries what came back. Read as text only,
@@ -536,7 +554,7 @@ func appendGeminiMessages(s *model.Session, msgs []geminiMessage) {
 			s.Messages = append(s.Messages, work...)
 			geminiNoteShellCalls(s, m, start, shellAt)
 		}
-		geminiNoteExits(s, m, shellAt)
+		geminiNoteExits(s, m, shellAt, errCounted)
 		text := geminiContentText(m.Content)
 		if text == "" {
 			continue
@@ -571,6 +589,11 @@ var geminiExit = regexp.MustCompile(`^Exit Code: (\d+)$`)
 // footer — the footer is the tail or there is none, and one the command
 // printed further up is its output.
 func geminiExitCode(out string) int {
+	code, _ := geminiExitCodeKnown(out)
+	return code
+}
+
+func geminiExitCodeKnown(out string) (int, bool) {
 	lines := strings.Split(out, "\n")
 	for i := range lines {
 		lines[i] = strings.TrimSpace(lines[i])
@@ -590,19 +613,19 @@ func geminiExitCode(out string) int {
 		}
 		if !qwenBlock {
 			if geminiFooterRank(l) < 0 {
-				return 0
+				return 0, false
 			}
-			return geminiFooterExit(lines[:i+1])
+			return geminiFooterExitKnown(lines[:i+1])
 		}
 		if strings.HasPrefix(l, "Process Group PGID: ") {
-			return geminiFooterExit(lines[:i+1])
+			return geminiFooterExitKnown(lines[:i+1])
 		}
 		// Not the footer's last line: skip this paragraph.
 		for i > 0 && lines[i-1] != "" {
 			i--
 		}
 	}
-	return 0
+	return 0, false
 }
 
 // qwenTruncatedPrefix opens a shell result Qwen cut down to its head and tail.
@@ -632,33 +655,52 @@ func geminiFooterRank(l string) int {
 // geminiFooterExit reads the footer that ends lines: walking up, each line
 // must come earlier in the written order than the one below it, so a line of
 // output that happens to look like a footer line is not taken into it.
-func geminiFooterExit(lines []string) int {
+func geminiFooterExitKnown(lines []string) (int, bool) {
 	below := len(geminiFooterOrder)
 	for _, line := range slices.Backward(lines) {
 		r := geminiFooterRank(line)
 		if r < 0 || r >= below {
-			return 0
+			return 0, false
 		}
 		if r == 0 {
 			m := geminiExit.FindStringSubmatch(line)
 			code, err := strconv.Atoi(m[1])
 			if err != nil {
-				return 0
+				return 0, false
 			}
-			return code
+			return code, true
 		}
 		below = r
 	}
-	return 0
+	return 0, false
 }
 
 type geminiCall struct {
 	ID     string         `json:"id"`
 	Name   string         `json:"name"`
+	Status string         `json:"status"`
 	Args   map[string]any `json:"args"`
 	Result []struct {
 		FunctionResponse *geminiResponse `json:"functionResponse"`
 	} `json:"result"`
+}
+
+func geminiCountToolCalls(s *model.Session, m geminiMessage, errCounted map[string]bool) {
+	var calls []geminiCall
+	if len(m.ToolCalls) == 0 || json.Unmarshal(m.ToolCalls, &calls) != nil {
+		return
+	}
+	for _, c := range calls {
+		if c.Name != "" {
+			s.AddToolCall(c.Name, false)
+		}
+		if failedCall(c.Status) {
+			s.ToolErrors++
+			if c.ID != "" {
+				errCounted[c.ID] = true
+			}
+		}
+	}
 }
 
 type geminiResponse struct {
@@ -696,9 +738,9 @@ func geminiNoteShellCalls(s *model.Session, m geminiMessage, start int, shellAt 
 	}
 }
 
-// geminiNoteExits appends a non-zero exit to the command it belongs to, from
+// geminiNoteExits counts tool failures and appends a command's exit status from
 // the call's own result or from the functionResponse record that follows.
-func geminiNoteExits(s *model.Session, m geminiMessage, shellAt map[string]int) {
+func geminiNoteExits(s *model.Session, m geminiMessage, shellAt map[string]int, errCounted map[string]bool) {
 	var resps []*geminiResponse
 	var calls []geminiCall
 	if len(m.ToolCalls) > 0 && json.Unmarshal(m.ToolCalls, &calls) == nil {
@@ -720,15 +762,23 @@ func geminiNoteExits(s *model.Session, m geminiMessage, shellAt map[string]int) 
 		if r == nil {
 			continue
 		}
+		code, hasExit := geminiExitCodeKnown(r.Response.Output)
+		if !hasExit {
+			code, hasExit = geminiExitCodeKnown(r.Response.Error)
+		}
+		errTrim := strings.TrimSpace(r.Response.Error)
+		failed := (hasExit && code != 0) || (errTrim != "" && errTrim != "(none)")
+		if failed && (r.ID == "" || !errCounted[r.ID]) {
+			s.ToolErrors++
+		}
+		if r.ID != "" {
+			errCounted[r.ID] = true
+		}
 		i, ok := shellAt[r.ID]
 		if !ok {
 			continue
 		}
-		code := geminiExitCode(r.Response.Output)
-		if code == 0 {
-			code = geminiExitCode(r.Response.Error)
-		}
-		if code > 0 {
+		if hasExit && code >= 0 && !strings.Contains(s.Messages[i].Text, "  → exit ") {
 			s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
 		}
 		delete(shellAt, r.ID) // once: the result arrives on both records

@@ -4087,7 +4087,10 @@ func TestFixPairAnswersCopilotPostToolUse(t *testing.T) {
 	})
 	copilotHookOutput = true
 	t.Cleanup(func() { copilotHookOutput = false })
-	var out bytes.Buffer
+	var strike1, out bytes.Buffer
+	if err := runHookToolAfterMode(os.Getenv("DEJA_INDEX_DIR"), bytes.NewReader(payload), &strike1, false); err != nil {
+		t.Fatal(err)
+	}
 	if err := runHookToolAfterMode(os.Getenv("DEJA_INDEX_DIR"), bytes.NewReader(payload), &out, false); err != nil {
 		t.Fatal(err)
 	}

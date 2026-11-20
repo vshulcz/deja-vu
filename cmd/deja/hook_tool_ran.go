@@ -123,7 +123,7 @@ func fileHookRanLineFor(dir, path string, metas []index.SessionMeta) string {
 			// exec'; echo …` — cleanup, run in two sessions, exit 0, and
 			// worth none of the bytes it costs at every action. So the line
 			// is restricted to the commands that check the work.
-			cmd := orientCommand(c.Text)
+			cmd := orientCommandBody(c.Text)
 			if cmd == "" || !index.VerifyCommand(cmd) {
 				continue
 			}

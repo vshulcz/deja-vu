@@ -1240,7 +1240,10 @@ func TestFixPairReadsQwensFramedFailure(t *testing.T) {
 	payload := `{"session_id":"qwen-1","cwd":"/work/app","hook_event_name":"PostToolUseFailure",` +
 		`"tool_name":"run_shell_command","tool_input":{"command":"go build ./..."},` +
 		`"error":"Command: go build ./...\nDirectory: (root)\nOutput: ./main.go:9:2: undefined: glimwraxHelper\nError: (none)\nExit Code: 1\n"}`
-	var out bytes.Buffer
+	var strike1, out bytes.Buffer
+	if err := runHookToolAfterMode(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(payload), &strike1, true); err != nil {
+		t.Fatal(err)
+	}
 	if err := runHookToolAfterMode(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(payload), &out, true); err != nil {
 		t.Fatal(err)
 	}
@@ -1491,6 +1494,7 @@ var readmeGuidanceNames = map[string]string{
 	"continue":    "Continue",
 	"crush":       "Crush",
 	"muse":        "Muse Code",
+	"ante":        "Ante",
 	"codebuddy":   "CodeBuddy Code",
 	"workbuddy":   "WorkBuddy",
 	"vscode":      "VS Code Copilot Chat",
@@ -1594,7 +1598,7 @@ var countWords = map[int]string{
 	37: "thirty-seven", 38: "thirty-eight", 39: "thirty-nine", 40: "forty",
 	41: "forty-one", 42: "forty-two", 43: "forty-three", 44: "forty-four",
 	45: "forty-five", 46: "forty-six", 47: "forty-seven", 48: "forty-eight",
-	49: "forty-nine", 50: "fifty", 51: "fifty-one",
+	49: "forty-nine", 50: "fifty", 51: "fifty-one", 52: "fifty-two",
 }
 
 // countWord is the word for a count, or a failure naming what to add.
@@ -1850,7 +1854,7 @@ func TestNpmReadmeLeadsWithWhatTheMainOneLeadsWith(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, line := range []string{
-		"Shared local memory, session history search, cross-agent handoff, and code recovery across 50 coding agents.",
+		"Shared local memory, session history search, cross-agent handoff, and code recovery across 51 coding agents.",
 	} {
 		if !strings.Contains(string(main), line) {
 			t.Fatalf("the main README no longer says %q — update this test with it", line)

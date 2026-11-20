@@ -34,7 +34,7 @@ const (
 
 // rulesHarnesses are the harnesses whose global rules file deja knows, in the
 // order `deja rules` lists them.
-var rulesHarnesses = []string{"claude-code", "codex", "opencode", "gemini", "qwen", "kimi", "grok", "goose", "copilot", "vscode", "cline", "kilocode", "mimo", "omnigent", "orca", "zed", "antigravity", "cherrystudio", "hermes", "aider", "continue", "trae", "trae-ide", "pi", "omp", "senpi", "gjc", "prime", "kimchi", "codewhale", "junie", "crush", "codebuddy", "workbuddy", "commandcode", "kiro", "roo", "zcode", "amp", "cursor", "windsurf", "deepseek", "openclaw", "reasonix", "muse", "devin"}
+var rulesHarnesses = []string{"claude-code", "codex", "opencode", "gemini", "qwen", "kimi", "grok", "goose", "copilot", "vscode", "cline", "kilocode", "mimo", "omnigent", "orca", "zed", "antigravity", "cherrystudio", "hermes", "aider", "continue", "trae", "trae-ide", "pi", "omp", "senpi", "gjc", "prime", "kimchi", "codewhale", "junie", "crush", "codebuddy", "workbuddy", "commandcode", "kiro", "roo", "zcode", "amp", "cursor", "windsurf", "deepseek", "openclaw", "reasonix", "muse", "devin", "ante"}
 
 // rulesPath is the file a harness reads its global rules from, or "" when deja
 // does not know one. Only paths something already showed reach the model —
@@ -152,6 +152,8 @@ func rulesFileFor(harness string) rulesFile {
 		return firstClaudeFallbackRules(sources.OmnigentRoot())
 	case "orca":
 		return firstClaudeFallbackRules(sources.OrcaRoot())
+	case "ante":
+		return firstClaudeFallbackRules(sources.AnteConfigDir())
 	case "zed":
 		// <config dir>/AGENTS.md, the "Personal AGENTS.md" in every request
 		// of Zed's own agent (crates/agent_settings/src/user_agents_md.rs on

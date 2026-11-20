@@ -493,26 +493,34 @@ func TestTheInvocationAfterAFailureCarriesTheRepair(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	payload, err := json.Marshal(map[string]any{
-		"invocationNum":  1,
-		"conversationId": "conv-fx",
-		"transcriptPath": transcript,
-		"workspacePaths": []string{filepath.Join(os.TempDir(), "agyfix")},
-	})
-	if err != nil {
-		t.Fatal(err)
+	callAt := func(num int) string {
+		payload, merr := json.Marshal(map[string]any{
+			"invocationNum":  num,
+			"conversationId": "conv-fx",
+			"transcriptPath": transcript,
+			"workspacePaths": []string{filepath.Join(os.TempDir(), "agyfix")},
+		})
+		if merr != nil {
+			t.Fatal(merr)
+		}
+		var out bytes.Buffer
+		if err := runHookAntigravity(dir, bytes.NewReader(payload), &out); err != nil {
+			t.Fatal(err)
+		}
+		return out.String()
 	}
-	var out bytes.Buffer
-	if err := runHookAntigravity(dir, bytes.NewReader(payload), &out); err != nil {
-		t.Fatal(err)
+	// Strike 1 on a non-detEnv confirmed pair stays silent (only opening digest).
+	if first := callAt(1); strings.Contains(first, "glimwraxctl") {
+		t.Errorf("strike 1 delivered non-detEnv repair too early:\n%s", first)
 	}
-	if !strings.Contains(out.String(), "glimwraxctl") {
-		t.Errorf("the repair did not arrive at the failure:\n%s", out.String())
+	// Strike 2 on consecutive failure delivers the repair.
+	if second := callAt(2); !strings.Contains(second, "glimwraxctl") {
+		t.Errorf("the repair did not arrive at the second failure:\n%s", second)
 	}
 }
 
-// seedClaudeFixPair writes a session that hit an error and then ran the command
-// that settled it — the shape a fix pair is built from.
+// seedClaudeFixPair writes two sessions that hit the same error and ran the
+// command that settled it — confirming the fix pair for auto-hooks.
 func seedClaudeFixPair(t *testing.T, root, project string) {
 	t.Helper()
 	dir := filepath.Join(root, "-"+project)
@@ -520,26 +528,28 @@ func seedClaudeFixPair(t *testing.T, root, project string) {
 		t.Fatal(err)
 	}
 	cwd := filepath.Join(os.TempDir(), project)
-	rec := func(kind string, content any, at string) string {
-		b := mustMarshal(t, map[string]any{
-			"type": kind, "sessionId": "fix1", "cwd": cwd, "timestamp": at,
-			"message": map[string]any{"role": kind, "content": content},
-		})
-		return string(b)
-	}
-	lines := []string{
-		rec("user", "the build stops on an undefined symbol", "2026-09-01T10:00:00Z"),
-		rec("assistant", []any{map[string]any{"type": "tool_use", "id": "t1", "name": "Bash",
-			"input": map[string]string{"command": "go build ./..."}}}, "2026-09-01T10:00:10Z"),
-		rec("user", []any{map[string]any{"type": "tool_result", "tool_use_id": "t1",
-			"content": "./main.go:9:2: undefined: glimwraxHelper"}}, "2026-09-01T10:00:20Z"),
-		rec("assistant", []any{map[string]any{"type": "tool_use", "id": "t2", "name": "Bash",
-			"input": map[string]string{"command": "glimwraxctl --sync && go build ./..."}}}, "2026-09-01T10:00:40Z"),
-		rec("user", []any{map[string]any{"type": "tool_result", "tool_use_id": "t2",
-			"content": "ok"}}, "2026-09-01T10:01:00Z"),
-	}
-	if err := os.WriteFile(filepath.Join(dir, "fix1.jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
-		t.Fatal(err)
+	for _, sid := range []string{"fix1", "fix2"} {
+		rec := func(kind string, content any, at string) string {
+			b := mustMarshal(t, map[string]any{
+				"type": kind, "sessionId": sid, "cwd": cwd, "timestamp": at,
+				"message": map[string]any{"role": kind, "content": content},
+			})
+			return string(b)
+		}
+		lines := []string{
+			rec("user", "the build stops on an undefined symbol", "2026-09-01T10:00:00Z"),
+			rec("assistant", []any{map[string]any{"type": "tool_use", "id": "t1", "name": "Bash",
+				"input": map[string]string{"command": "go build ./..."}}}, "2026-09-01T10:00:10Z"),
+			rec("user", []any{map[string]any{"type": "tool_result", "tool_use_id": "t1",
+				"content": "./main.go:9:2: undefined: glimwraxHelper"}}, "2026-09-01T10:00:20Z"),
+			rec("assistant", []any{map[string]any{"type": "tool_use", "id": "t2", "name": "Bash",
+				"input": map[string]string{"command": "glimwraxctl --sync && go build ./..."}}}, "2026-09-01T10:00:40Z"),
+			rec("user", []any{map[string]any{"type": "tool_result", "tool_use_id": "t2",
+				"content": "ok"}}, "2026-09-01T10:01:00Z"),
+		}
+		if err := os.WriteFile(filepath.Join(dir, sid+".jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 

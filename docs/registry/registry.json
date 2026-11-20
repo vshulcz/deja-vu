@@ -196,6 +196,101 @@
       }
     },
     {
+      "id": "ante",
+      "store_paths": [
+        "~/.ante/sessions/*/events.jsonl",
+        "~/.ante/sessions/*/dialog.json",
+        "${ANTE_HOME}/sessions/*/events.jsonl",
+        "${DEJA_ANTE_ROOT}/*/events.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/ante/sessions/ses_01M7WQZKYBJ61WM9H6TR6FP4CY/events.jsonl"
+      ],
+      "parser_source": "internal/sources/ante.go",
+      "last_verified": "2026-11-20",
+      "display_name": "Ante",
+      "capabilities": {
+        "mcp": true,
+        "auto": false,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": ""
+      },
+      "gaps": {
+        "auto": {
+          "state": "impossible",
+          "why": "AntigmaLabs/ante v0.3.7 exposes MCP, skills, slash commands and AGENTS.md, with no user-configurable lifecycle hook events in crates/ or docs-site/docs/extend/.",
+          "source": "https://github.com/AntigmaLabs/ante/tree/v0.3.7/docs-site/docs/extend"
+        }
+      },
+      "surfaces": {
+        "digest": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "AntigmaLabs/ante v0.3.7 crates/ and docs-site/docs/extend/ define no user-configurable lifecycle or compaction hook events"
+        },
+        "prompt": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "AntigmaLabs/ante v0.3.7 crates/ and docs-site/docs/extend/ define no user-configurable lifecycle or compaction hook events"
+        },
+        "pre_tool": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "AntigmaLabs/ante v0.3.7 crates/ and docs-site/docs/extend/ define no user-configurable lifecycle or compaction hook events"
+        },
+        "failure": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "AntigmaLabs/ante v0.3.7 crates/ and docs-site/docs/extend/ define no user-configurable lifecycle or compaction hook events"
+        },
+        "compaction_reset": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "AntigmaLabs/ante v0.3.7 crates/ and docs-site/docs/extend/ define no user-configurable lifecycle or compaction hook events"
+        },
+        "compaction_capture": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "AntigmaLabs/ante v0.3.7 crates/ and docs-site/docs/extend/ define no user-configurable lifecycle or compaction hook events"
+        },
+        "compaction_packet": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "AntigmaLabs/ante v0.3.7 crates/ and docs-site/docs/extend/ define no user-configurable lifecycle or compaction hook events"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "handoff": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "session_end": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "AntigmaLabs/ante v0.3.7 crates/ and docs-site/docs/extend/ define no user-configurable lifecycle or compaction hook events"
+        },
+        "rules": {
+          "status": "yes",
+          "proof": "fixture"
+        },
+        "statusline": {
+          "status": "no",
+          "proof": "blocked",
+          "note": "status_line_command in ~/.ante/settings.json (preference.mdx) replaces Ante's item-based status bar wholesale with no stack_with_default option, so an MCP-only install cannot set it safely"
+        },
+        "reader": {
+          "status": "yes",
+          "proof": "fixture"
+        }
+      }
+    },
+    {
       "id": "antigravity",
       "store_paths": [
         "~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl",

@@ -15,6 +15,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Gemini CLI](gemini.md) | session JSON and replayable JSONL |
 | [aider](aider.md) | append-only Markdown |
 | [Amp](amp.md) | one JSON object per thread |
+| [Ante](ante.md) | JSONL event stream (`events.jsonl`), `meta.json` and `dialog.json` |
 | [Antigravity](antigravity.md) | JSONL transcript |
 | [Grok Build](grok.md) | ACP update JSONL with JSON metadata |
 | [Goose](goose.md) | legacy JSONL and SQLite session store |

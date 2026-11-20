@@ -359,6 +359,12 @@ func zedSession(db string, r zedRow) (model.Session, bool) {
 		Started: started,
 		Updated: updated,
 	}
+	if th.Model != nil && th.Model.Model != "" {
+		s.SetModel(th.Model.Provider, th.Model.Model)
+	}
+	if th.TokenUsage != nil {
+		applyUsageMap(&s, th.TokenUsage)
+	}
 	// Zed stores no per-message timestamp in either thread format, so the place
 	// in the array is the only clock there is, and it becomes one: the thread's
 	// start plus a millisecond per record. Sharing one stamp made two turns
@@ -372,6 +378,7 @@ func zedSession(db string, r zedRow) (model.Session, bool) {
 		return t
 	}
 	for _, raw := range th.Messages {
+		zedTelemetry(&s, raw)
 		role, text := zedMessage(raw)
 		if text != "" && !HarnessAuthored(role) {
 			s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: tick()})
@@ -441,6 +448,11 @@ type zedThread struct {
 	// so a store an older Zed wrote and a newer one never opened has only the
 	// original five columns. Every thread document carries the path anyway.
 	Snapshot zedSnapshot `json:"initial_project_snapshot"`
+	Model    *struct {
+		Provider string `json:"provider"`
+		Model    string `json:"model"`
+	} `json:"model"`
+	TokenUsage map[string]any `json:"cumulative_token_usage"`
 }
 
 type zedSnapshot struct {
@@ -632,6 +644,52 @@ func zedWork(raw json.RawMessage, t time.Time) []model.Message {
 		out = append(out, model.Message{Role: RoleFiles, Text: strings.Join(dedupeStrings(paths), "\n"), Time: t})
 	}
 	return out
+}
+
+func zedTelemetry(s *model.Session, raw json.RawMessage) {
+	var tagged map[string]json.RawMessage
+	if json.Unmarshal(raw, &tagged) != nil {
+		return
+	}
+	body, ok := tagged["Agent"]
+	if !ok {
+		return
+	}
+	var msg struct {
+		Content []struct {
+			ToolUse *struct {
+				Name string `json:"name"`
+			} `json:"ToolUse"`
+		} `json:"content"`
+		ToolResults map[string]struct {
+			IsError bool `json:"is_error"`
+			Content struct {
+				Text string `json:"Text"`
+			} `json:"content"`
+			Output json.RawMessage `json:"output"`
+		} `json:"tool_results"`
+	}
+	if json.Unmarshal(body, &msg) != nil {
+		return
+	}
+	for _, block := range msg.Content {
+		if block.ToolUse != nil {
+			s.AddToolCall(block.ToolUse.Name, false)
+		}
+	}
+	for _, r := range msg.ToolResults {
+		text := strings.TrimSpace(r.Content.Text)
+		if text == "" {
+			var strOut string
+			if json.Unmarshal(r.Output, &strOut) == nil {
+				text = strings.TrimSpace(strOut)
+			}
+		}
+		code, hasExit := zedExitCode(text)
+		if r.IsError || (hasExit && code > 0) {
+			s.ToolErrors++
+		}
+	}
 }
 
 // zedExitCode reads the status Zed's terminal tool opens its result with:

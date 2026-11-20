@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -31,7 +30,7 @@ const (
 
 // commandsStateMagic changes with what the state means; a state of another
 // one is walked again rather than read.
-var commandsStateMagic = [8]byte{'D', 'J', 'C', 'M', 'D', 'S', '0', '3'}
+var commandsStateMagic = [8]byte{'D', 'J', 'C', 'M', 'D', 'S', '0', '4'}
 
 func commandsStatePath(dir string) string { return filepath.Join(dir, commandsStateFile) }
 
@@ -73,10 +72,12 @@ type commandsSession struct {
 // commandsRun is one command in one session: the text and log offset of its
 // first run there, how many runs, and the newest.
 type commandsRun struct {
-	Cmd   string
-	First int64
-	Runs  int
-	Last  time.Time
+	Cmd      string
+	First    int64
+	Runs     int
+	Outcomes int
+	Failures int
+	Last     time.Time
 }
 
 func newCommandsState() *commandsState {
@@ -96,7 +97,7 @@ func (st *commandsState) add(key string, path uint64, text string, at time.Time,
 		s.Paths = append(s.Paths, path)
 		s.Runs = append(s.Runs, map[string]*commandsRun{})
 	}
-	cmd := withoutExitStatus(strings.TrimSpace(firstTextLine(text)))
+	cmd, code, hasExit := canonicalCommandOutcome(text)
 	if cmd == "" || len(cmd) > commandTextMax {
 		return
 	}
@@ -110,6 +111,12 @@ func (st *commandsState) add(key string, path uint64, text string, at time.Time,
 		s.Runs[i][low] = r
 	}
 	r.Runs++
+	if hasExit {
+		r.Outcomes++
+		if code != 0 {
+			r.Failures++
+		}
+	}
 	if at.After(r.Last) {
 		r.Last = at
 	}
@@ -149,6 +156,8 @@ func (st *commandsState) table(m Manifest) (out []CommandUse) {
 						o.Cmd, o.First = r.Cmd, r.First
 					}
 					o.Runs += r.Runs
+					o.Outcomes += r.Outcomes
+					o.Failures += r.Failures
 					if r.Last.After(o.Last) {
 						o.Last = r.Last
 					}
@@ -164,6 +173,8 @@ func (st *commandsState) table(m Manifest) (out []CommandUse) {
 				a.use.Command, a.first = r.Cmd, r.First
 			}
 			a.use.Runs += r.Runs
+			a.use.Outcomes += r.Outcomes
+			a.use.Failures += r.Failures
 			a.sessions++
 			pa := a.byProject[meta.Project]
 			if pa == nil {
@@ -171,6 +182,8 @@ func (st *commandsState) table(m Manifest) (out []CommandUse) {
 				a.byProject[meta.Project] = pa
 			}
 			pa.sessions[key] = true
+			pa.outcomes += r.Outcomes
+			pa.failures += r.Failures
 			if newerRun(r.Last, key, pa) {
 				pa.last, pa.lastKey = r.Last, key
 			}
@@ -492,8 +505,10 @@ func writeCommandsStateFile(dir string, st *commandsState) error {
 				r := s.Runs[i][low]
 				body = binary.AppendUvarint(body, text(low))
 				body = binary.AppendUvarint(body, text(r.Cmd))
-				body = binary.AppendUvarint(body, uint64(r.First)) //nolint:gosec // record offsets are non-negative
-				body = binary.AppendUvarint(body, uint64(r.Runs))  //nolint:gosec // run counts are non-negative
+				body = binary.AppendUvarint(body, uint64(r.First))    //nolint:gosec // record offsets are non-negative
+				body = binary.AppendUvarint(body, uint64(r.Runs))     //nolint:gosec // run counts are non-negative
+				body = binary.AppendUvarint(body, uint64(r.Outcomes)) //nolint:gosec // outcome counts are non-negative
+				body = binary.AppendUvarint(body, uint64(r.Failures)) //nolint:gosec // failure counts are non-negative
 				body = binary.AppendVarint(body, recordNanos(r.Last))
 			}
 		}
@@ -574,7 +589,11 @@ func readCommandsStateFile(dir string) (*commandsState, bool) {
 			nr := num()
 			for k := uint64(0); k < nr && !bad; k++ {
 				low, cmd := textAt(), textAt()
-				r := &commandsRun{Cmd: cmd, First: int64(num()), Runs: int(num())} //nolint:gosec // written from non-negative values
+				firstVal := int64(num())  //nolint:gosec // written from non-negative values
+				runsVal := int(num())     //nolint:gosec // written from non-negative values
+				outcomesVal := int(num()) //nolint:gosec // written from non-negative values
+				failuresVal := int(num()) //nolint:gosec // written from non-negative values
+				r := &commandsRun{Cmd: cmd, First: firstVal, Runs: runsVal, Outcomes: outcomesVal, Failures: failuresVal}
 				ns, n := binary.Varint(b)
 				if n <= 0 {
 					bad = true

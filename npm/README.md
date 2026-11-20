@@ -5,13 +5,13 @@
   </picture>
 </p>
 
-<p align="center"><strong>Shared local memory, session history search, cross-agent handoff, and code recovery across 50 coding agents.</strong></p>
+<p align="center"><strong>Shared local memory, session history search, cross-agent handoff, and code recovery across 51 coding agents.</strong></p>
 
 <p align="center"><a href="https://github.com/vshulcz/deja-vu#readme">English</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.zh.md">简体中文</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.zh-TW.md">繁體中文</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.ja.md">日本語</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.ko.md">한국어</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.es.md">Español</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.pt.md">Português</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.fr.md">Français</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.de.md">Deutsch</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.ru.md">Русский</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.tr.md">Türkçe</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.hi.md">हिन्दी</a></p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="deja-vu cross-agent coding session memory"></p>
 
-Fifty coding agents — including Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, opencode, Cline, Copilot CLI, Roo Code, Kilo Code, aider, Goose, Qwen Code, Kimi Code, Antigravity, Grok Build, pi, omp, DeepSeek Harness, Hermes, Kiro, Reasonix and Zed — already write every session to local files. **deja starts full**: it indexes months of history from before you installed it so your agents keep context across `/compact`, hand off mid-task via `deja handoff`, and recover overwritten code via `deja restore` and `deja blame` — with no model and no capture step.
+Fifty-one coding agents — including Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, opencode, Cline, Copilot CLI, Roo Code, Kilo Code, aider, Goose, Qwen Code, Kimi Code, Antigravity, Grok Build, pi, omp, DeepSeek Harness, Hermes, Kiro, Reasonix and Zed — already write every session to local files. **deja starts full**: it indexes months of history from before you installed it so your agents keep context across `/compact`, hand off mid-task via `deja handoff`, and recover overwritten code via `deja restore` and `deja blame` — with no model and no capture step.
 
 One Go binary. No LLM, no embeddings, no API key. The network is used only by commands you run for it, such as `deja update` and `deja sync ssh`, and by a daily release check, which `DEJA_OFFLINE=1` turns off.
 **58% fewer tokens** on repeated repository tasks (53,558 vs 126,222 baseline; 52,815 vs 103,443 in alternated 11-run trials). **97.2% R@5** on LongMemEval-S (**88.9% hit@1** on the 470-question cleaned set), and **13.6 s** to index 19,195 sessions (**0.7–0.8 ms** in-process lookup).
@@ -46,7 +46,7 @@ Or wire the stdio MCP server directly in any MCP client (`mcp.json` / `claude_de
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (**88.9% hit@1** on the 470-question cleaned set) | **58% fewer tokens** on repeated repository tasks | **13.6 s** to index 19,195 sessions / **0.7–0.8 ms** in-process lookup across 50 coding agents |
+| **97.2% R@5** on LongMemEval-S (**88.9% hit@1** on the 470-question cleaned set) | **58% fewer tokens** on repeated repository tasks | **13.6 s** to index 19,195 sessions / **0.7–0.8 ms** in-process lookup across 51 coding agents |
 
 ## Repository memory & handoff
 

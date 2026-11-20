@@ -1101,7 +1101,10 @@ func collectMatchedSessionLines(s model.Session, terms []string, asked string, t
 		// An envelope can carry the query's words and say nothing a reader
 		// wanted: a wrapped inter-agent notification quoting a session id
 		// matched, and the block opened with truncated JSON (#2735).
-		if digest.IsPlumbing(line) || digest.IsToolCallRecord(line) || (m.Role == "assistant" && digest.IsCelebratoryBoilerplate(line)) {
+		trimmedLine := strings.TrimSpace(line)
+		if digest.IsPlumbing(line) || digest.IsToolCallRecord(line) ||
+			trimmedLine == "[thinking]" || trimmedLine == "[tool_result]" || strings.HasPrefix(trimmedLine, "[tool_use ") ||
+			(m.Role == "assistant" && (digest.IsCelebratoryBoilerplate(line) || (IsPureProcessNarration(line) && !HasIdentifierTerm(terms)))) {
 			continue
 		}
 		matchedAt[i] = true
@@ -1192,7 +1195,10 @@ func appendMatchedReplyConclusions(s model.Session, terms []string, trajConcl, m
 		// carrying a decision word — and the log of a question carries the
 		// question's words by construction — was quoted as the answer to
 		// the question it recorded (#2067).
-		if digest.IsPlumbing(line) || digest.IsToolCallRecord(line) || (m.Role == "assistant" && digest.IsCelebratoryBoilerplate(line)) {
+		trimmedLine := strings.TrimSpace(line)
+		if digest.IsPlumbing(line) || digest.IsToolCallRecord(line) ||
+			trimmedLine == "[thinking]" || trimmedLine == "[tool_result]" || strings.HasPrefix(trimmedLine, "[tool_use ") ||
+			(m.Role == "assistant" && (digest.IsCelebratoryBoilerplate(line) || (IsPureProcessNarration(line) && !HasIdentifierTerm(terms)))) {
 			continue
 		}
 		if text := contextText(line, false); strings.TrimSpace(text) != "" {

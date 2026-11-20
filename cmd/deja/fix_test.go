@@ -689,7 +689,9 @@ func TestTheFixLadderSpeaksAtTheRightStage(t *testing.T) {
 		t.Errorf("stage one, the hook spoke about an error nobody has hit:\n%s", got)
 	}
 
-	// Stage two: one session ran something after it. Held, not offered.
+	// Stage two: one session ran something after it. Held from auto-hooks
+	// (Candidate requires 2+ sessions for live hook injection), while explicit
+	// `deja fix` still reports it as unconfirmed.
 	addSession("one", 6)
 	if err = index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
@@ -701,18 +703,14 @@ func TestTheFixLadderSpeaksAtTheRightStage(t *testing.T) {
 	if !strings.Contains(asked, "unconfirmed") {
 		t.Errorf("stage two, asked: %q", asked)
 	}
-	// Served, and served as one sighting. Silence here was measured against the
-	// failures it was costing: of 1057 real ones, 112 had a confirmed pair and
-	// 373 more had only this (#2589).
-	got := afterHook("a2")
-	if !strings.Contains(got, "nothing confirms it worked") {
-		t.Errorf("stage two, the hook withheld the sighting it is holding:\n%s", got)
-	}
-	if strings.Contains(got, "what followed it:") {
-		t.Errorf("stage two, a sighting was offered as a confirmed remedy:\n%s", got)
+	for strike := 1; strike <= 2; strike++ {
+		if got := afterHook("a2"); strings.TrimSpace(got) != "" {
+			t.Errorf("stage two strike %d, candidate leaked into auto-hook:\n%s", strike, got)
+		}
 	}
 
-	// Stage three: a second session did the same, so both doors answer.
+	// Stage three: a second session did the same. Explicit `deja fix` answers,
+	// and the auto-hook holds back on Strike 1 then delivers on Strike 2.
 	addSession("two", 3)
 	if err = index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
@@ -724,8 +722,11 @@ func TestTheFixLadderSpeaksAtTheRightStage(t *testing.T) {
 	if !strings.Contains(asked, "brew services restart postgresql") {
 		t.Errorf("stage three, asked: %q", asked)
 	}
+	if got := afterHook("a3"); strings.TrimSpace(got) != "" {
+		t.Errorf("stage three strike 1, hook spoke on first non-detEnv failure:\n%s", got)
+	}
 	if got := afterHook("a3"); !strings.Contains(got, "brew services restart postgresql") {
-		t.Errorf("stage three, the hook stayed quiet about a confirmed remedy:\n%s", got)
+		t.Errorf("stage three strike 2, the hook stayed quiet about a confirmed remedy:\n%s", got)
 	}
 }
 

@@ -1,0 +1,1482 @@
+package main
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"slices"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+	"unicode"
+
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
+	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
+)
+
+const (
+	coordFile               = ".coord"
+	coordStateVersion       = 1
+	coordTTL                = 30 * time.Minute
+	coordGitLockStaleAfter  = 10 * time.Minute
+	coordMaxSessions        = 64
+	coordMaxFilesPerSession = 32
+	coordMaxStamps          = 256
+	coordSpawnDedupWindow   = 5 * time.Second
+)
+
+var (
+	coordInProcMu sync.Mutex
+	coordNow      = time.Now
+)
+
+type coordFileTouch struct {
+	AtUnix int64 `json:"at"`
+}
+
+type coordStamp struct {
+	AtUnix int64 `json:"at"`
+	Val    int64 `json:"val,omitempty"`
+}
+
+type coordSession struct {
+	ID                string                    `json:"id"`
+	ParentID          string                    `json:"parent,omitempty"`
+	Harness           string                    `json:"harness,omitempty"`
+	Worktree          string                    `json:"worktree,omitempty"`
+	UpdatedAt         int64                     `json:"updated"`
+	Edits             map[string]coordFileTouch `json:"edits,omitempty"`
+	Reads             map[string]coordFileTouch `json:"reads,omitempty"`
+	VerifyCmd         string                    `json:"verify_cmd,omitempty"`
+	VerifyAt          int64                     `json:"verify_at,omitempty"`
+	LastSpawnBriefKey string                    `json:"last_spawn_key,omitempty"`
+	LastSpawnBriefAt  int64                     `json:"last_spawn_at,omitempty"`
+	BriefedAt         int64                     `json:"briefed_at,omitempty"`
+}
+
+type coordState struct {
+	Version  int                      `json:"v"`
+	Sessions map[string]*coordSession `json:"sessions,omitempty"`
+	Stamps   map[string]coordStamp    `json:"stamps,omitempty"`
+}
+
+type coordActionKind int
+
+const (
+	coordActionNone coordActionKind = iota
+	coordActionRead
+	coordActionEdit
+)
+
+func coordPath(dir string) string {
+	return dir + coordFile
+}
+
+func holdCoordLock(dir string) func() {
+	coordInProcMu.Lock()
+	if dir == "" {
+		return coordInProcMu.Unlock
+	}
+	lockPath := coordPath(dir) + ".lock"
+	_ = atomicfile.MkdirSharedAll(filepath.Dir(lockPath))
+	var release func()
+	for i := range 5 {
+		rel, ok, busy := takeInstallLock(lockPath, false)
+		if ok {
+			release = rel
+			break
+		}
+		if !busy || i == 4 {
+			break
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	return func() {
+		if release != nil {
+			release()
+		}
+		coordInProcMu.Unlock()
+	}
+}
+
+func loadCoordState(dir string) coordState {
+	st := coordState{
+		Version:  coordStateVersion,
+		Sessions: map[string]*coordSession{},
+		Stamps:   map[string]coordStamp{},
+	}
+	if dir == "" {
+		return st
+	}
+	data, readErr := os.ReadFile(coordPath(dir))
+	if readErr != nil || len(data) == 0 {
+		return st
+	}
+	var parsed coordState
+	if unmarshalErr := json.Unmarshal(data, &parsed); unmarshalErr != nil {
+		return st
+	}
+	if parsed.Sessions != nil {
+		st.Sessions = parsed.Sessions
+	}
+	if parsed.Stamps != nil {
+		st.Stamps = parsed.Stamps
+	}
+	st.Version = coordStateVersion
+	return st
+}
+
+func saveCoordState(dir string, st coordState) {
+	if dir == "" {
+		return
+	}
+	st.Version = coordStateVersion
+	data, marshalErr := json.Marshal(st)
+	if marshalErr != nil {
+		return
+	}
+	p := coordPath(dir)
+	_ = atomicfile.MkdirSharedAll(filepath.Dir(p))
+	_ = atomicfile.Write(p, data, 0o600)
+}
+
+func pruneTouchMap(m map[string]coordFileTouch, cutoffUnix int64) map[string]coordFileTouch {
+	if len(m) == 0 {
+		return nil
+	}
+	type entry struct {
+		path string
+		at   int64
+	}
+	kept := make([]entry, 0, len(m))
+	for p, t := range m {
+		if p != "" && t.AtUnix >= cutoffUnix {
+			kept = append(kept, entry{path: p, at: t.AtUnix})
+		}
+	}
+	if len(kept) == 0 {
+		return nil
+	}
+	if len(kept) > coordMaxFilesPerSession {
+		sort.Slice(kept, func(i, j int) bool {
+			if kept[i].at != kept[j].at {
+				return kept[i].at > kept[j].at
+			}
+			return kept[i].path < kept[j].path
+		})
+		kept = kept[:coordMaxFilesPerSession]
+	}
+	out := make(map[string]coordFileTouch, len(kept))
+	for _, e := range kept {
+		out[e.path] = coordFileTouch{AtUnix: e.at}
+	}
+	return out
+}
+
+func pruneCoordState(st *coordState, now time.Time) {
+	if st == nil {
+		return
+	}
+	if st.Sessions == nil {
+		st.Sessions = map[string]*coordSession{}
+	}
+	if st.Stamps == nil {
+		st.Stamps = map[string]coordStamp{}
+	}
+	cutoffUnix := now.UTC().Add(-coordTTL).Unix()
+
+	type sessEntry struct {
+		id string
+		s  *coordSession
+	}
+	keptSessions := make([]sessEntry, 0, len(st.Sessions))
+	for id, s := range st.Sessions {
+		if id == "" || s == nil || s.UpdatedAt < cutoffUnix {
+			continue
+		}
+		s.ID = id
+		s.Edits = pruneTouchMap(s.Edits, cutoffUnix)
+		s.Reads = pruneTouchMap(s.Reads, cutoffUnix)
+		if s.VerifyAt < cutoffUnix {
+			s.VerifyCmd = ""
+			s.VerifyAt = 0
+		}
+		if s.LastSpawnBriefAt < cutoffUnix {
+			s.LastSpawnBriefKey = ""
+			s.LastSpawnBriefAt = 0
+		}
+		if s.BriefedAt < cutoffUnix {
+			s.BriefedAt = 0
+		}
+		keptSessions = append(keptSessions, sessEntry{id: id, s: s})
+	}
+	if len(keptSessions) > coordMaxSessions {
+		sort.Slice(keptSessions, func(i, j int) bool {
+			if keptSessions[i].s.UpdatedAt != keptSessions[j].s.UpdatedAt {
+				return keptSessions[i].s.UpdatedAt > keptSessions[j].s.UpdatedAt
+			}
+			return keptSessions[i].id < keptSessions[j].id
+		})
+		keptSessions = keptSessions[:coordMaxSessions]
+	}
+	nextSessions := make(map[string]*coordSession, len(keptSessions))
+	for _, e := range keptSessions {
+		nextSessions[e.id] = e.s
+	}
+	st.Sessions = nextSessions
+
+	type stampEntry struct {
+		key string
+		st  coordStamp
+	}
+	keptStamps := make([]stampEntry, 0, len(st.Stamps))
+	for k, v := range st.Stamps {
+		if k != "" && v.AtUnix >= cutoffUnix {
+			keptStamps = append(keptStamps, stampEntry{key: k, st: v})
+		}
+	}
+	if len(keptStamps) > coordMaxStamps {
+		sort.Slice(keptStamps, func(i, j int) bool {
+			if keptStamps[i].st.AtUnix != keptStamps[j].st.AtUnix {
+				return keptStamps[i].st.AtUnix > keptStamps[j].st.AtUnix
+			}
+			return keptStamps[i].key < keptStamps[j].key
+		})
+		keptStamps = keptStamps[:coordMaxStamps]
+	}
+	nextStamps := make(map[string]coordStamp, len(keptStamps))
+	for _, e := range keptStamps {
+		nextStamps[e.key] = e.st
+	}
+	st.Stamps = nextStamps
+}
+
+func ensureCoordSession(st *coordState, id string, nowUnix int64) *coordSession {
+	if st.Sessions == nil {
+		st.Sessions = map[string]*coordSession{}
+	}
+	s := st.Sessions[id]
+	if s == nil {
+		s = &coordSession{ID: id}
+		st.Sessions[id] = s
+	}
+	s.UpdatedAt = nowUnix
+	return s
+}
+
+// coordCanonicalPath resolves p relative to cwd, cleans it, resolves symlinks
+// across existing parent directories (for files that do not exist yet), and
+// uppercases any Windows drive letter so all harnesses produce identical keys.
+func coordCanonicalPath(cwd, p string) string {
+	p = strings.TrimSpace(p)
+	if p == "" || p == "-" {
+		return ""
+	}
+	if strings.Contains(p, "://") {
+		return ""
+	}
+	if !filepath.IsAbs(p) {
+		if strings.TrimSpace(cwd) == "" {
+			return ""
+		}
+		p = filepath.Join(cwd, p)
+	}
+	p = filepath.Clean(p)
+	resolved := evalSymlinksWithMissingTail(p)
+	if runtime.GOOS == "windows" && len(resolved) >= 2 && resolved[1] == ':' && resolved[0] >= 'a' && resolved[0] <= 'z' {
+		resolved = strings.ToUpper(resolved[:1]) + resolved[1:]
+	}
+	return resolved
+}
+
+func evalSymlinksWithMissingTail(p string) string {
+	if res, symErr := filepath.EvalSymlinks(p); symErr == nil {
+		return filepath.Clean(res)
+	}
+	cur := p
+	var tail []string
+	for {
+		parent := filepath.Dir(cur)
+		base := filepath.Base(cur)
+		if parent == cur {
+			break
+		}
+		tail = append(tail, base)
+		cur = parent
+		if res, symErr := filepath.EvalSymlinks(cur); symErr == nil {
+			for _, seg := range slices.Backward(tail) {
+				res = filepath.Join(res, seg)
+			}
+			return filepath.Clean(res)
+		}
+	}
+	return filepath.Clean(p)
+}
+
+// resolveCoordGitWorktree walks upward from cwd using filesystem metadata only
+// (never spawning git) and returns the canonical worktree root and git dir.
+func resolveCoordGitWorktree(cwd string) (string, string) {
+	cur := coordCanonicalPath("", cwd)
+	if cur == "" {
+		return "", ""
+	}
+	info, statErr := os.Stat(cur)
+	if statErr == nil && !info.IsDir() {
+		cur = filepath.Dir(cur)
+	}
+	for {
+		dotGit := filepath.Join(cur, ".git")
+		gitInfo, gitErr := os.Lstat(dotGit)
+		if gitErr == nil {
+			if gitInfo.IsDir() {
+				return cur, dotGit
+			}
+			data, readErr := os.ReadFile(dotGit)
+			if readErr == nil && len(data) <= 4096 {
+				line := strings.TrimSpace(string(data))
+				if rest, ok := strings.CutPrefix(line, "gitdir:"); ok {
+					gd := coordCanonicalPath(cur, strings.TrimSpace(rest))
+					if gd != "" {
+						return cur, gd
+					}
+				}
+			}
+		}
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			return "", ""
+		}
+		cur = parent
+	}
+}
+
+func coordShortHash(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:8])
+}
+
+func coordIsAncestor(st coordState, descendantID, ancestorID string) bool {
+	if descendantID == "" || ancestorID == "" || descendantID == ancestorID {
+		return false
+	}
+	seen := map[string]bool{descendantID: true}
+	cur := descendantID
+	for range 16 {
+		sess := st.Sessions[cur]
+		if sess == nil || sess.ParentID == "" {
+			break
+		}
+		if sess.ParentID == ancestorID {
+			return true
+		}
+		if seen[sess.ParentID] {
+			break
+		}
+		seen[sess.ParentID] = true
+		cur = sess.ParentID
+	}
+	return false
+}
+
+func coordSameLineage(dir, selfID, selfParent, transcript, otherID string, st coordState, cachedLineage *map[string]bool) bool {
+	if otherID == "" || otherID == selfID {
+		return true
+	}
+	if selfParent != "" && otherID == selfParent {
+		return true
+	}
+	if coordIsAncestor(st, selfID, otherID) || coordIsAncestor(st, otherID, selfID) {
+		return true
+	}
+	if selfParent != "" && coordIsAncestor(st, selfParent, otherID) {
+		return true
+	}
+	if *cachedLineage == nil && dir != "" && selfID != "" {
+		*cachedLineage = askerLineage(dir, selfID, transcript, selfParent)
+	}
+	return (*cachedLineage)[otherID]
+}
+
+func isPostToolEvent(eventName string) bool {
+	switch strings.ToLower(strings.TrimSpace(eventName)) {
+	case "posttooluse", "aftertool", "posttool", "posttoolusefailure":
+		return true
+	}
+	return false
+}
+
+type coordPayloadView struct {
+	SessionID       string
+	ParentSessionID string
+	TranscriptPath  string
+	Harness         string
+	EventName       string
+	ToolName        string
+	CWD             string
+	Paths           []string
+	Patch           string
+	Command         string
+	ToolInputCmd    string
+	IsFailure       bool
+}
+
+func parseCoordPayloadView(raw []byte, fallbackCWD string, fallback toolHookInput) coordPayloadView {
+	out := coordPayloadView{
+		SessionID:      strings.TrimSpace(fallback.SessionID),
+		TranscriptPath: strings.TrimSpace(fallback.TranscriptPath),
+		ToolName:       strings.TrimSpace(fallback.ToolName),
+		CWD:            strings.TrimSpace(fallbackCWD),
+	}
+	if len(raw) == 0 {
+		return out
+	}
+	var doc map[string]any
+	if unmarshalErr := json.Unmarshal(raw, &doc); unmarshalErr != nil {
+		return out
+	}
+	if out.SessionID == "" {
+		out.SessionID = firstJSONString(doc, "session_id", "sessionId", "conversation_id", "conversationId")
+	}
+	out.ParentSessionID = firstJSONString(doc, "parent_session_id", "parentSessionId")
+	if out.TranscriptPath == "" {
+		out.TranscriptPath = firstJSONString(doc, "transcript_path", "transcriptPath")
+	}
+	out.Harness = strings.ToLower(firstJSONString(doc, "harness"))
+	out.EventName = firstJSONString(doc, "hook_event_name", "hookEventName", "event")
+	if out.ToolName == "" {
+		out.ToolName = firstJSONString(doc, "tool_name", "toolName", "tool")
+	}
+	if out.CWD == "" {
+		out.CWD = firstJSONString(doc, "cwd", "workspaceRoot")
+		if out.CWD == "" {
+			if roots, ok := doc["workspace_roots"].([]any); ok && len(roots) > 0 {
+				if first, ok := roots[0].(string); ok {
+					out.CWD = strings.TrimSpace(first)
+				}
+			}
+		}
+	}
+	if strings.EqualFold(out.EventName, "PostToolUseFailure") ||
+		jsonBool(doc["is_error"]) || jsonBool(doc["isError"]) || jsonBool(doc["tool_result_is_error"]) ||
+		strings.EqualFold(firstJSONString(doc, "failure_type", "failureType"), "error") ||
+		coordValueNonEmpty(doc["error"]) || coordValueNonEmpty(doc["tool_error"]) || coordValueNonEmpty(doc["error_message"]) {
+		out.IsFailure = true
+	}
+	for _, key := range []string{"tool_response", "toolResult", "tool_output"} {
+		resp := coordAsObject(doc[key])
+		if resp == nil {
+			continue
+		}
+		if jsonBool(resp["is_error"]) || jsonBool(resp["isError"]) ||
+			coordValueNonEmpty(resp["error"]) || coordValueNonEmpty(resp["tool_error"]) {
+			out.IsFailure = true
+		}
+		if rt, ok := resp["resultType"].(string); ok {
+			rt = strings.TrimSpace(rt)
+			if rt != "" && !strings.EqualFold(rt, "success") {
+				out.IsFailure = true
+			}
+		}
+		for _, ck := range []string{"exit_code", "exitCode", "exit_status", "exitStatus"} {
+			if coordNonZeroStatus(resp[ck]) {
+				out.IsFailure = true
+			}
+		}
+	}
+
+	ti := extractToolInputMap(doc)
+	if ti != nil {
+		out.Command = firstJSONString(ti, "command", "cmd")
+		if out.Command == "" {
+			out.Command = firstJSONString(doc, "command")
+		}
+		out.ToolInputCmd = out.Command
+		out.Patch = firstJSONString(ti, "patch", "patchText", "patch_text", "diff", "input")
+		out.Paths = collectToolInputPaths(ti)
+	}
+	return out
+}
+
+func extractToolInputMap(doc map[string]any) map[string]any {
+	for _, k := range []string{"tool_input", "toolInput", "input"} {
+		if m, ok := doc[k].(map[string]any); ok {
+			return m
+		}
+	}
+	return nil
+}
+
+func collectToolInputPaths(ti map[string]any) []string {
+	var paths []string
+	seen := map[string]bool{}
+	add := func(v string) {
+		v = strings.TrimSpace(v)
+		if v != "" && !seen[v] {
+			seen[v] = true
+			paths = append(paths, v)
+		}
+	}
+	for _, k := range []string{
+		"file_path", "filePath", "path", "target_file", "targetFile",
+		"TargetFile", "target_path", "targetPath", "absolute_path",
+		"absolutePath", "AbsolutePath", "notebook_path", "notebookPath",
+	} {
+		if s, ok := ti[k].(string); ok {
+			add(s)
+		}
+	}
+	for _, k := range []string{"paths", "files"} {
+		if arr, ok := ti[k].([]any); ok {
+			for _, item := range arr {
+				switch v := item.(type) {
+				case string:
+					add(v)
+				case map[string]any:
+					add(firstJSONString(v, "file_path", "filePath", "path", "target_file", "targetFile"))
+				}
+			}
+		}
+	}
+	return paths
+}
+
+func firstJSONString(m map[string]any, keys ...string) string {
+	for _, k := range keys {
+		if s, ok := m[k].(string); ok {
+			if tr := strings.TrimSpace(s); tr != "" {
+				return tr
+			}
+		}
+	}
+	return ""
+}
+
+func jsonBool(v any) bool {
+	b, ok := v.(bool)
+	return ok && b
+}
+
+func coordJSONInt(v any) (int, bool) {
+	switch n := v.(type) {
+	case float64:
+		return int(n), true
+	case int:
+		return n, true
+	case int64:
+		return int(n), true
+	}
+	return 0, false
+}
+
+func coordToolAction(toolName string, tiCmd string, hasPatch bool) coordActionKind {
+	lower := strings.ToLower(strings.TrimSpace(toolName))
+	switch lower {
+	case "apply_patch", "patch":
+		return coordActionEdit
+	case "str_replace_editor", "str_replace_based_edit_tool":
+		if strings.EqualFold(strings.TrimSpace(tiCmd), "view") {
+			return coordActionRead
+		}
+		return coordActionEdit
+	case "edit", "write", "multiedit", "notebookedit", "edit_file", "write_file",
+		"write_to_file", "replace_file_content", "multi_replace_file_content",
+		"create_file", "insert_edit_into_file", "str_replace", "search_replace",
+		"file_edit", "file_write", "patch_file", "update_file", "delete_file", "remove_file":
+		return coordActionEdit
+	case "read", "read_file", "view_file", "view_file_outline", "view_code_item",
+		"read_notebook", "open_file", "cat_file", "file_read", "get_file", "read_many_files":
+		return coordActionRead
+	}
+	if strings.HasPrefix(lower, "write_") || strings.HasPrefix(lower, "edit_") || strings.Contains(lower, "replace_file") {
+		return coordActionEdit
+	}
+	if hasPatch && !isCommandTool(toolName) {
+		return coordActionEdit
+	}
+	return coordActionNone
+}
+
+func coordActionPaths(cwd string, view coordPayloadView) (coordActionKind, []string) {
+	hasPatch := view.Patch != ""
+	action := coordToolAction(view.ToolName, view.ToolInputCmd, hasPatch)
+	if action == coordActionNone {
+		return coordActionNone, nil
+	}
+	rawPaths := slices.Clone(view.Paths)
+	if hasPatch {
+		for _, pf := range applyPatchFiles(view.Patch) {
+			rawPaths = append(rawPaths, sources.ShellPatchPath(view.Patch, cwd, pf))
+		}
+	}
+	seen := map[string]bool{}
+	out := make([]string, 0, len(rawPaths))
+	for _, rp := range rawPaths {
+		cp := coordCanonicalPath(cwd, rp)
+		if cp != "" && !seen[cp] {
+			seen[cp] = true
+			out = append(out, cp)
+		}
+	}
+	return action, out
+}
+
+func coordDisplayPath(cwd, canonical string) string {
+	if cleanCWD := coordCanonicalPath("", cwd); cleanCWD != "" {
+		if rel, relErr := filepath.Rel(cleanCWD, canonical); relErr == nil && rel != "" && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != ".." {
+			return filepath.ToSlash(rel)
+		}
+	}
+	return search.SafePath(canonical)
+}
+
+func coordFormatAge(sec int64) string {
+	if sec < 60 {
+		if sec <= 1 {
+			return "1s"
+		}
+		return fmt.Sprintf("%ds", sec)
+	}
+	return fmt.Sprintf("%dm", sec/60)
+}
+
+func coordShortID(id string) string {
+	if len(id) > 12 {
+		return id[:12]
+	}
+	return id
+}
+
+func coordPolicyAllows(cwd, transcriptPath string) bool {
+	pol := policy.Load()
+	if !pol.Allows(policy.ActivationAuto, "local") {
+		return false
+	}
+	if (cwd != "" || transcriptPath != "") && pol.Ignored(transcriptPath, cwd) {
+		return false
+	}
+	if cwd != "" && pol.Ignored("", strings.TrimRight(filepath.ToSlash(filepath.Clean(cwd)), "/")+"/") {
+		return false
+	}
+	return true
+}
+
+// coordHandleToolFile checks Active File Radar collisions against other active
+// non-lineage sessions and records the caller's edit/read touch in .coord.
+func coordHandleToolFile(dir, cwd string, input toolHookInput, raw []byte) string {
+	if dir == "" || recallIsOff() {
+		return ""
+	}
+	view := parseCoordPayloadView(raw, cwd, input)
+	if view.SessionID == "" || !coordPolicyAllows(view.CWD, view.TranscriptPath) {
+		return ""
+	}
+	action, paths := coordActionPaths(view.CWD, view)
+	if action == coordActionNone && isCommandTool(view.ToolName) && view.Command != "" {
+		if patchFiles := applyPatchFiles(view.Command); len(patchFiles) > 0 {
+			action = coordActionEdit
+			seen := map[string]bool{}
+			for _, pf := range patchFiles {
+				pf = sources.ShellPatchPath(view.Command, view.CWD, pf)
+				if cp := coordCanonicalPath(view.CWD, pf); cp != "" && !seen[cp] {
+					seen[cp] = true
+					paths = append(paths, cp)
+				}
+			}
+		}
+	}
+	if action == coordActionNone || len(paths) == 0 {
+		return ""
+	}
+
+	postEvent := isPostToolEvent(view.EventName)
+	checkCollisions := action == coordActionEdit || (action == coordActionRead && postEvent)
+	wt, _ := resolveCoordGitWorktree(view.CWD)
+	now := coordNow()
+	nowUnix := now.UTC().Unix()
+
+	release := holdCoordLock(dir)
+	defer release()
+
+	st := loadCoordState(dir)
+	pruneCoordState(&st, now)
+
+	selfParent := view.ParentSessionID
+	if existing := st.Sessions[view.SessionID]; existing != nil && selfParent == "" {
+		selfParent = existing.ParentID
+	}
+
+	var cachedLineage map[string]bool
+	var warnings []string
+	if checkCollisions {
+		for _, p := range paths {
+			var newestID string
+			var newestTouch coordFileTouch
+			for otherID, other := range st.Sessions {
+				if coordSameLineage(dir, view.SessionID, selfParent, view.TranscriptPath, otherID, st, &cachedLineage) {
+					continue
+				}
+				if touch, ok := other.Edits[p]; ok && touch.AtUnix > newestTouch.AtUnix {
+					newestTouch = touch
+					newestID = otherID
+				}
+			}
+			if newestID == "" {
+				continue
+			}
+			stampKey := "file:" + coordShortHash(view.SessionID+"\x00"+p+"\x00"+newestID)
+			if stamped, seen := st.Stamps[stampKey]; seen && stamped.Val == newestTouch.AtUnix {
+				continue
+			}
+			st.Stamps[stampKey] = coordStamp{AtUnix: nowUnix, Val: newestTouch.AtUnix}
+			ageSec := max(nowUnix-newestTouch.AtUnix, 0)
+			warnings = append(warnings, fmt.Sprintf(
+				"parallel edit radar: %s was edited %s ago by another active session (%s)",
+				coordDisplayPath(view.CWD, p),
+				coordFormatAge(ageSec),
+				coordShortID(newestID),
+			))
+		}
+	}
+
+	sess := ensureCoordSession(&st, view.SessionID, nowUnix)
+	if selfParent != "" && sess.ParentID == "" {
+		sess.ParentID = selfParent
+	}
+	if view.Harness != "" && sess.Harness == "" {
+		sess.Harness = view.Harness
+	}
+	if wt != "" {
+		sess.Worktree = wt
+	}
+	switch action { //nolint:exhaustive // coordActionNone returns above before recording touches
+	case coordActionEdit:
+		if sess.Edits == nil {
+			sess.Edits = map[string]coordFileTouch{}
+		}
+		for _, p := range paths {
+			sess.Edits[p] = coordFileTouch{AtUnix: nowUnix}
+		}
+	case coordActionRead:
+		if sess.Reads == nil {
+			sess.Reads = map[string]coordFileTouch{}
+		}
+		for _, p := range paths {
+			sess.Reads[p] = coordFileTouch{AtUnix: nowUnix}
+		}
+	}
+	pruneCoordState(&st, now)
+	saveCoordState(dir, st)
+
+	if len(warnings) == 0 {
+		return ""
+	}
+	return defuseHostTriggers(strings.Join(warnings, "\n"))
+}
+
+func isASCIIAlpha(b byte) bool {
+	return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z')
+}
+
+func tokenLooksWindowsPath(tok string) bool {
+	if len(tok) >= 2 && isASCIIAlpha(tok[0]) && tok[1] == ':' {
+		return true
+	}
+	if len(tok) >= 4 && strings.HasPrefix(tok, "-C") && isASCIIAlpha(tok[2]) && tok[3] == ':' {
+		return true
+	}
+	return strings.HasPrefix(tok, `\\`) || strings.HasPrefix(tok, `.\`) || strings.HasPrefix(tok, `..\`)
+}
+
+func shellBaseName(p string) string {
+	if idx := strings.LastIndexAny(p, `/\`); idx >= 0 {
+		p = p[idx+1:]
+	}
+	return strings.ToLower(p)
+}
+
+func splitShellSegments(cmd string) []string {
+	var segs []string
+	var cur strings.Builder
+	var quote byte
+	escaped := false
+	for i := 0; i < len(cmd); i++ {
+		ch := cmd[i]
+		if escaped {
+			cur.WriteByte(ch)
+			escaped = false
+			continue
+		}
+		if quote != 0 {
+			switch {
+			case ch == '\\' && quote == '"' && (runtime.GOOS != "windows" || (i+1 < len(cmd) && cmd[i+1] == '"')):
+				escaped = true
+			case ch == quote:
+				quote = 0
+			}
+			cur.WriteByte(ch)
+			continue
+		}
+		if ch == '\\' {
+			if runtime.GOOS != "windows" || (i+1 < len(cmd) && cmd[i+1] == '\n') {
+				escaped = true
+			}
+			cur.WriteByte(ch)
+			continue
+		}
+		if ch == '\'' || ch == '"' {
+			quote = ch
+			cur.WriteByte(ch)
+			continue
+		}
+		if ch == ';' || ch == '\n' || ch == '|' || (ch == '&' && i+1 < len(cmd) && cmd[i+1] == '&') {
+			if s := strings.TrimSpace(cur.String()); s != "" {
+				segs = append(segs, s)
+			}
+			cur.Reset()
+			if (ch == '|' && i+1 < len(cmd) && cmd[i+1] == '|') || (ch == '&' && i+1 < len(cmd) && cmd[i+1] == '&') {
+				i++
+			}
+			continue
+		}
+		cur.WriteByte(ch)
+	}
+	if s := strings.TrimSpace(cur.String()); s != "" {
+		segs = append(segs, s)
+	}
+	return segs
+}
+
+func splitShellFields(seg string) []string {
+	var out []string
+	var cur strings.Builder
+	var quote byte
+	escaped := false
+	hasTok := false
+	winTok := false
+	for i := range len(seg) {
+		ch := seg[i]
+		if escaped {
+			cur.WriteByte(ch)
+			escaped = false
+			hasTok = true
+			continue
+		}
+		if !winTok {
+			winTok = runtime.GOOS == "windows" ||
+				tokenLooksWindowsPath(cur.String()) ||
+				(cur.Len() == 0 && (strings.HasPrefix(seg[i:], `\\`) || strings.HasPrefix(seg[i:], `.\`) || strings.HasPrefix(seg[i:], `..\`)))
+		}
+		if quote != 0 {
+			switch {
+			case ch == '\\' && quote == '"' && (!winTok || (i+1 < len(seg) && seg[i+1] == '"')):
+				escaped = true
+			case ch == quote:
+				quote = 0
+			default:
+				cur.WriteByte(ch)
+			}
+			hasTok = true
+			continue
+		}
+		switch {
+		case ch == '\\':
+			if winTok {
+				cur.WriteByte(ch)
+			} else {
+				escaped = true
+			}
+			hasTok = true
+		case ch == '\'' || ch == '"':
+			quote = ch
+			hasTok = true
+		case unicode.IsSpace(rune(ch)):
+			if hasTok {
+				out = append(out, cur.String())
+				cur.Reset()
+				hasTok = false
+				winTok = false
+			}
+		default:
+			cur.WriteByte(ch)
+			hasTok = true
+		}
+	}
+	if hasTok {
+		out = append(out, cur.String())
+	}
+	return out
+}
+
+func isEnvAssignToken(tok string) bool {
+	eq := strings.IndexByte(tok, '=')
+	if eq <= 0 {
+		return false
+	}
+	for i := range eq {
+		c := tok[i]
+		valid := (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c == '_') || (i > 0 && c >= '0' && c <= '9')
+		if !valid {
+			return false
+		}
+	}
+	return true
+}
+
+var gitValueFlags = map[string]bool{
+	"-c":          true,
+	"--git-dir":   true,
+	"--work-tree": true,
+	"--namespace": true,
+}
+
+func parseGitInvocation(fields []string) (dirOverride, subcmd string, rest []string, ok bool) {
+	i := 0
+	for i < len(fields) && isEnvAssignToken(fields[i]) {
+		i++
+	}
+	if i < len(fields) && fields[i] == "env" {
+		i++
+		for i < len(fields) && (isEnvAssignToken(fields[i]) || strings.HasPrefix(fields[i], "-")) {
+			i++
+		}
+	}
+	if i >= len(fields) {
+		return "", "", nil, false
+	}
+	bin := shellBaseName(fields[i])
+	if bin != "git" && bin != "git.exe" {
+		return "", "", nil, false
+	}
+	i++
+	for i < len(fields) {
+		f := fields[i]
+		if f == "-C" && i+1 < len(fields) {
+			dirOverride = fields[i+1]
+			i += 2
+			continue
+		}
+		if afterC, hasC := strings.CutPrefix(f, "-C"); hasC && afterC != "" {
+			dirOverride = afterC
+			i++
+			continue
+		}
+		if gitValueFlags[f] && i+1 < len(fields) {
+			i += 2
+			continue
+		}
+		if strings.HasPrefix(f, "-") {
+			i++
+			continue
+		}
+		return dirOverride, strings.ToLower(f), fields[i+1:], true
+	}
+	return "", "", nil, false
+}
+
+func isMutatingGitSubcmd(subcmd string, args []string) bool {
+	switch subcmd {
+	case "add", "commit", "amend", "checkout", "switch", "restore", "reset",
+		"rebase", "merge", "cherry-pick", "pull", "push", "rm", "mv",
+		"am", "apply", "clean", "tag":
+		return true
+	case "stash":
+		if len(args) > 0 {
+			switch strings.ToLower(args[0]) {
+			case "list", "show":
+				return false
+			}
+		}
+		return true
+	case "worktree":
+		if len(args) > 0 && strings.EqualFold(args[0], "list") {
+			return false
+		}
+		return true
+	case "branch":
+		for _, a := range args {
+			switch a {
+			case "-l", "--list", "--show-current", "-a", "--all", "-r", "--remotes", "--contains", "--no-contains", "--merged", "--no-merged", "-v", "-vv":
+				return false
+			}
+		}
+		return len(args) > 0
+	}
+	return false
+}
+
+// mutatingGitSubcommand inspects a shell command and returns the target CWD and
+// mutating git subcommand if one is present.
+func mutatingGitSubcommand(cmd, cwd string) (targetCWD, subcmd string) {
+	curCWD := cwd
+	for _, seg := range splitShellSegments(cmd) {
+		fields := splitShellFields(seg)
+		if len(fields) >= 2 && fields[0] == "cd" && !strings.HasPrefix(fields[1], "-") {
+			if nextCWD := coordCanonicalPath(curCWD, fields[1]); nextCWD != "" {
+				curCWD = nextCWD
+			}
+			continue
+		}
+		dirFlag, sub, args, ok := parseGitInvocation(fields)
+		if !ok || !isMutatingGitSubcmd(sub, args) {
+			continue
+		}
+		effectiveCWD := curCWD
+		if dirFlag != "" {
+			if resolvedFlag := coordCanonicalPath(curCWD, dirFlag); resolvedFlag != "" {
+				effectiveCWD = resolvedFlag
+			}
+		}
+		return effectiveCWD, sub
+	}
+	return "", ""
+}
+
+// coordCheckMutatingGit checks PreToolUse command invocations for an existing
+// git index.lock or concurrent active edits in the same git worktree.
+func coordCheckMutatingGit(dir, cwd string, input toolHookInput, raw []byte) string {
+	if dir == "" || recallIsOff() {
+		return ""
+	}
+	view := parseCoordPayloadView(raw, cwd, input)
+	if isPostToolEvent(view.EventName) || !isCommandTool(view.ToolName) {
+		return ""
+	}
+	if !coordPolicyAllows(view.CWD, view.TranscriptPath) {
+		return ""
+	}
+	cmd := strings.TrimSpace(view.Command)
+	if cmd == "" {
+		cmd = strings.TrimSpace(input.ToolInput.Command)
+	}
+	if cmd == "" || view.SessionID == "" {
+		return ""
+	}
+	targetCWD, subcmd := mutatingGitSubcommand(cmd, view.CWD)
+	if subcmd == "" {
+		return ""
+	}
+	wt, gitDir := resolveCoordGitWorktree(targetCWD)
+	if gitDir == "" && wt == "" {
+		return ""
+	}
+
+	now := coordNow()
+	nowUnix := now.UTC().Unix()
+
+	release := holdCoordLock(dir)
+	defer release()
+
+	st := loadCoordState(dir)
+	pruneCoordState(&st, now)
+	var warnings []string
+
+	wtLabel := ""
+	if wt != "" {
+		wtLabel = filepath.Base(wt)
+		if wtLabel == "" || wtLabel == "." {
+			wtLabel = search.SafePath(wt)
+		}
+	}
+
+	if gitDir != "" {
+		lockPath := filepath.Join(gitDir, "index.lock")
+		if info, statErr := os.Stat(lockPath); statErr == nil {
+			modUnix := info.ModTime().UTC().Unix()
+			stampKey := "gitlock:" + coordShortHash(view.SessionID+"\x00"+gitDir)
+			if stamped, seen := st.Stamps[stampKey]; !seen || stamped.Val != modUnix {
+				st.Stamps[stampKey] = coordStamp{AtUnix: nowUnix, Val: modUnix}
+				age := max(now.Sub(info.ModTime()), 0)
+				ageText := coordFormatAge(int64(age.Seconds()))
+				if age >= coordGitLockStaleAfter {
+					warnings = append(warnings, fmt.Sprintf(
+						"git radar: stale index.lock (%s old) in %s before git %s — check whether another git process crashed",
+						ageText, wtLabel, subcmd,
+					))
+				} else {
+					warnings = append(warnings, fmt.Sprintf(
+						"git radar: index.lock active (%s old) in %s before git %s — another git operation may still be running",
+						ageText, wtLabel, subcmd,
+					))
+				}
+			}
+		} else if !errors.Is(statErr, os.ErrNotExist) {
+			// Permission or IO oddity is ignored cleanly in hook paths.
+			_ = statErr
+		}
+	}
+
+	if wt != "" {
+		selfParent := view.ParentSessionID
+		if existing := st.Sessions[view.SessionID]; existing != nil && selfParent == "" {
+			selfParent = existing.ParentID
+		}
+		var cachedLineage map[string]bool
+		var colliderID string
+		var latestEditAt int64
+		var sampleFile string
+		editCount := 0
+		for otherID, other := range st.Sessions {
+			if other.Worktree != wt || coordSameLineage(dir, view.SessionID, selfParent, view.TranscriptPath, otherID, st, &cachedLineage) {
+				continue
+			}
+			for fPath, touch := range other.Edits {
+				editCount++
+				if touch.AtUnix > latestEditAt {
+					latestEditAt = touch.AtUnix
+					colliderID = otherID
+					sampleFile = fPath
+				}
+			}
+		}
+		if colliderID != "" {
+			stampKey := "gitwt:" + coordShortHash(view.SessionID+"\x00"+wt+"\x00"+colliderID)
+			if stamped, seen := st.Stamps[stampKey]; !seen || stamped.Val != latestEditAt {
+				st.Stamps[stampKey] = coordStamp{AtUnix: nowUnix, Val: latestEditAt}
+				warnings = append(warnings, fmt.Sprintf(
+					"git radar: %d file(s) in this worktree recently edited by active session %s (e.g. %s) before git %s",
+					editCount, coordShortID(colliderID), coordDisplayPath(wt, sampleFile), subcmd,
+				))
+			}
+		}
+	}
+
+	if len(warnings) > 0 {
+		saveCoordState(dir, st)
+	}
+	if len(warnings) == 0 {
+		return ""
+	}
+	return defuseHostTriggers(strings.Join(warnings, "\n"))
+}
+
+// coordRecordPreCommand touches the session's live entry in .coord when it runs
+// a PreToolUse shell command.
+func coordRecordPreCommand(dir, cwd string, input toolHookInput, raw []byte) {
+	if dir == "" || recallIsOff() {
+		return
+	}
+	view := parseCoordPayloadView(raw, cwd, input)
+	if view.SessionID == "" || !isCommandTool(view.ToolName) || !coordPolicyAllows(view.CWD, view.TranscriptPath) {
+		return
+	}
+	wt, _ := resolveCoordGitWorktree(view.CWD)
+	now := coordNow()
+	nowUnix := now.UTC().Unix()
+
+	release := holdCoordLock(dir)
+	defer release()
+
+	st := loadCoordState(dir)
+	pruneCoordState(&st, now)
+	sess := ensureCoordSession(&st, view.SessionID, nowUnix)
+	if view.ParentSessionID != "" && sess.ParentID == "" {
+		sess.ParentID = view.ParentSessionID
+	}
+	if view.Harness != "" && sess.Harness == "" {
+		sess.Harness = view.Harness
+	}
+	if wt != "" {
+		sess.Worktree = wt
+	}
+	saveCoordState(dir, st)
+}
+
+func isCoordVerifyCommand(cmd string) bool {
+	cmd = strings.TrimSpace(cmd)
+	if cmd == "" || index.InspectionCommand(cmd) {
+		return false
+	}
+	if index.VerifyCommand(cmd) {
+		return true
+	}
+	return isTestRunnerCommand(cmd)
+}
+
+func normalizeVerifyCmdForBrief(cmd, cwd string) string {
+	cmd = strings.TrimSpace(cmd)
+	if cmd == "" {
+		return ""
+	}
+	fields := strings.Fields(cmd)
+	cmd = strings.Join(fields, " ")
+	wt, _ := resolveCoordGitWorktree(cwd)
+	canonicalCWD := coordCanonicalPath("", cwd)
+
+	if strings.HasPrefix(cmd, "cd ") {
+		if idx := strings.Index(cmd, " && "); idx > 3 {
+			cdArg := strings.TrimSpace(cmd[3:idx])
+			cdArg = strings.Trim(cdArg, `"'`)
+			resolvedCD := coordCanonicalPath(cwd, cdArg)
+			if resolvedCD != "" && (resolvedCD == canonicalCWD || (wt != "" && resolvedCD == wt)) {
+				cmd = strings.TrimSpace(cmd[idx+4:])
+			}
+		}
+	}
+	cmd = defuseHostTriggers(cmd)
+	runes := []rune(cmd)
+	if len(runes) > 120 {
+		cmd = string(runes[:117]) + "..."
+	}
+	return cmd
+}
+
+func coordAsObject(v any) map[string]any {
+	switch x := v.(type) {
+	case map[string]any:
+		return x
+	case string:
+		trimmed := strings.TrimSpace(x)
+		if strings.HasPrefix(trimmed, "{") {
+			var nested map[string]any
+			if json.Unmarshal([]byte(trimmed), &nested) == nil {
+				return nested
+			}
+		}
+	}
+	return nil
+}
+
+func coordValueNonEmpty(v any) bool {
+	switch x := v.(type) {
+	case string:
+		t := strings.TrimSpace(x)
+		return t != "" && !strings.EqualFold(t, "(none)") && !strings.EqualFold(t, "null")
+	case map[string]any:
+		for _, k := range []string{"message", "error", "code", "detail", "reason"} {
+			if coordValueNonEmpty(x[k]) {
+				return true
+			}
+		}
+		return len(x) > 0 && x["message"] == nil && x["error"] == nil && x["code"] == nil
+	}
+	return false
+}
+
+func coordNonZeroStatus(v any) bool {
+	if code, ok := coordJSONInt(v); ok {
+		return code != 0
+	}
+	if s, ok := v.(string); ok {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return false
+		}
+		n, err := strconv.Atoi(s)
+		return err == nil && n != 0
+	}
+	return false
+}
+
+func coordRawHeadIndicatesFailure(raw []byte) bool {
+	if len(raw) == 0 {
+		return false
+	}
+	head := strings.ToLower(string(raw[:min(len(raw), 4096)]))
+	for _, needle := range []string{
+		"posttoolusefailure",
+		`"tool_result_is_error":true`,
+		`"is_error":true`,
+		`"iserror":true`,
+		`"failure_type":"error"`,
+		`"tool_error":"`,
+		`"error_message":"`,
+	} {
+		if strings.Contains(head, needle) {
+			return true
+		}
+	}
+	return false
+}
+
+func coordOutputHasNonZeroExit(text string) bool {
+	if text == "" {
+		return false
+	}
+	markers := []string{
+		"exited with code ",
+		"exit code: ",
+		"exit code ",
+		"exit_code: ",
+		"exit: ",
+		"| exit=",
+		"→ exit ",
+	}
+	for rawLine := range strings.SplitSeq(text, "\n") {
+		low := strings.ToLower(strings.TrimSpace(rawLine))
+		if low == "" {
+			continue
+		}
+		if rest, ok := strings.CutPrefix(low, "exit "); ok {
+			if code, parsed := parseLeadingExitInt(rest); parsed && code != 0 {
+				return true
+			}
+		}
+		for _, marker := range markers {
+			idx := 0
+			for {
+				pos := strings.Index(low[idx:], marker)
+				if pos < 0 {
+					break
+				}
+				rest := low[idx+pos+len(marker):]
+				if code, ok := parseLeadingExitInt(rest); ok && code != 0 {
+					return true
+				}
+				idx += pos + len(marker)
+			}
+		}
+	}
+	return false
+}
+
+func parseLeadingExitInt(s string) (int, bool) {
+	s = strings.TrimLeft(s, " \t")
+	if s == "" {
+		return 0, false
+	}
+	end := 0
+	if s[0] == '-' || s[0] == '+' {
+		end++
+	}
+	digitsStart := end
+	for end < len(s) && s[end] >= '0' && s[end] <= '9' {
+		end++
+	}
+	if end == digitsStart {
+		return 0, false
+	}
+	if end < len(s) {
+		switch s[end] {
+		case '.', '>', ',', ')', ' ', '\t', '\r':
+		default:
+			return 0, false
+		}
+	}
+	n, err := strconv.Atoi(s[:end])
+	return n, err == nil
+}
+
+func coordHasFriction(text string) bool {
+	if text == "" {
+		return false
+	}
+	return index.OutputReadsAsFailure(text)
+}
+
+func coordStreakStampKey(sessionID, cwd string) string {
+	if sid := strings.TrimSpace(sessionID); sid != "" {
+		return "fail-streak:sid:" + sid
+	}
+	clean := coordCanonicalPath("", cwd)
+	if clean == "" {
+		clean = filepath.Clean(strings.TrimSpace(cwd))
+	}
+	if clean == "" || clean == "." {
+		return ""
+	}
+	return "fail-streak:cwd:" + clean
+}
+
+// coordRecordAfterCommand updates per-session command failure streaks and
+// records passing verification commands in .coord. It returns the updated
+// failure streak (0 on clean commands).
+func coordRecordAfterCommand(dir, cwd, cmd, output string, raw []byte, fallbackSessionID string) int {
+	view := parseCoordPayloadView(raw, cwd, toolHookInput{SessionID: fallbackSessionID})
+	if strings.TrimSpace(cmd) == "" {
+		cmd = view.Command
+	}
+	if view.CWD == "" {
+		view.CWD = strings.TrimSpace(cwd)
+	}
+	failed := view.IsFailure || coordRawHeadIndicatesFailure(raw) || coordHasFriction(output) || isDetEnvFailureOutput(output) || coordOutputHasNonZeroExit(output)
+	if !coordPolicyAllows(view.CWD, view.TranscriptPath) {
+		if failed {
+			return 1
+		}
+		return 0
+	}
+	return coordRecordCommandOutcome(dir, view.CWD, view.SessionID, cmd, failed)
+}
+
+// coordRecordShellAfter updates the command failure streak for non-JSON shell
+// hooks (deja shell -c / postexec) and returns the updated streak.
+func coordRecordShellAfter(dir, cwd, sessionID, cmd string, failed bool) int {
+	return coordRecordCommandOutcome(dir, cwd, sessionID, cmd, failed)
+}
+
+// coordResetFailStreak clears a session's consecutive failure streak when an
+// external signal (such as an Antigravity transcript tool step) shows exit 0.
+func coordResetFailStreak(dir, sessionID, cwd string) {
+	coordRecordCommandOutcome(dir, cwd, sessionID, "", false)
+}
+
+func coordRecordCommandOutcome(dir, cwd, sessionID, cmd string, failed bool) int {
+	if dir == "" || recallIsOff() || !coordPolicyAllows(cwd, "") {
+		if failed {
+			return 1
+		}
+		return 0
+	}
+	streakKey := coordStreakStampKey(sessionID, cwd)
+	verifyNorm := ""
+	if !failed && sessionID != "" && isCoordVerifyCommand(cmd) {
+		verifyNorm = normalizeVerifyCmdForBrief(cmd, cwd)
+	}
+	if !failed && verifyNorm == "" {
+		if streakKey == "" {
+			return 0
+		}
+		if _, statErr := os.Stat(coordPath(dir)); statErr != nil {
+			return 0
+		}
+	}
+	now := coordNow()
+	nowUnix := now.UTC().Unix()
+
+	release := holdCoordLock(dir)
+	defer release()
+
+	st := loadCoordState(dir)
+	pruneCoordState(&st, now)
+	if failed {
+		if streakKey == "" {
+			return 1
+		}
+		next := int(st.Stamps[streakKey].Val) + 1
+		st.Stamps[streakKey] = coordStamp{AtUnix: nowUnix, Val: int64(next)}
+		saveCoordState(dir, st)
+		return next
+	}
+
+	dirty := false
+	if streakKey != "" {
+		if _, exists := st.Stamps[streakKey]; exists {
+			delete(st.Stamps, streakKey)
+			dirty = true
+		}
+	}
+	if verifyNorm != "" {
+		wt, _ := resolveCoordGitWorktree(cwd)
+		sess := ensureCoordSession(&st, sessionID, nowUnix)
+		if wt != "" {
+			sess.Worktree = wt
+		}
+		sess.VerifyCmd = verifyNorm
+		sess.VerifyAt = nowUnix
+		dirty = true
+	}
+	if dirty {
+		saveCoordState(dir, st)
+	}
+	return 0
+}

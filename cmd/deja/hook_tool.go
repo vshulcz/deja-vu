@@ -386,44 +386,11 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	// other than the caller, so it answers in its own shape. See hook_spawn.go.
 	if isSpawnTool(input.ToolName) {
 		if !planIndexReady(dir) {
-			// Ask, do not build. #777 gave the per-prompt and session-start hooks
-			// this: an index in a format this build cannot read answers nothing,
-			// which reads as a user with no history, and nothing else asks for the
-			// rebuild that fixes it. A spawned subagent reaches only these hooks —
-			// install.go says so where it wires Task and Agent — so without this a
-			// fleet works against a stale index until its parent types something
-			// (#2567). requestWarmup writes a sentinel and detaches a child; the
-			// action pays neither the read nor the wait.
 			requestWarmup(dir)
-			return nil
 		}
-		// Spawn recall runs the prompt hook, which handles its own commit lock.
+		// Run spawn coordination even on cold stores so live parent briefs reach subagents.
 		return runHookSpawn(dir, input, raw, stdout)
 	}
-	// Never build or repair from here. This runs inside an action the user is
-	// waiting on, and a miss costs nothing while a rebuild costs seconds.
-	if !planIndexReady(dir) {
-		// Ask, do not build. #777 gave the per-prompt and session-start hooks
-		// this: an index in a format this build cannot read answers nothing,
-		// which reads as a user with no history, and nothing else asks for the
-		// rebuild that fixes it. A spawned subagent reaches only these hooks —
-		// install.go says so where it wires Task and Agent — so without this a
-		// fleet works against a stale index until its parent types something
-		// (#2567). requestWarmup writes a sentinel and detaches a child; the
-		// action pays neither the read nor the wait.
-		// Keep running index-free repo-memory and AST checks on cold stores.
-		requestWarmup(dir)
-		if hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)) == "" {
-			return nil
-		}
-	}
-	// A PreToolUse hook fires on every action, so the same fact must not be
-	// re-injected turn after turn. Dedupe per agent session on the fact, the
-	// way hook-plan and hook-prompt dedupe what they inject.
-	//
-	// The walk is told what has already gone out rather than being filtered
-	// after the fact: it returns one line, and dropping that line used to end
-	// the call, so a repeated fact took the line behind it with it (#3603).
 	if strings.TrimSpace(input.SessionID) == "" {
 		switch {
 		case strings.TrimSpace(input.TranscriptPath) != "":
@@ -435,30 +402,81 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 		}
 	}
 	cwd := hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots))
-	var line string
-	for range 3 {
-		injected := alreadyInjected(dir, input.SessionID)
-		used := func(candidate string) bool { return injected["tool:"+shortHash(dedupeFact(candidate))] }
-		candidate := toolHookLineSkipping(dir, cwd, input, used)
-		if candidate == "" {
+	var coordLine string
+	if isCommandTool(input.ToolName) {
+		fileWarn := coordHandleToolFile(dir, cwd, input, raw)
+		gitWarn := coordCheckMutatingGit(dir, cwd, input, raw)
+		coordRecordPreCommand(dir, cwd, input, raw)
+		switch {
+		case fileWarn != "" && gitWarn != "":
+			coordLine = fileWarn + "\n" + gitWarn
+		case fileWarn != "":
+			coordLine = fileWarn
+		case gitWarn != "":
+			coordLine = gitWarn
+		}
+	} else {
+		coordLine = coordHandleToolFile(dir, cwd, input, raw)
+	}
+	// Never build or repair from here. This runs inside an action the user is
+	// waiting on, and a miss costs nothing while a rebuild costs seconds.
+	indexReady := planIndexReady(dir)
+	if !indexReady {
+		// Ask, do not build. #777 gave the per-prompt and session-start hooks
+		// this: an index in a format this build cannot read answers nothing,
+		// which reads as a user with no history, and nothing else asks for the
+		// rebuild that fixes it. A spawned subagent reaches only these hooks —
+		// install.go says so where it wires Task and Agent — so without this a
+		// fleet works against a stale index until its parent types something
+		// (#2567). requestWarmup writes a sentinel and detaches a child; the
+		// action pays neither the read nor the wait.
+		// Keep running index-free coordination, repo-memory and AST checks on cold stores.
+		requestWarmup(dir)
+		if coordLine == "" && cwd == "" {
 			return nil
 		}
-		token := "tool:" + shortHash(dedupeFact(candidate))
-		releaseSeenLock, _ := holdHookseenLock(dir)
-		latest := alreadyInjected(dir, input.SessionID)
-		if latest[token] {
+	}
+	// A PreToolUse hook fires on every action, so the same fact must not be
+	// re-injected turn after turn. Dedupe per agent session on the fact, the
+	// way hook-plan and hook-prompt dedupe what they inject.
+	//
+	// The walk is told what has already gone out rather than being filtered
+	// after the fact: it returns one line, and dropping that line used to end
+	// the call, so a repeated fact took the line behind it with it (#3603).
+	var line string
+	if indexReady || cwd != "" {
+		for range 3 {
+			injected := alreadyInjected(dir, input.SessionID)
+			used := func(candidate string) bool { return injected["tool:"+shortHash(dedupeFact(candidate))] }
+			candidate := toolHookLineSkipping(dir, cwd, input, used)
+			if candidate == "" {
+				break
+			}
+			token := "tool:" + shortHash(dedupeFact(candidate))
+			releaseSeenLock, _ := holdHookseenLock(dir)
+			latest := alreadyInjected(dir, input.SessionID)
+			if latest[token] {
+				releaseSeenLock()
+				continue
+			}
+			rememberInjectedIDs(dir, input.SessionID, token)
 			releaseSeenLock()
-			continue
+			line = candidate
+			break
 		}
-		rememberInjectedIDs(dir, input.SessionID, token)
-		releaseSeenLock()
-		line = candidate
-		break
+	}
+	if line != "" {
+		line = truncateToolLine(line, toolHookMaxBytes)
+	}
+	switch {
+	case line != "" && coordLine != "":
+		line = line + "\n" + coordLine
+	case coordLine != "":
+		line = coordLine
 	}
 	if line == "" {
 		return nil
 	}
-	line = truncateToolLine(line, toolHookMaxBytes)
 	out := frameRecall(line)
 	// Record the injection so deja's most frequent surface is not invisible to
 	// stats and the receipt. Deduped above, so this counts a distinct fact
@@ -945,7 +963,7 @@ func commandFailureLine(dir, cwd, cmd string) string {
 			if p.Candidate {
 				continue
 			}
-			if p.Project != "" && !hookProjectIs(cwd, p.Project) {
+			if p.Project == "" || cwd == "" || !hookProjectIs(cwd, p.Project) {
 				continue
 			}
 			cleanCmd, ok := withoutFailedExit(orientCommand(strings.TrimPrefix(strings.TrimSpace(search.SafeCommand(p.Command)), "$ ")))
@@ -962,14 +980,14 @@ func commandFailureLine(dir, cwd, cmd string) string {
 	return line
 }
 
-func missingProgramLineWithRemedy(dir, cmd string) string {
+func missingProgramLineWithRemedy(dir, cwd, cmd string) string {
 	line := missingProgramLine(dir, cmd)
-	if line == "" || strings.Contains(line, " — ") {
+	if line == "" || strings.Contains(line, "The same command ran without it.") || strings.Contains(line, "next command that worked:") || cwd == "" {
 		return line
 	}
 	pol := policy.Load()
 	allow := func(project string) bool {
-		return pol.Allows(policy.ActivationAuto, project)
+		return project != "" && hookProjectIs(cwd, project) && pol.Allows(policy.ActivationAuto, project)
 	}
 	for _, prog := range commandPrograms(cmd) {
 		for _, p := range index.FixesForCommand(dir, cmd, "command not found: "+prog, 4, allow) {
@@ -1017,15 +1035,16 @@ func confirmedCommandTrapLine(dir, cwd, cmd string) string {
 		return ""
 	}
 	pol := policy.Load()
+	here := hookProjectMatcher(cwd)
 	allow := func(project string) bool {
-		return pol.Allows(policy.ActivationAuto, project) && hookProjectIs(cwd, project)
+		return pol.Allows(policy.ActivationAuto, project) && here(project)
 	}
-	if fail, ok := index.CommandFailedBefore(dir, cmd, allow); ok && fail.Project != "" && hookProjectIs(cwd, fail.Project) && !isUnitTestFailureLine(fail.Line) {
+	if fail, ok := index.CommandFailedBefore(dir, cmd, allow); ok && fail.Project != "" && here(fail.Project) && !isUnitTestFailureLine(fail.Line) {
 		for _, p := range index.FixesForCommand(dir, cmd, fail.Line, 4, allow) {
 			if p.Candidate || p.Command == "" {
 				continue
 			}
-			if p.Project != "" && !hookProjectIs(cwd, p.Project) {
+			if p.Project != "" && !here(p.Project) {
 				continue
 			}
 			cleanCmd, ok := withoutFailedExit(orientCommand(strings.TrimPrefix(strings.TrimSpace(search.SafeCommand(p.Command)), "$ ")))
@@ -1080,7 +1099,7 @@ func confirmedCommandTrapLine(dir, cwd, cmd string) string {
 		if !matched {
 			continue
 		}
-		if p.Candidate && frictionCount(dir, p, pol) < 2 {
+		if p.Candidate {
 			continue
 		}
 		errLine := truncateToolLine(search.SafeLine(p.Error), 160)
@@ -1101,7 +1120,21 @@ func hookProjectIs(cwd, project string) bool {
 	if project == "" {
 		return false
 	}
-	return namesInclude(digest.ProjectNameCandidates(cwd), project)
+	return namesInclude(projectNameCandidates(cwd), project)
+}
+
+// projectNameCandidates is a seam for the test that counts the working-out.
+var projectNameCandidates = digest.ProjectNameCandidates
+
+// hookProjectMatcher is hookProjectIs for a caller that asks it about every
+// stored pair. cwd's names are worked out once rather than per pair: each
+// working-out resolves every worktree root of the repository on disk, and a
+// repository with hundreds of worktrees held the tool hook for minutes.
+func hookProjectMatcher(cwd string) func(project string) bool {
+	names := sync.OnceValue(func() []string { return projectNameCandidates(cwd) })
+	return func(project string) bool {
+		return project != "" && namesInclude(names(), project)
+	}
 }
 
 // namesInclude is hookProjectIs over names already asked for.
@@ -1382,7 +1415,7 @@ func promotedCommandHookLine(dir, cwd, cmd, self string, used func(string) bool)
 		}
 	}
 	if planIndexReady(dir) {
-		if line := missingProgramLineWithRemedy(dir, cmd); line != "" {
+		if line := missingProgramLineWithRemedy(dir, cwd, cmd); line != "" {
 			if !used(line) {
 				return line
 			}

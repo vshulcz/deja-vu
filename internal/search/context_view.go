@@ -157,6 +157,12 @@ func withoutHarnessEnvelopes(s model.Session) model.Session {
 				continue
 			}
 			m.Text = left
+		} else if m.Role == "assistant" {
+			cleaned := StripToolProtocolNoise(m.Text)
+			if strings.TrimSpace(cleaned) == "" {
+				continue
+			}
+			m.Text = cleaned
 		}
 		msgs = append(msgs, m)
 	}
@@ -445,6 +451,9 @@ func contextTurnWeights(turns []contextTurn, parts int) []float64 {
 			}
 		}
 		weights[j] = sum * float64(covered)
+		if t.role == "assistant" && IsPureProcessNarration(t.raw) {
+			weights[j] *= 0.25
+		}
 	}
 	return weights
 }

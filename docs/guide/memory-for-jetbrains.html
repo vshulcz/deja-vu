@@ -191,7 +191,7 @@
 <h1>Adding memory to JetBrains AI Assistant</h1>
 <p class="pagelede">one MCP file every IDE reads, and no hook that can deliver a digest<span class="mins" data-mins></span></p>
 
-<p>AI Assistant is the chat inside IntelliJ IDEA, PyCharm, GoLand and the other JetBrains IDEs. It keeps each project's chats on disk and opens the next one without them — and without anything from the other forty-nine coding agents on the machine.</p>
+<p>AI Assistant is the chat inside IntelliJ IDEA, PyCharm, GoLand and the other JetBrains IDEs. It keeps each project's chats on disk and opens the next one without them — and without anything from the other fifty coding agents on the machine.</p>
 <div class="term-shot"><img src="../assets/demo.gif" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier" loading="lazy"><p class="cap">same prompt before and after deja — local BM25 recall across past sessions on disk, zero LLM calls</p></div>
 
 <h2>What AI Assistant already has</h2>
@@ -210,7 +210,7 @@
 <p>A chat reopens from the IDE's own history panel. There is no command-line resume: <code>deja resume</code> has nothing to print for an AI Assistant chat. Carrying one into a new chat is <code>deja handoff</code>, which prints a packet to paste — the chat runs inside the IDE, so there is no flag to hand that packet to.</p>
 
 <h2>The part that is not about this harness</h2>
-<p>The index covers every agent's transcripts on the machine — fifty of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code or Cursor answers a question asked in AI Assistant, including sessions from before any of this was installed. Indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+<p>The index covers every agent's transcripts on the machine — fifty-one of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code or Cursor answers a question asked in AI Assistant, including sessions from before any of this was installed. Indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
 
 <h2>Repository memory &amp; handoff</h2>
 <p>Share vetted project decisions and dead ends through git in <code>.deja/memory.jsonl</code> (<code>deja repo candidates</code>, <code>deja repo add &lt;id&gt;</code>). Entries are redacted on write, stored sorted with <code>merge=union</code> so parallel branches merge cleanly, and loaded for any teammate who clones the repository (<code>{"activations":{"auto":{"repo":false}}}</code> in the trust policy keeps them out of hooks). See <a href="repo-memory.html">repo memory</a>.</p>

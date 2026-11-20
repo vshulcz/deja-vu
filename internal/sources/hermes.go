@@ -191,6 +191,10 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 func applyHermesMeta(out []model.Session, meta map[string]hermesMeta) {
 	for i := range out {
 		m := meta[out[i].ID]
+		if m.Model != "" || m.Provider != "" {
+			out[i].SetModel(m.Provider, m.Model)
+		}
+		out[i].AddTokens(m.TokensIn, m.TokensOut, m.TokensReason, m.TokensCache)
 		// Only a cli row records a cwd. A branch and a delegate_task child
 		// ran where the session they came from did, and their file tools
 		// resolved a relative path there.
@@ -439,7 +443,13 @@ type hermesMeta struct {
 	Branched string `json:"branched"`
 	// Delegated is model_config._delegate_from: delegate_task marks its
 	// child with the parent (tools/delegate_tool.py, 0.17.0).
-	Delegated string `json:"delegated"`
+	Delegated    string `json:"delegated"`
+	Provider     string `json:"provider"`
+	Model        string `json:"model"`
+	TokensIn     int64  `json:"input_tokens"`
+	TokensOut    int64  `json:"output_tokens"`
+	TokensReason int64  `json:"reasoning_tokens"`
+	TokensCache  int64  `json:"cache_read_tokens"`
 }
 
 // hermesSessionMeta reads hermesMeta for every session. Stamped with the
@@ -465,9 +475,17 @@ func hermesSessionMetaWhere(db, where string) map[string]hermesMeta {
 	}
 	fields := `'id',cast(id as text)`
 	var fieldsSb458 strings.Builder
-	for col, key := range map[string]string{"cwd": "cwd", "source": "source", "parent_session_id": "parent"} {
+	for col, key := range map[string]string{
+		"cwd": "cwd", "source": "source", "parent_session_id": "parent",
+		"model": "model", "billing_provider": "provider", "provider": "provider_fallback",
+	} {
 		if cols[col] {
 			fmt.Fprintf(&fieldsSb458, `,'%s',cast(%s as text)`, key, col)
+		}
+	}
+	for _, col := range []string{"input_tokens", "output_tokens", "reasoning_tokens", "cache_read_tokens"} {
+		if cols[col] {
+			fmt.Fprintf(&fieldsSb458, `,'%s',%s`, col, col)
 		}
 	}
 	fields += fieldsSb458.String()
@@ -476,13 +494,18 @@ func hermesSessionMetaWhere(db, where string) map[string]hermesMeta {
 		// and lose every session's cwd with it.
 		fields += `,'branched',case when json_valid(model_config) then cast(json_extract(model_config,'$._branched_from') as text) end`
 		fields += `,'delegated',case when json_valid(model_config) then cast(json_extract(model_config,'$._delegate_from') as text) end`
+		fields += `,'cfg_model',case when json_valid(model_config) then cast(json_extract(model_config,'$.model') as text) end`
+		fields += `,'cfg_provider',case when json_valid(model_config) then cast(json_extract(model_config,'$.provider') as text) end`
 	}
 	out, err := sqliteOutput(db, `select json_object(`+fields+`) from sessions`+where)
 	if err != nil {
 		return nil
 	}
 	rows, err := sqliteObjects[struct {
-		ID string `json:"id"`
+		ID               string `json:"id"`
+		ProviderFallback string `json:"provider_fallback"`
+		CfgModel         string `json:"cfg_model"`
+		CfgProvider      string `json:"cfg_provider"`
 		hermesMeta
 	}](out)
 	if err != nil {
@@ -493,7 +516,30 @@ func hermesSessionMetaWhere(db, where string) map[string]hermesMeta {
 		if r.ID == "" {
 			continue
 		}
-		meta[r.ID] = hermesMeta{Cwd: strings.TrimSpace(r.Cwd), Source: strings.TrimSpace(r.Source), Parent: strings.TrimSpace(r.Parent), Branched: strings.TrimSpace(r.Branched), Delegated: strings.TrimSpace(r.Delegated)}
+		modelID := strings.TrimSpace(r.Model)
+		if modelID == "" {
+			modelID = strings.TrimSpace(r.CfgModel)
+		}
+		prov := strings.TrimSpace(r.Provider)
+		if prov == "" {
+			prov = strings.TrimSpace(r.ProviderFallback)
+		}
+		if prov == "" {
+			prov = strings.TrimSpace(r.CfgProvider)
+		}
+		meta[r.ID] = hermesMeta{
+			Cwd:          strings.TrimSpace(r.Cwd),
+			Source:       strings.TrimSpace(r.Source),
+			Parent:       strings.TrimSpace(r.Parent),
+			Branched:     strings.TrimSpace(r.Branched),
+			Delegated:    strings.TrimSpace(r.Delegated),
+			Provider:     prov,
+			Model:        modelID,
+			TokensIn:     r.TokensIn,
+			TokensOut:    r.TokensOut,
+			TokensReason: r.TokensReason,
+			TokensCache:  r.TokensCache,
+		}
 	}
 	return meta
 }

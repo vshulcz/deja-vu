@@ -2528,3 +2528,87 @@ func TestRecallNamesTheOtherMachinesCopy(t *testing.T) {
 		t.Errorf("the two copies are not told apart:\n%s", text)
 	}
 }
+
+func TestRecallPacksFiveVerboseHitsOnMultiLineIssueQuery(t *testing.T) {
+	hermeticEnv(t)
+	proj := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-work-app")
+	for i := 1; i <= 5; i++ {
+		sid := fmt.Sprintf("verbose-%d", i)
+		padding := strings.Repeat("additional diagnostic trace context for batched tensor evaluation and solver state ", 2)
+		lines := make([]string, 0, 10)
+		for turn := range 5 {
+			tsU := fmt.Sprintf("2026-09-%02dT10:%02d:00Z", i, turn*2)
+			tsA := fmt.Sprintf("2026-09-%02dT10:%02d:30Z", i, turn*2)
+			lines = append(lines,
+				fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":"/work/app","timestamp":%q,"message":{"role":"user","content":"Check DiagonalSolver failure #%d turn %d: sparseCholesky PivotCache hits shape mismatch when passing block diagonal matrix with rank 3. %s"}}`, sid, tsU, i, turn, padding),
+				fmt.Sprintf(`{"type":"assistant","sessionId":%q,"cwd":"/work/app","timestamp":%q,"message":{"role":"assistant","content":"We decided to normalize DiagonalSolver batch shapes in PivotCache before sparseCholesky factorization (attempt %d turn %d). %s"}}`, sid, tsA, i, turn, padding),
+			)
+		}
+		writeClaudeFixture(t, filepath.Join(proj, sid+".jsonl"), sid, lines)
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	q := "DiagonalSolver throws ValueError on batched sparse tensor\nSteps to reproduce:\n1. Pass block diagonal matrix with rank 3\n2. Call sparseCholesky decomposition\nExpected: preserve batch shape\nActual: shape mismatch inside PivotCache"
+	budget := recallMCPBudget - recallFrameOverhead
+	text, served, _, _, err := recallTextResult(dir, q, "", 5, 0, budget)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if served != 5 {
+		t.Fatalf("served %d hits, want 5:\n%s", served, text)
+	}
+	if len(text) > budget {
+		t.Errorf("page len %d exceeds budget %d:\n%s", len(text), budget, text)
+	}
+	for i := 1; i <= 5; i++ {
+		marker := fmt.Sprintf("\n%d. [", i)
+		if !strings.Contains(text, marker) {
+			t.Errorf("missing hit %d marker %q in page:\n%s", i, marker, text)
+		}
+	}
+}
+
+func TestRecallCoverageAndLeadCapLongWordListsWithinPageBudget(t *testing.T) {
+	hermeticEnv(t)
+	proj := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-work-app")
+	var shared []string
+	var queryWords []string
+	for i := 1; i <= 42; i++ {
+		w := fmt.Sprintf("domainToken%02d", i)
+		queryWords = append(queryWords, w)
+		if i <= 36 {
+			shared = append(shared, w)
+		}
+	}
+	for i := 1; i <= 5; i++ {
+		sid := fmt.Sprintf("cov-%d", i)
+		msg := fmt.Sprintf("Investigated %s in session %d with diagnostic details.", strings.Join(shared, " "), i)
+		writeClaudeFixture(t, filepath.Join(proj, sid+".jsonl"), sid, []string{
+			fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":"/work/app","timestamp":"2026-09-0%dT10:00:00Z","message":{"role":"user","content":%q}}`, sid, i, msg),
+			fmt.Sprintf(`{"type":"assistant","sessionId":%q,"cwd":"/work/app","timestamp":"2026-09-0%dT10:01:00Z","message":{"role":"assistant","content":%q}}`, sid, i, "Resolved "+msg),
+		})
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	q := strings.Join(queryWords, " ")
+	budget := recallMCPBudget - recallFrameOverhead
+	text, served, _, _, err := recallTextResult(dir, q, "", 5, 0, budget)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if served != 5 {
+		t.Fatalf("served %d hits, want 5:\n%s", served, text)
+	}
+	if !strings.Contains(text, "(+") {
+		t.Errorf("expected capped word list marker (+N more) in header:\n%s", text)
+	}
+	for i := 1; i <= 5; i++ {
+		if !strings.Contains(text, fmt.Sprintf("%d. [", i)) {
+			t.Errorf("missing hit %d row in page:\n%s", i, text)
+		}
+	}
+}

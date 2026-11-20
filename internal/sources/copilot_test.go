@@ -1633,8 +1633,8 @@ func TestCopilotMarksACommandThatExitedNonZero(t *testing.T) {
 	if !strings.HasSuffix(cmds[0], "  → exit 1") {
 		t.Errorf("the failed run reads %q, want it to end in the exit marker", cmds[0])
 	}
-	if strings.Contains(cmds[1], "→ exit") {
-		t.Errorf("the run that succeeded carries an outcome it did not have: %q", cmds[1])
+	if !strings.HasSuffix(cmds[1], "  → exit 0") {
+		t.Errorf("the run that succeeded reads %q, want it to end in exit 0", cmds[1])
 	}
 }
 
@@ -1728,8 +1728,8 @@ func TestCopilotDoesNotMarkAnEarlierRunWithALaterOutcome(t *testing.T) {
 	if len(cmds) != 2 {
 		t.Fatalf("commands = %d, want 2: %q", len(cmds), cmds)
 	}
-	if strings.Contains(cmds[0], "→ exit") {
-		t.Errorf("the run that succeeded wears a later failure: %q", cmds[0])
+	if !strings.HasSuffix(cmds[0], "  → exit 0") {
+		t.Errorf("the run that succeeded reads %q, want it to end in exit 0", cmds[0])
 	}
 	if !strings.HasSuffix(cmds[1], "  → exit 1") {
 		t.Errorf("the run that failed lost its outcome: %q", cmds[1])

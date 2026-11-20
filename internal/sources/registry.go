@@ -951,6 +951,19 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			}},
 		},
 		{
+			// Ante (AntigmaLabs/ante): per-session directory holding events.jsonl,
+			// meta.json and an optional dialog.json snapshot.
+			Name: "ante", Load: LoadAnte, Files: AnteSessionFiles,
+			Kinds: []FileKind{{
+				Name:      "ante",
+				Match:     AnteUnderRoot,
+				Parse:     fullParse(ParseAnteFile),
+				ParseFrom: offsetParse(ParseAnteFileFromOffset),
+				Resumes:   anteResumes,
+				Sidecar:   besideSidecar("meta.json"),
+			}},
+		},
+		{
 			// deja's own notes, and the entries committed in the .deja/ of
 			// the repositories deja has been run in. A repo file is read
 			// whole: a merge or a deleted line rewrites it.

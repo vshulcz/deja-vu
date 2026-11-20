@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Ante (`ante`) session reader under `~/.ante/sessions` (`events.jsonl`, `meta.json`, `dialog.json`), shared-skill & MCP installer wiring, and CLI resume/handoff support, bringing `deja` to 50 coding agents.
+
 ## [0.24.3] - 2026-11-19
 
 Six new agent readers (`clawcode`, `codearts`, `mimo`, `omnigent`, `orca`, and

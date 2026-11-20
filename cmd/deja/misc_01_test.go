@@ -3813,7 +3813,10 @@ func TestToolAfterAnswersTheFailureEventItWasSent(t *testing.T) {
 		"error":           "Exit code 2\ngoroutine 1 [running]:\npanic: sql: database is closed",
 		"is_interrupt":    false,
 	})
-	var out bytes.Buffer
+	var strike1, out bytes.Buffer
+	if err := runHookToolAfter(os.Getenv("DEJA_INDEX_DIR"), bytes.NewReader(payload), &strike1); err != nil {
+		t.Fatal(err)
+	}
 	if err := runHookToolAfter(os.Getenv("DEJA_INDEX_DIR"), bytes.NewReader(payload), &out); err != nil {
 		t.Fatal(err)
 	}

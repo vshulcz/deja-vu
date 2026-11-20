@@ -37,6 +37,8 @@ var sharedSidecarSuffixes = []string{
 	".part",
 	".lock",
 	".live",
+	".coord",
+	".coord.lock",
 	".hookseen",
 	".hookseen.lock",
 	".dejavu",

@@ -14,7 +14,7 @@ Busca local de sessões entre agentes, AI Line Blame e handoff para IntelliJ IDE
 ## Recursos
 
 - **Widget na barra de status**: exibe estatísticas ao vivo de `deja statusline` do projeto ativo no lado direito da barra de status da IDE. Clicar abre o menu de ações do `deja-vu`.
-- **Pesquisar sessões de IA (`Tools → deja-vu → Search AI Sessions...`)**: consulta sessões locais em todos os 49 agentes suportados (`deja search --json`) e abre a transcrição selecionada em uma aba Markdown somente leitura.
+- **Pesquisar sessões de IA (`Tools → deja-vu → Search AI Sessions...`)**: consulta sessões locais em todos os 50 agentes suportados (`deja search --json`) e abre a transcrição selecionada em uma aba Markdown somente leitura.
 - **Sessões recentes (`Tools → deja-vu → Recent AI Sessions`)**: lista as 50 sessões mais recentes na máquina (`deja last 50 --json`) com filtro de busca rápida.
 - **AI Blame na linha atual (menu de contexto / `Tools → deja-vu → AI Blame Current Line`)**: executa `deja blame <file>:<line> --json` (com fallback para `<file>`) para abrir a sessão de IA que escreveu ou editou a linha sob o cursor.
 - **Copiar handoff entre agentes (`Tools → deja-vu → Copy Cross-Agent Handoff`)**: executa `deja handoff` na raiz do projeto, copia o resumo para a área de transferência e o abre em uma aba Markdown somente leitura.
@@ -54,7 +54,7 @@ O arquivo instalável é gravado em `build/distributions/`.
 
 | Recall | Tokens | Indexação e busca |
 |---|---|---|
-| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 49 agentes de código |
+| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 50 agentes de código |
 
 ## Memória do repositório e handoff entre agentes
 

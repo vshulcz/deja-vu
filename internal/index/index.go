@@ -824,7 +824,11 @@ import (
 // which recall marks as theirs, and a build writes receipts.bin, the records
 // that back what a model said, which every later pass keeps up to date; rows
 // and indexes built before have neither.
-const version = 109
+// 110: explicit exit 0 command stamps across harnesses whose stores record
+// clean exits, cross-harness model/token/tool telemetry, and deterministic
+// Antigravity multi-workspace project attribution.
+// 111: canonicalized recurring commands and per-command outcome counts.
+const version = 111
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

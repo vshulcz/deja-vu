@@ -1103,6 +1103,11 @@ func TestSpawnHookStaysSilentWithNothingToSay(t *testing.T) {
 	if _, err := captureRun(t, "index"); err != nil {
 		t.Fatal(err)
 	}
+	cwd := filepath.Join(t.TempDir(), "src", "app")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(cwd)
 	got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Task","toolInput":`+
 		`{"prompt":"Port the kubernetes admission webhook to the new cert rotation scheme."},"session_id":"parent"}`)
 	if got != "" {
@@ -1718,24 +1723,25 @@ func taskRepoWithAChange(t *testing.T) string {
 	return repo
 }
 
-// bigToolAfterPayload is a PostToolUse payload whose stderr begins with err and
-// is padded past the stdin bound.
-func bigToolAfterPayload(t *testing.T, err, cwd string, size int) []byte {
+// bigToolAfterPayload is a PostToolUse payload whose stderr begins with knownErr
+// and is padded past the stdin bound.
+func bigToolAfterPayload(t *testing.T, size int) []byte {
 	t.Helper()
+	const knownErr = "panic: sql: database is closed"
 	obj := map[string]any{
 		"hook_event_name": "PostToolUse",
 		"tool_name":       "Bash",
 		"tool_input":      map[string]string{"command": "make deploy ENV=staging"},
-		"tool_response":   map[string]string{"stderr": err + "\n"},
-		"session_id":      "big",
-		"cwd":             cwd,
+		"tool_response":   map[string]string{"stderr": knownErr + "\n"},
+		"session_id":      fmt.Sprintf("big-%d", size),
+		"cwd":             "/work/app",
 	}
 	base, jerr := json.Marshal(obj)
 	if jerr != nil {
 		t.Fatal(jerr)
 	}
 	pad := max(size-len(base), 0)
-	obj["tool_response"] = map[string]string{"stderr": err + "\n" + strings.Repeat("x", pad)}
+	obj["tool_response"] = map[string]string{"stderr": knownErr + "\n" + strings.Repeat("x", pad)}
 	b, merr := json.Marshal(obj)
 	if merr != nil {
 		t.Fatal(merr)
@@ -1752,14 +1758,20 @@ func TestToolAfterUsesWhatArrivedFromAHugePayload(t *testing.T) {
 	seedFixPair(t, knownErr, "make clean && make CGO_ENABLED=0")
 	dir := os.Getenv("DEJA_INDEX_DIR")
 
-	var small, big bytes.Buffer
-	if err := runHookToolAfter(dir, bytes.NewReader(bigToolAfterPayload(t, knownErr, "/work/app", 900<<10)), &small); err != nil {
+	var small1, small, big1, big bytes.Buffer
+	if err := runHookToolAfter(dir, bytes.NewReader(bigToolAfterPayload(t, 900<<10)), &small1); err != nil {
+		t.Fatal(err)
+	}
+	if err := runHookToolAfter(dir, bytes.NewReader(bigToolAfterPayload(t, 900<<10)), &small); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(small.String(), "what followed it") {
 		t.Fatalf("the control did not recall at all, fixture is wrong:\n%s", small.String())
 	}
-	if err := runHookToolAfter(dir, bytes.NewReader(bigToolAfterPayload(t, knownErr, "/work/app", 1200<<10)), &big); err != nil {
+	if err := runHookToolAfter(dir, bytes.NewReader(bigToolAfterPayload(t, 1200<<10)), &big1); err != nil {
+		t.Fatal(err)
+	}
+	if err := runHookToolAfter(dir, bytes.NewReader(bigToolAfterPayload(t, 1200<<10)), &big); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(big.String(), "what followed it") {
@@ -1859,7 +1871,7 @@ func TestTheAfterHookSaysHowOftenTheErrorCameUp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	line := fixPairLine(dir, "", wall)
+	line := fixPairLine(dir, "/work/app", wall)
 	if line == "" {
 		t.Fatalf("the fixture found no fix pair for the wall")
 	}
@@ -1953,8 +1965,25 @@ func TestAMissingProgramIsAnsweredFromAnyProject(t *testing.T) {
 	if err := index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	if line := fixPairLine(dir, "/work/storefront", wall); !strings.Contains(line, "the same command worked as: make check-billing") {
-		t.Errorf("a missing program was not answered from another project: %q", line)
+	if line := fixPairLine(dir, "/work/billing", wall); !strings.Contains(line, "the same command worked as: make check-billing") {
+		t.Errorf("a missing program was not answered in its own project: %q", line)
+	}
+	// Missing binary/module is detEnv so same-project Strike 1 delivers immediately via hook-tool-after.
+	sameStrike1 := fmt.Sprintf(`{"hook_event_name":"PostToolUse","tool_name":"Bash",`+
+		`"tool_input":{"command":"timeout 120 make check-billing"},"tool_response":{"stderr":%q},`+
+		`"cwd":"/work/billing","session_id":"missing-same-1"}`, wall)
+	var sameOut bytes.Buffer
+	if err := runHookToolAfter(dir, strings.NewReader(sameStrike1), &sameOut); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(sameOut.String(), "make check-billing") {
+		t.Errorf("same-project detEnv failure stayed silent on Strike 1:\n%s", sameOut.String())
+	}
+	if line := fixPairLine(dir, "/work/storefront", wall); line != "" {
+		t.Errorf("another project's fix leaked into storefront auto-hook: %q", line)
+	}
+	if line := fixPairLine(dir, "", wall); line != "" {
+		t.Errorf("unscoped auto-hook lookup leaked a fix pair: %q", line)
 	}
 	if line := fixPairLine(dir, "/work/storefront", other); line != "" {
 		t.Errorf("another project's next command reached this one: %q", line)
@@ -1983,7 +2012,10 @@ func TestFixPairPlainDropsTheEnvelope(t *testing.T) {
 	seedFixPair(t, "panic: sql: database is closed", "make clean && make CGO_ENABLED=0")
 	payload := postToolPayload("run_commands", "make", "", "panic: sql: database is closed", "plain-1")
 
-	var plain bytes.Buffer
+	var plain1, plain bytes.Buffer
+	if err := runHookToolAfterMode(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(payload), &plain1, true); err != nil {
+		t.Fatal(err)
+	}
 	if err := runHookToolAfterMode(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(payload), &plain, true); err != nil {
 		t.Fatal(err)
 	}
@@ -1999,10 +2031,12 @@ func TestFixPairPlainDropsTheEnvelope(t *testing.T) {
 	}
 
 	// The envelope form still wraps, for the hosts that read it.
-	var wrapped bytes.Buffer
-	if err := runHookToolAfterMode(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(
-		postToolPayload("run_commands", "make", "", "panic: sql: database is closed", "plain-2"),
-	), &wrapped, false); err != nil {
+	wrappedPayload := postToolPayload("run_commands", "make", "", "panic: sql: database is closed", "plain-2")
+	var wrapped1, wrapped bytes.Buffer
+	if err := runHookToolAfterMode(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(wrappedPayload), &wrapped1, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := runHookToolAfterMode(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(wrappedPayload), &wrapped, false); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(wrapped.String(), "hookSpecificOutput") {
@@ -2013,8 +2047,8 @@ func TestFixPairPlainDropsTheEnvelope(t *testing.T) {
 // What another project ran after the same error is what that project did next,
 // and almost never about this failure: over 396 hints on one machine, 2 of 67
 // from another project addressed the error and 59 had nothing to do with it.
-// The line keeps to the project the agent is in; a pair with no project is a
-// fact about the machine and still answers everywhere.
+// Auto-hooks restrict fixes strictly to the current project and stay silent when
+// cwd is unknown.
 func TestTheAfterHookKeepsToThisProjectsRemedies(t *testing.T) {
 	tmp := hermeticEnv(t)
 	root := filepath.Join(tmp, "claude")
@@ -2058,20 +2092,27 @@ func TestTheAfterHookKeepsToThisProjectsRemedies(t *testing.T) {
 	if line := fixPairLine(dir, "/work/storefront", wall); line != "" {
 		t.Errorf("another project's next command reached this one: %q", line)
 	}
-	if line := fixPairLine(dir, "", wall); !strings.Contains(line, "docker compose up -d db") {
-		t.Errorf("with no directory to go by the line went silent: %q", line)
+	if line := fixPairLine(dir, "", wall); line != "" {
+		t.Errorf("with no directory to go by the auto-hook leaked a remedy: %q", line)
 	}
-	// The hook reads the directory from its payload.
+	// The hook reads the directory from its payload: same project stays silent on
+	// Strike 1 and delivers on Strike 2; other projects stay silent on both.
 	for cwd, want := range map[string]bool{"/work/billing": true, "/work/storefront": false} {
 		payload := fmt.Sprintf(`{"hook_event_name":"PostToolUse","tool_name":"Bash",`+
 			`"tool_input":{"command":"make migrate-billing"},"tool_response":{"stderr":%q},`+
 			`"cwd":%q,"session_id":"s-%s"}`, wall, cwd, filepath.Base(cwd))
-		var out bytes.Buffer
+		var s1, out bytes.Buffer
+		if err := runHookToolAfter(dir, strings.NewReader(payload), &s1); err != nil {
+			t.Fatal(err)
+		}
+		if s1.Len() != 0 {
+			t.Errorf("hook from %s strike 1: expected silence, got:\n%s", cwd, s1.String())
+		}
 		if err := runHookToolAfter(dir, strings.NewReader(payload), &out); err != nil {
 			t.Fatal(err)
 		}
 		if got := strings.Contains(out.String(), "docker compose up -d db"); got != want {
-			t.Errorf("hook from %s: remedy shown %v, want %v:\n%s", cwd, got, want, out.String())
+			t.Errorf("hook from %s strike 2: remedy shown %v, want %v:\n%s", cwd, got, want, out.String())
 		}
 	}
 }
@@ -2207,8 +2248,14 @@ func postToolPayload(tool, command, stdout, stderr, session string) string {
 func TestFixPairArrivesWhenTheCommandFails(t *testing.T) {
 	seedFixPair(t, "panic: sql: database is closed", "make clean && make CGO_ENABLED=0")
 
-	var out bytes.Buffer
+	var strike1, out bytes.Buffer
 	payload := postToolPayload("Bash", "make", "", "goroutine 1 [running]:\npanic: sql: database is closed", "agent-1")
+	if err := runHookToolAfter(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(payload), &strike1); err != nil {
+		t.Fatal(err)
+	}
+	if strike1.Len() != 0 {
+		t.Fatalf("strike 1 delivered non-detEnv fix pair unexpectedly:\n%s", strike1.String())
+	}
 	if err := runHookToolAfter(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(payload), &out); err != nil {
 		t.Fatal(err)
 	}
@@ -2289,7 +2336,10 @@ func TestFixPairReadsWhateverTheHarnessCallsOutput(t *testing.T) {
 		if jerr != nil {
 			t.Fatal(jerr)
 		}
-		var out bytes.Buffer
+		var strike1, out bytes.Buffer
+		if err := runHookToolAfter(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(string(b)), &strike1); err != nil {
+			t.Fatalf("%s strike 1: %v", name, err)
+		}
 		if err := runHookToolAfter(os.Getenv("DEJA_INDEX_DIR"), strings.NewReader(string(b)), &out); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
@@ -2392,12 +2442,33 @@ func TestShellLevelDiagnosticFixPairAnsweredFromAnyProject(t *testing.T) {
 	if err := index.Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	// In a different project, the shell error should be answered with the fix
-	// even when the surrounding grep arguments differ between checkouts.
-	if line := fixPairLineFor(dir, "/work/otherproject", "git grep -n --include=*.py other_symbol internal/sub", wall); !strings.Contains(line, "git grep --include='*.py' pattern") {
-		t.Errorf("shell-level error was not answered from another project: %q", line)
+	// Same-project shell-level diagnostic answers immediately (including Strike 1 via hook-tool-after);
+	// cross-project and unscoped lookups stay silent in auto-hooks.
+	if line := fixPairLineFor(dir, "/work/searchapp", "git grep -n --include=*.py other_symbol internal/sub", wall); !strings.Contains(line, "git grep --include='*.py' pattern") {
+		t.Errorf("shell-level error was not answered in its own project: %q", line)
 	}
-	// A project-specific error from another project should still be filtered out
+	samePayload := mustMarshal(t, map[string]any{
+		"hook_event_name": "PostToolUse",
+		"tool_name":       "Bash",
+		"tool_input":      map[string]string{"command": "git grep -n --include=*.py other_symbol internal/sub"},
+		"tool_response":   map[string]string{"stderr": wall},
+		"cwd":             "/work/searchapp",
+		"session_id":      "shell-same-1",
+	})
+	var sameOut bytes.Buffer
+	if err := runHookToolAfter(dir, bytes.NewReader(samePayload), &sameOut); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(sameOut.String(), "git grep --include='*.py' pattern") {
+		t.Errorf("shell-level error stayed silent on same-project Strike 1:\n%s", sameOut.String())
+	}
+	if line := fixPairLineFor(dir, "/work/otherproject", "git grep -n --include=*.py other_symbol internal/sub", wall); line != "" {
+		t.Errorf("cross-project shell-level error leaked into another project auto-hook: %q", line)
+	}
+	if line := fixPairLineFor(dir, "", "git grep -n --include=*.py other_symbol internal/sub", wall); line != "" {
+		t.Errorf("unscoped shell-level error leaked into auto-hook: %q", line)
+	}
+	// A project-specific error from another project is filtered out too.
 	if line := fixPairLineFor(dir, "/work/otherproject", "make migrate", other); line != "" {
 		t.Errorf("project-specific error from another project leaked: %q", line)
 	}

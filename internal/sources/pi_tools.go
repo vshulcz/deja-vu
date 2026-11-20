@@ -117,6 +117,9 @@ func (r *piReader) toolCalls(content any, t time.Time) {
 // call records one tool call. applied is false for a call already known to
 // have failed, whose edit or write changed nothing.
 func (r *piReader) call(id, name string, args map[string]any, applied bool, t time.Time) {
+	if name != "" {
+		r.s.AddToolCall(name, false)
+	}
 	if name == "" || args == nil {
 		return
 	}
@@ -312,12 +315,16 @@ func (r *piReader) hashline(id, input string, t time.Time) {
 // every other harness writes, and a gjc hashline edit gets the lines it
 // replaced, read off the result's diff.
 func (r *piReader) toolResult(msg map[string]any, t time.Time) {
+	failed, _ := msg["isError"].(bool)
+	details, _ := msg["details"].(map[string]any)
+	code, hasExit := piExitCode(details["exitCode"])
+	if failed || (hasExit && code != 0) {
+		r.s.ToolErrors++
+	}
 	id, _ := msg["toolCallId"].(string)
 	if id == "" {
 		return
 	}
-	failed, _ := msg["isError"].(bool)
-	details, _ := msg["details"].(map[string]any)
 	if name, _ := msg["toolName"].(string); name == "eval" {
 		r.evalCalls(details, t)
 	}

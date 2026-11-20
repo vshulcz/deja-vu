@@ -191,6 +191,9 @@ func kiroDBHistory(s *model.Session, raw json.RawMessage) {
 				}
 				if code, ok := kiroExitStatus(r.Content); ok {
 					exits.stamp(s.Messages, r.ID, "", code)
+					if code != 0 {
+						s.ToolErrors++
+					}
 				}
 			}
 		}
@@ -207,6 +210,7 @@ func kiroDBHistory(s *model.Session, raw json.RawMessage) {
 			var calls []any
 			for _, u := range a.ToolUses {
 				if u.Name != "" && u.Args != nil {
+					s.AddToolCall(u.Name, false)
 					call := kiroToolCall(u.Name, u.Args)
 					call["id"] = u.ID
 					calls = append(calls, call)

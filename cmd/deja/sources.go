@@ -227,6 +227,7 @@ func printSourcesTo(w io.Writer, dir string) {
 		{"kimchi", sources.KimchiRoot(), []string{sources.KimchiRoot()}, sources.KimchiSessionFiles, sources.LoadKimchi},
 		{"commandcode", sources.CommandCodeRoot(), []string{sources.CommandCodeRoot()}, sources.CommandCodeSessionFiles, sources.LoadCommandCode},
 		{"clawcode", sources.ClawCodeRoot(), sources.ClawCodeRoots(), sources.ClawCodeSessionFiles, sources.LoadClawCode},
+		{"ante", sources.AnteRoot(), sources.AnteRoots(), sources.AnteSessionFiles, sources.LoadAnte},
 		{"zcode", sources.ZCodeRoot(), []string{sources.ZCodeRoot()}, sources.ZCodeSessionFiles, sources.LoadZCode},
 		{"gjc", sources.GjcRoot(), []string{sources.GjcRoot()}, sources.GjcSessionFiles, sources.LoadGjc},
 		{"continue", filepath.Join(sources.ContinueRoot(), "sessions"), []string{filepath.Join(sources.ContinueRoot(), "sessions")}, sources.ContinueSessionFiles, sources.LoadContinue},

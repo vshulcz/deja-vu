@@ -3388,10 +3388,10 @@ insert into session_summaries values (
 }
 
 // A clean result that lands in the pass after its call gives the command the
-// exit 0 a rebuild stamps on it, in every harness whose reader stamps one:
-// goose's structured exit_code, kiro-cli's exit_status and the pi family's
-// clean run, as Claude's does since #5527. The others stamp no exit 0 and are
-// here as controls.
+// exit 0 a rebuild stamps on it, in every harness whose reader records an
+// explicit clean exit (antigravity, claude, clawcode, codex, commandcode,
+// copilot, goose, kiro-cli, pi, omp and qwen). kimi carries bare stdout and
+// stays unstamped as a control.
 func TestACleanResultInTheNextPassStampsItsExit(t *testing.T) {
 	cases := []struct {
 		name, env, file string
@@ -3480,7 +3480,14 @@ func TestACleanResultInTheNextPassStampsItsExit(t *testing.T) {
 			file: "projects/-tmp-proj/chats/q1.jsonl",
 			head: `{"type":"user","sessionId":"q1","timestamp":"2026-07-17T09:00:00Z","cwd":"/tmp/proj","message":{"role":"user","parts":[{"text":"fix the retry loop"}]}}` + "\n",
 			call: `{"type":"assistant","sessionId":"q1","timestamp":"2026-07-17T09:00:01Z","cwd":"/tmp/proj","message":{"role":"model","parts":[{"functionCall":{"id":"f1","name":"run_shell_command","args":{"command":"go vet ./retry"}}}]}}` + "\n",
-			res:  `{"type":"tool_result","sessionId":"q1","timestamp":"2026-07-17T09:00:02Z","cwd":"/tmp/proj","message":{"role":"user","parts":[{"functionResponse":{"id":"f1","name":"run_shell_command","response":{"output":"Command: go vet ./retry\nExit Code: 0\nok"}}}]}}` + "\n",
+			res:  `{"type":"tool_result","sessionId":"q1","timestamp":"2026-07-17T09:00:02Z","cwd":"/tmp/proj","message":{"role":"user","parts":[{"functionResponse":{"id":"f1","name":"run_shell_command","response":{"output":"Command: go vet ./retry\nDirectory: (root)\nOutput: ok\nError: (none)\nExit Code: 0\nSignal: (none)\nBackground PIDs: (none)\nProcess Group PGID: 4242"}}}]}}` + "\n",
+		},
+		{
+			name: "antigravity", env: "DEJA_ANTIGRAVITY_ROOT",
+			file: "brain/conv-vet-1/.system_generated/logs/transcript.jsonl",
+			head: `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-10-01T09:00:00Z","content":"<USER_REQUEST>\nfix the retry loop\n</USER_REQUEST>"}` + "\n",
+			call: `{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-10-01T09:02:00Z","content":"","tool_calls":[{"id":"tc1","name":"run_command","args":{"CommandLine":"\"go vet ./retry\"","Cwd":"\"/tmp/proj\""}}]}` + "\n",
+			res:  `{"step_index":2,"source":"MODEL","type":"RUN_COMMAND","status":"DONE","created_at":"2026-10-01T09:02:01Z","content":"Command exited with code 0.\nCommand output:\nok"}` + "\n",
 		},
 	}
 	for _, tc := range cases {
@@ -3495,14 +3502,92 @@ func TestACleanResultInTheNextPassStampsItsExit(t *testing.T) {
 			parityWrite(t, f, tc.res, true)
 			parityPass(t, inc, false)
 			sameAsRebuild(t, inc)
-			held := false
-			for _, v := range paritySnapshot(t, inc) {
-				held = held || strings.Contains(v, "$ go vet ./retry")
+			snap := paritySnapshot(t, inc)
+			held, stamped := false, false
+			for _, v := range snap {
+				if strings.Contains(v, "$ go vet ./retry  → exit 0") {
+					stamped = true
+				}
+				if strings.Contains(v, "$ go vet ./retry") {
+					held = true
+				}
 			}
-			if !held {
-				t.Error("control: the command was never indexed")
+			if tc.name == "kimi" {
+				if !held || stamped {
+					t.Errorf("kimi should hold unstamped command cleanly, got stamped=%v held=%v (%q)", stamped, held, snap)
+				}
+			} else if !stamped {
+				t.Errorf("%s did not stamp  → exit 0 across incremental pass: %q", tc.name, snap)
 			}
 		})
+	}
+}
+
+func TestAntigravityAppendCrossRepoReadKeepsInitialProject(t *testing.T) {
+	root := parityEnv(t, map[string]string{"DEJA_ANTIGRAVITY_ROOT": "ag"})
+	inc := filepath.Join(root, "inc")
+	repoMain := filepath.Join(root, "work", "org", "repo-main")
+	repoOther := filepath.Join(root, "work", "org", "other-repo")
+	for _, repo := range []string{repoMain, repoOther} {
+		if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	viewCall := func(path string) map[string]any {
+		return map[string]any{"name": "view_file", "args": map[string]any{"AbsolutePath": path}}
+	}
+	marshalRow := func(row map[string]any) string {
+		b, err := json.Marshal(row)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	headCalls := []map[string]any{
+		viewCall(filepath.Join(repoMain, "a.go")),
+		viewCall(filepath.Join(repoMain, "b.go")),
+		viewCall(filepath.Join(repoMain, "c.go")),
+		viewCall(filepath.Join(repoMain, "d.go")),
+		viewCall(filepath.Join(repoMain, "e.go")),
+	}
+	tailCalls := []map[string]any{
+		viewCall(filepath.Join(repoOther, "README.md")),
+		viewCall(filepath.Join(repoOther, "go.mod")),
+		viewCall(filepath.Join(repoOther, "doc.go")),
+	}
+	p := filepath.Join(root, "ag", "brain", "conv-proj-1", ".system_generated", "logs", "transcript.jsonl")
+	head := marshalRow(map[string]any{
+		"source":     "USER_EXPLICIT",
+		"type":       "USER_INPUT",
+		"created_at": "2026-07-01T10:00:00Z",
+		"content":    "inspect repo-main",
+	}) + "\n" + marshalRow(map[string]any{
+		"source":     "MODEL",
+		"type":       "PLANNER_RESPONSE",
+		"created_at": "2026-07-01T10:00:01Z",
+		"content":    "reading repo-main",
+		"tool_calls": headCalls,
+	}) + "\n"
+	parityWrite(t, p, head, false)
+	parityPass(t, inc, false)
+
+	tail := marshalRow(map[string]any{
+		"source":     "MODEL",
+		"type":       "PLANNER_RESPONSE",
+		"created_at": "2026-07-01T10:01:00Z",
+		"content":    "reading other-repo",
+		"tool_calls": tailCalls,
+	}) + "\n"
+	parityWrite(t, p, tail, true)
+	parityPass(t, inc, false)
+
+	sameAsRebuild(t, inc)
+	metas, err := AllMeta(inc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(metas) != 1 || metas[0].Project != "org/repo-main" {
+		t.Fatalf("AllMeta = %+v, want 1 row with Project %q", metas, "org/repo-main")
 	}
 }
 

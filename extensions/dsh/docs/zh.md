@@ -6,7 +6,7 @@
 
 **[★ vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)** 扩展（LongMemEval-S **97.2% R@5**）· [文档](https://vshulcz.github.io/deja-vu/zh/) · [在线演示](https://vshulcz.github.io/deja-vu/view/) · [评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-面向 DeepSeek Harness（`dsh`）与 DSH Desktop（`anywhere-labs/dsh-desktop`）的 `session-query` 插件。除了 DSH 自身的对话历史，deja 还索引 Claude Code、Codex、Cursor、opencode、Antigravity、Grok Build、Kimi、Cline、Zed 等其他四十九个智能体本来就写在磁盘上的会话文件。不需要提前录制：历史已经在那里，包括安装 deja 之前的那些月份。如果你上周才转到 dsh，上周之前做过的事仍然可以在 dsh 里查到（全部由本地单文件 Go 二进制 `deja` 与 BM25 索引完成，无 LLM，可用 `DEJA_OFFLINE=1` 关闭每日检查）。
+面向 DeepSeek Harness（`dsh`）与 DSH Desktop（`anywhere-labs/dsh-desktop`）的 `session-query` 插件。除了 DSH 自身的对话历史，deja 还索引 Claude Code、Codex、Cursor、opencode、Antigravity、Grok Build、Kimi、Cline、Zed 等其他五十个智能体本来就写在磁盘上的会话文件。不需要提前录制：历史已经在那里，包括安装 deja 之前的那些月份。如果你上周才转到 dsh，上周之前做过的事仍然可以在 dsh 里查到（全部由本地单文件 Go 二进制 `deja` 与 BM25 索引完成，无 LLM，可用 `DEJA_OFFLINE=1` 关闭每日检查）。
 
 ![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -20,7 +20,7 @@ dsh plugin --profile web add dsh-deja
 dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 ```
 
-若系统未预先安装 `deja`，请配置 `DEJA_BIN`，或使用安装脚本 / Homebrew 一并完成全机 49 款智能体与 `$DSH_HOME/plugins/deja/` 的配置：
+若系统未预先安装 `deja`，请配置 `DEJA_BIN`，或使用安装脚本 / Homebrew 一并完成全机 50 款智能体与 `$DSH_HOME/plugins/deja/` 的配置：
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -75,7 +75,7 @@ node --test extensions/dsh/test/*.test.js
 
 | 召回率 | Token 用量 | 索引与检索耗时 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 49 个编程智能体的检索仅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 50 个编程智能体的检索仅 **0.7 ms** |
 
 ## 仓库记忆与跨智能体接力
 

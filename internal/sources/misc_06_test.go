@@ -216,7 +216,7 @@ func TestQwenFailedCommandCarriesItsExitCode(t *testing.T) {
 			cmds = append(cmds, m.Text)
 		}
 	}
-	want := []string{"$ git log --oneline -1 -- retry.go  → exit 128", "$ git status --short"}
+	want := []string{"$ git log --oneline -1 -- retry.go  → exit 128", "$ git status --short  → exit 0"}
 	if strings.Join(cmds, "|") != strings.Join(want, "|") {
 		t.Fatalf("commands = %q, want %q", cmds, want)
 	}
@@ -2077,6 +2077,7 @@ func TestFormatRegistryConformance(t *testing.T) {
 		"DEJA_OMNIGENT_ROOT", "DEJA_OMNIGENT_DB", "OMNIGENT_DATA_DIR",
 		"DEJA_ORCA_ROOT", "DEJA_ORCA_DB",
 		"DEJA_CLAWCODE_ROOT", "DEJA_CLAWCODE_ROOTS", "CLAW_CONFIG_HOME",
+		"DEJA_ANTE_ROOT", "DEJA_ANTE_ROOTS", "ANTE_HOME",
 	} {
 		t.Setenv(key, "")
 	}
@@ -2487,6 +2488,8 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 		// and a registry fixture that needs an external tool to read cannot be
 		// checked on a machine that lacks it.
 		sessions, err = ParseDeepSeekFile(path)
+	case "ante":
+		sessions, err = ParseAnteFile(path)
 	default:
 		t.Fatalf("no conformance parser for %q", id)
 	}
@@ -2498,7 +2501,7 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 
 // registryFixturesWithCalls are the registry fixtures whose tool calls are
 // read into work records.
-var registryFixturesWithCalls = map[string]bool{"clawcode": true, "deepseek": true, "continue": true, "trae": true, "muse": true, "codebuddy": true, "devin": true, "junie": true, "jetbrains": true, "kimi": true, "mcode": true, "gemini": true, "omnigent": true, "orca": true}
+var registryFixturesWithCalls = map[string]bool{"clawcode": true, "deepseek": true, "continue": true, "trae": true, "muse": true, "codebuddy": true, "devin": true, "junie": true, "jetbrains": true, "kimi": true, "mcode": true, "gemini": true, "omnigent": true, "orca": true, "ante": true}
 
 func validateRegistrySessions(t *testing.T, id string, sessions []model.Session) {
 	t.Helper()
@@ -3101,9 +3104,10 @@ func TestEachLineWalksStopAtAMissingFile(t *testing.T) {
 	}
 }
 
-// The answering rule only knows the calls the tail makes. A failed exit for
-// a call stored already sends the file back; one for a call in the same tail,
-// a clean exit, or a line that does not decode does not (#4443).
+// The answering rule only knows the calls the tail makes. Any recorded exit
+// for a call stored already sends the file back so clean exits also stamp the
+// prior command; one for a call in the same tail or a line that does not
+// decode does not.
 func TestCodexAndCopilotResumesOnlyOnAFailureForAStoredCall(t *testing.T) {
 	codexCall := func(id string) string {
 		return `{"timestamp":"2026-07-31T00:00:02Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","call_id":"` + id + `","arguments":"{\"cmd\":\"go test ./...\"}"}}` + "\n"
@@ -3124,13 +3128,15 @@ func TestCodexAndCopilotResumesOnlyOnAFailureForAStoredCall(t *testing.T) {
 		want       bool
 	}{
 		{"codex failed exit for a stored call", codexResumes, codexCall("c1"), codexOut("c1", "2"), false},
-		{"codex clean exit for a stored call", codexResumes, codexCall("c1"), codexOut("c1", "0"), true},
+		{"codex clean exit for a stored call", codexResumes, codexCall("c1"), codexOut("c1", "0"), false},
 		{"codex call and failure both in the tail", codexResumes, "", codexCall("c2") + codexOut("c2", "1"), true},
+		{"codex call and clean exit both in the tail", codexResumes, "", codexCall("c2") + codexOut("c2", "0"), true},
 		{"codex half-written answer", codexResumes, codexCall("c1"), `{"type":"response_item","payload":{"type":"function_call_output","call_id":"c1","out` + "\n", true},
 		{"codex failure then more", codexResumes, codexCall("c1"), codexOut("c1", "1") + codexCall("c3") + codexOut("c3", "0"), false},
 		{"copilot failed exit for a stored call", copilotResumes, copilotCall("k1"), copilotOut("k1", "1"), false},
-		{"copilot clean exit for a stored call", copilotResumes, copilotCall("k1"), copilotOut("k1", "0"), true},
+		{"copilot clean exit for a stored call", copilotResumes, copilotCall("k1"), copilotOut("k1", "0"), false},
 		{"copilot call and failure both in the tail", copilotResumes, "", copilotCall("k2") + copilotOut("k2", "1"), true},
+		{"copilot call and clean exit both in the tail", copilotResumes, "", copilotCall("k2") + copilotOut("k2", "0"), true},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			head := `{"type":"session_meta"}` + "\n" + c.head

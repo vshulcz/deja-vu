@@ -269,7 +269,7 @@ func (tr *traeTurns) tool(s *model.Session, item map[string]any, cwd string, t t
 	}
 	switch pt {
 	case "function_call":
-		if traeClaudeTool(s, item, t) {
+		if traeClaudeTool(s, item, t, calls) {
 			return
 		}
 		codexCall(s, traeShellCall(item), calls, cwd, t)
@@ -323,11 +323,12 @@ func traeItemText(item map[string]any, types ...string) string {
 // traeClaudeTool reads a call made with Claude Code's tool set, which TRAE's
 // binary carries next to Codex's (Bash, Edit, Write, Read and the rest), through
 // the Claude dialect. Codex's names are lowercase and left to codexCall.
-func traeClaudeTool(s *model.Session, item map[string]any, t time.Time) bool {
+func traeClaudeTool(s *model.Session, item map[string]any, t time.Time, calls map[string]int) bool {
 	name, _ := item["name"].(string)
 	if name == "" || name[0] < 'A' || name[0] > 'Z' {
 		return false
 	}
+	s.AddToolCall(name, false)
 	in := map[string]any{}
 	switch a := item["arguments"].(type) {
 	case string:
@@ -336,7 +337,17 @@ func traeClaudeTool(s *model.Session, item map[string]any, t time.Time) bool {
 		in = a
 	}
 	id, _ := item["call_id"].(string)
-	s.Messages = append(s.Messages, codeBuddyWorkRecords([]any{map[string]any{"type": "tool_use", "id": id, "name": name, "input": in}}, t)...)
+	recs := codeBuddyWorkRecords([]any{map[string]any{"type": "tool_use", "id": id, "name": name, "input": in}}, t)
+	start := len(s.Messages)
+	s.Messages = append(s.Messages, recs...)
+	if id != "" && calls != nil {
+		for i, r := range recs {
+			if r.Role == RoleCommand {
+				calls[id] = start + i
+				break
+			}
+		}
+	}
 	return true
 }
 
