@@ -237,7 +237,12 @@ export default function extension(pi) {
         // omp's edit names its file only in the anchor its input opens with,
         // "[path#HASH]".
         const anchor = /^\s*\[([^\]#]+)#/.exec(String((event.input && event.input.input) || ""));
-        const path = String((event.input && (event.input.path || event.input.file_path)) || (anchor && anchor[1]) || "");
+        let path = String((event.input && (event.input.path || event.input.file_path)) || (anchor && anchor[1]) || "");
+        // omp's read folds its line selector into the path ("file.go:12-40",
+        // ":-12", ":50+150", ":5-16,960-973", ":raw", stacked as ":2-4:raw"),
+        // and deja knows the file by its bare path.
+        const selector = /:(?:raw|-?[0-9]+(?:[-+][0-9]*)?(?:,[0-9]+(?:-[0-9]*)?)*)$/i;
+        while (selector.test(path)) path = path.replace(selector, "");
         if (!path) return;
         const parts = Array.isArray(event.content) ? event.content : [];
         const id = "file:" + String(event.toolCallId || "");

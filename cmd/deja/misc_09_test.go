@@ -3629,6 +3629,45 @@ console.log(JSON.stringify(r));
 	}
 }
 
+// omp's read folds its line selector into the path; hook-tool knows the file
+// only by its bare path, so the selector is dropped before asking (#6106).
+func TestOmpReadAsksAboutTheBarePath(t *testing.T) {
+	stub, calls := answeringDeja(t)
+	paths := []string{
+		"/w/config.go:12-40", "/w/config.go:-12", "/w/config.go:12-", "/w/config.go:12",
+		"/w/config.go:50+150", "/w/config.go:5-16,960-973", "/w/config.go:2-4:raw",
+		"/w/config.go:raw:2-4", "/w/config.go:RAW", "/w/config.go",
+	}
+	driver := `
+const mod = await import("PLUGIN");
+const handlers = {};
+mod.default({ on(n, f) { (handlers[n] ||= []).push(f); }, registerCommand() {} });
+const paths = PATHS;
+for (let i = 0; i < paths.length; i++) {
+  await handlers.tool_result[0]({ toolName: "read", toolCallId: "c" + i, input: { path: paths[i] }, content: [{ type: "text", text: "ok" }], isError: false });
+}
+await handlers.tool_result[0]({ toolName: "read", toolCallId: "win", input: { path: "C:\\w\\config.go:7-9" }, content: [], isError: false });
+console.log("done");
+`
+	b, _ := json.Marshal(paths)
+	out := runNodeDriver(t, "index.js", ompExtensionJS(stub), strings.Replace(driver, "PATHS", string(b), 1))
+	if !strings.Contains(out, "done") {
+		t.Fatalf("driver: %s", out)
+	}
+	got := toolCalls(calls(), "hook-tool")
+	if len(got) != len(paths)+1 {
+		t.Fatalf("hook-tool ran %d times, want %d: %v", len(got), len(paths)+1, got)
+	}
+	for i, in := range got[:len(paths)] {
+		if p := inputPath(in); p != "/w/config.go" {
+			t.Errorf("read of %q asked about %q, want /w/config.go", paths[i], p)
+		}
+	}
+	if p := inputPath(got[len(paths)]); p != `C:\w\config.go` {
+		t.Errorf("Windows read asked about %q, want the drive letter kept", p)
+	}
+}
+
 // prime's model has one tool, ipython; files and commands are in its code
 // and the exit code only in the BashResult text (prime-agent 0.9.8).
 func TestPrimeFileAndFailureLinesFromTheCell(t *testing.T) {
