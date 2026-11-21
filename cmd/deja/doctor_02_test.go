@@ -4089,3 +4089,62 @@ func TestDoctorNamesAnIndexPathThatIsAFile(t *testing.T) {
 		t.Errorf("the report tells the reader to run a build that will refuse:\n%s", got)
 	}
 }
+
+// TeleAgent keeps one store per account under users/<account>/teleagent.db, so
+// doctor's row names the store it found rather than one fixed path, and the
+// store it names is the one the probe parses. An account directory a login
+// created and never opened a conversation in has no store to name (#6128).
+func TestDoctorTeleagentNamesTheAccountStore(t *testing.T) {
+	tmp := hermeticEnv(t)
+	if !sources.SQLite3Available() {
+		t.Skip("sqlite3 not installed")
+	}
+	root := filepath.Join(tmp, "teleagent")
+	acct := filepath.Join(root, "users", "2091696589113404")
+	if err := os.MkdirAll(acct, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	db := filepath.Join(acct, "teleagent.db")
+	schema, err := os.ReadFile(filepath.Join("..", "..", "fixtures", "registry", "teleagent", "teleagent.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
+	cmd.Stdin = strings.NewReader(string(schema))
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("build store: %v: %s", err, out)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "users", "2091696589113405"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_TELEAGENT_ROOT", root)
+	t.Setenv("TELEAGENT_HOME", "")
+	t.Setenv("XDG_DATA_HOME", "")
+
+	var buf bytes.Buffer
+	dir := filepath.Join(tmp, "idx")
+	if err := index.Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	doctorHarnesses(&buf, dir)
+	var row string
+	for line := range strings.SplitSeq(buf.String(), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "teleagent ") {
+			row = line
+		}
+	}
+	if !strings.Contains(row, "found") || !strings.Contains(row, db) {
+		t.Fatalf("teleagent row = %q, want the account store named\n%s", row, buf.String())
+	}
+
+	var check doctorStoreCheck
+	for _, c := range doctorStoreChecks() {
+		if c.name == "teleagent" {
+			check = c
+		}
+	}
+	store, _ := inspectDoctorStore(check)
+	if store.State != "ok" {
+		t.Errorf("store state = %q, want ok", store.State)
+	}
+}
