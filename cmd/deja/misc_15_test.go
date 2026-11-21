@@ -4134,3 +4134,28 @@ func isZhNumeral(s string) bool {
 	}
 	return false
 }
+
+func TestCleanZCodeRegistryPath(t *testing.T) {
+	t.Setenv("LOCALAPPDATA", `C:\Users\alex\AppData\Local`)
+	cases := []struct {
+		name   string
+		raw    string
+		expand bool
+		want   string
+	}{
+		{name: "empty", raw: "", want: ""},
+		{name: "whitespace", raw: "   \t ", want: ""},
+		{name: "empty quotes", raw: `""`, want: ""},
+		{name: "double quoted with spaces", raw: `  "D:\Programs\ZCode\"  `, want: `D:\Programs\ZCode\`},
+		{name: "single quoted", raw: `'C:\Apps\ZCode'`, want: `C:\Apps\ZCode`},
+		{name: "expand env case-insensitive", raw: `"%LocalAppData%\Programs\ZCode"`, expand: true, want: `C:\Users\alex\AppData\Local\Programs\ZCode`},
+		{name: "keep percent when not REG_EXPAND_SZ", raw: `%LocalAppData%\Programs\ZCode`, expand: false, want: `%LocalAppData%\Programs\ZCode`},
+		{name: "preserve unknown and percent before var", raw: `%MISSING%%LOCALAPPDATA%\ZCode`, expand: true, want: `%MISSING%C:\Users\alex\AppData\Local\ZCode`},
+		{name: "double percent preserved", raw: `100%%\%LOCALAPPDATA%\ZCode`, expand: true, want: `100%%\C:\Users\alex\AppData\Local\ZCode`},
+	}
+	for _, tc := range cases {
+		if got := cleanZCodeRegistryPath(tc.raw, tc.expand); got != tc.want {
+			t.Errorf("%s: cleanZCodeRegistryPath(%q, %v) = %q, want %q", tc.name, tc.raw, tc.expand, got, tc.want)
+		}
+	}
+}

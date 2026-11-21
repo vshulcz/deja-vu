@@ -56,7 +56,7 @@ func regValueString(key syscall.Handle, name string) (string, bool) {
 	if err != nil && err != syscall.ERROR_MORE_DATA {
 		return "", false
 	}
-	if typ != syscall.REG_SZ && typ != syscall.REG_EXPAND_SZ {
+	if (typ != syscall.REG_SZ && typ != syscall.REG_EXPAND_SZ) || size == 0 {
 		return "", false
 	}
 	buf := make([]byte, size)
@@ -65,11 +65,15 @@ func regValueString(key syscall.Handle, name string) (string, bool) {
 		return "", false
 	}
 	// The value is UTF-16 with a trailing NUL; strip it and any padding.
-	u16 := utf16.Decode(unsafeSlice(buf))
+	u16 := utf16.Decode(unsafeSlice(buf[:size]))
 	for len(u16) > 0 && u16[len(u16)-1] == 0 {
 		u16 = u16[:len(u16)-1]
 	}
-	return string(u16), true
+	s := string(u16)
+	if typ == syscall.REG_EXPAND_SZ {
+		s = expandPercentEnv(s)
+	}
+	return s, true
 }
 
 // unsafeSlice reinterprets a byte slice as uint16 without importing unsafe:
@@ -139,6 +143,10 @@ func zcodeRegistryInstallLocationsReal() []string {
 					}
 					loc, ok := regValueString(subKey, "InstallLocation")
 					if !ok {
+						return
+					}
+					loc = cleanZCodeRegistryPath(loc, false)
+					if loc == "" {
 						return
 					}
 					// InstallLocation may be the install root or already name

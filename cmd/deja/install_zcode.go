@@ -268,8 +268,7 @@ func installZCodeHooksWith(exe string, uninstall, alsoLiveConfig bool) (installR
 	}
 	// A 3.17+ desktop build keeps reading config.json instead of the
 	// setting.json the 3.14.4 CLI runtime migrated to (#4429). Write the hooks
-	// there too, so either runtime runs them. The server stays in setting.json —
-	// putting it in config.json would bring it back through the migration.
+	// there too, so either runtime runs them.
 	if alsoLiveConfig {
 		legacyRes, lerr := edit(zcodeLegacyConfigPath(), false)
 		if lerr != nil {
@@ -568,4 +567,66 @@ func zcodeCommandIsOurs(cmd string) bool {
 		}
 	}
 	return false
+}
+
+// lookupEnvFold reads name with case-insensitive fallback so tests running on
+// POSIX can resolve Windows-style casing such as %LocalAppData%.
+func lookupEnvFold(name string) (string, bool) {
+	if v, ok := os.LookupEnv(name); ok {
+		return v, true
+	}
+	for _, entry := range os.Environ() {
+		k, v, ok := strings.Cut(entry, "=")
+		if ok && strings.EqualFold(k, name) {
+			return v, true
+		}
+	}
+	return "", false
+}
+
+// expandPercentEnv expands Windows-style %VAR% placeholders when the named
+// variable exists, leaving unclosed markers and unknown names verbatim.
+func expandPercentEnv(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); {
+		if s[i] != '%' {
+			b.WriteByte(s[i])
+			i++
+			continue
+		}
+		end := strings.IndexByte(s[i+1:], '%')
+		if end <= 0 {
+			b.WriteByte('%')
+			i++
+			continue
+		}
+		name := s[i+1 : i+1+end]
+		if val, ok := lookupEnvFold(name); ok {
+			b.WriteString(val)
+			i += 1 + end + 1
+			continue
+		}
+		b.WriteByte('%')
+		i++
+	}
+	return b.String()
+}
+
+// cleanZCodeRegistryPath normalizes a Windows Uninstall InstallLocation value,
+// expanding %VAR% placeholders when expand is true and stripping outer quotes
+// and whitespace.
+func cleanZCodeRegistryPath(raw string, expand bool) string {
+	if expand {
+		raw = expandPercentEnv(raw)
+	}
+	s := strings.TrimSpace(raw)
+	for len(s) >= 2 {
+		if (s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'') {
+			s = strings.TrimSpace(s[1 : len(s)-1])
+			continue
+		}
+		break
+	}
+	s = strings.TrimSpace(strings.Trim(s, `"`))
+	return s
 }
