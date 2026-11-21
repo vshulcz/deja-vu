@@ -370,6 +370,19 @@ func decodeRecordHeader(b []byte, t *recordTables) (Record, byte, []byte, error)
 	return rec, b[0], b[1:], nil
 }
 
+const stubDeflatePrefix = 384
+
+func inflateRecordTimestamp(b []byte, ts *[8]byte) error {
+	zr := inflateReaders.Get().(io.ReadCloser)                                 //nolint:forcetypeassert // the pool holds only flate readers
+	if err := zr.(flate.Resetter).Reset(bytes.NewReader(b), nil); err != nil { //nolint:forcetypeassert // a flate reader is a Resetter
+		inflateReaders.Put(zr)
+		return err
+	}
+	_, err := io.ReadFull(zr, ts[:])
+	inflateReaders.Put(zr)
+	return err
+}
+
 // decodeRecordStubRole decodes a record's key, source path, role, and 8-byte
 // timestamp without reading or allocating its text body.
 func decodeRecordStubRole(b []byte, t *recordTables) (Record, error) {
@@ -380,15 +393,13 @@ func decodeRecordStubRole(b []byte, t *recordTables) (Record, error) {
 	var ts [8]byte
 	switch flag {
 	case recordDeflated:
-		zr := inflateReaders.Get().(io.ReadCloser)                                 //nolint:forcetypeassert // the pool holds only flate readers
-		if err := zr.(flate.Resetter).Reset(bytes.NewReader(b), nil); err != nil { //nolint:forcetypeassert // a flate reader is a Resetter
-			inflateReaders.Put(zr)
-			return rec, err
-		}
-		_, err := io.ReadFull(zr, ts[:])
-		inflateReaders.Put(zr)
-		if err != nil {
-			return rec, err
+		if err := inflateRecordTimestamp(b[:min(len(b), stubDeflatePrefix)], &ts); err != nil {
+			if len(b) <= stubDeflatePrefix {
+				return rec, err
+			}
+			if err := inflateRecordTimestamp(b, &ts); err != nil {
+				return rec, err
+			}
 		}
 	case recordRaw:
 		if len(b) < 8 {
