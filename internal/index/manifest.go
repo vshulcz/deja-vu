@@ -3,6 +3,7 @@ package index
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -520,12 +521,47 @@ func manifestFromCore(core manifestCore, sessions map[string]SessionMeta) Manife
 	return Manifest{Version: core.Version, Format: core.Format, Files: core.Files, BuiltAt: core.BuiltAt, SourcesReadAt: core.SourcesReadAt, Generation: core.Generation, Scope: core.Scope, Redacted: core.Redacted, RedactionRules: core.RedactionRules, ExportWatermarks: core.ExportWatermarks, ExportBoundary: core.ExportBoundary, ImportedRecords: core.ImportedRecords, RecordStrings: core.RecordStrings, RecordsSize: core.RecordsSize, DeadRecords: core.DeadRecords, DeadBytes: core.DeadBytes, BucketFiles: core.BucketFiles, IngestHealth: core.IngestHealth, IngestFiles: core.IngestFiles, ExcludeFingerprint: core.ExcludeFingerprint, AliasFingerprint: core.AliasFingerprint, ToolFingerprint: core.ToolFingerprint, Compactions: core.Compactions, KeptDated: core.KeptDated, ReadZone: core.ReadZone, Deferred: core.Deferred, PartialOf: core.PartialOf, SearchOnly: core.SearchOnly, Empty: core.Empty, Sessions: sessions}
 }
 
+// importedFile stores sync import deduplication keys outside manifest.gob
+// so ordinary hook and retrieval reads do not decode the ledger (#6135).
+const importedFile = "imported.gob"
+
+// readImportedRecords loads the sync import deduplication ledger from
+// imported.gob, merging any true entries from a legacy unsplit manifest.
+func readImportedRecords(dir string, legacy map[string]bool) (map[string]bool, error) {
+	var out map[string]bool
+	if err := readGob(filepath.Join(dir, importedFile), &out); err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+		out = maps.Clone(legacy)
+	}
+	if out == nil {
+		out = map[string]bool{}
+	}
+	for k, v := range legacy {
+		if v {
+			out[k] = true
+		}
+	}
+	return out, nil
+}
+
+func writeImportedRecords(dir string, dedupe map[string]bool) error {
+	if len(dedupe) == 0 {
+		return nil
+	}
+	return writeGobAtomic(filepath.Join(dir, importedFile), dedupe)
+}
+
 // writeManifestOnly persists manifest.gob without rewriting sessions.gob —
 // for updates that change only core fields (e.g. export watermarks) where the
 // caller has not loaded sessions and must not clobber them. It wrote no
 // records, so it keeps the sizes the manifest committed: see stampStore.
 func writeManifestOnly(dir string, m Manifest) error {
-	core := manifestCore{Version: m.Version, Format: m.Format, Files: m.Files, BuiltAt: m.BuiltAt, SourcesReadAt: m.SourcesReadAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ExportBoundary: m.ExportBoundary, ImportedRecords: m.ImportedRecords, RecordStrings: m.RecordStrings, DeadRecords: m.DeadRecords, DeadBytes: m.DeadBytes, IngestHealth: m.IngestHealth, IngestFiles: m.IngestFiles, ExcludeFingerprint: m.ExcludeFingerprint, AliasFingerprint: m.AliasFingerprint, ToolFingerprint: m.ToolFingerprint, Compactions: m.Compactions, KeptDated: m.KeptDated, ReadZone: m.ReadZone, Deferred: m.Deferred, PartialOf: m.PartialOf, SearchOnly: m.SearchOnly, Empty: m.Empty}
+	if err := writeImportedRecords(dir, m.ImportedRecords); err != nil {
+		return err
+	}
+	core := manifestCore{Version: m.Version, Format: m.Format, Files: m.Files, BuiltAt: m.BuiltAt, SourcesReadAt: m.SourcesReadAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ExportBoundary: m.ExportBoundary, RecordStrings: m.RecordStrings, DeadRecords: m.DeadRecords, DeadBytes: m.DeadBytes, IngestHealth: m.IngestHealth, IngestFiles: m.IngestFiles, ExcludeFingerprint: m.ExcludeFingerprint, AliasFingerprint: m.AliasFingerprint, ToolFingerprint: m.ToolFingerprint, Compactions: m.Compactions, KeptDated: m.KeptDated, ReadZone: m.ReadZone, Deferred: m.Deferred, PartialOf: m.PartialOf, SearchOnly: m.SearchOnly, Empty: m.Empty}
 	stampStore(dir, &core, m, false)
 	err := writeGobAtomic(filepath.Join(dir, "manifest.gob"), core)
 	invalidateManifestCache(dir)
@@ -575,8 +611,11 @@ func writeManifestMeta(dir string, m Manifest) error {
 }
 
 func commitManifest(dir string, m Manifest, wroteRecords, share bool) error {
+	if err := writeImportedRecords(dir, m.ImportedRecords); err != nil {
+		return err
+	}
 	mergeIngestDiag(&m)
-	core := manifestCore{Version: m.Version, Format: m.Format, Files: m.Files, BuiltAt: m.BuiltAt, SourcesReadAt: m.SourcesReadAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ExportBoundary: m.ExportBoundary, ImportedRecords: m.ImportedRecords, RecordStrings: m.RecordStrings, DeadRecords: m.DeadRecords, DeadBytes: m.DeadBytes, IngestHealth: m.IngestHealth, IngestFiles: m.IngestFiles, ExcludeFingerprint: m.ExcludeFingerprint, AliasFingerprint: m.AliasFingerprint, ToolFingerprint: m.ToolFingerprint, Compactions: m.Compactions, KeptDated: m.KeptDated, ReadZone: m.ReadZone, Deferred: m.Deferred, PartialOf: m.PartialOf, SearchOnly: m.SearchOnly, Empty: m.Empty}
+	core := manifestCore{Version: m.Version, Format: m.Format, Files: m.Files, BuiltAt: m.BuiltAt, SourcesReadAt: m.SourcesReadAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ExportBoundary: m.ExportBoundary, RecordStrings: m.RecordStrings, DeadRecords: m.DeadRecords, DeadBytes: m.DeadBytes, IngestHealth: m.IngestHealth, IngestFiles: m.IngestFiles, ExcludeFingerprint: m.ExcludeFingerprint, AliasFingerprint: m.AliasFingerprint, ToolFingerprint: m.ToolFingerprint, Compactions: m.Compactions, KeptDated: m.KeptDated, ReadZone: m.ReadZone, Deferred: m.Deferred, PartialOf: m.PartialOf, SearchOnly: m.SearchOnly, Empty: m.Empty}
 	stampStore(dir, &core, m, wroteRecords)
 	sfi, err := writeGobAtomicStat(filepath.Join(dir, "sessions.gob"), m.Sessions)
 	if err != nil {

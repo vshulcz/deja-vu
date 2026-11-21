@@ -624,9 +624,12 @@ func Import(dir, inDir string) (int, error) {
 	if !recordsIntact(dir, m) {
 		return 0, fmt.Errorf("%w: records.bin does not match the manifest — run `deja index` and import again", errCorruptIndex)
 	}
-	if m.ImportedRecords == nil {
-		m.ImportedRecords = map[string]bool{}
+	hadLegacy := len(m.ImportedRecords) > 0
+	dedupe, err := readImportedRecords(dir, m.ImportedRecords)
+	if err != nil {
+		return 0, err
 	}
+	m.ImportedRecords = dedupe
 	paths, err := filepath.Glob(filepath.Join(inDir, "*.jsonl"))
 	if err != nil {
 		return 0, err
@@ -652,6 +655,9 @@ func Import(dir, inDir string) (int, error) {
 		}
 	}
 	if imp.added == 0 {
+		if !hadLegacy {
+			m.ImportedRecords = nil
+		}
 		if err := writeManifest(dir, m); err != nil {
 			return 0, err
 		}
@@ -755,7 +761,7 @@ func initEmptyIndex(dir string) error {
 	// Same reasoning for the tools this build could use: blank reads as "an
 	// older deja wrote this", and a store skipped for a missing CLI would then
 	// never be re-read once it was installed (#1760).
-	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, SearchOnly: searchOnlyFor(dir), Files: map[string]FileState{}, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), ExportWatermarks: map[string]int64{}, ImportedRecords: map[string]bool{},
+	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, SearchOnly: searchOnlyFor(dir), Files: map[string]FileState{}, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), ExportWatermarks: map[string]int64{},
 		Compactions:        compactionsForRebuild(dir, readTombstones()),
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
 		AliasFingerprint:   sources.ProjectAliasFingerprint(),

@@ -88,9 +88,6 @@ func contextByID(dir, q string, harness ...string) (string, idContext, bool) {
 		return "", idContext{}, false
 	}
 	whole := kept[0]
-	if full, ok, ferr := wholeSessionForMCP(dir, whole); ferr == nil && ok {
-		whole = full
-	}
 	index.MarkUserRules(dir, &whole, howScope(howCwd(), "", false))
 	search.ScrubMessages(&whole)
 	var b bytes.Buffer
