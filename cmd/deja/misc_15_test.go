@@ -3707,6 +3707,54 @@ func TestZCodeDesktopVersionSelectsTheLiveConfig(t *testing.T) {
 	}
 }
 
+// TestInstallZCodeWithReportsAConfigError covers the error paths of
+// installZCodeWith: a setting.json that will not parse, and a config.json that
+// will not parse. Each must surface the parse error rather than silently
+// continue with an empty config (which would drop the user's own entries).
+func TestInstallZCodeWithReportsAConfigError(t *testing.T) {
+	orig := zcodeDesktopVersion
+	defer func() { zcodeDesktopVersion = orig }()
+	zcodeDesktopVersion = func() ([3]int, bool) { return [3]int{3, 17, 2}, true }
+
+	// setting.json is the first file an install touches. A config that does
+	// not parse must come back as an error, not as a silent rewrite.
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	dir := filepath.Join(home, ".zcode", "cli")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	setting := filepath.Join(dir, "setting.json")
+	if err := os.WriteFile(setting, []byte(`{not json`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installZCode("/usr/local/bin/deja", false); err == nil {
+		t.Error("a bad setting.json was accepted; want a parse error")
+	}
+
+	// A valid setting.json but a config.json that will not parse: the first
+	// half succeeds, the live-config half must report the bad config.json.
+	home2 := t.TempDir()
+	t.Setenv("HOME", home2)
+	t.Setenv("USERPROFILE", home2)
+	dir2 := filepath.Join(home2, ".zcode", "cli")
+	if err := os.MkdirAll(dir2, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	setting2 := filepath.Join(dir2, "setting.json")
+	config2 := filepath.Join(dir2, "config.json")
+	if err := os.WriteFile(setting2, []byte(`{"mcp":{"servers":{}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(config2, []byte(`{broken`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installZCode("/usr/local/bin/deja", false); err == nil {
+		t.Error("a bad config.json was accepted; want a parse error")
+	}
+}
+
 // doctor reports against whichever file exists. A 3.17+ machine has only
 // config.json, so asking for setting.json read a wired install as missing.
 func TestDoctorZCodeNamesTheFileThatIsThere(t *testing.T) {
