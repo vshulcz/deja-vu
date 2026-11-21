@@ -251,18 +251,18 @@ func TestLineageAvoidsFullSessionStubInflation(t *testing.T) {
 	for i := range 8 {
 		askerMsgs = append(askerMsgs, turn("user", fmt.Sprintf("asker-tail-%02d %s", i, pad), int64(2000+(sharedN+i)*1000)))
 	}
-	var copyExtra []model.Message
+	copyExtra := make([]model.Message, 0, 5)
 	for i := range 5 {
 		copyExtra = append(copyExtra, turn("assistant", fmt.Sprintf("early-shift-%02d %s", i, pad), int64(100+i*100)))
 	}
 	shiftedCopy := slices.Concat(base[:1], copyExtra, base[1:])
 	shiftedSibling := slices.Concat(
 		base[:1],
-		[]model.Message{turn("assistant", fmt.Sprintf("early-sibling-shift %s", pad), 500)},
+		[]model.Message{turn("assistant", "early-sibling-shift "+pad, 500)},
 		base[1:],
 		[]model.Message{
-			turn("user", fmt.Sprintf("shifted-sibling-diverged-0 %s", pad), int64(2000+(sharedN+200)*1000)),
-			turn("assistant", fmt.Sprintf("shifted-sibling-diverged-1 %s", pad), int64(2000+(sharedN+201)*1000)),
+			turn("user", "shifted-sibling-diverged-0 "+pad, int64(2000+(sharedN+200)*1000)),
+			turn("assistant", "shifted-sibling-diverged-1 "+pad, int64(2000+(sharedN+201)*1000)),
 		},
 	)
 
