@@ -34,7 +34,7 @@ deja install --auto
 | [`vscode/`](vscode) | VS Code Marketplace & OpenVSX `vshulcz.deja-status` | `code --install-extension vshulcz.deja-status` |
 | [`jetbrains/`](jetbrains) | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35998-deja-vu-cross-agent-ai-session-memory) `com.github.vshulcz.deja-vu`, release asset `deja-jetbrains.zip` | `idea installPlugins com.github.vshulcz.deja-vu` |
 | [`nvim/`](nvim) | Neovim runtime plugin (`lua/deja/`) | `{ "vshulcz/deja-vu", opts = {} }` |
-| [`raycast/`](raycast) | Raycast extension `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
+| [`raycast/`](raycast) | [Raycast Store](https://www.raycast.com/vshulcz/deja-vu) `vshulcz/deja-vu` | `open raycast://extensions/vshulcz/deja-vu` |
 | [`spec-kit/`](spec-kit) | Spec Kit extension `deja-vu`, release asset `deja-spec-kit.zip` | `specify extension add deja-vu --from https://github.com/vshulcz/deja-vu/releases/latest/download/deja-spec-kit.zip` |
 
 Six more integrations live outside this directory because their registries or
