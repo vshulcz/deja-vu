@@ -667,7 +667,7 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 		scope = howScope(howCwd(), "", false)
 		o.PoolScope = scope
 	}
-	result, o2, hits, policyHidden, err := recallRank(dir, q, o)
+	result, o2, hits, policyHidden, err := recallRankWithLive(dir, q, o, live, true)
 	if err != nil {
 		return rankedRecall{}, err
 	}
@@ -697,9 +697,9 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 		var phidden int
 		var perr error
 		if cut, ok := index.ScopedFrom(result, scope); ok {
-			pr, po2, ph, phidden, perr = recallRankFrom(dir, q, po, cut)
+			pr, po2, ph, phidden, perr = recallRankFromWithLive(dir, q, po, cut, live, true)
 		} else if index.AnyInScope(dir, scope) {
-			pr, po2, ph, phidden, perr = recallRank(dir, q, po)
+			pr, po2, ph, phidden, perr = recallRankWithLive(dir, q, po, live, true)
 		}
 		// The index filter matches names as substrings; kept are the
 		// sessions the hooks call this project's, by the same rule, so a

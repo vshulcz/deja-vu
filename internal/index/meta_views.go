@@ -1,8 +1,17 @@
 package index
 
 import (
+	"maps"
+	"os"
+	"path/filepath"
 	"reflect"
+	"slices"
+	"strconv"
+	"strings"
 	"sync"
+	"time"
+
+	"github.com/vshulcz/deja-vu/internal/model"
 )
 
 // metaViews are what recall derives from one manifest's session table: every
@@ -28,12 +37,31 @@ type metaViews struct {
 	byOrd       map[uint32]*SessionMeta
 	idOnce      sync.Once
 	byID        map[string][]*SessionMeta
+	openingOnce sync.Once
+	byOpening   map[uint64][]*SessionMeta
+	edgesOnce   sync.Once
+	edges       spawnEdges
 	countedOnce sync.Once
 	counted     int
+
+	lineageMu    sync.Mutex
+	lineageCache map[string]cachedLineage
 
 	giveUpMu     sync.Mutex
 	giveUpRecs   map[string][]Record
 	giveUpLoaded map[string]bool
+}
+
+type spawnEdges struct {
+	children map[string][]string
+	parent   map[string]string
+	forks    map[string]SessionMeta
+	hasChild map[string]bool
+}
+
+type cachedLineage struct {
+	out  map[string]bool
+	cuts map[string]time.Time
 }
 
 // viewsFor is the views of m's session table: the cached ones when m is the
@@ -105,6 +133,89 @@ func (v *metaViews) metasByID() map[string][]*SessionMeta {
 		}
 	})
 	return v.byID
+}
+
+func (v *metaViews) metasByOpening() map[uint64][]*SessionMeta {
+	v.openingOnce.Do(func() {
+		all := v.allMeta()
+		v.byOpening = make(map[uint64][]*SessionMeta)
+		for i := range all {
+			if all[i].Opening != 0 {
+				v.byOpening[all[i].Opening] = append(v.byOpening[all[i].Opening], &all[i])
+			}
+		}
+	})
+	return v.byOpening
+}
+
+func (v *metaViews) spawnEdges() spawnEdges {
+	v.edgesOnce.Do(func() {
+		all := v.allMeta()
+		v.edges = spawnEdges{
+			children: map[string][]string{},
+			parent:   map[string]string{},
+			forks:    map[string]SessionMeta{},
+			hasChild: map[string]bool{},
+		}
+		for i := range all {
+			meta := all[i]
+			if meta.Parent == "" || meta.Parent == meta.ID {
+				continue
+			}
+			v.edges.hasChild[meta.Parent] = true
+			if meta.IsSpawned() {
+				v.edges.children[meta.Parent] = append(v.edges.children[meta.Parent], meta.ID)
+				v.edges.parent[meta.ID] = meta.Parent
+			} else if meta.Kind == model.KindFork {
+				v.edges.forks[meta.ID] = meta
+			}
+		}
+	})
+	return v.edges
+}
+
+func lineageFileStamp(path string) string {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return "missing"
+	}
+	return strconv.FormatInt(fi.Size(), 10) + ":" + strconv.FormatInt(fi.ModTime().UnixNano(), 10)
+}
+
+func lineageCacheKey(dir string, ids map[string]bool) string {
+	keys := make([]string, 0, len(ids))
+	for id, ok := range ids {
+		if ok && id != "" {
+			keys = append(keys, id)
+		}
+	}
+	slices.Sort(keys)
+	return dir + "\x00" +
+		lineageFileStamp(filepath.Join(dir, "records.bin")) + "\x00" +
+		lineageFileStamp(filepath.Join(dir, recordOffsetsFile)) + "\x00" +
+		strings.Join(keys, "\x00")
+}
+
+func (v *metaViews) getLineageCached(key string) (cachedLineage, bool) {
+	v.lineageMu.Lock()
+	e, ok := v.lineageCache[key]
+	v.lineageMu.Unlock()
+	if !ok {
+		return cachedLineage{}, false
+	}
+	return cachedLineage{out: maps.Clone(e.out), cuts: maps.Clone(e.cuts)}, true
+}
+
+func (v *metaViews) putLineageCached(key string, out map[string]bool, cuts map[string]time.Time) {
+	const maxLineageCacheEntries = 16
+	v.lineageMu.Lock()
+	if v.lineageCache == nil {
+		v.lineageCache = make(map[string]cachedLineage, 4)
+	} else if len(v.lineageCache) >= maxLineageCacheEntries {
+		clear(v.lineageCache)
+	}
+	v.lineageCache[key] = cachedLineage{out: maps.Clone(out), cuts: maps.Clone(cuts)}
+	v.lineageMu.Unlock()
 }
 
 // metaAt is the session with ordinal sid in byOrd, and whether there is one.

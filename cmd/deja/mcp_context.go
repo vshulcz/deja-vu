@@ -132,7 +132,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	if err != nil {
 		return "", 0, 0, nil, nil, "", err
 	}
-	ss := withoutLiveSessions(dir, result.Sessions)
+	ss := withoutExcludedSessions(result.Sessions, live)
 	o.Tier = result.Tier
 	o.Unread = result.Unread
 	if result.Stemmed {

@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
@@ -257,9 +258,14 @@ func liveLineage(dir string) map[string]bool {
 	return out
 }
 
+// liveLineageCutCalls counts liveLineageCut invocations so tests verify
+// single-pass resolution across recall surfaces.
+var liveLineageCutCalls atomic.Int64
+
 // liveLineageCut is liveLineage with the cut LineageCut gives each session it
 // leaves on the page that a live session shares turns with (#5335).
 func liveLineageCut(dir string) (map[string]bool, map[string]time.Time) {
+	liveLineageCutCalls.Add(1)
 	ids := liveSessionIDs(dir)
 	if asker := mcpUnstampedAsker(dir); asker != "" {
 		ids = maps.Clone(ids)
@@ -497,7 +503,12 @@ func spawnParent(sid string) string {
 // question ranks first by wording however it is weighted, so demotion left it
 // on a page of five (#3945).
 func withoutLiveSessions(dir string, ss []model.Session) []model.Session {
-	live := liveLineage(dir)
+	return withoutExcludedSessions(ss, liveLineage(dir))
+}
+
+// withoutExcludedSessions drops sessions present in live without recomputing
+// live lineage when the caller already holds it.
+func withoutExcludedSessions(ss []model.Session, live map[string]bool) []model.Session {
 	if len(live) == 0 {
 		return ss
 	}

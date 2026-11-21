@@ -2,10 +2,9 @@ package index
 
 import (
 	"hash/fnv"
-	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -66,9 +65,27 @@ func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) (ma
 		}
 		return out, nil
 	}
+	pureIndexed := len(heads) == 0 && len(wholes) == 0
+	var views *metaViews
+	var cacheKey string
+	if pureIndexed {
+		views = viewsFor(m)
+		cacheKey = lineageCacheKey(dir, ids)
+		if hit, hitOK := views.getLineageCached(cacheKey); hitOK {
+			return hit.out, hit.cuts
+		}
+	} else {
+		views = viewsFor(m)
+	}
+	edges := views.spawnEdges()
+	byID := views.metasByID()
 	anyKnown := len(heads) > 0 || len(wholes) > 0 || len(wholeForks) > 0 || len(headOpenings) > 0 || len(wholeOpenings) > 0
-	for _, meta := range m.Sessions {
-		if ids[meta.ID] {
+	for id := range ids {
+		if id == "" {
+			continue
+		}
+		for _, metaPtr := range byID[id] {
+			meta := *metaPtr
 			anyKnown = true
 			if meta.Kind == "fork" {
 				metaForks = append(metaForks, meta)
@@ -78,15 +95,19 @@ func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) (ma
 			if meta.Opening != 0 {
 				askers[meta.Opening] = append(askers[meta.Opening], meta)
 			}
-		} else if meta.Parent != "" && ids[meta.Parent] {
+		}
+		if edges.hasChild[id] {
 			anyKnown = true
 		}
 	}
 	if !anyKnown {
+		if pureIndexed {
+			views.putLineageCached(cacheKey, out, nil)
+		}
 		return out, nil
 	}
-	held := heldRecords(dir, m)
-	byID := viewsFor(m).metasByID()
+	lr := newLineageReader(dir, m)
+	defer lr.close()
 	// parentMeta is the session a fork names, in the fork's own harness.
 	parentMeta := func(harness, id string) (SessionMeta, bool) {
 		for _, p := range byID[id] {
@@ -103,11 +124,11 @@ func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) (ma
 	// hide.
 	forkHolds := func(fork SessionMeta) bool {
 		p, ok := parentMeta(fork.Harness, fork.Parent)
-		return !ok || held(fork, p) || endedBy(dir, m, p, startedAt(dir, m, fork))
+		return !ok || lr.held(fork, p) || lr.endedBy(p, lr.startedAt(fork))
 	}
 	for _, wf := range wholeForks {
 		p, ok := parentMeta(wf.harness, wf.parent)
-		if !ok || wholeHolds(dir, m, []map[string]bool{wf.turns}, p) || endedBy(dir, m, p, wf.started) {
+		if !ok || lr.wholeHolds([]map[string]bool{wf.turns}, p) || lr.endedBy(p, wf.started) {
 			out[wf.parent] = true
 		}
 	}
@@ -116,30 +137,50 @@ func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) (ma
 			out[f.Parent] = true
 		}
 	}
-	own := spawnedFamily(m, ids, out, forkHolds)
-	for _, meta := range m.Sessions {
-		if own[meta.ID] {
-			out[meta.ID] = true
-		}
-		if meta.Opening == 0 || ids[meta.ID] {
-			continue
-		}
-		if headOpenings[meta.Opening] {
-			out[meta.ID] = true
-			continue
-		}
-		if ws := wholeOpenings[meta.Opening]; len(ws) > 0 && wholeHolds(dir, m, ws, meta) {
-			out[meta.ID] = true
-			continue
-		}
-		for _, a := range askers[meta.Opening] {
-			if held(a, meta) {
+	for id := range spawnedFamilyEdges(edges, ids, out, forkHolds) {
+		out[id] = true
+	}
+	hideSharedOpenings(views.metasByOpening(), lr, ids, out, headOpenings, wholeOpenings, askers)
+	cuts := lineageCuts(views, lr, out, metaForks, wholeForks, askers, wholeOpenings, parentMeta)
+	if pureIndexed {
+		views.putLineageCached(cacheKey, out, cuts)
+	}
+	return out, cuts
+}
+
+func hideSharedOpenings(byOpening map[uint64][]*SessionMeta, lr *lineageReader, ids, out map[string]bool, headOpenings map[uint64]bool, wholeOpenings map[uint64][]map[string]bool, askers map[uint64][]SessionMeta) {
+	openings := make(map[uint64]bool, len(headOpenings)+len(wholeOpenings)+len(askers))
+	for o := range headOpenings {
+		openings[o] = true
+	}
+	for o := range wholeOpenings {
+		openings[o] = true
+	}
+	for o := range askers {
+		openings[o] = true
+	}
+	for opening := range openings {
+		for _, metaPtr := range byOpening[opening] {
+			meta := *metaPtr
+			if ids[meta.ID] || out[meta.ID] {
+				continue
+			}
+			if headOpenings[opening] {
 				out[meta.ID] = true
-				break
+				continue
+			}
+			if ws := wholeOpenings[opening]; len(ws) > 0 && lr.wholeHolds(ws, meta) {
+				out[meta.ID] = true
+				continue
+			}
+			for _, a := range askers[opening] {
+				if lr.held(a, meta) {
+					out[meta.ID] = true
+					break
+				}
 			}
 		}
 	}
-	return out, lineageCuts(dir, m, out, metaForks, wholeForks, askers, wholeOpenings, parentMeta)
 }
 
 // wholeFork is a fork read off its store in full: the source it names and the
@@ -183,7 +224,7 @@ func unindexedAskers(ids map[string]bool, heads, wholes []model.Session, headOpe
 
 // lineageCuts is where each session left out of out is cut for the askers it
 // shares turns with.
-func lineageCuts(dir string, m Manifest, out map[string]bool, metaForks []SessionMeta, wholeForks []wholeFork, askers map[uint64][]SessionMeta, wholeOpenings map[uint64][]map[string]bool, parentMeta func(harness, id string) (SessionMeta, bool)) map[string]time.Time {
+func lineageCuts(views *metaViews, lr *lineageReader, out map[string]bool, metaForks []SessionMeta, wholeForks []wholeFork, askers map[uint64][]SessionMeta, wholeOpenings map[uint64][]map[string]bool, parentMeta func(harness, id string) (SessionMeta, bool)) map[string]time.Time {
 	// What stays on the page and shares turns with an asker is cut at the
 	// last turn they share: a source that went on after the fork, a sibling
 	// fork. The asker holds everything up to there already (#5335).
@@ -196,124 +237,54 @@ func lineageCuts(dir string, m Manifest, out map[string]bool, metaForks []Sessio
 			cuts[id] = at
 		}
 	}
-	shared := sharedRecords(dir, m)
 	for _, f := range metaForks {
 		if p, ok := parentMeta(f.Harness, f.Parent); ok && !out[p.ID] {
-			at := shared(f, p)
+			at := lr.shared(f, p)
 			if at.IsZero() {
 				// Copied with new times: what the source held when the
 				// fork started is what it copied.
-				at = startedAt(dir, m, f)
+				at = lr.startedAt(f)
 			}
 			cutAt(p.ID, at)
 		}
 	}
 	for _, wf := range wholeForks {
 		if p, ok := parentMeta(wf.harness, wf.parent); ok && !out[p.ID] {
-			at := wholeShared(dir, m, wf.turns, p)
+			at := lr.wholeShared(wf.turns, p)
 			if at.IsZero() {
 				at = wf.started
 			}
 			cutAt(p.ID, at)
 		}
 	}
-	for _, meta := range m.Sessions {
-		if meta.Opening == 0 || out[meta.ID] {
-			continue
+	byOpening := views.metasByOpening()
+	for opening, as := range askers {
+		for _, metaPtr := range byOpening[opening] {
+			meta := *metaPtr
+			if out[meta.ID] {
+				continue
+			}
+			for _, a := range as {
+				cutAt(meta.ID, lr.shared(a, meta))
+			}
 		}
-		for _, a := range askers[meta.Opening] {
-			cutAt(meta.ID, shared(a, meta))
-		}
-		for _, w := range wholeOpenings[meta.Opening] {
-			cutAt(meta.ID, wholeShared(dir, m, w, meta))
+	}
+	for opening, ws := range wholeOpenings {
+		for _, metaPtr := range byOpening[opening] {
+			meta := *metaPtr
+			if out[meta.ID] {
+				continue
+			}
+			for _, w := range ws {
+				cutAt(meta.ID, lr.wholeShared(w, meta))
+			}
 		}
 	}
 	return cuts
 }
 
-// heldRecords answers whether asker holds other's last record, the same role,
-// time and text: other is then a copy the asker carries, and nothing in it is
-// news to the asker. Records are read only for sessions that open alike, which
-// takes a fork, so a store without forks reads none. A read that fails answers
-// no, which keeps the session on the page.
-func heldRecords(dir string, m Manifest) func(asker, other SessionMeta) bool {
-	path := filepath.Join(dir, "records.bin")
-	tables := tablesFromManifest(m)
-	sets := map[string]map[string]bool{}
-	key := func(r Record) string {
-		return r.Role + "\x00" + strconv.FormatInt(r.Time.UnixNano(), 10) + "\x00" + r.Text
-	}
-	return func(asker, other SessionMeta) bool {
-		k := asker.Key()
-		set, ok := sets[k]
-		if !ok {
-			if recs, err := recordsForKey(path, tables, k); err == nil {
-				set = make(map[string]bool, len(recs))
-				for _, r := range recs {
-					set[key(r)] = true
-				}
-			}
-			sets[k] = set
-		}
-		if len(set) == 0 {
-			return false
-		}
-		recs, err := recordsForKey(path, tables, other.Key())
-		if err != nil {
-			return false
-		}
-		// What the harness writes into a source after the fork is not work:
-		// a backgrounded session gains "No response requested." and a task
-		// notification, and the fork that holds every turn before them got
-		// its source back as recall (#4251).
-		for _, rec := range slices.Backward(recs) {
-			if !afterForkNoise(rec) {
-				return set[key(rec)]
-			}
-		}
-		return false
-	}
-}
-
-// endedBy reports whether src's last turn came no later than at, so a fork
-// that started at that moment was made after everything src holds. A fork read with no
-// times says nothing either way, and its source is left out as it always was;
-// a read that fails answers no.
-func endedBy(dir string, m Manifest, src SessionMeta, at time.Time) bool {
-	if at.IsZero() {
-		return true
-	}
-	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), src.Key())
-	if err != nil {
-		return false
-	}
-	for _, rec := range slices.Backward(recs) {
-		switch r := rec; {
-		case afterForkNoise(r), r.Role == roleEdit, r.Role == roleWrote, r.Role == roleFiles, r.Time.IsZero():
-			continue
-		}
-		return !rec.Time.After(at)
-	}
-	return false
-}
-
-// startedAt is when an indexed session started: its own field, or its first
-// timed record when the harness left that out.
-func startedAt(dir string, m Manifest, meta SessionMeta) time.Time {
-	if !meta.Started.IsZero() {
-		return meta.Started
-	}
-	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), meta.Key())
-	if err != nil {
-		return time.Time{}
-	}
-	for _, r := range recs {
-		if !r.Time.IsZero() {
-			return r.Time
-		}
-	}
-	return time.Time{}
-}
+// lineageBodyDecodes counts full record-body decodes during lineage checks.
+var lineageBodyDecodes atomic.Int64
 
 // firstTimed is the time of a session's first timed message.
 func firstTimed(s model.Session) time.Time {
@@ -337,32 +308,6 @@ func wholeTurns(s model.Session) map[string]bool {
 }
 
 func turnKey(role string, ms int64) string { return role + "\x00" + strconv.FormatInt(ms, 10) }
-
-// wholeHolds reports whether any of the whole askers holds other's last record
-// that is a turn rather than harness noise. File changes are passed over: an
-// opencode session's diff store is filed after its turns at the file's mtime,
-// and the store a whole asker is read off carries no diff. A read that fails
-// answers no.
-func wholeHolds(dir string, m Manifest, wholes []map[string]bool, other SessionMeta) bool {
-	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), other.Key())
-	if err != nil {
-		return false
-	}
-	for _, rec := range slices.Backward(recs) {
-		switch r := rec; {
-		case afterForkNoise(r), r.Role == roleEdit, r.Role == roleWrote, r.Role == roleFiles:
-			continue
-		}
-		k := turnKey(rec.Role, rec.Time.UnixMilli())
-		for _, w := range wholes {
-			if w[k] {
-				return true
-			}
-		}
-		return false
-	}
-	return false
-}
 
 // afterForkNoise reports a record the harness wrote on its own rather than a
 // turn anyone took: an envelope under the user role, Claude Code's reply to a
@@ -391,12 +336,7 @@ func HasSession(dir, id string) bool {
 	if err != nil {
 		return false
 	}
-	for _, meta := range m.Sessions {
-		if meta.ID == id {
-			return true
-		}
-	}
-	return false
+	return len(viewsFor(m).metasByID()[id]) > 0
 }
 
 // spawnedFamily is every sub-agent below the askers and every parent above
@@ -410,26 +350,18 @@ func HasSession(dir, id string) bool {
 // fork to its source when forkHolds says the fork holds the source's end: a
 // sub-agent of a fork counts what the fork counts (#5305).
 func spawnedFamily(m Manifest, ids, out map[string]bool, forkHolds func(SessionMeta) bool) map[string]bool {
-	children := map[string][]string{}
-	parent := map[string]string{}
-	forks := map[string]SessionMeta{}
-	for _, meta := range m.Sessions {
-		if meta.Parent == "" || meta.Parent == meta.ID {
-			continue
-		}
-		if meta.IsSpawned() {
-			children[meta.Parent] = append(children[meta.Parent], meta.ID)
-			parent[meta.ID] = meta.Parent
-		} else if meta.Kind == model.KindFork && forkHolds != nil {
-			forks[meta.ID] = meta
-		}
-	}
+	return spawnedFamilyEdges(viewsFor(m).spawnEdges(), ids, out, forkHolds)
+}
+
+func spawnedFamilyEdges(edges spawnEdges, ids, out map[string]bool, forkHolds func(SessionMeta) bool) map[string]bool {
 	up := func(id string) string {
-		if p := parent[id]; p != "" {
+		if p := edges.parent[id]; p != "" {
 			return p
 		}
-		if f, ok := forks[id]; ok && forkHolds(f) {
-			return f.Parent
+		if forkHolds != nil {
+			if f, ok := edges.forks[id]; ok && forkHolds(f) {
+				return f.Parent
+			}
 		}
 		return ""
 	}
@@ -457,7 +389,7 @@ func spawnedFamily(m Manifest, ids, out map[string]bool, forkHolds func(SessionM
 	for len(queue) > 0 {
 		id := queue[0]
 		queue = queue[1:]
-		for _, c := range children[id] {
+		for _, c := range edges.children[id] {
 			if !own[c] && !ids[c] {
 				own[c] = true
 				queue = append(queue, c)
