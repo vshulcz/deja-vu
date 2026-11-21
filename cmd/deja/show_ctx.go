@@ -85,7 +85,11 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 		return err
 	}
 	if o.json {
-		return printSessionJSON(os.Stdout, s, o.offset, o.limit, sourceInstance)
+		limit := o.limit
+		if !o.sliced {
+			limit = len(s.Messages)
+		}
+		return printSessionJSON(os.Stdout, s, o.offset, limit, sourceInstance)
 	}
 	if o.sliced {
 		// Both flags are documented for `show` and only the JSON path honoured
@@ -270,9 +274,9 @@ type showOptions struct {
 	id, harness   string
 	json          bool
 	offset, limit int
-	// sliced records that the reader asked for a slice, as opposed to the
-	// JSON default: applying 50 to the text output would silently truncate
-	// `deja show` for everyone who reads a session whole (#709).
+	// sliced records that the reader asked for a window via --offset or
+	// --limit: bare `deja show` returns the full session in both text and
+	// --json modes, while --offset/--limit pages up to 50 default / 200 max.
 	sliced bool
 }
 

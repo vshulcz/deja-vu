@@ -860,6 +860,80 @@ func TestHermesProfileRulesStatusDoctorUninstall(t *testing.T) {
 	}
 }
 
+func TestRulesSyncAndStatusOnFileWithoutTrailingNewline(t *testing.T) {
+	home := rulesHome(t, "hermes")
+	hh := filepath.Join(home, ".hermes")
+	root := filepath.Join(hh, "SOUL.md")
+	prof1 := filepath.Join(hh, "profiles", "hermecules", "SOUL.md")
+	prof2 := filepath.Join(hh, "profiles", "hermus", "SOUL.md")
+	writeRulesTestFile(t, root, "root identity")
+	writeRulesTestFile(t, prof1, "hermecules identity")
+	writeRulesTestFile(t, prof2, "hermus identity")
+	writeRulesTestFile(t, rulesSourcePath(), "- rule one\r- rule two\r\n- rule three")
+
+	outSync, err := rulesOut(t, "sync")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(outSync, "unchanged") {
+		t.Fatalf("first sync unexpectedly reported unchanged:\n%s", outSync)
+	}
+
+	for _, p := range []string{root, prof1, prof2} {
+		got := readRulesTestFile(t, p)
+		if strings.HasSuffix(got, "\n") {
+			t.Errorf("%s gained trailing newline after sync: %q", p, got)
+		}
+		if strings.Contains(got, "\r") {
+			t.Errorf("%s retained CR character after sync: %q", p, got)
+		}
+		if !strings.Contains(got, rulesStart) || !strings.Contains(got, "- rule two") {
+			t.Errorf("%s missing synced rules block: %q", p, got)
+		}
+	}
+
+	status, err := rulesOut(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(status, "stale") {
+		t.Fatalf("status reported stale after sync on newline-less files:\n%s", status)
+	}
+	for _, target := range []string{"hermes", "hermes:hermecules", "hermes:hermus"} {
+		found := false
+		for _, line := range strings.Split(status, "\n") {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 && fields[0] == target {
+				found = true
+				if !strings.Contains(line, "in sync") {
+					t.Errorf("status line for %s = %q, want in sync", target, line)
+				}
+			}
+		}
+		if !found {
+			t.Errorf("status output missing row for %s:\n%s", target, status)
+		}
+	}
+	if note := rulesDoctorNote(); note != "" {
+		t.Errorf("rulesDoctorNote() = %q, want empty", note)
+	}
+
+	outAgain, err := rulesOut(t, "sync")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(outAgain, "unchanged") {
+		t.Errorf("second sync output = %q, want unchanged", outAgain)
+	}
+	statusAgain, err := rulesOut(t)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(statusAgain, "stale") {
+		t.Fatalf("status reported stale after idempotent sync:\n%s", statusAgain)
+	}
+}
+
 // A cut payload is salvaged from the raw bytes, and that only looked under
 // tool_response at the keys Claude and Codex use. Gemini CLI puts a command's
 // output in tool_response.llmContent (and again in returnDisplay), Qwen Code

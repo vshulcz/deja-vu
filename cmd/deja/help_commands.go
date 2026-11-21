@@ -55,7 +55,7 @@ var helpEntries = []helpEntry{
 	{name: "show", group: groupSearch,
 		usage:    []string{"deja show <id-prefix> [--json] [--harness name] [--offset n] [--limit n]"},
 		desc:     "read one session, message by message",
-		more:     "The id is the one a search hit, deja last or deja log prints; a unique prefix is enough. --harness picks one when the prefix matches sessions from two agents.",
+		more:     "The id is the one a search hit, deja last or deja log prints; a unique prefix is enough. --harness picks one when the prefix matches sessions from two agents. --offset and --limit (default 50, max 200) slice a long session instead of reading all messages.",
 		examples: []string{"deja show 01a00feb", "deja show 01a00feb --offset 40 --limit 20"}},
 	{name: "last", group: groupSearch,
 		usage:    []string{"deja last [n] [--json] [--project name] [--harness name] [--from machine|local] [--since duration] [--role user|assistant|tool|files|command|edit|summary]"},

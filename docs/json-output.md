@@ -175,8 +175,8 @@ A hit used to carry its session's whole message list, which made the size of an
 answer the size of the reader's longest transcript: on a 2,716-session store one
 relevance answer was 136 MB over 50 hits and 140,841 messages, and encoding it
 cost a second of wall time and half a gigabyte of resident memory. The same
-answer is 2.6 MB now. `deja show --json` is the surface for a whole session, and
-it carries a window (`offset`, `limit`, `total`, `returned`) for the same reason.
+answer is 2.6 MB now. `deja show --json` returns the whole session by default
+and carries a window (`offset`, `limit`, `total`, `returned`, `capped`) so `--offset`/`--limit` callers can page long transcripts cleanly.
 
 `deja blame --json` applies the same bound to the messages that mention the file.
 
@@ -252,8 +252,10 @@ The existing positional count remains the bound, for example
 The harness plus the exact native session ID is the stable form for a script,
 since ids can collide across harnesses. Without `--harness`, an id prefix that
 names one session is read; one that names more than one is refused with what
-separates them. Reads return redacted index content in a bounded message window;
-the default limit is 50 and the maximum is 200.
+separates them. Reads return redacted index content across the full session by
+default (`capped` is omitted when every message is returned). Pass `--offset` or
+`--limit` to read a bounded window (`--limit` defaults to 50 when slicing,
+maximum 200) with `"capped": true` whenever messages remain outside the window.
 
 ```json
 {
@@ -269,7 +271,7 @@ the default limit is 50 and the maximum is 200.
       {"role": "user", "text": "bounded redacted text", "time": "2026-01-02T03:04:05Z"}
     ]
   },
-  "window": {"offset": 0, "limit": 50, "total": 81, "returned": 50}
+  "window": {"offset": 0, "limit": 50, "total": 81, "returned": 50, "capped": true}
 }
 ```
 

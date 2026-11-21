@@ -488,7 +488,9 @@ func writeAiderContext(body string) error {
 // it as a block.
 func withAiderRules(body, old string) string {
 	if start, end := markerLines(old, rulesStart, rulesEnd); start >= 0 && end >= 0 {
-		return strings.TrimRight(body, "\n") + "\n\n" + old[start:end]
+		block := strings.ReplaceAll(old[start:end], "\r\n", "\n")
+		block = strings.ReplaceAll(block, "\r", "\n")
+		return strings.TrimRight(body, "\n") + "\n\n" + strings.TrimSuffix(block, "\n") + "\n"
 	}
 	return body
 }
