@@ -4090,3 +4090,31 @@ func TestAHookTypedAtATerminalSaysWhatItIs(t *testing.T) {
 		t.Skip("stdin is a terminal here")
 	}
 }
+
+func TestHookPromptUnknownSessionWithoutTranscriptCompletesFast(t *testing.T) {
+	tmp := hermeticEnv(t)
+	t.Setenv("DEJA_NO_AUTO_INDEX", "1")
+	codexDir := filepath.Join(os.Getenv("DEJA_CODEX_ROOT"), "sessions", "2026", "11", "21")
+	if err := os.MkdirAll(codexDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Regression test for #6133: an unnamed session lookup with large rollouts
+	// on disk and no transcript_path must stay bounded and finish quickly.
+	pad := strings.Repeat("{\"type\":\"event_msg\",\"payload\":{\"type\":\"agent_reasoning\",\"text\":\"padding\"}}\n", 16*1024)
+	for i := range 6 {
+		p := filepath.Join(codexDir, fmt.Sprintf("rollout-2026-11-21T10-00-0%d-00000000-0000-4000-8000-00000000000%d.jsonl", i, i))
+		if err := os.WriteFile(p, []byte(pad), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir := filepath.Join(tmp, "empty-index")
+	start := time.Now()
+	var out bytes.Buffer
+	payload := `{"harness":"codex","session_id":"019d9999-unknown-0000-0000-000000000000","prompt":"hello","cwd":"/proj"}`
+	if err := runHookPrompt(dir, strings.NewReader(payload), &out); err != nil {
+		t.Fatalf("runHookPrompt: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Fatalf("runHookPrompt with unknown session took %s, want bounded sub-second execution", elapsed)
+	}
+}

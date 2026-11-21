@@ -1189,3 +1189,76 @@ func TestReadGeminiCompactionLargeTruncatedTranscriptStaysMetricComplete(t *test
 		t.Fatalf("expected antigravity MetricComplete=true when all retained tail JSONL lines are valid")
 	}
 }
+
+func TestFileContainsTokenBoundedReadsHeadAndTailOnly(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "large.jsonl")
+	const window = compactionProbeWindow
+	pad := strings.Repeat("x", int(window)*3)
+	content := "head-token\n" + pad + "\nmiddle-only-token\n" + pad + "\ntail-token\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if ok, n := fileContainsTokenBounded(path, []byte("head-token")); !ok || n != window {
+		t.Fatalf("head probe = (%v, %d), want (true, %d)", ok, n, window)
+	}
+	if ok, n := fileContainsTokenBounded(path, []byte("tail-token")); !ok || n != 2*window {
+		t.Fatalf("tail probe = (%v, %d), want (true, %d)", ok, n, 2*window)
+	}
+	if ok, n := fileContainsTokenBounded(path, []byte("middle-only-token")); ok || n != 2*window {
+		t.Fatalf("middle probe = (%v, %d), want (false, %d)", ok, n, 2*window)
+	}
+}
+
+func TestCompactionCandidatesByIDRespectsProbeBudget(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	root := filepath.Join(t.TempDir(), "codex")
+	t.Setenv("DEJA_CODEX_ROOT", root)
+	dir := filepath.Join(root, "sessions", "2026", "11", "21")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Write 8 large rollouts (2 MiB each) with another session id. Calling
+	// ReadCompactionSession with an unknown id must inspect only the bounded
+	// head+tail window rather than reading all bytes into memory.
+	payload := strings.Repeat("{\"type\":\"event_msg\",\"payload\":{\"type\":\"agent_reasoning\",\"text\":\"padding\"}}\n", 24*1024)
+	for i := range 8 {
+		name := fmt.Sprintf("rollout-2026-11-21T10-00-0%d-00000000-0000-4000-8000-00000000000%d.jsonl", i, i)
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(payload), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Also verify compressed archives without the id in the filename are skipped
+	// in the fallback loop without error or decompression.
+	zstName := "rollout-2026-11-21T10-00-09-00000000-0000-4000-8000-000000000009.jsonl.zst"
+	if err := os.WriteFile(filepath.Join(dir, zstName), []byte("not-actually-zstd"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := compactionCandidatesByID("codex", "019d9999-unknown-0000-0000-000000000000")
+	if len(got) != 0 {
+		t.Fatalf("got %d candidates for unknown id, want 0", len(got))
+	}
+}
+
+func TestCompactionDBProbeSkipsMissingSession(t *testing.T) {
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("sqlite3 not installed")
+	}
+	t.Setenv("HOME", t.TempDir())
+	root := t.TempDir()
+	t.Setenv("DEJA_GOOSE_ROOT", root)
+	db := filepath.Join(root, "sessions.db")
+	sql := `create table sessions(id text primary key, description text, working_dir text, created_at text, updated_at text);
+insert into sessions values('goose-present','demo','/work/demo','2026-11-21T10:00:00Z','2026-11-21T10:01:00Z');`
+	if out, err := exec.CommandContext(t.Context(), "sqlite3", db, sql).CombinedOutput(); err != nil {
+		t.Fatalf("sqlite3 setup: %v %s", err, out)
+	}
+	if checked, found := compactionDBContainsID("goose", db, "goose-present"); !checked || !found {
+		t.Fatalf("existing session probe = (%v, %v), want (true, true)", checked, found)
+	}
+	if checked, found := compactionDBContainsID("goose", db, "goose-missing"); !checked || found {
+		t.Fatalf("missing session probe = (%v, %v), want (true, false)", checked, found)
+	}
+	if got := compactionCandidatesByID("goose", "goose-missing"); len(got) != 0 {
+		t.Fatalf("compactionCandidatesByID returned %d candidates for missing goose id, want 0", len(got))
+	}
+}
