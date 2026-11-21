@@ -154,7 +154,13 @@ func importedSessions(dir string) importedState {
 	}
 	out.watermarks = m.ExportWatermarks
 	out.boundary = m.ExportBoundary
-	out.dedupe = m.ImportedRecords
+	if len(m.ImportedRecords) > 0 {
+		if dedupe, rerr := readImportedRecords(dir, m.ImportedRecords); rerr == nil {
+			out.dedupe = dedupe
+		} else {
+			out.dedupe = m.ImportedRecords
+		}
+	}
 	by := map[string]*model.Session{}
 	_ = eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
 		if r.SourcePath != syncImportPath {

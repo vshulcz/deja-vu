@@ -2847,3 +2847,221 @@ func TestFirstBuildKeepsDeferredAcrossNewestFirstPublish(t *testing.T) {
 		t.Fatalf("first build left Deferred empty (%d entries), want the compressed rollout", len(m.Deferred))
 	}
 }
+
+func TestImportedRecordsSidecarSurvivalAndMigration(t *testing.T) {
+	setupStore := func(t *testing.T, searchOnly bool) (dir, proj, batchDir string) {
+		t.Helper()
+		tmp := hermeticIndexEnv(t)
+		if searchOnly {
+			t.Setenv(SearchOnlyEnv, "1")
+			defer ApplySearchOnly()()
+		}
+		proj = filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-tmp-sidecar")
+		if err := os.MkdirAll(proj, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		local1 := `{"type":"user","sessionId":"local1","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"sidecarlocalneedle one"}}` + "\n"
+		if err := os.WriteFile(filepath.Join(proj, "local1.jsonl"), []byte(local1), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		dir = filepath.Join(tmp, "idx")
+		if err := Ensure(dir, "", false, nil); err != nil {
+			t.Fatal(err)
+		}
+		base := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+		batchDir = filepath.Join(tmp, "batches")
+		writeSyncBatch(t, batchDir, []SyncRecord{
+			{Harness: "claude", SessionID: "remote1", Project: "deja-vu", Role: "user", Text: "sidecarimportneedle question", Time: base},
+			{Harness: "claude", SessionID: "remote1", Project: "deja-vu", Role: "assistant", Text: "sidecarimportneedle answer", Time: base.Add(time.Minute)},
+		})
+		n, err := Import(dir, batchDir)
+		if err != nil || n != 2 {
+			t.Fatalf("initial import n=%d err=%v", n, err)
+		}
+		return dir, proj, batchDir
+	}
+
+	assertSidecarSplit := func(t *testing.T, dir, stage string) {
+		t.Helper()
+		var core manifestCore
+		if err := readGob(filepath.Join(dir, "manifest.gob"), &core); err != nil {
+			t.Fatalf("%s: read manifestCore: %v", stage, err)
+		}
+		if len(core.ImportedRecords) != 0 {
+			t.Fatalf("%s: manifest.gob kept %d ImportedRecords, want 0", stage, len(core.ImportedRecords))
+		}
+		var dedupe map[string]bool
+		if err := readGob(filepath.Join(dir, importedFile), &dedupe); err != nil {
+			t.Fatalf("%s: read %s: %v", stage, importedFile, err)
+		}
+		if len(dedupe) == 0 {
+			t.Fatalf("%s: %s is empty", stage, importedFile)
+		}
+		m, err := readManifest(dir)
+		if err != nil {
+			t.Fatalf("%s: readManifest: %v", stage, err)
+		}
+		if len(m.ImportedRecords) != 0 {
+			t.Fatalf("%s: readManifest decoded %d ImportedRecords, want 0", stage, len(m.ImportedRecords))
+		}
+		cached, err := readManifestCached(dir)
+		if err != nil {
+			t.Fatalf("%s: readManifestCached: %v", stage, err)
+		}
+		if len(cached.ImportedRecords) != 0 {
+			t.Fatalf("%s: readManifestCached holds %d ImportedRecords, want 0", stage, len(cached.ImportedRecords))
+		}
+	}
+
+	rewriteAsLegacy := func(t *testing.T, dir string) {
+		t.Helper()
+		var dedupe map[string]bool
+		if err := readGob(filepath.Join(dir, importedFile), &dedupe); err != nil {
+			t.Fatalf("read %s: %v", importedFile, err)
+		}
+		if err := os.Remove(filepath.Join(dir, importedFile)); err != nil {
+			t.Fatal(err)
+		}
+		var core manifestCore
+		if err := readGob(filepath.Join(dir, "manifest.gob"), &core); err != nil {
+			t.Fatal(err)
+		}
+		core.ImportedRecords = dedupe
+		if err := writeGobAtomic(filepath.Join(dir, "manifest.gob"), core); err != nil {
+			t.Fatal(err)
+		}
+		invalidateManifestCache(dir)
+	}
+
+	t.Run("sidecar survives append replace forget and rebuild", func(t *testing.T) {
+		dir, proj, batchDir := setupStore(t, false)
+		assertSidecarSplit(t, dir, "after import")
+
+		before, err := os.ReadFile(filepath.Join(dir, importedFile))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n, importErr := Import(dir, batchDir); importErr != nil || n != 0 {
+			t.Fatalf("no-op import n=%d err=%v", n, importErr)
+		}
+		afterNoop, err := os.ReadFile(filepath.Join(dir, importedFile))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(before, afterNoop) {
+			t.Fatalf("no-op import rewrote %s", importedFile)
+		}
+
+		// Append incremental update.
+		f, err := os.OpenFile(filepath.Join(proj, "local1.jsonl"), os.O_WRONLY|os.O_APPEND, 0o644)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, writeErr := f.WriteString(`{"type":"assistant","sessionId":"local1","timestamp":"2026-01-02T03:05:05Z","message":{"role":"assistant","content":"sidecarlocalneedle appended"}}` + "\n"); writeErr != nil {
+			_ = f.Close()
+			t.Fatal(writeErr)
+		}
+		_ = f.Close()
+		if err = Ensure(dir, "", false, nil); err != nil {
+			t.Fatal(err)
+		}
+		assertSidecarSplit(t, dir, "after append")
+
+		// Non-append replacePass (remove local1, add local2).
+		if err = os.Remove(filepath.Join(proj, "local1.jsonl")); err != nil {
+			t.Fatal(err)
+		}
+		local2 := `{"type":"user","sessionId":"local2","timestamp":"2026-01-03T03:04:05Z","message":{"role":"user","content":"sidecarlocalneedle two"}}` + "\n"
+		if err = os.WriteFile(filepath.Join(proj, "local2.jsonl"), []byte(local2), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err = Ensure(dir, "", false, nil); err != nil {
+			t.Fatal(err)
+		}
+		assertSidecarSplit(t, dir, "after replacePass")
+
+		// Forget local session; sidecar stays intact.
+		if _, forgetErr := Forget(dir, ForgetOptions{Session: "local2"}); forgetErr != nil {
+			t.Fatal(forgetErr)
+		}
+		assertSidecarSplit(t, dir, "after forget")
+
+		// Full rebuild; sidecar stays intact.
+		if err = Ensure(dir, "", true, nil); err != nil {
+			t.Fatal(err)
+		}
+		assertSidecarSplit(t, dir, "after rebuild")
+
+		if n, importErr := Import(dir, batchDir); importErr != nil || n != 0 {
+			t.Fatalf("re-import after lifecycle n=%d err=%v", n, importErr)
+		}
+	})
+
+	t.Run("sidecar survives search-only replacePass", func(t *testing.T) {
+		dir, proj, batchDir := setupStore(t, true)
+		if err := os.Remove(filepath.Join(proj, "local1.jsonl")); err != nil {
+			t.Fatal(err)
+		}
+		local2 := `{"type":"user","sessionId":"local2","timestamp":"2026-01-03T03:04:05Z","message":{"role":"user","content":"searchonly replace"}}` + "\n"
+		if err := os.WriteFile(filepath.Join(proj, "local2.jsonl"), []byte(local2), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := Ensure(dir, "", false, nil); err != nil {
+			t.Fatal(err)
+		}
+		assertSidecarSplit(t, dir, "search-only replacePass")
+		if n, err := Import(dir, batchDir); err != nil || n != 0 {
+			t.Fatalf("re-import under search-only n=%d err=%v", n, err)
+		}
+	})
+
+	t.Run("legacy manifest migrates via replacePass", func(t *testing.T) {
+		dir, proj, batchDir := setupStore(t, false)
+		rewriteAsLegacy(t, dir)
+		if err := os.Remove(filepath.Join(proj, "local1.jsonl")); err != nil {
+			t.Fatal(err)
+		}
+		local2 := `{"type":"user","sessionId":"local2","timestamp":"2026-01-03T03:04:05Z","message":{"role":"user","content":"migrate replace"}}` + "\n"
+		if err := os.WriteFile(filepath.Join(proj, "local2.jsonl"), []byte(local2), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := Ensure(dir, "", false, nil); err != nil {
+			t.Fatal(err)
+		}
+		assertSidecarSplit(t, dir, "legacy replacePass")
+		if n, err := Import(dir, batchDir); err != nil || n != 0 {
+			t.Fatalf("re-import after replacePass migration n=%d err=%v", n, err)
+		}
+	})
+
+	t.Run("legacy manifest migrates via rebuild", func(t *testing.T) {
+		dir, _, batchDir := setupStore(t, false)
+		rewriteAsLegacy(t, dir)
+		if err := Ensure(dir, "", true, nil); err != nil {
+			t.Fatal(err)
+		}
+		assertSidecarSplit(t, dir, "legacy rebuild")
+		if n, err := Import(dir, batchDir); err != nil || n != 0 {
+			t.Fatalf("re-import after rebuild migration n=%d err=%v", n, err)
+		}
+	})
+
+	t.Run("legacy manifest migrates via noop import", func(t *testing.T) {
+		dir, _, batchDir := setupStore(t, false)
+		rewriteAsLegacy(t, dir)
+		if n, err := Import(dir, batchDir); err != nil || n != 0 {
+			t.Fatalf("legacy noop import n=%d err=%v", n, err)
+		}
+		assertSidecarSplit(t, dir, "legacy noop import")
+	})
+
+	t.Run("corrupt sidecar fails import rather than dropping dedupe", func(t *testing.T) {
+		dir, _, batchDir := setupStore(t, false)
+		if err := os.WriteFile(filepath.Join(dir, importedFile), []byte("not-gob"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Import(dir, batchDir); err == nil {
+			t.Fatal("expected error importing with corrupt sidecar")
+		}
+	})
+}

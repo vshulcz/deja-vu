@@ -155,11 +155,11 @@ func newestParked(dir string) string {
 	return ps[len(ps)-1]
 }
 
-// indexState is what lives inside the index directory without being built
-// from the transcripts: the hook text still waiting for its session
-// (cmd/deja's deferred/). No pass writes it into a new index, so every swap
-// deleted it along with the old one (#5052).
-var indexState = []string{"deferred"}
+// indexState holds index state that is not rebuilt from transcripts (deferred
+// hook text in cmd/deja's deferred/) or lives out-of-band so ordinary rebuilds
+// and metadata rewrites avoid decoding and rewriting it (imported.gob). Every
+// swap moves it into the replacement directory in one rename (#5052).
+var indexState = []string{"deferred", importedFile}
 
 // carryIndexState moves indexState from the parked index into the new one and
 // returns the names it moved, so a failed swap can put them back. A rename,

@@ -466,7 +466,7 @@ func (rp *replacePass) startManifest() {
 	// generation.
 	rp.m = Manifest{Version: version, KeptDated: true, Format: onDiskFormat, SearchOnly: searchOnlyAfter(rp.old), Files: rp.files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(), ReadZone: zoneFingerprint(),
 		Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: rp.scope,
-		ExportWatermarks: rp.old.ExportWatermarks, ExportBoundary: rp.old.ExportBoundary, ImportedRecords: rp.old.ImportedRecords,
+		ExportWatermarks: rp.old.ExportWatermarks, ExportBoundary: rp.old.ExportBoundary,
 		Compactions: cloneCompactions(rp.old.Compactions),
 		// Kept from the old index: this build reuses records written under
 		// those patterns, so claiming today's set would be a lie the reader
@@ -482,6 +482,13 @@ func (rp *replacePass) startManifest() {
 		// transcript changed (#2015). A store this pass re-read starts over,
 		// because a file rewritten clean has to be able to clear its count.
 		IngestFiles: copyIngestFiles(rp.old.IngestFiles, rp.reread, rp.logTails)}
+	if len(rp.old.ImportedRecords) > 0 {
+		if dedupe, rerr := readImportedRecords(rp.dir, rp.old.ImportedRecords); rerr == nil {
+			rp.m.ImportedRecords = dedupe
+		} else {
+			rp.m.ImportedRecords = rp.old.ImportedRecords
+		}
+	}
 	if rp.appending && rp.old.Generation != "" {
 		// Nothing moved: an offset from before still names the same record.
 		rp.m.Generation = rp.old.Generation
