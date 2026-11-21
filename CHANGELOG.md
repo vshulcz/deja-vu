@@ -7,9 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-11-21
+
+Three new agent readers (`ante`, `doubao`, and `teleagent`, bringing `deja` to
+52 coding agents), a composite GitHub Action, sub-second cold `deja recall` and
+2.3 MB synced manifests via `imported.gob` and stub-based lineage scans, plus
+parallel edit radar, subagent parent briefs, 2-strike fix gating, and pass-rate
+ranking for verification commands.
+
 ### Added
 
-- Ante (`ante`) session reader under `~/.ante/sessions` (`events.jsonl`, `meta.json`, `dialog.json`), shared-skill & MCP installer wiring, and CLI resume/handoff support, bringing `deja` to 50 coding agents.
+- Three new agent readers bring `deja` to 52 harnesses (#6116, #6117, #6128, #6139). Adds Ante (`ante`, `~/.ante/sessions` JSONL/JSON stores, installer wiring, and `ante --resume`), Doubao Desktop (`doubao`, Chromium IndexedDB LevelDB stores across macOS, Linux, and Windows, from @takomitkm), and TeleAgent (`teleagent`, per-account `teleagent.db` SQLite stores, from @takomitkm), with 52-harness parity across all READMEs, registry pages, and MCP guidance.
+- Composite GitHub Action (`uses: vshulcz/deja-vu@main`, root `action.yml`) installs `deja` with SHA-256 checksum verification across Linux, macOS, and Windows runners, alongside `mise` install documentation (#6121, #6126, #6130).
+- Hooks track active file edits and git worktrees in a short-lived `.coord` radar to warn on parallel session collisions, and inject a bounded parent context brief when a subagent spawns (#6103).
+- `commands.gob` records per-command pass and fail session counts and expands `VerifyCommand` recognition to chained, env-prefixed, path-qualified, linter, and repo check invocations so `deja how`, MCP `orient`, and post-edit hints rank commands that pass (#6105).
+- `deja bench live --delivery` audits harness delivery wiring across the full catalog instead of four hardcoded agents, `deja mcp` routes omitted `mode` calls by query shape, and hook digests drop fork twins and uncorroborated hints (#6119).
+- Relevance scoring and RM3 expansion preserve compound identifier segments on natural-language bug reports, recall packing prioritizes resolution turns, and `deja ctx` gates diff blocks on query-bound symbols (#6113).
+- Top-fold Codex, Gemini CLI, and OpenCode install commands in the README, live Raycast Store (`raycast.com/vshulcz/deja-vu`), Wikidata (`Q142234463`), Hugging Face dataset, and Zenodo DOI links, a ClickHouse Loom row in `compare.html` (from @zlareb1), and nested docs header links (#6096, #6122, #6127, #6132, #6137).
+
+### Changed
+
+- Sync import dedupe hashes move out of `manifest.gob` into an `imported.gob` sidecar and `contextByID` drops a duplicate whole-session load, cutting a synced manifest from 54 MB to 2.3 MB and `hook-tool` latency from 191 ms to 101 ms (#6136).
+- Live lineage checks resolve once per `recall` or `context` call, index opening and spawn edges in memory, binary-search shared session prefixes, and read raw role and header stubs via `recoffsets.bin` instead of inflating full `records.bin` session bodies. Cold CLI `deja recall` drops from 9,039 ms to 658 ms, and warm `deja mcp` `recall` lands at 164-260 ms (#6141, #6142).
+- Automatic hook `fixes.gob` hints require a 2-strike `.coord` failure streak within the same project, bypassing on first strike only for `Repaired` or `Substitute` pairs and deterministic shell, environment, CLI, or permission errors (#6110).
+- Non-Claude session parsers align on explicit exit-0 command markers, incremental tail resumption, token and tool-call telemetry, and fix-pair command matching (#6101).
+- Tightened the one-time interactive GitHub star prompt and dropped the rejected unscoped `deja-vu` npm publish step (#6095, #6123).
+
+### Fixed
+
+- `hook-prompt`, `hook-context`, and the DeepSeek Harness (`dsh`) plugin stay non-blocking under cold or rebuilding indexes by running `dsh` hooks asynchronously with bounded timeouts and respecting active rebuild locks, while unnamed session lookups without a transcript path cap fallback probes to 64 KB head/tail windows and keyed SQLite queries (#6114, #6134).
+- Bare `deja show <id> --json` returns the full session when `--offset` and `--limit` are omitted while keeping `window.capped` on paged slices, `deja rules status` handles CRLF source rules and newline-less targets, and `extensions/dsh` declares `engines.dsh` and documents pnpm build-script approval (#6120, #6131, #6139).
+- Codex unwraps `# Context from my IDE setup:` envelopes from VS Code and Cursor and restores tool-call names on imported external-agent transcripts, and Windows ZCode detection reads `InstallLocation` from the uninstall registry. From @takomitkm (#6099, #6129).
+- Fix-pair hook scans compute project names once per scan (from @Sora-bluesky, #6108), and Oh My Pi (`omp`) `hook-tool` strips `:offset-limit` line ranges before querying file history (from @dchaudhari7177, #6111).
 
 ## [0.24.3] - 2026-11-19
 
@@ -2852,7 +2881,8 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.24.3...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.25.0...HEAD
+[0.25.0]: https://github.com/vshulcz/deja-vu/compare/v0.24.3...v0.25.0
 [0.24.3]: https://github.com/vshulcz/deja-vu/compare/v0.24.2...v0.24.3
 [0.24.2]: https://github.com/vshulcz/deja-vu/compare/v0.24.1...v0.24.2
 [0.24.1]: https://github.com/vshulcz/deja-vu/compare/v0.24.0...v0.24.1

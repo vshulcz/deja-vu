@@ -446,6 +446,9 @@ func TestSharedGroupOpenAndMkdir(t *testing.T) {
 		t.Fatalf(".hookseen perm = %v, err = %v, want 0660", fi.Mode().Perm(), err)
 	}
 	t.Setenv("DEJA_SHARED_GROUP", "")
+	// Under /tmp on BSD/macOS (root:wheel), new directories inherit wheel, and
+	// chmod silently clears S_ISGID unless the caller belongs to the file's group.
+	_ = os.Chown(dir, -1, os.Getegid())
 	if err := os.Chmod(dir, 0o770|os.ModeSetgid); err != nil {
 		t.Fatal(err)
 	}
