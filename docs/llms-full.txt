@@ -151,7 +151,7 @@ deja repo add --kind gotcha "staging webhook receiver rejects payloads above 1 M
 
 ### Retrieval Benchmarks (`scripts/longmemeval`, `scripts/locomo`)
 
-- **Standalone verification & submission repo:** `https://github.com/vshulcz/coding-agent-memory-benchmark`
+- **Standalone verification & submission repo:** `https://github.com/vshulcz/coding-agent-memory-benchmark` (Hugging Face: `https://huggingface.co/datasets/vshulcz/coding-agent-memory-benchmark`, Zenodo DOI: `https://doi.org/10.5281/zenodo.24416712`)
 
 - **LongMemEval-S (500 questions, full set including abstentions):**
   - `hit@1`: **88.2%** | `hit@5 (R@5)`: **97.2%** | `hit@10`: **98.6%** | `hit@20`: **99.4%** | `MRR`: **0.921** | median search: `14.5 ms` | official `evidence_recall@5`: `91.0%`
