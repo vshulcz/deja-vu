@@ -615,7 +615,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 		// the store: the legacy name the pre-rename builds wrote.
 		{"devin", []string{sources.DevinSessionsDB(), sources.DevinLegacySessionsDB()}, sources.DevinFiles, doctorProbeDevin},
 		{"mimo", []string{sources.MimoDB()}, func() []string { return presentDoctorFile(sources.MimoDB()) }, doctorProbeMimo},
-		{"teleagent", sources.TeleAgentSessionFiles(), func() []string { return sources.TeleAgentSessionFiles() }, doctorProbeTeleagent},
+		{"teleagent", sources.TeleAgentSessionFiles(), sources.TeleAgentSessionFiles, doctorProbeTeleagent},
 		{"omnigent", []string{sources.OmnigentDB()}, func() []string { return presentDoctorFile(sources.OmnigentDB()) }, sources.ParseOmnigentDB},
 		{"orca", []string{sources.OrcaDB()}, func() []string { return presentDoctorFile(sources.OrcaDB()) }, sources.ParseOrcaDB},
 		{"deja", []string{sources.NotesFile()}, func() []string { return presentDoctorFile(sources.NotesFile()) }, sources.ParseNotesFile},
