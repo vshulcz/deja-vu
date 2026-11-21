@@ -4148,3 +4148,82 @@ func TestDoctorTeleagentNamesTheAccountStore(t *testing.T) {
 		t.Errorf("store state = %q, want ok", store.State)
 	}
 }
+
+func TestTeleagentIncrementalPassDoesNotDoubleTurns(t *testing.T) {
+	tmp := hermeticEnv(t)
+	if !sources.SQLite3Available() {
+		t.Skip("sqlite3 not installed")
+	}
+	root := filepath.Join(tmp, "teleagent")
+	db1 := filepath.Join(root, "users", "2091696589113404", "teleagent.db")
+	db2 := filepath.Join(root, "users", "2091696589113405", "teleagent.db")
+	for _, db := range []string{db1, db2} {
+		if err := os.MkdirAll(filepath.Dir(db), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	schema, err := os.ReadFile(filepath.Join("..", "..", "fixtures", "registry", "teleagent", "teleagent.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	runSQL := func(dbPath, sql string) {
+		t.Helper()
+		cmd := exec.CommandContext(t.Context(), "sqlite3", dbPath)
+		cmd.Stdin = strings.NewReader(sql)
+		out, rerr := cmd.CombinedOutput()
+		if rerr != nil {
+			t.Fatalf("sqlite3 %s: %v: %s", dbPath, rerr, out)
+		}
+	}
+	runSQL(db1, string(schema))
+	schema2 := strings.NewReplacer(
+		"ses_teleagent_01", "ses_teleagent_02",
+		"msg_teleagent_", "msg_teleagent_b_",
+	).Replace(string(schema))
+	runSQL(db2, schema2)
+
+	t.Setenv("DEJA_TELEAGENT_ROOT", root)
+	t.Setenv("TELEAGENT_HOME", "")
+	t.Setenv("XDG_DATA_HOME", "")
+
+	dir := filepath.Join(tmp, "idx")
+	if err = index.Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	sessions, _, _ := index.BuiltSummary(dir, nil)
+	if sessions != 2 {
+		t.Fatalf("pass 1 sessions = %d, want 2", sessions)
+	}
+	s1, ok, err := index.FindByIdentity(dir, "teleagent", "ses_teleagent_01")
+	if err != nil || !ok || len(s1.Messages) != 2 {
+		t.Fatalf("pass 1 ses_teleagent_01: ok=%v err=%v msgs=%d", ok, err, len(s1.Messages))
+	}
+	if s1.Path != db1 {
+		t.Fatalf("pass 1 Path = %q, want %q", s1.Path, db1)
+	}
+
+	runSQL(db1, `
+		insert into session_message (id, session_id, type, seq, time_created, time_updated, data)
+		values ('msg_teleagent_03', 'ses_teleagent_01', 'user', 3, 1752915610000, 1752915610000, '{"time":{"created":1752915610000},"text":"Follow-up verify check after singleflight."}');
+		update session_v2 set time_updated = 1752915610000 where id = 'ses_teleagent_01';
+	`)
+	future := time.Now().Add(2 * time.Second)
+	if err = os.Chtimes(db1, future, future); err != nil {
+		t.Fatal(err)
+	}
+	if err = index.Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	sessions, _, _ = index.BuiltSummary(dir, nil)
+	if sessions != 2 {
+		t.Fatalf("pass 2 sessions = %d, want 2", sessions)
+	}
+	s1, ok, err = index.FindByIdentity(dir, "teleagent", "ses_teleagent_01")
+	if err != nil || !ok || len(s1.Messages) != 3 {
+		t.Fatalf("pass 2 ses_teleagent_01: ok=%v err=%v msgs=%d (want 3)", ok, err, len(s1.Messages))
+	}
+	s2, ok, err := index.FindByIdentity(dir, "teleagent", "ses_teleagent_02")
+	if err != nil || !ok || len(s2.Messages) != 2 {
+		t.Fatalf("pass 2 ses_teleagent_02: ok=%v err=%v msgs=%d (want 2)", ok, err, len(s2.Messages))
+	}
+}

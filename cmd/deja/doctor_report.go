@@ -615,7 +615,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 		// the store: the legacy name the pre-rename builds wrote.
 		{"devin", []string{sources.DevinSessionsDB(), sources.DevinLegacySessionsDB()}, sources.DevinFiles, doctorProbeDevin},
 		{"mimo", []string{sources.MimoDB()}, func() []string { return presentDoctorFile(sources.MimoDB()) }, doctorProbeMimo},
-		{"teleagent", sources.TeleAgentSessionFiles(), sources.TeleAgentSessionFiles, doctorProbeTeleagent},
+		{"teleagent", []string{sources.TeleAgentDataDir()}, sources.TeleAgentSessionFiles, doctorProbeTeleagent},
 		{"omnigent", []string{sources.OmnigentDB()}, func() []string { return presentDoctorFile(sources.OmnigentDB()) }, sources.ParseOmnigentDB},
 		{"orca", []string{sources.OrcaDB()}, func() []string { return presentDoctorFile(sources.OrcaDB()) }, sources.ParseOrcaDB},
 		{"deja", []string{sources.NotesFile()}, func() []string { return presentDoctorFile(sources.NotesFile()) }, sources.ParseNotesFile},
@@ -707,7 +707,7 @@ func doctorProbeMimo(path string) ([]model.Session, error) {
 }
 
 func doctorProbeTeleagent(path string) ([]model.Session, error) {
-	return sources.ParseTeleagentDB(path)
+	return sources.ParseOpencodeNewest(path)
 }
 
 // anotherFileOpens reports whether any file besides one already known to be

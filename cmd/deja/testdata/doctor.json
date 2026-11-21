@@ -447,7 +447,9 @@
     {
       "name": "teleagent",
       "state": "missing",
-      "paths": null,
+      "paths": [
+        "<tmp>/home/.local/share/TeleAgent"
+      ],
       "files": 0,
       "indexed_sessions": 0
     },

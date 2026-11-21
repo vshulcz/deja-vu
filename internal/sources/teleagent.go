@@ -74,7 +74,13 @@ func TeleAgentDBs() []string {
 
 // ParseTeleagentDB reads one account's store through OpenCode's schema.
 func ParseTeleagentDB(db string) ([]model.Session, error) {
-	return parseOpencodeSchemaDB("teleagent", db, "", 0)
+	ss, err := parseOpencodeSchemaDB("teleagent", db, "", 0)
+	if err == nil {
+		for i := range ss {
+			ss[i].Path = db
+		}
+	}
+	return ss, err
 }
 
 // ParseTeleagentDBSince reads one account's sessions changed after t.
@@ -82,7 +88,13 @@ func ParseTeleagentDBSince(db string, t time.Time) ([]model.Session, error) {
 	if t.IsZero() {
 		return ParseTeleagentDB(db)
 	}
-	return parseOpencodeSchemaDBSince("teleagent", db, t)
+	ss, err := parseOpencodeSchemaDBSince("teleagent", db, t)
+	if err == nil {
+		for i := range ss {
+			ss[i].Path = db
+		}
+	}
+	return ss, err
 }
 
 // TeleAgentSessionFiles lists every account's store that exists and is

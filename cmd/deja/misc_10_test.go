@@ -1769,7 +1769,7 @@ func TestPagesCountHarnessesInDigitsCorrectly(t *testing.T) {
 		}
 		for _, m := range claim.FindAllStringSubmatch(string(b), -1) {
 			got, err := strconv.Atoi(m[1])
-			if err != nil || got < 10 || got > 50 {
+			if err != nil || got < 10 || got > 60 {
 				// Not a claim about how many harnesses there are: "3 agents"
 				// in a sentence about someone else's tool, a version, a count
 				// of something entirely different.
@@ -1812,7 +1812,7 @@ func TestPagesCountHarnessesInDigitsCorrectly(t *testing.T) {
 // `formats` and `tools` are in the noun list because the same number is written
 // with them: "twenty-five formats" outlived eight harnesses on three pages
 // while every sentence that said `agents` was kept current by this test.
-var spelled = regexp.MustCompile(`(?i)\b(other\s+)?((?:twenty|thirty|forty)(?:-(?:one|two|three|four|five|six|seven|eight|nine))?)\s+(more\s+)?(?:coding\s+)?(?:harnesses|agents|formats|tools)\b`)
+var spelled = regexp.MustCompile(`(?i)\b(other\s+)?((?:twenty|thirty|forty|fifty)(?:-(?:one|two|three|four|five|six|seven|eight|nine))?)\s+(more\s+)?(?:coding\s+)?(?:harnesses|agents|formats|tools)\b`)
 
 // registryHarnessCount is how many harnesses deja reads, from the one file that
 // decides it. deja itself is in the registry as the reader, not as something it

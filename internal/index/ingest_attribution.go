@@ -773,6 +773,9 @@ func resolveStorePaths() map[string]string {
 	for _, db := range sources.CrushDBs() {
 		out[db] = "crush"
 	}
+	for _, db := range sources.TeleAgentSessionFiles() {
+		out[db] = "teleagent"
+	}
 	if cm := sources.ClaudeMemDBPath(); cm != "" {
 		out[cm] = "claude"
 	}

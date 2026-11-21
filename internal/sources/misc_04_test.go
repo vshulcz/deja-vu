@@ -3819,7 +3819,14 @@ func TestTeleagentParseAndAccounts(t *testing.T) {
 	if len(ss) != 2 {
 		t.Fatalf("LoadTeleAgent() got %d sessions, want 2 (one per account)", len(ss))
 	}
+	wantPaths := map[string]bool{dbs[0]: true, dbs[1]: true}
+	if ss[0].Path == ss[1].Path {
+		t.Fatalf("LoadTeleAgent() duplicated Path %q across accounts", ss[0].Path)
+	}
 	for _, s := range ss {
+		if !wantPaths[s.Path] {
+			t.Fatalf("Path = %q, want one of %v", s.Path, dbs)
+		}
 		if s.Harness != "teleagent" || s.ID != "ses_teleagent_01" {
 			t.Fatalf("got harness=%q id=%q", s.Harness, s.ID)
 		}
@@ -3831,12 +3838,12 @@ func TestTeleagentParseAndAccounts(t *testing.T) {
 		}
 	}
 	since, err := ParseTeleagentDBSince(dbs[0], time.UnixMilli(1744000000000))
-	if err != nil || len(since) != 1 {
-		t.Fatalf("ParseTeleagentDBSince: len=%d err=%v", len(since), err)
+	if err != nil || len(since) != 1 || since[0].Path != dbs[0] {
+		t.Fatalf("ParseTeleagentDBSince: ss=%+v err=%v", since, err)
 	}
 	zero, err := ParseTeleagentDBSince(dbs[0], time.Time{})
-	if err != nil || len(zero) != 1 {
-		t.Fatalf("ParseTeleagentDBSince zero: len=%d err=%v", len(zero), err)
+	if err != nil || len(zero) != 1 || zero[0].Path != dbs[0] {
+		t.Fatalf("ParseTeleagentDBSince zero: ss=%+v err=%v", zero, err)
 	}
 	after, err := ParseTeleagentDBSince(dbs[0], time.UnixMilli(1844000000000))
 	if err != nil || len(after) != 0 {

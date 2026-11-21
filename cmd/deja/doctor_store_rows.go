@@ -410,15 +410,13 @@ func (r *doctorStoreRows) laterStores(sqlite bool) {
 	mimoDB := sources.MimoDB()
 	r.row("mimo", mimoDB, doctorFilePresent(mimoDB), doctorSQLiteDetail(mimoDB, sqlite))
 	teleAgentDBs := sources.TeleAgentSessionFiles()
-	teleAgentLoc, teleAgentPresent := "", false
-	if len(teleAgentDBs) > 0 {
-		teleAgentLoc, teleAgentPresent = teleAgentDBs[0], true
+	if len(teleAgentDBs) == 0 {
+		r.row("teleagent", sources.TeleAgentDataDir(), false, "")
+	} else {
+		for _, db := range teleAgentDBs {
+			r.row("teleagent", db, true, doctorSQLiteDetail(db, sqlite))
+		}
 	}
-	teleAgentDetail := ""
-	if teleAgentLoc != "" {
-		teleAgentDetail = doctorSQLiteDetail(teleAgentLoc, sqlite)
-	}
-	r.row("teleagent", teleAgentLoc, teleAgentPresent, teleAgentDetail)
 	omnigentDB := sources.OmnigentDB()
 	r.row("omnigent", omnigentDB, doctorFilePresent(omnigentDB), doctorSQLiteDetail(omnigentDB, sqlite))
 	orcaDB := sources.OrcaDB()

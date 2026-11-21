@@ -25,6 +25,13 @@
     <summary>Compare deja-vu (97.2% R@5 LongMemEval-S, 52 agents) against claude-mem, MemPalace, agentmemory, Mem0, Letta, MCP Memory, CASS, ctx, and agentsview.</summary>
   </entry>
   <entry>
+    <title>TeleAgent session history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-teleagent-session-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-teleagent-session-history.html"></link>
+    <updated>2026-11-21T00:00:00Z</updated>
+    <summary>Where the TeleAgent desktop client keeps its conversation history — one OpenCode-schema SQLite store per account — and how deja indexes it read-only.</summary>
+  </entry>
+  <entry>
     <title>Search Claude Code, Codex &amp; Cursor sessions — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/find-a-session.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/find-a-session.html"></link>
@@ -37,6 +44,13 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/harnesses.html"></link>
     <updated>2026-11-21T00:00:00Z</updated>
     <summary>The fifty-two coding agents deja indexes today, where each stores its history, and how to add a new one.</summary>
+  </entry>
+  <entry>
+    <title>TeleAgent 星辰超级智能体 history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-teleagent.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-teleagent.html"></link>
+    <updated>2026-11-21T00:00:00Z</updated>
+    <summary>Where TeleAgent keeps its conversation history, and how deja indexes it — one OpenCode-schema SQLite store per account, no install surface.</summary>
   </entry>
   <entry>
     <title>Resume yesterday&#39;s Claude Code or Codex session — deja-vu</title>
@@ -65,20 +79,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html"></link>
     <updated>2026-11-20T00:00:00Z</updated>
     <summary>No API key or daemon: deja-vu (97.2% R@5 LongMemEval-S) indexes Claude Code, Codex, Cursor, opencode and 45 other agents via hooks and MCP.</summary>
-  </entry>
-  <entry>
-    <title>TeleAgent session history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-teleagent-session-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-teleagent-session-history.html"></link>
-    <updated>2026-11-20T00:00:00Z</updated>
-    <summary>Where the TeleAgent desktop client keeps its conversation history — one OpenCode-schema SQLite store per account — and how deja indexes it read-only.</summary>
-  </entry>
-  <entry>
-    <title>TeleAgent 星辰超级智能体 history — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-teleagent.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-teleagent.html"></link>
-    <updated>2026-11-20T00:00:00Z</updated>
-    <summary>Where TeleAgent keeps its conversation history, and how deja indexes it — one OpenCode-schema SQLite store per account, no install surface.</summary>
   </entry>
   <entry>
     <title>Recover files overwritten by an AI agent — deja-vu</title>
