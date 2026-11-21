@@ -291,7 +291,7 @@ kendi ekosisteminde bir paketi var; eklentilerini oradan kuranlar için:
 | JetBrains IDEs | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35998-deja-vu-cross-agent-ai-session-memory) (`com.github.vshulcz.deja-vu`) ([`extensions/jetbrains/`](../../extensions/jetbrains/docs/tr.md)) | `idea installPlugins com.github.vshulcz.deja-vu` |
 | Neovim | `lazy.nvim` ve CodeCompanion eklentisi ([`extensions/nvim/`](../../extensions/nvim/docs/tr.md)) | `{ "vshulcz/deja-vu", opts = {} }` |
 | tmux | [TPM](https://github.com/tmux-plugins/tpm) açılır penceresi (`prefix + D`) ve `#{deja_status}` (`deja.tmux`) | `set -g @plugin 'vshulcz/deja-vu'` |
-| Raycast | Raycast uzantısı `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
+| Raycast | [Raycast Store](https://www.raycast.com/vshulcz/deja-vu) | `open raycast://extensions/vshulcz/deja-vu` |
 | CC Switch | tek tıkla MCP ve Skill deposu aktarımı (`ccswitch://`) | [CC Switch'e MCP ekle](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [Ajan geçiş kılavuzu](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 İki yoldan biri yeter, ikisi birden de bir şey bozmaz: her paket önce `deja install`'ın yazdığını okur.

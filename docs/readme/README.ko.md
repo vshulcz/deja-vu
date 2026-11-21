@@ -284,7 +284,7 @@ Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI �
 | JetBrains IDEs | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35998-deja-vu-cross-agent-ai-session-memory) (`com.github.vshulcz.deja-vu`) ([`extensions/jetbrains/`](../../extensions/jetbrains/docs/ko.md)) | `idea installPlugins com.github.vshulcz.deja-vu` |
 | Neovim | `lazy.nvim` &amp; CodeCompanion 플러그인 ([`extensions/nvim/`](../../extensions/nvim/docs/ko.md)) | `{ "vshulcz/deja-vu", opts = {} }` |
 | tmux | [TPM](https://github.com/tmux-plugins/tpm) 팝업 (`prefix + D`) &amp; `#{deja_status}` (`deja.tmux`) | `set -g @plugin 'vshulcz/deja-vu'` |
-| Raycast | Raycast 확장 `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
+| Raycast | [Raycast Store](https://www.raycast.com/vshulcz/deja-vu) | `open raycast://extensions/vshulcz/deja-vu` |
 | CC Switch | 원클릭 MCP &amp; Skill 저장소 가져오기 (`ccswitch://`) | [CC Switch에 MCP 추가](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [에이전트 전환 가이드](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 어느 쪽이든 하나면 충분하고 둘 다 해도 탈이 없습니다. 각 패키지는 먼저 `deja install`이 써 둔 설정을

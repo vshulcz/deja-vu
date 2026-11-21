@@ -290,7 +290,7 @@ Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI �
 | JetBrains IDEs | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35998-deja-vu-cross-agent-ai-session-memory) (`com.github.vshulcz.deja-vu`) ([`extensions/jetbrains/`](../../extensions/jetbrains/docs/ru.md)) | `idea installPlugins com.github.vshulcz.deja-vu` |
 | Neovim | плагин для `lazy.nvim` и CodeCompanion ([`extensions/nvim/`](../../extensions/nvim/docs/ru.md)) | `{ "vshulcz/deja-vu", opts = {} }` |
 | tmux | всплывающее окно [TPM](https://github.com/tmux-plugins/tpm) (`prefix + D`) и `#{deja_status}` (`deja.tmux`) | `set -g @plugin 'vshulcz/deja-vu'` |
-| Raycast | расширение Raycast `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
+| Raycast | [Raycast Store](https://www.raycast.com/vshulcz/deja-vu) | `open raycast://extensions/vshulcz/deja-vu` |
 | CC Switch | импорт MCP и репозитория Skills в 1 клик (`ccswitch://`) | [Добавить MCP в CC Switch](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [Переход между агентами](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 Любого пути достаточно, оба вместе тоже не мешают: каждый пакет сначала читает то, что записал
