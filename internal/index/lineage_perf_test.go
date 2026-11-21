@@ -388,20 +388,20 @@ func TestLineagePrefixAndStubEdgeCases(t *testing.T) {
 	if zKey == "" {
 		t.Fatal("z-asker missing from manifest")
 	}
-	offs, ok := lr.offsetsFor(zKey)
-	if !ok || len(offs) == 0 {
-		t.Fatalf("offsetsFor(%q) failed: ok=%v len=%d", zKey, ok, len(offs))
+	offs, offsOK := lr.offsetsFor(zKey)
+	if !offsOK || len(offs) == 0 {
+		t.Fatalf("offsetsFor(%q) failed: ok=%v len=%d", zKey, offsOK, len(offs))
 	}
-	if empty, ok := lr.roleStubsFrom(zKey, offs, 0, map[string]bool{}); !ok || len(empty) != 0 {
-		t.Fatalf("empty wantRoles returned ok=%v len=%d", ok, len(empty))
+	if empty, emptyOK := lr.roleStubsFrom(zKey, offs, 0, map[string]bool{}); !emptyOK || len(empty) != 0 {
+		t.Fatalf("empty wantRoles returned ok=%v len=%d", emptyOK, len(empty))
 	}
 	roleSet := map[string]bool{"user": true}
-	firstPass, ok := lr.roleStubsFrom(zKey, offs, 0, roleSet)
-	if !ok || len(firstPass) == 0 {
-		t.Fatalf("roleStubsFrom first pass failed: ok=%v len=%d", ok, len(firstPass))
+	firstPass, firstOK := lr.roleStubsFrom(zKey, offs, 0, roleSet)
+	if !firstOK || len(firstPass) == 0 {
+		t.Fatalf("roleStubsFrom first pass failed: ok=%v len=%d", firstOK, len(firstPass))
 	}
-	secondPass, ok := lr.roleStubsFrom(zKey, offs, 0, roleSet)
-	if !ok || len(secondPass) != len(firstPass) {
+	secondPass, secondOK := lr.roleStubsFrom(zKey, offs, 0, roleSet)
+	if !secondOK || len(secondPass) != len(firstPass) {
 		t.Fatalf("roleStubsFrom cache pass = %d, want %d", len(secondPass), len(firstPass))
 	}
 
@@ -447,22 +447,31 @@ func TestLineagePrefixAndStubEdgeCases(t *testing.T) {
 	if _, rok := lr2.roleStubsFrom("wrong-key", offs[:1], 0, nil); rok || lr2.roOK {
 		t.Fatalf("wrong-key roleStubsFrom rok=%v roOK=%v, want false/false", rok, lr2.roOK)
 	}
-	if fbStubs, ok := lr2.sessionRoleStubs(zKey, 0, map[string]bool{"user": true}); !ok || len(fbStubs) == 0 {
-		t.Fatalf("fallback sessionRoleStubs(%q) ok=%v len=%d", zKey, ok, len(fbStubs))
+	if fbStubs, fbOK := lr2.sessionRoleStubs(zKey, 0, map[string]bool{"user": true}); !fbOK || len(fbStubs) == 0 {
+		t.Fatalf("fallback sessionRoleStubs(%q) ok=%v len=%d", zKey, fbOK, len(fbStubs))
 	}
-	if fbEmpty, ok := lr2.sessionRoleStubs(zKey, 0, map[string]bool{}); !ok || len(fbEmpty) != 0 {
-		t.Fatalf("fallback empty roles ok=%v len=%d", ok, len(fbEmpty))
+	if fbEmpty, fbEmptyOK := lr2.sessionRoleStubs(zKey, 0, map[string]bool{}); !fbEmptyOK || len(fbEmpty) != 0 {
+		t.Fatalf("fallback empty roles ok=%v len=%d", fbEmptyOK, len(fbEmpty))
 	}
-	if fbMissing, ok := lr2.sessionRoleStubs("claude\x00missing-for-mismatch", 0, nil); !ok || len(fbMissing) != 0 {
-		t.Fatalf("fallback missing session ok=%v len=%d, want true/0", ok, len(fbMissing))
+	if fbMissing, fbMissOK := lr2.sessionRoleStubs("claude\x00missing-for-mismatch", 0, nil); !fbMissOK || len(fbMissing) != 0 {
+		t.Fatalf("fallback missing session ok=%v len=%d, want true/0", fbMissOK, len(fbMissing))
+	}
+	if dec, ih, si := lr2.heldFastCheck(zKey, zKey, rawRec, 0); dec || ih || si != 0 {
+		t.Fatalf("heldFastCheck(!roOK) = (%v, %v, %d)", dec, ih, si)
+	}
+	if dec, ih, si := lr.heldFastCheck("claude\x00missing-for-mismatch", zKey, rawRec, 0); !dec || ih || si != 0 {
+		t.Fatalf("heldFastCheck(empty offs) = (%v, %v, %d), want (true, false, 0)", dec, ih, si)
+	}
+	if dec, ih, si := lr.heldFastCheck(zKey, "claude\x00missing-for-mismatch", rawRec, 0); dec || ih || si != 0 {
+		t.Fatalf("heldFastCheck(empty other offs) = (%v, %v, %d), want (false, false, 0)", dec, ih, si)
 	}
 	lr2.recordsPath = filepath.Join(t.TempDir(), "missing.bin")
-	if _, ok := lr2.sessionRoleStubs("claude\x00unreadable", 0, nil); ok {
+	if _, unreadOK := lr2.sessionRoleStubs("claude\x00unreadable", 0, nil); unreadOK {
 		t.Fatal("fallback unreadable records unexpectedly returned ok=true")
 	}
 	lr3 := newLineageReader(t.TempDir(), m)
 	defer lr3.close()
-	if _, ok := lr3.sessionRoleStubs(zKey, 0, nil); ok {
+	if _, unopenOK := lr3.sessionRoleStubs(zKey, 0, nil); unopenOK {
 		t.Fatal("unopened store sessionRoleStubs unexpectedly returned ok=true")
 	}
 }

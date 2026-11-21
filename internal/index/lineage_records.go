@@ -865,37 +865,41 @@ func (lr *lineageReader) probeHoldCandidates(aKey string, aOffs []int64, target 
 	return false, false, nil
 }
 
+func (lr *lineageReader) heldFastCheck(aKey, oKey string, last Record, lastIdx int) (decided, isHeld bool, startIdx int) {
+	if !lr.roOK {
+		return false, false, 0
+	}
+	aOffs, aOK := lr.offsetsFor(aKey)
+	if !aOK || len(aOffs) == 0 {
+		return aOK, false, 0
+	}
+	matched, fallback, err := lr.probeHoldCandidates(aKey, aOffs, last, lastIdx)
+	if err != nil || matched {
+		return true, err == nil && matched, 0
+	}
+	if fallback || len(aOffs) < lineagePrefixMinRecords {
+		return false, false, 0
+	}
+	oOffs, oOK := lr.offsetsFor(oKey)
+	if !oOK || len(oOffs) < lineagePrefixMinRecords {
+		return false, false, 0
+	}
+	pref := lr.sharedPrefix(aKey, aOffs, oKey, oOffs)
+	if lr.roOK && pref.monotonic && last.Time.After(pref.bound) {
+		return false, false, pref.length
+	}
+	return false, false, 0
+}
+
 func (lr *lineageReader) held(asker, other SessionMeta) bool {
 	last, lastIdx, ok := lr.lastMatchWithIndex(other.Key(), isHoldNoiseRole, afterForkNoise)
 	if !ok {
 		return false
 	}
 	aKey := asker.Key()
-	startIdx := 0
-	if lr.roOK {
-		if aOffs, aOK := lr.offsetsFor(aKey); aOK {
-			if len(aOffs) == 0 {
-				return false
-			}
-			matched, fallback, err := lr.probeHoldCandidates(aKey, aOffs, last, lastIdx)
-			if err != nil {
-				return false
-			}
-			if matched {
-				return true
-			}
-			if !fallback && len(aOffs) >= lineagePrefixMinRecords {
-				if oOffs, oOK := lr.offsetsFor(other.Key()); oOK && len(oOffs) >= lineagePrefixMinRecords {
-					pref := lr.sharedPrefix(aKey, aOffs, other.Key(), oOffs)
-					if pref.monotonic && last.Time.After(pref.bound) {
-						startIdx = pref.length
-					}
-				}
-			}
-			if !lr.roOK {
-				startIdx = 0
-			}
-		}
+	decided, isHeld, startIdx := lr.heldFastCheck(aKey, other.Key(), last, lastIdx)
+	if decided {
+		return isHeld
 	}
 	stubs, ok := lr.sessionRoleStubs(aKey, startIdx, map[string]bool{last.Role: true})
 	if !ok {
@@ -906,7 +910,7 @@ func (lr *lineageReader) held(asker, other SessionMeta) bool {
 		if st.at.UnixNano() != wantNano {
 			continue
 		}
-		if txt, ok := lr.stubText(aKey, st); ok && txt == last.Text {
+		if txt, txtOK := lr.stubText(aKey, st); txtOK && txt == last.Text {
 			return true
 		}
 	}
