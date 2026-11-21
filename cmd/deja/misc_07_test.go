@@ -3859,7 +3859,7 @@ func assertTopKeys(t *testing.T, name string, v any, want ...string) {
 func TestLastAndShowEnvelopesAreStable(t *testing.T) {
 	assertTopKeys(t, "recentJSON", recentJSON{}, "schema_version", "sessions", "policy_withheld")
 	assertTopKeys(t, "sessionJSON", sessionJSON{}, "schema_version", "session", "window")
-	assertTopKeys(t, "sessionWindow", sessionWindow{}, "offset", "limit", "total", "returned")
+	assertTopKeys(t, "sessionWindow", sessionWindow{}, "offset", "limit", "total", "returned", "capped")
 }
 
 func TestMachineRecentSearchAndExactRead(t *testing.T) {
@@ -3929,7 +3929,7 @@ func TestMachineRecentSearchAndExactRead(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &exact); err != nil {
 		t.Fatalf("show json: %v\n%s", err, out)
 	}
-	if exact.SchemaVersion != jsonout.Version || exact.Session.ID != hits[0].Session.ID || exact.Session.Harness != "claude" || exact.Session.Source.Instance != "test-workstation" || exact.Window.Offset != 1 || exact.Window.Limit != 1 || exact.Window.Total != 3 || exact.Window.Returned != 1 || len(exact.Session.Messages) != 1 || !strings.Contains(exact.Session.Messages[0].Text, "second") {
+	if exact.SchemaVersion != jsonout.Version || exact.Session.ID != hits[0].Session.ID || exact.Session.Harness != "claude" || exact.Session.Source.Instance != "test-workstation" || exact.Window.Offset != 1 || exact.Window.Limit != 1 || exact.Window.Total != 3 || exact.Window.Returned != 1 || !exact.Window.Capped || len(exact.Session.Messages) != 1 || !strings.Contains(exact.Session.Messages[0].Text, "second") {
 		t.Fatalf("exact = %#v", exact)
 	}
 }
@@ -3945,6 +3945,88 @@ func TestMachineFlagValidation(t *testing.T) {
 		if _, err := captureRun(t, args...); err == nil {
 			t.Fatalf("run(%q) succeeded", args)
 		}
+	}
+}
+
+func TestShowJSONReturnsFullSessionUnlessSliced(t *testing.T) {
+	hermeticEnv(t)
+	t.Setenv("DEJA_SOURCE_INSTANCE", "test-workstation")
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	const total = 65
+	lines := make([]string, 0, total)
+	base := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	for i := range total {
+		role := "user"
+		recType := "user"
+		if i%2 == 1 {
+			role = "assistant"
+			recType = "assistant"
+		}
+		ts := base.Add(time.Duration(i) * time.Minute).Format(time.RFC3339)
+		lines = append(lines, fmt.Sprintf(`{"type":%q,"sessionId":"long-sess","timestamp":%q,"message":{"role":%q,"content":"msg %02d"}}`, recType, ts, role, i))
+	}
+	writeClaudeFixture(t, filepath.Join(root, "machine", "long-sess.jsonl"), "long-sess", lines)
+
+	// Index the fixture via `last` just like TestMachineRecentSearchAndExactRead.
+	if _, err := captureRun(t, "last", "1", "--json", "--harness", "claude"); err != nil {
+		t.Fatal(err)
+	}
+
+	outFull, err := captureRun(t, "show", "long-sess", "--harness", "claude", "--json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(outFull, `"capped"`) {
+		t.Fatalf("full show --json unexpectedly emitted capped key:\n%s", outFull)
+	}
+	var full sessionJSON
+	if err = json.Unmarshal([]byte(outFull), &full); err != nil {
+		t.Fatalf("full json: %v\n%s", err, outFull)
+	}
+	if full.Window.Offset != 0 || full.Window.Limit != total || full.Window.Total != total || full.Window.Returned != total || full.Window.Capped || len(full.Session.Messages) != total {
+		t.Fatalf("full window/messages = %+v / %d, want all %d uncapped", full.Window, len(full.Session.Messages), total)
+	}
+
+	outSliced, err := captureRun(t, "show", "long-sess", "--harness", "claude", "--json", "--offset", "0", "--limit", "10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(outSliced, `"capped":true`) {
+		t.Fatalf("sliced show --json missing capped:true:\n%s", outSliced)
+	}
+	var sliced sessionJSON
+	if err = json.Unmarshal([]byte(outSliced), &sliced); err != nil {
+		t.Fatalf("sliced json: %v\n%s", err, outSliced)
+	}
+	if sliced.Window.Offset != 0 || sliced.Window.Limit != 10 || sliced.Window.Total != total || sliced.Window.Returned != 10 || !sliced.Window.Capped || len(sliced.Session.Messages) != 10 {
+		t.Fatalf("sliced window/messages = %+v / %d", sliced.Window, len(sliced.Session.Messages))
+	}
+
+	outOffsetOnly, err := captureRun(t, "show", "long-sess", "--harness", "claude", "--json", "--offset", "10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var offOnly sessionJSON
+	if err = json.Unmarshal([]byte(outOffsetOnly), &offOnly); err != nil {
+		t.Fatalf("offset-only json: %v\n%s", err, outOffsetOnly)
+	}
+	if offOnly.Window.Offset != 10 || offOnly.Window.Limit != 50 || offOnly.Window.Total != total || offOnly.Window.Returned != 50 || !offOnly.Window.Capped || len(offOnly.Session.Messages) != 50 {
+		t.Fatalf("offset-only window/messages = %+v / %d", offOnly.Window, len(offOnly.Session.Messages))
+	}
+
+	outCoverAll, err := captureRun(t, "show", "long-sess", "--harness", "claude", "--json", "--limit", "100")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(outCoverAll, `"capped"`) {
+		t.Fatalf("covering slice unexpectedly emitted capped:\n%s", outCoverAll)
+	}
+	var coverAll sessionJSON
+	if err = json.Unmarshal([]byte(outCoverAll), &coverAll); err != nil {
+		t.Fatalf("covering json: %v\n%s", err, outCoverAll)
+	}
+	if coverAll.Window.Returned != total || coverAll.Window.Capped || len(coverAll.Session.Messages) != total {
+		t.Fatalf("covering window/messages = %+v / %d", coverAll.Window, len(coverAll.Session.Messages))
 	}
 }
 

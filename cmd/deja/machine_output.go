@@ -18,10 +18,11 @@ type recentJSON struct {
 }
 
 type sessionWindow struct {
-	Offset   int `json:"offset"`
-	Limit    int `json:"limit"`
-	Total    int `json:"total"`
-	Returned int `json:"returned"`
+	Offset   int  `json:"offset"`
+	Limit    int  `json:"limit"`
+	Total    int  `json:"total"`
+	Returned int  `json:"returned"`
+	Capped   bool `json:"capped,omitempty"`
 }
 
 type sessionJSON struct {
@@ -66,7 +67,11 @@ func printSessionJSON(w io.Writer, session model.Session, offset, limit int, sou
 		SchemaVersion: jsonout.Version,
 		Session:       session,
 		Window: sessionWindow{
-			Offset: offset, Limit: limit, Total: total, Returned: len(session.Messages),
+			Offset:   offset,
+			Limit:    limit,
+			Total:    total,
+			Returned: len(session.Messages),
+			Capped:   len(session.Messages) < total,
 		},
 	})
 }

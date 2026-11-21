@@ -406,6 +406,7 @@ func readRules() (body string, exists bool, err error) {
 	}
 	b = bytes.TrimPrefix(b, utf8BOM)
 	body = strings.ReplaceAll(string(b), "\r\n", "\n")
+	body = strings.ReplaceAll(body, "\r", "\n")
 	body = strings.TrimRight(body, " \t\n")
 	// A marker inside the rules would end up inside the block, and the next
 	// sync would cut the reader's file at it.
@@ -507,7 +508,8 @@ func rulesState(path, body string) (string, error) {
 		return "stale", nil
 	}
 	inner := strings.ReplaceAll(doc[start:end], "\r\n", "\n")
-	if inner == rulesBlock(body) {
+	inner = strings.ReplaceAll(inner, "\r", "\n")
+	if strings.TrimSuffix(inner, "\n") == strings.TrimSuffix(rulesBlock(body), "\n") {
 		return "in sync", nil
 	}
 	return "stale", nil
