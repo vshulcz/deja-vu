@@ -664,20 +664,29 @@ func trimUTF8(s string, budget int) string {
 
 // recallRank runs one recall search and turns its sessions into ranked hits.
 func recallRank(dir, q string, o search.Options) (index.SearchResult, search.Options, []search.Hit, int, error) {
+	return recallRankWithLive(dir, q, o, nil, false)
+}
+
+func recallRankWithLive(dir, q string, o search.Options, live map[string]bool, liveKnown bool) (index.SearchResult, search.Options, []search.Hit, int, error) {
 	result, err := recallSearch(dir, o, mcpProgress())
 	if err != nil {
 		return index.SearchResult{}, o, nil, 0, err
 	}
-	return recallRankFrom(dir, q, o, result)
+	return recallRankFromWithLive(dir, q, o, result, live, liveKnown)
 }
 
 // recallSearch is the index search recall ranks; a test counts the calls.
 var recallSearch = index.SearchWithRecoveryDetailed
 
-// recallRankFrom is recallRank on a search already run.
-func recallRankFrom(dir, q string, o search.Options, result index.SearchResult) (index.SearchResult, search.Options, []search.Hit, int, error) {
+// recallRankFromWithLive is recallRankWithLive on a search already run.
+func recallRankFromWithLive(dir, q string, o search.Options, result index.SearchResult, live map[string]bool, liveKnown bool) (index.SearchResult, search.Options, []search.Hit, int, error) {
 	var err error
-	ss := withoutLiveSessions(dir, withoutScoped(result))
+	ss := withoutScoped(result)
+	if liveKnown {
+		ss = withoutExcludedSessions(ss, live)
+	} else {
+		ss = withoutLiveSessions(dir, ss)
+	}
 	o.Tier = result.Tier
 	o.Unread = result.Unread
 	if result.Stemmed {
