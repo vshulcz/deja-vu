@@ -1921,15 +1921,26 @@ func findSymbolDeclarationInRepo(cwd, sym string) (string, int, string) {
 	if cwd == "" || len(lowSym) < 4 || policy.SourceHintsOff() {
 		return "", 0, ""
 	}
+	var alreadyIndexed map[string]bool
 	if idx := loadRepoSymbolMap(cwd); idx.numFiles > 0 || idx.capped {
 		if loc, ok := idx.firstDecl[lowSym]; ok {
 			return loc.rel, loc.line, loc.sig
 		}
-		return "", 0, ""
+		if !idx.capped {
+			return "", 0, ""
+		}
+		alreadyIndexed = make(map[string]bool, len(idx.files))
+		for _, f := range idx.files {
+			alreadyIndexed[filepath.ToSlash(f.rel)] = true
+		}
 	}
 	scanRoot := safeScanRoot(cwd)
 	if scanRoot == "" {
 		return "", 0, ""
+	}
+	maxFile := maxRepoSymbolFileBytes
+	if maxFile <= 0 {
+		maxFile = 256 << 10
 	}
 	var files []string
 	_ = filepath.WalkDir(scanRoot, func(p string, d os.DirEntry, err error) error {
@@ -1952,14 +1963,40 @@ func findSymbolDeclarationInRepo(cwd, sym string) (string, int, string) {
 		}
 		switch strings.ToLower(filepath.Ext(base)) {
 		case ".go", ".py", ".ts", ".tsx", ".js", ".jsx", ".rs":
+			if len(alreadyIndexed) > 0 {
+				if r, err := filepath.Rel(cwd, p); err == nil && !strings.HasPrefix(r, "..") && alreadyIndexed[filepath.ToSlash(r)] {
+					return nil
+				}
+				if r, err := filepath.Rel(scanRoot, p); err == nil && !strings.HasPrefix(r, "..") && alreadyIndexed[filepath.ToSlash(r)] {
+					return nil
+				}
+			}
 			files = append(files, p)
 		}
 		return nil
 	})
+	const (
+		directMaxBytes int64 = 16 << 20
+		directBudget         = 500 * time.Millisecond
+	)
+	var bytesRead int64
+	var filesRead int
+	scanStart := time.Now()
 	for _, cand := range files {
-		raw, err := os.ReadFile(cand)
-		if err != nil || len(raw) > 256<<10 {
+		if filesRead >= 32 && time.Since(scanStart) >= directBudget {
+			break
+		}
+		if info, err := os.Stat(cand); err == nil && info.Size() > maxFile {
 			continue
+		}
+		raw, err := os.ReadFile(cand)
+		if err != nil || int64(len(raw)) > maxFile {
+			continue
+		}
+		bytesRead += int64(len(raw))
+		filesRead++
+		if bytesRead > directMaxBytes {
+			break
 		}
 		content := string(raw)
 		if !strings.Contains(strings.ToLower(content), lowSym) {

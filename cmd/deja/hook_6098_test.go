@@ -3,7 +3,9 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 )
@@ -133,5 +135,82 @@ func TestAskerLineageCutForHarnessSkipsDeepseekExternalProbes(t *testing.T) {
 	defaultSet, _ := askerLineageCutForHarness(dir, childSID, "", "")
 	if !defaultSet[parentSID] {
 		t.Errorf("askerLineageCutForHarness(\"\") missing Grok parent %q: %v", parentSID, defaultSet)
+	}
+}
+
+func TestCappedRepoSymbolMapSkipsDiskCacheAndFallsBackForSymbolBrief(t *testing.T) {
+	tmp := hermeticEnv(t)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+
+	claudeProj := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
+	if err := os.MkdirAll(claudeProj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rec := `{"type":"user","message":{"role":"user","content":"quokka retry budget"},"timestamp":"2026-07-01T10:00:00Z","sessionId":"s1","cwd":"/repo"}` + "\n"
+	if err := os.WriteFile(filepath.Join(claudeProj, "s1.jsonl"), []byte(rec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := index.Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	prevDir := getActiveDejaDir()
+	setActiveDejaDir(dir)
+	t.Cleanup(func() { setActiveDejaDir(prevDir) })
+
+	repo := filepath.Join(tmp, "capped-repo")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{
+		"aaa_other.go":        "package demo\n\nfunc AlphaNoise() {}\n",
+		"zeta_target.go":      "package demo\n\n// ZetaTargetSymbol keeps retry state.\nfunc ZetaTargetSymbol(n int) int {\n\treturn n + 1\n}\n",
+		"zeta_caller.go":      "package demo\n\nfunc CallZeta(n int) int {\n\treturn ZetaTargetSymbol(n)\n}\n",
+		"zeta_target_test.go": "package demo\n\nimport \"testing\"\n\nfunc TestZetaTargetSymbol(t *testing.T) {\n\t_ = ZetaTargetSymbol(1)\n}\n",
+	}
+	for name, body := range files {
+		if err := os.WriteFile(filepath.Join(repo, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	prevMax := repoSymbolScanMaxFiles
+	repoSymbolScanMaxFiles = 1
+	t.Cleanup(func() { repoSymbolScanMaxFiles = prevMax })
+
+	idx := loadRepoSymbolMap(repo)
+	if !idx.capped {
+		t.Fatalf("expected capped symbol map with repoSymbolScanMaxFiles=1, got capped=false (numFiles=%d)", idx.numFiles)
+	}
+
+	brief := liveRecallBrief(dir, repo, "please inspect ZetaTargetSymbol")
+	for _, want := range []string{"zeta_target.go:", "zeta_caller.go", "TestZetaTargetSymbol"} {
+		if !strings.Contains(brief, want) {
+			t.Fatalf("liveRecallBrief missing %q when symbol map was capped:\n%s", want, brief)
+		}
+	}
+
+	// Verify disk cache control: uncapped snapshot with valid mtime loads, capped snapshot is rejected.
+	st, err := os.Stat(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mtimes := map[string]int64{repo: st.ModTime().UnixNano()}
+	saveRepoSymbolMapToDisk(dir, repo, repo, repoSymbolMap{
+		at:        time.Now(),
+		capped:    false,
+		dirMtimes: mtimes,
+	})
+	if _, ok := loadRepoSymbolMapFromDisk(dir, repo, repo); !ok {
+		t.Fatalf("expected uncapped disk snapshot to load")
+	}
+	saveRepoSymbolMapToDisk(dir, repo, repo, repoSymbolMap{
+		at:        time.Now(),
+		capped:    true,
+		dirMtimes: mtimes,
+	})
+	if _, ok := loadRepoSymbolMapFromDisk(dir, repo, repo); ok {
+		t.Fatalf("expected capped disk snapshot to be rejected")
 	}
 }

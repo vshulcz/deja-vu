@@ -142,7 +142,7 @@ var (
 	repoSymbolScanMaxFiles                     = 2000
 	repoSymbolScanMaxBytes               int64 = 16 << 20
 	repoSymbolScanBudget                       = 2 * time.Second
-	repoSymbolScanMinFilesBeforeDeadline       = 32
+	repoSymbolScanMinFilesBeforeDeadline       = 128
 	repoSymbolScanHook                   func(string)
 )
 
@@ -187,7 +187,7 @@ func repoSymbolDiskCacheAllowed() (string, bool) {
 		repoSymbolScanMaxFiles != 2000 ||
 		repoSymbolScanMaxBytes != 16<<20 ||
 		repoSymbolScanBudget != 2*time.Second ||
-		repoSymbolScanMinFilesBeforeDeadline != 32 {
+		repoSymbolScanMinFilesBeforeDeadline != 128 {
 		return "", false
 	}
 	dir := getActiveDejaDir()
@@ -277,7 +277,7 @@ func loadRepoSymbolMapFromDisk(dir, scanRoot, cwd string) (repoSymbolMap, bool) 
 	if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&snap); err != nil {
 		return repoSymbolMap{}, false
 	}
-	if snap.Version != repoSymbolDiskVersion || snap.At.IsZero() || time.Since(snap.At) >= repoSymbolDiskTTL {
+	if snap.Capped || snap.Version != repoSymbolDiskVersion || snap.At.IsZero() || time.Since(snap.At) >= repoSymbolDiskTTL {
 		return repoSymbolMap{}, false
 	}
 	idx := repoSymbolMapFromSnapshot(snap)
@@ -373,7 +373,7 @@ func loadRepoSymbolMap(cwd string) repoSymbolMap {
 	}
 	idx.at = time.Now()
 	repoSymbolMapCache.Store(scanRoot, idx)
-	if dir, ok := repoSymbolDiskCacheAllowed(); ok && len(idx.dirMtimes) > 0 {
+	if dir, ok := repoSymbolDiskCacheAllowed(); ok && len(idx.dirMtimes) > 0 && !idx.capped {
 		saveRepoSymbolMapToDisk(dir, scanRoot, cwd, idx)
 	}
 	return idx
