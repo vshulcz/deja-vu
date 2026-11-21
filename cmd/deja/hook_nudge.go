@@ -279,18 +279,24 @@ func promptSymbolBriefLine(cwd, asked string, seen map[string]bool) (string, str
 	}
 	var cands []symbolCand
 	useIdx := idx.numFiles > 0 || idx.capped
+	cappedFallbacks := 0
 	for _, item := range eligible {
 		if useIdx {
 			df := idx.declDF[item.low]
-			if df == 0 || df > 3 {
+			if df > 3 {
 				continue
 			}
-			loc, ok := idx.firstDecl[item.low]
-			if !ok || loc.rel == "" || loc.sig == "" {
+			if df > 0 {
+				loc, ok := idx.firstDecl[item.low]
+				if ok && loc.rel != "" && loc.sig != "" {
+					cands = append(cands, symbolCand{tok: item.tok, df: df, order: item.order, rel: loc.rel, line: loc.line, sig: loc.sig})
+				}
 				continue
 			}
-			cands = append(cands, symbolCand{tok: item.tok, df: df, order: item.order, rel: loc.rel, line: loc.line, sig: loc.sig})
-			continue
+			if !idx.capped || cappedFallbacks >= 2 {
+				continue
+			}
+			cappedFallbacks++
 		}
 		rel, lineNo, sig := findSymbolDeclarationInRepo(cwd, item.tok)
 		if rel != "" && sig != "" {
@@ -308,14 +314,19 @@ func promptSymbolBriefLine(cwd, asked string, seen map[string]bool) (string, str
 		if repoDec := repoMemoryDecisionForFile(cwd, cand.rel, []string{cand.tok}, pol); repoDec != "" {
 			line += repoDecisionLabel + repoDec
 		}
+		var callers string
 		if idx.numFiles <= 250 {
-			if callers := crossFileCallersLine(cwd, cand.rel, []string{cand.tok}); callers != "" {
-				line += callers
+			callers = crossFileCallersLine(cwd, cand.rel, []string{cand.tok})
+		} else {
+			if idx.numFiles <= 1500 {
+				callers = crossFileCallersFromIndexLine(cwd, &idx, cand.rel, cand.tok, cand.sig)
 			}
-		} else if idx.numFiles <= 1500 {
-			if callers := crossFileCallersFromIndexLine(cwd, &idx, cand.rel, cand.tok, cand.sig); callers != "" {
-				line += callers
+			if callers == "" && idx.capped {
+				callers = crossFileCallersLine(cwd, cand.rel, []string{cand.tok})
 			}
+		}
+		if callers != "" {
+			line += callers
 		}
 		if ran := siblingTestLineFor(cwd, cand.rel, []string{cand.tok}); ran != "" && !strings.Contains(line, ran) {
 			line += ran

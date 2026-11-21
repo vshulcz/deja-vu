@@ -223,7 +223,7 @@ func emptyRecallAnswerPolicy(dir, q string, hidden int) string {
 	q = clampEcho(q)
 	st := readWarmupStatus(dir)
 	current := st != nil && index.HasManifest(dir) && index.IsCurrentVersion(dir)
-	if st != nil && index.HasManifest(dir) && (current || index.AnswersWhileRebuilding(dir)) && !index.Damaged(dir) {
+	if st != nil && index.HasManifest(dir) && (current || index.AnswersWhileRebuilding(dir)) && !index.HookDamaged(dir) {
 		// A refresh over an index that already answers: the search ran over
 		// every session indexed so far, and saying nothing can be recalled
 		// yet denied the history it had just searched.

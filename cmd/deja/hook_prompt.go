@@ -231,8 +231,10 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// Version, not just presence: terms hash into buckets an index from
 	// another format never wrote, so a stale store answers every prompt with
 	// nothing and looks exactly like a user with no history (#777).
-	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.Damaged(dir) {
-		requestWarmup(dir)
+	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.HookDamaged(dir) {
+		if !index.RebuildInProgress(dir) {
+			requestWarmup(dir)
+		}
 		return emitCommittedNudgeOnly(dir, cwd, input.SessionID, asked, advisories, failNudge, nil, nil, nil, nil, false, plain, stdout)
 	}
 	// A new session whose first words ask to carry on another one gets that
@@ -302,7 +304,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	skip := promptHookSkipSet(recent, inProject)
 	// The asker and what counts as it: a spawn's parent, a sub-agent's parent,
 	// the sub-agents it spawned (#4548), a fork's source (#4549).
-	self, cut := askerLineageCut(dir, input.SessionID, input.TranscriptPath, input.ParentSessionID)
+	self, cut := askerLineageCutForHarness(dir, input.SessionID, input.TranscriptPath, input.Harness, input.ParentSessionID)
 	for id := range self {
 		skip[id] = true
 	}

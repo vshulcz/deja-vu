@@ -220,3 +220,39 @@ test("without a page deja is asked for --plain and keeps its notes", { skip }, a
   assert.deepEqual(calls().slice(before), ["hook-context --plain", "hook-prompt --plain"]);
 });
 
+test("/deja yields to the event loop while deja runs asynchronously", { skip }, async () => {
+  const slowBin = join(STAND, "deja-slow");
+  writeFileSync(
+    slowBin,
+    `#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args[0] === "version") { console.log("deja 0.0.0-test"); process.exit(0); }
+if (args[0] === "search") {
+  setTimeout(() => { console.log("SLOW_HIT"); process.exit(0); }, 80);
+} else {
+  process.exit(0);
+}
+`,
+  );
+  chmodSync(slowBin, 0o755);
+  const prev = process.env.DEJA_BIN;
+  process.env.DEJA_BIN = slowBin;
+  try {
+    const { default: apply } = await import("../index.js?async-cmd");
+    const web = host(["connection"]);
+    apply(web.ctx, {});
+    let ticks = 0;
+    const timer = setInterval(() => { ticks++; }, 10);
+    try {
+      const reply = await web.command.handler({ rawInput: "slow query", agent: { sessionId: "session-async" } });
+      assert.equal(reply.kind, "success");
+      assert.ok(reply.text.includes("SLOW_HIT"), reply.text);
+      assert.ok(ticks >= 2, `event loop stayed blocked during /deja (ticks=${ticks})`);
+    } finally {
+      clearInterval(timer);
+    }
+  } finally {
+    process.env.DEJA_BIN = prev;
+  }
+});
+
