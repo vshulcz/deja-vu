@@ -108,12 +108,34 @@ func zcodeAlsoLegacy(res installResult, uninstall bool, edit func(string, bool) 
 
 // installZCode writes the server under `mcp.servers`, which is one level
 // deeper than the `mcpServers` every other client here uses, so the shared
-// installMCPJSON cannot be pointed at it.
+// installMCPJSON cannot be pointed at it. It is the installTargetFunc for the
+// "zcode" target.
 func installZCode(exe string, uninstall bool) (installResult, error) {
+	return installZCodeWith(exe, uninstall, !uninstall && zcodeConfigIsLiveRuntimeConfig())
+}
+
+// installZCodeWith is installZCode with the live-config decision made by the
+// caller. A 3.17+ desktop build reads config.json (#4429 reversed, #5959), so
+// when alsoLiveConfig is true the server is written there as well as
+// setting.json — the same split installZCodeHooksWith already makes. The
+// server alone is what `deja install zcode` installs, so it must follow the
+// same judgement or the MCP server never loads on those builds.
+func installZCodeWith(exe string, uninstall, alsoLiveConfig bool) (installResult, error) {
 	edit := func(path string, uninstall bool) (installResult, error) { return zcodeServerAt(path, exe, uninstall) }
 	res, err := edit(zcodeConfigPath(), uninstall)
 	if err != nil {
 		return installResult{}, err
+	}
+	// A 3.17+ desktop build keeps reading config.json instead of the
+	// setting.json the 3.14.4 CLI runtime migrated to (#4429). Write the
+	// server there too, so either runtime loads it. The setting.json copy
+	// stays: on the 3.14.4 CLI runtime it is the only file read.
+	if alsoLiveConfig {
+		legacyRes, lerr := edit(zcodeLegacyConfigPath(), false)
+		if lerr != nil {
+			return installResult{}, lerr
+		}
+		res = wroteAll(res, legacyRes)
 	}
 	return zcodeAlsoLegacy(res, uninstall, edit)
 }
@@ -211,7 +233,7 @@ func installZCodeAuto(exe string, uninstall bool) (installResult, error) {
 	// half-wired with nothing saying so. Check whether config.json is the live
 	// runtime config before installZCode creates setting.json.
 	alsoLiveConfig := !uninstall && zcodeConfigIsLiveRuntimeConfig()
-	server, err := installZCode(exe, uninstall)
+	server, err := installZCodeWith(exe, uninstall, alsoLiveConfig)
 	if err != nil {
 		return installResult{}, err
 	}
@@ -246,8 +268,7 @@ func installZCodeHooksWith(exe string, uninstall, alsoLiveConfig bool) (installR
 	}
 	// A 3.17+ desktop build keeps reading config.json instead of the
 	// setting.json the 3.14.4 CLI runtime migrated to (#4429). Write the hooks
-	// there too, so either runtime runs them. The server stays in setting.json —
-	// putting it in config.json would bring it back through the migration.
+	// there too, so either runtime runs them.
 	if alsoLiveConfig {
 		legacyRes, lerr := edit(zcodeLegacyConfigPath(), false)
 		if lerr != nil {
@@ -546,4 +567,66 @@ func zcodeCommandIsOurs(cmd string) bool {
 		}
 	}
 	return false
+}
+
+// lookupEnvFold reads name with case-insensitive fallback so tests running on
+// POSIX can resolve Windows-style casing such as %LocalAppData%.
+func lookupEnvFold(name string) (string, bool) {
+	if v, ok := os.LookupEnv(name); ok {
+		return v, true
+	}
+	for _, entry := range os.Environ() {
+		k, v, ok := strings.Cut(entry, "=")
+		if ok && strings.EqualFold(k, name) {
+			return v, true
+		}
+	}
+	return "", false
+}
+
+// expandPercentEnv expands Windows-style %VAR% placeholders when the named
+// variable exists, leaving unclosed markers and unknown names verbatim.
+func expandPercentEnv(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); {
+		if s[i] != '%' {
+			b.WriteByte(s[i])
+			i++
+			continue
+		}
+		end := strings.IndexByte(s[i+1:], '%')
+		if end <= 0 {
+			b.WriteByte('%')
+			i++
+			continue
+		}
+		name := s[i+1 : i+1+end]
+		if val, ok := lookupEnvFold(name); ok {
+			b.WriteString(val)
+			i += 1 + end + 1
+			continue
+		}
+		b.WriteByte('%')
+		i++
+	}
+	return b.String()
+}
+
+// cleanZCodeRegistryPath normalizes a Windows Uninstall InstallLocation value,
+// expanding %VAR% placeholders when expand is true and stripping outer quotes
+// and whitespace.
+func cleanZCodeRegistryPath(raw string, expand bool) string {
+	if expand {
+		raw = expandPercentEnv(raw)
+	}
+	s := strings.TrimSpace(raw)
+	for len(s) >= 2 {
+		if (s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'') {
+			s = strings.TrimSpace(s[1 : len(s)-1])
+			continue
+		}
+		break
+	}
+	s = strings.TrimSpace(strings.Trim(s, `"`))
+	return s
 }
