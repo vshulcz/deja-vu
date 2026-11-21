@@ -135,7 +135,7 @@ skill 调用的是上面装好的 `deja` 二进制，自己不带。
 
 ## 能得到什么
 
-**在 Codex 里解决，Claude 记得。** 五十一个编程智能体把每一次对话都写进本地文件，
+**在 Codex 里解决，Claude 记得。** 五十二个编程智能体把每一次对话都写进本地文件，
 deja 把这些文件变成一层它们都能读的记忆。
 
 | | |
@@ -239,7 +239,7 @@ Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy
 CodeArts Desktop ·
 Ante ·
 Doubao ·
-Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed。
+Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · TeleAgent · Zed。
 
 每个工具分别支持 MCP 召回、自动召回、技能、命令、resume 和 handoff 中的哪些，见
 [英文 README 的能力矩阵](../../README.md#supported-harnesses)。自定义存储位置通过 `DEJA_*_ROOT`

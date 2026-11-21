@@ -6,7 +6,7 @@
 
 **[★ vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)** 扩展（LongMemEval-S **97.2% R@5**）· [文档](https://vshulcz.github.io/deja-vu/zh/) · [在线演示](https://vshulcz.github.io/deja-vu/view/) · [评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-> 面向 Claude Code、Codex、Cursor、Gemini CLI、OpenClaw、Hermes 及其他五十个智能体的本机跨工具会话记忆索引（零大模型依赖、单 Go 二进制）。
+> 面向 Claude Code、Codex、Cursor、Gemini CLI、OpenClaw、Hermes 及其他五十一个智能体的本机跨工具会话记忆索引（零大模型依赖、单 Go 二进制）。
 
 ![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -20,7 +20,7 @@
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-`@vshulcz/magpie-deja` 依赖 `@vshulcz/deja-vu`，若本机 `PATH` 中尚未安装 `deja`，安装插件时会自动拉取对应平台的二进制。首次使用前可执行一次 `deja index` 建立本地会话索引，或运行 `deja install --auto` 为本机五十一个编程工具配置原生 MCP 工具（`recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff`）与生命周期钩子；当客户端自身已通过 `deja install` 注入记忆时，网关钩子会自动让步，不会重复注入。
+`@vshulcz/magpie-deja` 依赖 `@vshulcz/deja-vu`，若本机 `PATH` 中尚未安装 `deja`，安装插件时会自动拉取对应平台的二进制。首次使用前可执行一次 `deja index` 建立本地会话索引，或运行 `deja install --auto` 为本机五十二个编程工具配置原生 MCP 工具（`recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff`）与生命周期钩子；当客户端自身已通过 `deja install` 注入记忆时，网关钩子会自动让步，不会重复注入。
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto

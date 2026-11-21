@@ -931,6 +931,21 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			}},
 		},
 		{
+			// TeleAgent (星辰超级智能体): China Telecom TeleAI's desktop client,
+			// one OpenCode-schema SQLite store per account under
+			// ~/.local/share/TeleAgent/users/<account>/teleagent.db.
+			Name: "teleagent", Load: LoadTeleAgent, Files: TeleAgentSessionFiles,
+			Kinds: []FileKind{{
+				Name: "teleagent",
+				Match: func(p string) bool {
+					return filepath.Base(p) == "teleagent.db" &&
+						strings.HasPrefix(filepath.Dir(p), TeleAgentUsersDir()+string(filepath.Separator))
+				},
+				Parse:     dbParse(ParseTeleagentDB, ParseTeleagentDBSince),
+				ParseFrom: dbParseFrom(ParseTeleagentDB, ParseTeleagentDBSince),
+			}},
+		},
+		{
 			// Omnigent: conversations and subagent runs in ~/.omnigent/chat.db.
 			Name: "omnigent", Load: LoadOmnigent, Files: OmnigentFiles,
 			Kinds: []FileKind{{

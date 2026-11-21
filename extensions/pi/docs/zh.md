@@ -6,7 +6,7 @@
 
 **[deja-vu](https://github.com/vshulcz/deja-vu)** 扩展（LongMemEval-S **97.2% R@5**）· [文档](https://vshulcz.github.io/deja-vu/zh/) · [在线演示](https://vshulcz.github.io/deja-vu/view/) · [评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-pi 记得自己的会话。这个扩展回答的是另一个问题：这台机器上 Claude Code、Codex、Cursor、Gemini、OpenClaw、Hermes 等其他五十个编程智能体里做过什么，包括装 pi 之前的那几个月。记忆在本地以单文件 Go 二进制 `deja` 运行并建立 BM25 索引，无需额外 LLM、嵌入模型或云端账号；除主动运行的更新与同步命令及可用 `DEJA_OFFLINE=1` 关闭的每日版本检查外，不发起网络请求。
+pi 记得自己的会话。这个扩展回答的是另一个问题：这台机器上 Claude Code、Codex、Cursor、Gemini、OpenClaw、Hermes 等其他五十一个编程智能体里做过什么，包括装 pi 之前的那几个月。记忆在本地以单文件 Go 二进制 `deja` 运行并建立 BM25 索引，无需额外 LLM、嵌入模型或云端账号；除主动运行的更新与同步命令及可用 `DEJA_OFFLINE=1` 关闭的每日版本检查外，不发起网络请求。
 
 ![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 

@@ -98,6 +98,8 @@ func SkipReason(harness string) string {
 		present = fileExists(KiroDB())
 	case "mimo":
 		present = fileExists(MimoDB())
+	case "teleagent":
+		present = len(TeleAgentDBs()) > 0
 	case "omnigent":
 		present = fileExists(OmnigentDB())
 	case "orca":

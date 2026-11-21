@@ -1598,7 +1598,7 @@ var countWords = map[int]string{
 	37: "thirty-seven", 38: "thirty-eight", 39: "thirty-nine", 40: "forty",
 	41: "forty-one", 42: "forty-two", 43: "forty-three", 44: "forty-four",
 	45: "forty-five", 46: "forty-six", 47: "forty-seven", 48: "forty-eight",
-	49: "forty-nine", 50: "fifty", 51: "fifty-one", 52: "fifty-two",
+	49: "forty-nine", 50: "fifty", 51: "fifty-one", 52: "fifty-two", 53: "fifty-three",
 }
 
 // countWord is the word for a count, or a failure naming what to add.
@@ -1769,7 +1769,7 @@ func TestPagesCountHarnessesInDigitsCorrectly(t *testing.T) {
 		}
 		for _, m := range claim.FindAllStringSubmatch(string(b), -1) {
 			got, err := strconv.Atoi(m[1])
-			if err != nil || got < 10 || got > 50 {
+			if err != nil || got < 10 || got > 60 {
 				// Not a claim about how many harnesses there are: "3 agents"
 				// in a sentence about someone else's tool, a version, a count
 				// of something entirely different.
@@ -1812,7 +1812,7 @@ func TestPagesCountHarnessesInDigitsCorrectly(t *testing.T) {
 // `formats` and `tools` are in the noun list because the same number is written
 // with them: "twenty-five formats" outlived eight harnesses on three pages
 // while every sentence that said `agents` was kept current by this test.
-var spelled = regexp.MustCompile(`(?i)\b(other\s+)?((?:twenty|thirty|forty)(?:-(?:one|two|three|four|five|six|seven|eight|nine))?)\s+(more\s+)?(?:coding\s+)?(?:harnesses|agents|formats|tools)\b`)
+var spelled = regexp.MustCompile(`(?i)\b(other\s+)?((?:twenty|thirty|forty|fifty)(?:-(?:one|two|three|four|five|six|seven|eight|nine))?)\s+(more\s+)?(?:coding\s+)?(?:harnesses|agents|formats|tools)\b`)
 
 // registryHarnessCount is how many harnesses deja reads, from the one file that
 // decides it. deja itself is in the registry as the reader, not as something it
@@ -1854,7 +1854,7 @@ func TestNpmReadmeLeadsWithWhatTheMainOneLeadsWith(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, line := range []string{
-		"Shared local memory, session history search, cross-agent handoff, and code recovery across 51 coding agents.",
+		"Shared local memory, session history search, cross-agent handoff, and code recovery across 52 coding agents.",
 	} {
 		if !strings.Contains(string(main), line) {
 			t.Fatalf("the main README no longer says %q — update this test with it", line)
@@ -2150,8 +2150,8 @@ func TestGuidePagesCarryDemoAndRepoMemory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(enGuides) != 50 {
-		t.Fatalf("expected 50 EN memory-for-* guides, got %d", len(enGuides))
+	if len(enGuides) != 51 {
+		t.Fatalf("expected 51 EN memory-for-* guides, got %d", len(enGuides))
 	}
 	zhGuides, err := filepath.Glob(filepath.Join(root, "docs", "zh", "guide", "memory-for-*.html"))
 	if err != nil {

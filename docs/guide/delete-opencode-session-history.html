@@ -80,7 +80,7 @@
 <a href="recover-overwritten-files.html">Recover overwritten files</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold" open><summary>Deleting sessions <span class="n">39</span></summary>
+<details class="grpfold" open><summary>Deleting sessions <span class="n">40</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -118,10 +118,11 @@
 <a href="delete-grok-session-history.html">Grok Build</a>
 <a href="delete-devin-session-history.html">Devin CLI</a>
 <a href="delete-mimo-session-history.html">MiMo-Code</a>
+<a href="delete-teleagent-session-history.html">TeleAgent</a>
 <a href="delete-omnigent-session-history.html">Omnigent</a>
 <a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold"><summary>Per-agent guides <span class="n">50</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">51</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
@@ -153,6 +154,7 @@
 <a href="memory-for-kimi.html">Kimi Code</a>
 <a href="memory-for-kiro.html">Kiro</a>
 <a href="memory-for-mimo.html">MiMo-Code</a>
+<a href="memory-for-teleagent.html">TeleAgent</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
 <a href="memory-for-oh-my-claudecode.html">oh-my-claudecode</a>
@@ -212,7 +214,7 @@ deja delete &lt;id&gt;</pre>
 <p>The sessions are the record of what was tried and what worked. opencode's own list is the only way back into them, and it reads the same database — so the answer to a question you solved in June exists only while that file does.</p>
 
 <h2>Keeping it searchable instead</h2>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads this database through <code>sqlite3</code> — along with the other fifty agents' histories on the machine — into one local index, searchable from the shell and readable by the agents themselves over MCP:</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads this database through <code>sqlite3</code> — along with the other fifty-one agents' histories on the machine — into one local index, searchable from the shell and readable by the agents themselves over MCP:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "opencode session about the retry budget"</pre>
 <p>Nothing to switch on first: the database is already there, including the months before deja was installed. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session from the index for good. A session you deleted in opencode stays readable under the Deleted tab of the screen bare <code>deja</code> opens, where <code>o</code> carries it into another agent; deja does not write rows back into <code>opencode.db</code>.</p>
