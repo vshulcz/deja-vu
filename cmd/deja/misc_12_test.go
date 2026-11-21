@@ -901,7 +901,7 @@ func TestRulesSyncAndStatusOnFileWithoutTrailingNewline(t *testing.T) {
 	}
 	for _, target := range []string{"hermes", "hermes:hermecules", "hermes:hermus"} {
 		found := false
-		for _, line := range strings.Split(status, "\n") {
+		for line := range strings.SplitSeq(status, "\n") {
 			fields := strings.Fields(line)
 			if len(fields) >= 2 && fields[0] == target {
 				found = true
