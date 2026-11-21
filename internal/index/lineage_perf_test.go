@@ -200,3 +200,89 @@ func TestLineageAvoidsFullSessionBodyInflation(t *testing.T) {
 		t.Fatalf("LineageCut decoded %d full record bodies across marathon sessions, want <= %d", decodes, maxAllowedDecodes)
 	}
 }
+
+func TestLineageAvoidsFullSessionStubInflation(t *testing.T) {
+	dir, forkPoint, _ := buildLargeLineageStore(t, 2000, 15)
+
+	lineageBodyDecodes.Store(0)
+	lineageStubDecodes.Store(0)
+	out, cut := LineageCut(dir, map[string]bool{"asker": true})
+	bodyDecodes := lineageBodyDecodes.Load()
+	stubDecodes := lineageStubDecodes.Load()
+
+	if !out["copy-with-noise"] || !out["sub-child"] {
+		t.Fatalf("unexpected out: %v", out)
+	}
+	if out["fork-diverged"] || !cut["fork-diverged"].Equal(forkPoint) {
+		t.Fatalf("fork-diverged out=%v cut=%v, want kept at %v", out["fork-diverged"], cut["fork-diverged"], forkPoint)
+	}
+	if out["sibling-diverged"] || !cut["sibling-diverged"].Equal(forkPoint) {
+		t.Fatalf("sibling-diverged out=%v cut=%v, want kept at %v", out["sibling-diverged"], cut["sibling-diverged"], forkPoint)
+	}
+	const maxAllowedBodyDecodes = 16
+	if bodyDecodes > maxAllowedBodyDecodes {
+		t.Fatalf("LineageCut decoded %d full record bodies across 2k-turn sessions, want <= %d", bodyDecodes, maxAllowedBodyDecodes)
+	}
+	const maxAllowedStubDecodes = 250
+	if stubDecodes > maxAllowedStubDecodes {
+		t.Fatalf("LineageCut decoded %d stubs across 2k-turn sessions, want <= %d", stubDecodes, maxAllowedStubDecodes)
+	}
+
+	// Shifted-index siblings share the opening and later fork point after extra
+	// early messages shift subsequent record indices out of alignment.
+	at := time.Date(2026, 10, 2, 7, 0, 0, 0, time.UTC)
+	pad := strings.Repeat("alpha beta gamma delta epsilon ", 240)
+	turn := func(role, text string, ms int64) model.Message {
+		return model.Message{Role: role, Text: text, Time: at.Add(time.Duration(ms) * time.Millisecond)}
+	}
+	const sharedN = 320
+	base := make([]model.Message, 0, sharedN+1)
+	base = append(base, turn("user", "retry loop spins on timeout", 0))
+	for i := range sharedN {
+		role := "tool-output"
+		if i%5 == 0 {
+			role = "assistant"
+		}
+		base = append(base, turn(role, fmt.Sprintf("turn-%04d %s", i, pad), int64(2000+i*1000)))
+	}
+	shiftedCut := base[len(base)-1].Time
+
+	askerMsgs := slices.Clone(base)
+	for i := range 8 {
+		askerMsgs = append(askerMsgs, turn("user", fmt.Sprintf("asker-tail-%02d %s", i, pad), int64(2000+(sharedN+i)*1000)))
+	}
+	var copyExtra []model.Message
+	for i := range 5 {
+		copyExtra = append(copyExtra, turn("assistant", fmt.Sprintf("early-shift-%02d %s", i, pad), int64(100+i*100)))
+	}
+	shiftedCopy := slices.Concat(base[:1], copyExtra, base[1:])
+	shiftedSibling := slices.Concat(
+		base[:1],
+		[]model.Message{turn("assistant", fmt.Sprintf("early-sibling-shift %s", pad), 500)},
+		base[1:],
+		[]model.Message{
+			turn("user", fmt.Sprintf("shifted-sibling-diverged-0 %s", pad), int64(2000+(sharedN+200)*1000)),
+			turn("assistant", fmt.Sprintf("shifted-sibling-diverged-1 %s", pad), int64(2000+(sharedN+201)*1000)),
+		},
+	)
+
+	shiftDir := filepath.Join(t.TempDir(), "index.db")
+	if err := os.MkdirAll(filepath.Join(shiftDir+".tmp", "buckets"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	shiftSessions := []model.Session{
+		{Harness: "claude", ID: "asker", Project: "p", Messages: askerMsgs},
+		{Harness: "claude", ID: "shifted-copy", Project: "p", Messages: shiftedCopy},
+		{Harness: "claude", ID: "shifted-sibling", Project: "p", Messages: shiftedSibling},
+	}
+	if err := writeSessions(shiftDir+".tmp", shiftDir, shiftSessions, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	sOut, sCut := LineageCut(shiftDir, map[string]bool{"asker": true})
+	if !sOut["shifted-copy"] {
+		t.Fatalf("shifted-copy should be hidden by asker: out=%v", sOut)
+	}
+	if sOut["shifted-sibling"] || !sCut["shifted-sibling"].Equal(shiftedCut) {
+		t.Fatalf("shifted-sibling out=%v cut=%v, want kept at %v", sOut["shifted-sibling"], sCut["shifted-sibling"], shiftedCut)
+	}
+}
