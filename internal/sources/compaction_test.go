@@ -1198,13 +1198,13 @@ func TestFileContainsTokenBoundedReadsHeadAndTailOnly(t *testing.T) {
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if ok, n := fileContainsTokenBounded(path, []byte("head-token"), window); !ok || n != window {
+	if ok, n := fileContainsTokenBounded(path, []byte("head-token")); !ok || n != window {
 		t.Fatalf("head probe = (%v, %d), want (true, %d)", ok, n, window)
 	}
-	if ok, n := fileContainsTokenBounded(path, []byte("tail-token"), window); !ok || n != 2*window {
+	if ok, n := fileContainsTokenBounded(path, []byte("tail-token")); !ok || n != 2*window {
 		t.Fatalf("tail probe = (%v, %d), want (true, %d)", ok, n, 2*window)
 	}
-	if ok, n := fileContainsTokenBounded(path, []byte("middle-only-token"), window); ok || n != 2*window {
+	if ok, n := fileContainsTokenBounded(path, []byte("middle-only-token")); ok || n != 2*window {
 		t.Fatalf("middle probe = (%v, %d), want (false, %d)", ok, n, 2*window)
 	}
 }

@@ -2,6 +2,7 @@ package sources
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -272,7 +273,7 @@ func compactionCandidateProbeMatch(harness, path, id string, needle []byte, tota
 		if *totalRead >= compactionProbeTotalBytes {
 			return false, true
 		}
-		found, n := fileContainsTokenBounded(path, needle, compactionProbeWindow)
+		found, n := fileContainsTokenBounded(path, needle)
 		*totalRead += n
 		return found, false
 	case isCompactionDBPath(path):
@@ -303,7 +304,7 @@ func isCompactionDBPath(path string) bool {
 		strings.HasSuffix(path, ".vscdb")
 }
 
-func fileContainsTokenBounded(path string, needle []byte, window int64) (bool, int64) {
+func fileContainsTokenBounded(path string, needle []byte) (bool, int64) {
 	f, err := os.Open(path)
 	if err != nil {
 		return false, 0
@@ -314,24 +315,24 @@ func fileContainsTokenBounded(path string, needle []byte, window int64) (bool, i
 		return false, 0
 	}
 	sz := info.Size()
-	if sz <= 2*window {
+	if sz <= 2*compactionProbeWindow {
 		buf := make([]byte, sz)
-		n, err := io.ReadFull(f, buf)
-		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		n, readErr := io.ReadFull(f, buf)
+		if readErr != nil && !errors.Is(readErr, io.EOF) && !errors.Is(readErr, io.ErrUnexpectedEOF) {
 			return false, int64(n)
 		}
 		return bytes.Contains(buf[:n], needle), int64(n)
 	}
-	buf := make([]byte, window)
+	buf := make([]byte, compactionProbeWindow)
 	n, err := io.ReadFull(f, buf)
-	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
 		return false, int64(n)
 	}
 	if bytes.Contains(buf[:n], needle) {
 		return true, int64(n)
 	}
-	m, err := f.ReadAt(buf, sz-window)
-	if err != nil && err != io.EOF {
+	m, err := f.ReadAt(buf, sz-compactionProbeWindow)
+	if err != nil && !errors.Is(err, io.EOF) {
 		return false, int64(n + m)
 	}
 	return bytes.Contains(buf[:m], needle), int64(n + m)
