@@ -270,7 +270,7 @@ Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI �
 | JetBrains 全家桶 | IntelliJ、GoLand、PyCharm、WebStorm 与 RustRover 插件（[`extensions/jetbrains/`](../../extensions/jetbrains/docs/zh.md)） | `idea installPlugins com.github.vshulcz.deja-vu` |
 | Neovim | `lazy.nvim` 与 CodeCompanion 插件（[`extensions/nvim/`](../../extensions/nvim/docs/zh.md)） | `{ "vshulcz/deja-vu", opts = {} }` |
 | tmux | [TPM](https://github.com/tmux-plugins/tpm) 弹窗（`prefix + D`）与状态栏 `#{deja_status}`（`deja.tmux`） | `set -g @plugin 'vshulcz/deja-vu'` |
-| Raycast | Raycast 扩展 `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
+| Raycast | [Raycast Store](https://www.raycast.com/vshulcz/deja-vu) | `open raycast://extensions/vshulcz/deja-vu` |
 | CC Switch | 一键导入 MCP 与 Skill 仓库（`ccswitch://`） | [导入 MCP 到 CC Switch](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [跨智能体切换指南](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 两条路各自都够用，两条都走也不会出问题：每个包都会先读 `deja install` 写下的配置。

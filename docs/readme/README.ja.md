@@ -425,7 +425,7 @@ TRAE IDE は接続はしますが、読み取りはしません。チャット�
 | JetBrains IDEs | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35998-deja-vu-cross-agent-ai-session-memory) (`com.github.vshulcz.deja-vu`)（[`extensions/jetbrains/`](../../extensions/jetbrains/docs/ja.md)） | `idea installPlugins com.github.vshulcz.deja-vu` |
 | Neovim | `lazy.nvim` ＆ CodeCompanion プラグイン（[`extensions/nvim/`](../../extensions/nvim/docs/ja.md)） | `{ "vshulcz/deja-vu", opts = {} }` |
 | tmux | [TPM](https://github.com/tmux-plugins/tpm) ポップアップ（`prefix + D`）＆ `#{deja_status}`（`deja.tmux`） | `set -g @plugin 'vshulcz/deja-vu'` |
-| Raycast | Raycast 拡張機能 `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
+| Raycast | [Raycast Store](https://www.raycast.com/vshulcz/deja-vu) | `open raycast://extensions/vshulcz/deja-vu` |
 | CC Switch | ワンクリック MCP ＆ Skill リポジトリ取り込み（`ccswitch://`） | [CC Switch に MCP を追加](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [エージェント切り替えガイド](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 どちらの方法も単独で十分で、両方を使っても問題ありません。どのパッケージもまず `deja install` が

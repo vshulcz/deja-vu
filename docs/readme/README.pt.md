@@ -290,7 +290,7 @@ cada um tem um pacote no próprio ecossistema, para quem instala extensões por 
 | JetBrains IDEs | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/35998-deja-vu-cross-agent-ai-session-memory) (`com.github.vshulcz.deja-vu`) ([`extensions/jetbrains/`](../../extensions/jetbrains/docs/pt.md)) | `idea installPlugins com.github.vshulcz.deja-vu` |
 | Neovim | plugin `lazy.nvim` e CodeCompanion ([`extensions/nvim/`](../../extensions/nvim/docs/pt.md)) | `{ "vshulcz/deja-vu", opts = {} }` |
 | tmux | popup [TPM](https://github.com/tmux-plugins/tpm) (`prefix + D`) e `#{deja_status}` (`deja.tmux`) | `set -g @plugin 'vshulcz/deja-vu'` |
-| Raycast | extensão Raycast `deja-vu` | `cd extensions/raycast && npm install && npx ray develop` |
+| Raycast | [Raycast Store](https://www.raycast.com/vshulcz/deja-vu) | `open raycast://extensions/vshulcz/deja-vu` |
 | CC Switch | importação em 1 clique de MCP e repositório de Skills (`ccswitch://`) | [Adicionar MCP ao CC Switch](ccswitch://v1/import?resource=mcp&apps=claude,codex,gemini,opencode&config=eyJtY3BTZXJ2ZXJzIjp7ImRlamEiOnsiY29tbWFuZCI6Im5weCIsImFyZ3MiOlsiLXkiLCJAdnNodWxjei9kZWphLXZ1Iiwic2VydmUiXX19fQ==) · [Guia de troca de agente](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html) |
 
 Qualquer um dos dois caminhos basta e os dois juntos não quebram nada: cada pacote lê primeiro o que o
