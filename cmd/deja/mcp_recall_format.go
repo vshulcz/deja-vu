@@ -678,11 +678,7 @@ func recallRankWithLive(dir, q string, o search.Options, live map[string]bool, l
 // recallSearch is the index search recall ranks; a test counts the calls.
 var recallSearch = index.SearchWithRecoveryDetailed
 
-// recallRankFrom is recallRank on a search already run.
-func recallRankFrom(dir, q string, o search.Options, result index.SearchResult) (index.SearchResult, search.Options, []search.Hit, int, error) {
-	return recallRankFromWithLive(dir, q, o, result, nil, false)
-}
-
+// recallRankFromWithLive is recallRankWithLive on a search already run.
 func recallRankFromWithLive(dir, q string, o search.Options, result index.SearchResult, live map[string]bool, liveKnown bool) (index.SearchResult, search.Options, []search.Hit, int, error) {
 	var err error
 	ss := withoutScoped(result)
