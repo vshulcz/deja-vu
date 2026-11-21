@@ -1,6 +1,7 @@
 package index
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -284,5 +285,184 @@ func TestLineageAvoidsFullSessionStubInflation(t *testing.T) {
 	}
 	if sOut["shifted-sibling"] || !sCut["shifted-sibling"].Equal(shiftedCut) {
 		t.Fatalf("shifted-sibling out=%v cut=%v, want kept at %v", sOut["shifted-sibling"], sCut["shifted-sibling"], shiftedCut)
+	}
+}
+
+func TestLineagePrefixAndStubEdgeCases(t *testing.T) {
+	at := time.Date(2026, 10, 2, 7, 0, 0, 0, time.UTC)
+	pad := strings.Repeat("alpha beta gamma delta epsilon ", 240)
+	turn := func(role, text string, step int) model.Message {
+		return model.Message{Role: role, Text: text, Time: at.Add(time.Duration(step) * time.Second)}
+	}
+
+	const n = 280
+	zBase := make([]model.Message, 0, n+3)
+	zBase = append(zBase, turn("user", "zero-tail opening", 0))
+	for i := 1; i < n; i++ {
+		zBase = append(zBase, turn("assistant", fmt.Sprintf("z-%03d ", i)+pad, i))
+	}
+	zFork := zBase[len(zBase)-1].Time
+	zWithZeros := append(slices.Clone(zBase),
+		model.Message{Role: roleFiles, Text: "f1.go"},
+		model.Message{Role: roleWrote, Text: "f2.go"},
+	)
+	zAsker := append(slices.Clone(zWithZeros), turn("user", "z-asker-tail "+pad, 500))
+	zDiverged := append(slices.Clone(zWithZeros), turn("assistant", "z-diverged-tail "+pad, 501))
+
+	tBase := make([]model.Message, 0, n)
+	tBase = append(tBase, turn("user", "text-mismatch opening", 0))
+	for i := 1; i < n-1; i++ {
+		tBase = append(tBase, turn("tool-output", fmt.Sprintf("t-%03d ", i)+pad, i))
+	}
+	tFork := tBase[len(tBase)-1].Time
+	tAsker := append(slices.Clone(tBase),
+		turn("assistant", "split-asker "+pad, n),
+		turn("user", "t-asker-tail "+pad, n+10),
+	)
+	tDiverged := append(slices.Clone(tBase),
+		turn("assistant", "split-other "+pad, n),
+		turn("assistant", "t-diverged-tail "+pad, n+20),
+	)
+
+	mBase := make([]model.Message, 0, n)
+	mBase = append(mBase, turn("user", "nonmono opening", 0))
+	for i := 1; i < n; i++ {
+		step := i
+		if i == 140 {
+			step = -3600
+		}
+		mBase = append(mBase, turn("assistant", fmt.Sprintf("m-%03d ", i)+pad, step))
+	}
+	mFork := mBase[len(mBase)-1].Time
+	mAsker := append(slices.Clone(mBase), turn("user", "m-asker-tail "+pad, 900))
+	mDiverged := append(slices.Clone(mBase), turn("assistant", "m-diverged-tail "+pad, 901))
+
+	dir := filepath.Join(t.TempDir(), "index.db")
+	if err := os.MkdirAll(filepath.Join(dir+".tmp", "buckets"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	ss := []model.Session{
+		{Harness: "claude", ID: "z-asker", Project: "p", Messages: zAsker},
+		{Harness: "claude", ID: "z-diverged", Project: "p", Messages: zDiverged},
+		{Harness: "claude", ID: "t-asker", Project: "p", Messages: tAsker},
+		{Harness: "claude", ID: "t-diverged", Project: "p", Messages: tDiverged},
+		{Harness: "claude", ID: "m-asker", Project: "p", Messages: mAsker},
+		{Harness: "claude", ID: "m-diverged", Project: "p", Messages: mDiverged},
+	}
+	if err := writeSessions(dir+".tmp", dir, ss, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+
+	out, cut := LineageCut(dir, map[string]bool{
+		"z-asker": true,
+		"t-asker": true,
+		"m-asker": true,
+	})
+	if out["z-diverged"] || !cut["z-diverged"].Equal(zFork) {
+		t.Fatalf("z-diverged out=%v cut=%v, want kept at %v", out["z-diverged"], cut["z-diverged"], zFork)
+	}
+	if out["t-diverged"] || !cut["t-diverged"].Equal(tFork) {
+		t.Fatalf("t-diverged out=%v cut=%v, want kept at %v", out["t-diverged"], cut["t-diverged"], tFork)
+	}
+	if out["m-diverged"] || !cut["m-diverged"].Equal(mFork) {
+		t.Fatalf("m-diverged out=%v cut=%v, want kept at %v", out["m-diverged"], cut["m-diverged"], mFork)
+	}
+
+	// Exercise whitebox reader helpers: empty/cached roleStubsFrom, span miss ->
+	// point read, and errOffsetsMismatch fallback.
+	m, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lr := newLineageReader(dir, m)
+	defer lr.close()
+	lr.ensureOpen()
+
+	var zKey string
+	for _, sm := range m.Sessions {
+		if sm.ID == "z-asker" {
+			zKey = sm.Key()
+			break
+		}
+	}
+	if zKey == "" {
+		t.Fatal("z-asker missing from manifest")
+	}
+	offs, ok := lr.offsetsFor(zKey)
+	if !ok || len(offs) == 0 {
+		t.Fatalf("offsetsFor(%q) failed: ok=%v len=%d", zKey, ok, len(offs))
+	}
+	if empty, ok := lr.roleStubsFrom(zKey, offs, 0, map[string]bool{}); !ok || len(empty) != 0 {
+		t.Fatalf("empty wantRoles returned ok=%v len=%d", ok, len(empty))
+	}
+	roleSet := map[string]bool{"user": true}
+	firstPass, ok := lr.roleStubsFrom(zKey, offs, 0, roleSet)
+	if !ok || len(firstPass) == 0 {
+		t.Fatalf("roleStubsFrom first pass failed: ok=%v len=%d", ok, len(firstPass))
+	}
+	secondPass, ok := lr.roleStubsFrom(zKey, offs, 0, roleSet)
+	if !ok || len(secondPass) != len(firstPass) {
+		t.Fatalf("roleStubsFrom cache pass = %d, want %d", len(secondPass), len(firstPass))
+	}
+
+	if _, _, serr := lr.tryRoleStubFromSpan([]byte{1, 2}, 0, zKey, offs[0], nil); !errors.Is(serr, errSpanIncomplete) {
+		t.Fatalf("truncated span err = %v, want errSpanIncomplete", serr)
+	}
+	if st, keep, rerr := lr.roleStubAtOffset(nil, 0, zKey, offs[1], map[string]bool{"assistant": true}); rerr != nil || !keep || st.role != "assistant" {
+		t.Fatalf("point read via roleStubAtOffset: st=%+v keep=%v err=%v", st, keep, rerr)
+	}
+	if _, _, rerr := lr.readRoleStubPoint(zKey, offs[1], map[string]bool{"user": true}); rerr != nil {
+		t.Fatalf("readRoleStubPoint role skip err = %v", rerr)
+	}
+
+	// Raw and deflated stub decode paths including truncated fallback failure.
+	tbl := lr.getTables()
+	rawRec := Record{Key: zKey, SourcePath: "s.jsonl", Role: "user", Time: at, Text: "hi"}
+	rawBytes := encodeRecord(rawRec, tbl)
+	if dec, derr := decodeRecordStubRole(rawBytes, tbl); derr != nil || dec.Role != "user" || !dec.Time.Equal(at) {
+		t.Fatalf("raw decodeRecordStubRole = (%+v, %v)", dec, derr)
+	}
+	defRec := Record{Key: zKey, SourcePath: "s.jsonl", Role: "assistant", Time: at, Text: pad}
+	defBytes := encodeRecord(defRec, tbl)
+	if dec, derr := decodeRecordStubRole(defBytes, tbl); derr != nil || dec.Role != "assistant" || !dec.Time.Equal(at) {
+		t.Fatalf("deflated decodeRecordStubRole = (%+v, %v)", dec, derr)
+	}
+	shortTrunc := defBytes[:min(len(defBytes), 20)]
+	if _, derr := decodeRecordStubRole(shortTrunc, tbl); derr == nil {
+		t.Fatal("expected short truncated deflated payload error")
+	}
+	longCorrupt := append(slices.Clone(shortTrunc), make([]byte, stubDeflatePrefix)...)
+	if _, derr := decodeRecordStubRole(longCorrupt, tbl); derr == nil {
+		t.Fatal("expected extended corrupt deflated payload error")
+	}
+
+	// Empty offset table entry, errOffsetsMismatch, and fallbackRoleStubs paths.
+	missingStubs, mok := lr.sessionRoleStubs("claude\x00missing-for-mismatch", 0, nil)
+	if !mok || len(missingStubs) != 0 {
+		t.Fatalf("missing session returned ok=%v len=%d, want true/0", mok, len(missingStubs))
+	}
+	lr2 := newLineageReader(dir, m)
+	defer lr2.close()
+	lr2.ensureOpen()
+	if _, rok := lr2.roleStubsFrom("wrong-key", offs[:1], 0, nil); rok || lr2.roOK {
+		t.Fatalf("wrong-key roleStubsFrom rok=%v roOK=%v, want false/false", rok, lr2.roOK)
+	}
+	if fbStubs, ok := lr2.sessionRoleStubs(zKey, 0, map[string]bool{"user": true}); !ok || len(fbStubs) == 0 {
+		t.Fatalf("fallback sessionRoleStubs(%q) ok=%v len=%d", zKey, ok, len(fbStubs))
+	}
+	if fbEmpty, ok := lr2.sessionRoleStubs(zKey, 0, map[string]bool{}); !ok || len(fbEmpty) != 0 {
+		t.Fatalf("fallback empty roles ok=%v len=%d", ok, len(fbEmpty))
+	}
+	if fbMissing, ok := lr2.sessionRoleStubs("claude\x00missing-for-mismatch", 0, nil); !ok || len(fbMissing) != 0 {
+		t.Fatalf("fallback missing session ok=%v len=%d, want true/0", ok, len(fbMissing))
+	}
+	lr2.recordsPath = filepath.Join(t.TempDir(), "missing.bin")
+	if _, ok := lr2.sessionRoleStubs("claude\x00unreadable", 0, nil); ok {
+		t.Fatal("fallback unreadable records unexpectedly returned ok=true")
+	}
+	lr3 := newLineageReader(t.TempDir(), m)
+	defer lr3.close()
+	if _, ok := lr3.sessionRoleStubs(zKey, 0, nil); ok {
+		t.Fatal("unopened store sessionRoleStubs unexpectedly returned ok=true")
 	}
 }

@@ -34,11 +34,6 @@ type recordStub struct {
 	text string
 }
 
-type sessionStubs struct {
-	list []recordStub
-	byRT map[roleTimeKey][]int
-}
-
 type prefixResult struct {
 	length    int
 	bound     time.Time
@@ -82,7 +77,6 @@ type lineageReader struct {
 	tailErr   bool
 
 	offsByKey      map[string][]int64
-	stubsByKey     map[string]*sessionStubs
 	stubByOff      map[int64]recordStub
 	roleStubsByKey map[string]map[string][]recordStub
 	prefixByPair   map[[2]string]prefixResult
@@ -96,7 +90,6 @@ func newLineageReader(dir string, m Manifest) *lineageReader {
 		recordsPath:    filepath.Join(dir, "records.bin"),
 		manifest:       m,
 		offsByKey:      map[string][]int64{},
-		stubsByKey:     map[string]*sessionStubs{},
 		stubByOff:      map[int64]recordStub{},
 		roleStubsByKey: map[string]map[string][]recordStub{},
 		prefixByPair:   map[[2]string]prefixResult{},
@@ -321,19 +314,6 @@ func (lr *lineageReader) fallbackRecords(key string) ([]Record, bool) {
 	return recs, true
 }
 
-func stubsFromRecords(recs []Record) *sessionStubs {
-	st := &sessionStubs{
-		list: make([]recordStub, len(recs)),
-		byRT: make(map[roleTimeKey][]int, len(recs)),
-	}
-	for i, r := range recs {
-		st.list[i] = recordStub{off: -1, role: r.Role, at: r.Time, text: r.Text}
-		rt := roleTimeKey{role: r.Role, nano: r.Time.UnixNano()}
-		st.byRT[rt] = append(st.byRT[rt], i)
-	}
-	return st
-}
-
 func (lr *lineageReader) readStubAt(key string, off int64) (Record, error) {
 	t := lr.getTables()
 	var head [lineageStubWindow]byte
@@ -372,31 +352,6 @@ func (lr *lineageReader) readStubAt(key string, off int64) (Record, error) {
 		lineageStubDecodes.Add(1)
 	}
 	return rec, derr
-}
-
-func (lr *lineageReader) readStubFromSpan(b []byte, rel int, key string) (Record, error) {
-	if rel < 0 || rel+4 > len(b) {
-		return Record{}, errOffsetsMismatch
-	}
-	size := int(binary.LittleEndian.Uint32(b[rel : rel+4]))
-	if size > maxRecordSize {
-		return Record{}, errOffsetsMismatch
-	}
-	t := lr.getTables()
-	if rel+4 < len(b) {
-		end := min(len(b), rel+4+size)
-		avail := b[rel+4 : end]
-		if recKey, _, ok := recordRoleIn(avail, t); ok {
-			if recKey != key {
-				return Record{}, errOffsetsMismatch
-			}
-			if rec, derr := decodeRecordStubRole(avail, t); derr == nil {
-				lineageStubDecodes.Add(1)
-				return rec, nil
-			}
-		}
-	}
-	return Record{}, errOffsetsMismatch
 }
 
 func sameStubMeta(a, b recordStub) bool {
@@ -699,79 +654,41 @@ func (lr *lineageReader) roleStubsFrom(key string, offs []int64, startIdx int, w
 	return out, true
 }
 
-func (lr *lineageReader) stubsFor(key string) (*sessionStubs, bool) {
-	if st, ok := lr.stubsByKey[key]; ok {
-		return st, true
+func (lr *lineageReader) fallbackRoleStubs(key string, wantRoles map[string]bool) ([]recordStub, bool) {
+	if wantRoles != nil && len(wantRoles) == 0 {
+		return nil, true
 	}
+	recs, ok := lr.fallbackRecords(key)
+	if !ok {
+		return nil, false
+	}
+	out := make([]recordStub, 0, len(recs))
+	for _, r := range recs {
+		if wantRoles != nil && !wantRoles[r.Role] {
+			continue
+		}
+		out = append(out, recordStub{off: -1, role: r.Role, at: r.Time, text: r.Text})
+	}
+	return out, true
+}
+
+func (lr *lineageReader) sessionRoleStubs(key string, startIdx int, wantRoles map[string]bool) ([]recordStub, bool) {
 	lr.ensureOpen()
 	if lr.file == nil {
 		return nil, false
 	}
 	if !lr.roOK {
-		recs, ok := lr.fallbackRecords(key)
-		if !ok {
-			return nil, false
-		}
-		st := stubsFromRecords(recs)
-		lr.stubsByKey[key] = st
-		return st, true
+		return lr.fallbackRoleStubs(key, wantRoles)
 	}
 	offs, ok := lr.offsetsFor(key)
 	if !ok {
-		return lr.fallbackStubs(key)
+		return lr.fallbackRoleStubs(key, wantRoles)
 	}
-	st := &sessionStubs{
-		list: make([]recordStub, 0, len(offs)),
-		byRT: make(map[roleTimeKey][]int, len(offs)),
+	stubs, ok := lr.roleStubsFrom(key, offs, startIdx, wantRoles)
+	if !ok && !lr.roOK {
+		return lr.fallbackRoleStubs(key, wantRoles)
 	}
-	var buf []byte
-	for i := 0; i < len(offs); {
-		j := i + 1
-		for j < len(offs) && offs[j]-offs[j-1] <= lineageSpanGap && offs[j]-offs[i] < spanSizeMax {
-			j++
-		}
-		start := offs[i]
-		want := int(offs[j-1]-start) + lineageStubWindow
-		if cap(buf) < want {
-			buf = make([]byte, want)
-		}
-		b := buf[:want]
-		n, err := lr.file.ReadAt(b, start)
-		if err != nil && !errors.Is(err, io.EOF) {
-			n = 0
-		}
-		b = b[:n]
-		for _, off := range offs[i:j] {
-			rec, serr := lr.readStubFromSpan(b, int(off-start), key)
-			if serr != nil {
-				rec, serr = lr.readStubAt(key, off)
-			}
-			if serr != nil {
-				if errors.Is(serr, errOffsetsMismatch) {
-					lr.roOK = false
-					return lr.fallbackStubs(key)
-				}
-				return nil, false
-			}
-			idx := len(st.list)
-			st.list = append(st.list, recordStub{off: off, role: rec.Role, at: rec.Time})
-			rt := roleTimeKey{role: rec.Role, nano: rec.Time.UnixNano()}
-			st.byRT[rt] = append(st.byRT[rt], idx)
-		}
-		i = j
-	}
-	lr.stubsByKey[key] = st
-	return st, true
-}
-
-func (lr *lineageReader) fallbackStubs(key string) (*sessionStubs, bool) {
-	recs, ok := lr.fallbackRecords(key)
-	if !ok {
-		return nil, false
-	}
-	st := stubsFromRecords(recs)
-	lr.stubsByKey[key] = st
-	return st, true
+	return stubs, ok
 }
 
 func (lr *lineageReader) fullRecordAt(key string, off int64) (Record, error) {
@@ -902,20 +819,6 @@ func isWholeHoldNoise(r Record) bool {
 	return afterForkNoise(r) || r.Role == roleEdit || r.Role == roleWrote || r.Role == roleFiles
 }
 
-func (lr *lineageReader) heldFallback(askerKey string, last Record) bool {
-	st, ok := lr.stubsFor(askerKey)
-	if !ok || len(st.list) == 0 {
-		return false
-	}
-	idxs := st.byRT[roleTimeKey{role: last.Role, nano: last.Time.UnixNano()}]
-	for _, idx := range idxs {
-		if txt, ok := lr.stubText(askerKey, st.list[idx]); ok && txt == last.Text {
-			return true
-		}
-	}
-	return false
-}
-
 func (lr *lineageReader) matchAtOffset(key string, off int64, target Record) (bool, error) {
 	if rec, ok := lr.fullByOff[off]; ok {
 		return rec.Role == target.Role && rec.Time.UnixNano() == target.Time.UnixNano() && rec.Text == target.Text, nil
@@ -968,41 +871,35 @@ func (lr *lineageReader) held(asker, other SessionMeta) bool {
 		return false
 	}
 	aKey := asker.Key()
-	if !lr.roOK {
-		return lr.heldFallback(aKey, last)
-	}
-	aOffs, ok := lr.offsetsFor(aKey)
-	if !ok {
-		return lr.heldFallback(aKey, last)
-	}
-	if len(aOffs) == 0 {
-		return false
-	}
-	matched, fallback, err := lr.probeHoldCandidates(aKey, aOffs, last, lastIdx)
-	if err != nil {
-		return false
-	}
-	if fallback {
-		return lr.heldFallback(aKey, last)
-	}
-	if matched {
-		return true
-	}
 	startIdx := 0
-	if len(aOffs) >= lineagePrefixMinRecords {
-		if oOffs, oOK := lr.offsetsFor(other.Key()); oOK && len(oOffs) >= lineagePrefixMinRecords {
-			pref := lr.sharedPrefix(aKey, aOffs, other.Key(), oOffs)
-			if !pref.ok {
-				return lr.heldFallback(aKey, last)
+	if lr.roOK {
+		if aOffs, aOK := lr.offsetsFor(aKey); aOK {
+			if len(aOffs) == 0 {
+				return false
 			}
-			if pref.monotonic && last.Time.After(pref.bound) {
-				startIdx = pref.length
+			matched, fallback, err := lr.probeHoldCandidates(aKey, aOffs, last, lastIdx)
+			if err != nil {
+				return false
+			}
+			if matched {
+				return true
+			}
+			if !fallback && len(aOffs) >= lineagePrefixMinRecords {
+				if oOffs, oOK := lr.offsetsFor(other.Key()); oOK && len(oOffs) >= lineagePrefixMinRecords {
+					pref := lr.sharedPrefix(aKey, aOffs, other.Key(), oOffs)
+					if pref.monotonic && last.Time.After(pref.bound) {
+						startIdx = pref.length
+					}
+				}
+			}
+			if !lr.roOK {
+				startIdx = 0
 			}
 		}
 	}
-	stubs, ok := lr.roleStubsFrom(aKey, aOffs, startIdx, map[string]bool{last.Role: true})
+	stubs, ok := lr.sessionRoleStubs(aKey, startIdx, map[string]bool{last.Role: true})
 	if !ok {
-		return lr.heldFallback(aKey, last)
+		return false
 	}
 	wantNano := last.Time.UnixNano()
 	for _, st := range stubs {
@@ -1119,25 +1016,31 @@ func (lr *lineageReader) matchSharedStubs(longKey string, longStubs []recordStub
 	return best
 }
 
-func (lr *lineageReader) sharedFallback(aKey, oKey string) time.Time {
-	var zero time.Time
-	aStubs, ok := lr.stubsFor(aKey)
-	if !ok || len(aStubs.list) == 0 {
-		return zero
+func (lr *lineageReader) sharedPrefixAndBounds(aKey, oKey string) (best time.Time, startIdx int, shortKey, longKey string) {
+	shortKey, longKey = aKey, oKey
+	if !lr.roOK {
+		return best, 0, shortKey, longKey
 	}
-	oStubs, ok := lr.stubsFor(oKey)
-	if !ok || len(oStubs.list) == 0 {
-		return zero
+	aOffs, aOK := lr.offsetsFor(aKey)
+	oOffs, oOK := lr.offsetsFor(oKey)
+	if !aOK || !oOK {
+		return best, 0, shortKey, longKey
 	}
-	aByRT := make(map[roleTimeKey][]recordStub, len(aStubs.list))
-	for _, st := range aStubs.list {
-		if !st.at.After(zero) {
-			continue
+	if len(oOffs) < len(aOffs) {
+		shortKey, longKey = oKey, aKey
+	}
+	if len(aOffs) >= lineagePrefixMinRecords && len(oOffs) >= lineagePrefixMinRecords {
+		if pref := lr.sharedPrefix(aKey, aOffs, oKey, oOffs); pref.ok {
+			best = pref.bound
+			if pref.monotonic {
+				startIdx = pref.length
+			}
 		}
-		rt := roleTimeKey{role: st.role, nano: st.at.UnixNano()}
-		aByRT[rt] = append(aByRT[rt], st)
 	}
-	return lr.matchSharedStubs(oKey, oStubs.list, aKey, aByRT, zero)
+	if !lr.roOK {
+		return time.Time{}, 0, aKey, oKey
+	}
+	return best, startIdx, shortKey, longKey
 }
 
 func (lr *lineageReader) shared(asker, other SessionMeta) time.Time {
@@ -1146,38 +1049,10 @@ func (lr *lineageReader) shared(asker, other SessionMeta) time.Time {
 		return zero
 	}
 	aKey, oKey := asker.Key(), other.Key()
-	if !lr.roOK {
-		return lr.sharedFallback(aKey, oKey)
-	}
-	aOffs, aOK := lr.offsetsFor(aKey)
-	oOffs, oOK := lr.offsetsFor(oKey)
-	if !aOK || !oOK {
-		return lr.sharedFallback(aKey, oKey)
-	}
-	if len(aOffs) == 0 || len(oOffs) == 0 {
-		return zero
-	}
-	best := zero
-	startIdx := 0
-	if len(aOffs) >= lineagePrefixMinRecords && len(oOffs) >= lineagePrefixMinRecords {
-		pref := lr.sharedPrefix(aKey, aOffs, oKey, oOffs)
-		if !pref.ok {
-			return lr.sharedFallback(aKey, oKey)
-		}
-		best = pref.bound
-		if pref.monotonic {
-			startIdx = pref.length
-		}
-	}
-	shortKey, shortOffs := aKey, aOffs
-	longKey, longOffs := oKey, oOffs
-	if len(oOffs) < len(aOffs) {
-		shortKey, shortOffs = oKey, oOffs
-		longKey, longOffs = aKey, aOffs
-	}
-	shortStubs, ok := lr.roleStubsFrom(shortKey, shortOffs, startIdx, nil)
+	best, startIdx, shortKey, longKey := lr.sharedPrefixAndBounds(aKey, oKey)
+	shortStubs, ok := lr.sessionRoleStubs(shortKey, startIdx, nil)
 	if !ok {
-		return lr.sharedFallback(aKey, oKey)
+		return zero
 	}
 	shortByRT := make(map[roleTimeKey][]recordStub, len(shortStubs))
 	wantRoles := map[string]bool{}
@@ -1192,20 +1067,20 @@ func (lr *lineageReader) shared(asker, other SessionMeta) time.Time {
 	if len(wantRoles) == 0 {
 		return best
 	}
-	longStubs, ok := lr.roleStubsFrom(longKey, longOffs, startIdx, wantRoles)
+	longStubs, ok := lr.sessionRoleStubs(longKey, startIdx, wantRoles)
 	if !ok {
-		return lr.sharedFallback(aKey, oKey)
+		return zero
 	}
 	return lr.matchSharedStubs(longKey, longStubs, shortKey, shortByRT, best)
 }
 
 func (lr *lineageReader) wholeShared(turns map[string]bool, other SessionMeta) time.Time {
 	var at time.Time
-	oStubs, ok := lr.stubsFor(other.Key())
+	oStubs, ok := lr.sessionRoleStubs(other.Key(), 0, nil)
 	if !ok {
 		return at
 	}
-	for _, st := range oStubs.list {
+	for _, st := range oStubs {
 		if !st.at.IsZero() && turns[turnKey(st.role, st.at.UnixMilli())] && st.at.After(at) {
 			at = st.at
 		}
