@@ -3643,8 +3643,18 @@ func TestZCodeDesktopVersionSelectsTheLiveConfig(t *testing.T) {
 	if !strings.Contains(string(b), "hook-context") {
 		t.Errorf("3.17+ did not get hooks in config.json: %s", b)
 	}
-	if strings.Contains(string(b), `"deja"`) {
-		t.Errorf("config.json gained a server, which the migration would carry back: %s", b)
+
+	// A 3.17+ build also reads the MCP server from config.json (#5959), so the
+	// server half of an install has to reach config.json too, not setting.json
+	// alone (#6016's custom-install remainder). The migration the old comment
+	// worried about only runs on the 3.14.4 first launch, which does not apply
+	// to a build that already reads config.json for good.
+	if _, err := installZCode("/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	b, _ = os.ReadFile(legacy)
+	if !strings.Contains(string(b), `"deja"`) {
+		t.Errorf("3.17+ did not get the server in config.json: %s", b)
 	}
 
 	// A fresh 3.17+ install before config.json even exists must also recognise

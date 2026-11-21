@@ -108,12 +108,34 @@ func zcodeAlsoLegacy(res installResult, uninstall bool, edit func(string, bool) 
 
 // installZCode writes the server under `mcp.servers`, which is one level
 // deeper than the `mcpServers` every other client here uses, so the shared
-// installMCPJSON cannot be pointed at it.
+// installMCPJSON cannot be pointed at it. It is the installTargetFunc for the
+// "zcode" target.
 func installZCode(exe string, uninstall bool) (installResult, error) {
+	return installZCodeWith(exe, uninstall, !uninstall && zcodeConfigIsLiveRuntimeConfig())
+}
+
+// installZCodeWith is installZCode with the live-config decision made by the
+// caller. A 3.17+ desktop build reads config.json (#4429 reversed, #5959), so
+// when alsoLiveConfig is true the server is written there as well as
+// setting.json — the same split installZCodeHooksWith already makes. The
+// server alone is what `deja install zcode` installs, so it must follow the
+// same judgement or the MCP server never loads on those builds.
+func installZCodeWith(exe string, uninstall, alsoLiveConfig bool) (installResult, error) {
 	edit := func(path string, uninstall bool) (installResult, error) { return zcodeServerAt(path, exe, uninstall) }
 	res, err := edit(zcodeConfigPath(), uninstall)
 	if err != nil {
 		return installResult{}, err
+	}
+	// A 3.17+ desktop build keeps reading config.json instead of the
+	// setting.json the 3.14.4 CLI runtime migrated to (#4429). Write the
+	// server there too, so either runtime loads it. The setting.json copy
+	// stays: on the 3.14.4 CLI runtime it is the only file read.
+	if alsoLiveConfig {
+		legacyRes, lerr := edit(zcodeLegacyConfigPath(), false)
+		if lerr != nil {
+			return installResult{}, lerr
+		}
+		res = wroteAll(res, legacyRes)
 	}
 	return zcodeAlsoLegacy(res, uninstall, edit)
 }
@@ -211,7 +233,7 @@ func installZCodeAuto(exe string, uninstall bool) (installResult, error) {
 	// half-wired with nothing saying so. Check whether config.json is the live
 	// runtime config before installZCode creates setting.json.
 	alsoLiveConfig := !uninstall && zcodeConfigIsLiveRuntimeConfig()
-	server, err := installZCode(exe, uninstall)
+	server, err := installZCodeWith(exe, uninstall, alsoLiveConfig)
 	if err != nil {
 		return installResult{}, err
 	}
