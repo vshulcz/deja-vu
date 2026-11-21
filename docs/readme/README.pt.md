@@ -259,7 +259,7 @@ Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy
 CodeArts Desktop ·
 Ante ·
 Doubao ·
-Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed.
+Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · TeleAgent · Zed.
 
 O que cada um suporta — recall por MCP, recall automático, skills, comandos, resume, handoff — está na
 [matriz de recursos do README em inglês](../../README.md#supported-harnesses). Locais de armazenamento customizados

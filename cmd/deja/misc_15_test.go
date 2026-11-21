@@ -3643,8 +3643,18 @@ func TestZCodeDesktopVersionSelectsTheLiveConfig(t *testing.T) {
 	if !strings.Contains(string(b), "hook-context") {
 		t.Errorf("3.17+ did not get hooks in config.json: %s", b)
 	}
-	if strings.Contains(string(b), `"deja"`) {
-		t.Errorf("config.json gained a server, which the migration would carry back: %s", b)
+
+	// A 3.17+ build also reads the MCP server from config.json (#5959), so the
+	// server half of an install has to reach config.json too, not setting.json
+	// alone (#6016's custom-install remainder). The migration the old comment
+	// worried about only runs on the 3.14.4 first launch, which does not apply
+	// to a build that already reads config.json for good.
+	if _, err := installZCode("/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	b, _ = os.ReadFile(legacy)
+	if !strings.Contains(string(b), `"deja"`) {
+		t.Errorf("3.17+ did not get the server in config.json: %s", b)
 	}
 
 	// A fresh 3.17+ install before config.json even exists must also recognise
@@ -3694,6 +3704,54 @@ func TestZCodeDesktopVersionSelectsTheLiveConfig(t *testing.T) {
 	zcodeDesktopVersion = func() ([3]int, bool) { return [3]int{}, false }
 	if !zcodeConfigIsLiveRuntimeConfig() {
 		t.Error("a live config with hooks.events was not recognised without a version")
+	}
+}
+
+// TestInstallZCodeWithReportsAConfigError covers the error paths of
+// installZCodeWith: a setting.json that will not parse, and a config.json that
+// will not parse. Each must surface the parse error rather than silently
+// continue with an empty config (which would drop the user's own entries).
+func TestInstallZCodeWithReportsAConfigError(t *testing.T) {
+	orig := zcodeDesktopVersion
+	defer func() { zcodeDesktopVersion = orig }()
+	zcodeDesktopVersion = func() ([3]int, bool) { return [3]int{3, 17, 2}, true }
+
+	// setting.json is the first file an install touches. A config that does
+	// not parse must come back as an error, not as a silent rewrite.
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	dir := filepath.Join(home, ".zcode", "cli")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	setting := filepath.Join(dir, "setting.json")
+	if err := os.WriteFile(setting, []byte(`{not json`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installZCode("/usr/local/bin/deja", false); err == nil {
+		t.Error("a bad setting.json was accepted; want a parse error")
+	}
+
+	// A valid setting.json but a config.json that will not parse: the first
+	// half succeeds, the live-config half must report the bad config.json.
+	home2 := t.TempDir()
+	t.Setenv("HOME", home2)
+	t.Setenv("USERPROFILE", home2)
+	dir2 := filepath.Join(home2, ".zcode", "cli")
+	if err := os.MkdirAll(dir2, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	setting2 := filepath.Join(dir2, "setting.json")
+	config2 := filepath.Join(dir2, "config.json")
+	if err := os.WriteFile(setting2, []byte(`{"mcp":{"servers":{}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(config2, []byte(`{broken`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installZCode("/usr/local/bin/deja", false); err == nil {
+		t.Error("a bad config.json was accepted; want a parse error")
 	}
 }
 
@@ -3816,7 +3874,7 @@ var zhCountWords = map[int]string{
 	30: "三十", 31: "三十一", 32: "三十二", 33: "三十三", 34: "三十四",
 	35: "三十五", 36: "三十六", 37: "三十七", 38: "三十八", 39: "三十九",
 	40: "四十", 41: "四十一", 42: "四十二", 43: "四十三",
-	44: "四十四", 45: "四十五", 46: "四十六", 47: "四十七", 48: "四十八", 49: "四十九", 50: "五十", 51: "五十一",
+	44: "四十四", 45: "四十五", 46: "四十六", 47: "四十七", 48: "四十八", 49: "四十九", 50: "五十", 51: "五十一", 52: "五十二",
 }
 
 // A bare numeral scan does not work here: 三十条任务链 and 十三个项目 count other
@@ -4075,4 +4133,29 @@ func isZhNumeral(s string) bool {
 		}
 	}
 	return false
+}
+
+func TestCleanZCodeRegistryPath(t *testing.T) {
+	t.Setenv("LOCALAPPDATA", `C:\Users\alex\AppData\Local`)
+	cases := []struct {
+		name   string
+		raw    string
+		expand bool
+		want   string
+	}{
+		{name: "empty", raw: "", want: ""},
+		{name: "whitespace", raw: "   \t ", want: ""},
+		{name: "empty quotes", raw: `""`, want: ""},
+		{name: "double quoted with spaces", raw: `  "D:\Programs\ZCode\"  `, want: `D:\Programs\ZCode\`},
+		{name: "single quoted", raw: `'C:\Apps\ZCode'`, want: `C:\Apps\ZCode`},
+		{name: "expand env case-insensitive", raw: `"%LocalAppData%\Programs\ZCode"`, expand: true, want: `C:\Users\alex\AppData\Local\Programs\ZCode`},
+		{name: "keep percent when not REG_EXPAND_SZ", raw: `%LocalAppData%\Programs\ZCode`, expand: false, want: `%LocalAppData%\Programs\ZCode`},
+		{name: "preserve unknown and percent before var", raw: `%MISSING%%LOCALAPPDATA%\ZCode`, expand: true, want: `%MISSING%C:\Users\alex\AppData\Local\ZCode`},
+		{name: "double percent preserved", raw: `100%%\%LOCALAPPDATA%\ZCode`, expand: true, want: `100%%\C:\Users\alex\AppData\Local\ZCode`},
+	}
+	for _, tc := range cases {
+		if got := cleanZCodeRegistryPath(tc.raw, tc.expand); got != tc.want {
+			t.Errorf("%s: cleanZCodeRegistryPath(%q, %v) = %q, want %q", tc.name, tc.raw, tc.expand, got, tc.want)
+		}
+	}
 }

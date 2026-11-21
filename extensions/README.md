@@ -185,7 +185,7 @@ two in step.
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (**88.9% hit@1** on the 470-question cleaned set) | **58% fewer tokens** on repeated repo tasks | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 51 coding agents |
+| **97.2% R@5** on LongMemEval-S (**88.9% hit@1** on the 470-question cleaned set) | **58% fewer tokens** on repeated repo tasks | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 52 coding agents |
 
 ## Repository memory & handoff
 

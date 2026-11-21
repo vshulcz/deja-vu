@@ -10,7 +10,7 @@ deja's MCP server, the `deja-history` skill, the `/deja` command and the
 `postToolUseFailure`, `preCompact` and `sessionEnd` hooks: the same wiring
 `deja install cursor-auto` writes.
 
-deja indexes the session transcripts fifty-one coding agents already write to
+deja indexes the session transcripts fifty-two coding agents already write to
 disk, including sessions from before it was installed, and answers from them
 locally: BM25 over the transcripts, no model and no embeddings, credentials
 redacted as the index is built.
@@ -40,7 +40,7 @@ stand down when the installer has already wired the same ones in
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (**88.9% hit@1** on the 470-question cleaned set) | **58% fewer tokens** on repeated repo tasks | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 51 coding agents |
+| **97.2% R@5** on LongMemEval-S (**88.9% hit@1** on the 470-question cleaned set) | **58% fewer tokens** on repeated repo tasks | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 52 coding agents |
 
 ## Repository memory & handoff
 

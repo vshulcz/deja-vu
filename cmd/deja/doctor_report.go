@@ -493,7 +493,7 @@ func doctorSQLite3() doctorComponent {
 // storeNeedsSQLite3 names the harnesses deja reads through the sqlite3 CLI.
 func storeNeedsSQLite3(name string) bool {
 	switch name {
-	case "opencode", "cursor", "grok", "hermes", "goose", "zed", "kilocode", "zcode", "mimo", "omnigent", "orca":
+	case "opencode", "cursor", "grok", "hermes", "goose", "zed", "kilocode", "zcode", "mimo", "teleagent", "omnigent", "orca":
 		return true
 	}
 	return false
@@ -615,6 +615,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 		// the store: the legacy name the pre-rename builds wrote.
 		{"devin", []string{sources.DevinSessionsDB(), sources.DevinLegacySessionsDB()}, sources.DevinFiles, doctorProbeDevin},
 		{"mimo", []string{sources.MimoDB()}, func() []string { return presentDoctorFile(sources.MimoDB()) }, doctorProbeMimo},
+		{"teleagent", []string{sources.TeleAgentDataDir()}, sources.TeleAgentSessionFiles, doctorProbeTeleagent},
 		{"omnigent", []string{sources.OmnigentDB()}, func() []string { return presentDoctorFile(sources.OmnigentDB()) }, sources.ParseOmnigentDB},
 		{"orca", []string{sources.OrcaDB()}, func() []string { return presentDoctorFile(sources.OrcaDB()) }, sources.ParseOrcaDB},
 		{"deja", []string{sources.NotesFile()}, func() []string { return presentDoctorFile(sources.NotesFile()) }, sources.ParseNotesFile},
@@ -702,6 +703,10 @@ func doctorProbeDevin(path string) ([]model.Session, error) {
 }
 
 func doctorProbeMimo(path string) ([]model.Session, error) {
+	return sources.ParseOpencodeNewest(path)
+}
+
+func doctorProbeTeleagent(path string) ([]model.Session, error) {
 	return sources.ParseOpencodeNewest(path)
 }
 

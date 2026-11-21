@@ -81,7 +81,7 @@
 <a href="recover-overwritten-files.html">Recover overwritten files</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold"><summary>Deleting sessions <span class="n">39</span></summary>
+<details class="grpfold"><summary>Deleting sessions <span class="n">40</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -119,10 +119,11 @@
 <a href="delete-grok-session-history.html">Grok Build</a>
 <a href="delete-devin-session-history.html">Devin CLI</a>
 <a href="delete-mimo-session-history.html">MiMo-Code</a>
+<a href="delete-teleagent-session-history.html">TeleAgent</a>
 <a href="delete-omnigent-session-history.html">Omnigent</a>
 <a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold"><summary>Per-agent guides <span class="n">50</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">51</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
@@ -154,6 +155,7 @@
 <a href="memory-for-kimi.html">Kimi Code</a>
 <a href="memory-for-kiro.html">Kiro</a>
 <a href="memory-for-mimo.html">MiMo-Code</a>
+<a href="memory-for-teleagent.html">TeleAgent</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
 <a href="memory-for-oh-my-claudecode.html">oh-my-claudecode</a>
@@ -224,7 +226,7 @@ go run ./scripts/locomo -data locomo10.json -out docs/benchmarks/locomo.json</pr
 <p>Two published long-term-memory benchmarks run through the exact production path: haystack sessions are written as real transcript files, indexed by the normal pipeline (parsing, redaction, tokenization), and queried with the verbatim question text. No LLM, no embeddings, no question rewriting. Both harnesses ship in the repo and finish in minutes on the public datasets.</p>
 <p><b>LongMemEval-S</b> (session-level retrieval, 470 questions on the cleaned set): <b>hit@1 88.9%</b>, hit@5 97.4%, hit@10 98.7%, hit@20 99.6%, MRR 0.926, median search ~15&nbsp;ms. hit@k credits a question when any of its evidence sessions ranks in the top&nbsp;k; the stricter official per-evidence metric is reported alongside: evidence-recall@1 57.2%, @5 91.5%, @10 95.3%, @20 97.7%. Weakest slice: preference questions (43.3% hit@1 — pure paraphrase is where lexical retrieval loses to semantic indexes, by design; hit@20 reaches 100%). Full-set numbers (500 questions, abstention included): hit@1 88.2%, MRR 0.921 — <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/benchmarks/longmemeval-s-full.json">that run is committed too</a>.</p>
 <p><b>LoCoMo</b> (session-level retrieval, 1,982 questions): hit@1 71.9%, hit@5 91.4%, hit@10 95.7%, MRR 0.802, median search ~3.5&nbsp;ms; evidence sessions carry their real dates, questions anchor relative time at their question date. Note: most published LoCoMo numbers are end-to-end QA accuracy with an answering LLM — a different metric; deja reports retrieval only.</p>
-<p class="mut">Both re-measured on 0.23.2, against the public datasets, on an M-series laptop. Each LongMemEval question is asked against its own haystack of about fifty-one sessions; asked against all 19,195 at once, the same kind of question lands at 19% hit@1, and the <a href="day-zero.html">day-zero page</a> runs that.</p>
+<p class="mut">Both re-measured on 0.23.2, against the public datasets, on an M-series laptop. Each LongMemEval question is asked against its own haystack of about fifty sessions; asked against all 19,195 at once, the same kind of question lands at 19% hit@1, and the <a href="day-zero.html">day-zero page</a> runs that.</p>
 <div class="note">Read these honestly: LongMemEval is lexically tractable — strong lexical retrievers cluster in the mid-90s at hit@5, so deep ranks do not differentiate systems there. deja's ranking is top-1-oriented and gates single-word noise.</div>
 
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
