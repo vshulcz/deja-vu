@@ -69,7 +69,7 @@ Running `deja` without arguments opens a terminal search over uncommitted-change
 <details>
 <summary><b>Package managers, Windows (Scoop / winget), native plugin bundles, and binary-only setup</b></summary>
 
-Alternative installers: `brew install deja-vu`, `nix run github:numtide/llm-agents.nix#deja-vu`, `go install github.com/vshulcz/deja-vu/cmd/deja@latest`, or `npx @vshulcz/deja-vu "query"` to run without installing. Desktop MCP clients can open the signed `.mcpb` bundle from the [latest release](https://github.com/vshulcz/deja-vu/releases/latest).
+Alternative installers: `brew install deja-vu`, `mise use -g aqua:vshulcz/deja-vu`, `nix run github:numtide/llm-agents.nix#deja-vu`, `go install github.com/vshulcz/deja-vu/cmd/deja@latest`, or `npx @vshulcz/deja-vu "query"` to run without installing. Desktop MCP clients can open the signed `.mcpb` bundle from the [latest release](https://github.com/vshulcz/deja-vu/releases/latest).
 
 Codex CLI, opencode, Claude Code, Qwen, and OpenClaw also accept native marketplace/registry installs (alongside [`cursor-plugin/`](cursor-plugin/) for Cursor and [`antigravity-plugin/`](antigravity-plugin/) for Antigravity; Copilot CLI installs only the skill from the bundle — run `deja install copilot-auto` for hooks and MCP):
 
@@ -110,6 +110,14 @@ nothing is committed: review with `git diff .deja/` and commit it like code
 ```
 
 Entries are redacted on write (secret matches are rejected), stored as sorted content-hashed JSON lines, and paired with `merge=union` in `.deja/.gitattributes` so parallel branch additions merge cleanly. Cloned repositories load these entries under untrusted framing (`{"activations":{"auto":{"repo":false}}}` in `policy.json` disables hook injection). See the [repo memory guide](https://vshulcz.github.io/deja-vu/guide/repo-memory.html).
+
+In GitHub Actions, run `deja` directly in CI without a separate install step:
+
+```yaml
+- uses: vshulcz/deja-vu@main
+  with:
+    args: audit --fail-on-secrets
+```
 
 ## Privacy
 
