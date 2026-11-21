@@ -247,6 +247,7 @@ func printSourcesTo(w io.Writer, dir string) {
 		{"zed", sources.ZedDB(), []string{sources.ZedDB()}, func() []string { return presentFiles(sources.ZedDB()) }, sources.LoadZed},
 		{"devin", filepath.Dir(sources.DevinSessionsDB()), []string{filepath.Dir(sources.DevinSessionsDB())}, sources.DevinFiles, sources.LoadDevin},
 		{"mimo", sources.MimoDB(), []string{sources.MimoDB()}, func() []string { return presentFiles(sources.MimoDB()) }, sources.LoadMimo},
+		{"teleagent", sources.TeleAgentDataDir(), sources.TeleAgentDBs(), sources.TeleAgentSessionFiles, sources.LoadTeleAgent},
 		{"omnigent", sources.OmnigentDB(), []string{sources.OmnigentDB()}, func() []string { return presentFiles(sources.OmnigentDB()) }, sources.LoadOmnigent},
 		{"orca", sources.OrcaDB(), []string{sources.OrcaDB()}, func() []string { return presentFiles(sources.OrcaDB()) }, sources.LoadOrca},
 		// The location is the registry, not a store: Crush keeps one store per

@@ -2453,6 +2453,21 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 			t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
 		}
 		sessions, err = ParseMimoDB(db)
+	case "teleagent":
+		if !SQLite3Available() {
+			t.Skip("sqlite3 not installed")
+		}
+		sql, readErr := os.ReadFile(path)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		db := filepath.Join(work, "teleagent.db")
+		build := exec.CommandContext(t.Context(), "sqlite3", db)
+		build.Stdin = strings.NewReader(string(sql))
+		if out, runErr := build.CombinedOutput(); runErr != nil {
+			t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
+		}
+		sessions, err = ParseTeleagentDB(db)
 	case "omnigent":
 		if !SQLite3Available() {
 			t.Skip("sqlite3 not installed")

@@ -4,7 +4,7 @@
   "id": "deja",
   "name": "deja-vu",
   "version": "0.24.2",
-  "description": "Cross-agent session memory across fifty-one AI coding tools, injected into Orca prompts and command actions.",
+  "description": "Cross-agent session memory across fifty-two AI coding tools, injected into Orca prompts and command actions.",
   "author": {
     "name": "Vladislav Shulcz",
     "url": "https://github.com/vshulcz"

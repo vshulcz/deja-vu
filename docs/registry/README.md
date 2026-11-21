@@ -54,6 +54,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Zed](zed.md) | SQLite thread store, zstd-compressed bodies |
 | [Devin CLI](devin.md) | one SQLite store of linked message nodes; subagents read as sessions of their own |
 | [MiMo-Code](mimo.md) | OpenCode-schema SQLite relational store, plus a JSON diff file per session |
+| [TeleAgent](teleagent.md) | OpenCode-schema SQLite store per account |
 | [Omnigent](omnigent.md) | SQLite session, message, and typed item store |
 | [Orca](orca.md) | SQLite journal entry and JSON block store |
 | [Claw Code](clawcode.md) | JSONL transcripts and legacy JSON snapshots under `~/.claw/sessions` |

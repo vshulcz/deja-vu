@@ -7,9 +7,9 @@
   </a>
 </p>
 
-<p align="center"><b>51 のコーディングエージェントをまたぐローカル共有メモリ、エージェント間ハンドオフ、コード復元。</b></p>
+<p align="center"><b>52 のコーディングエージェントをまたぐローカル共有メモリ、エージェント間ハンドオフ、コード復元。</b></p>
 
-<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes をはじめとする 51 のエージェントは、すべてのセッションをすでにディスクに保存しています。<br>
+<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes をはじめとする 52 のエージェントは、すべてのセッションをすでにディスクに保存しています。<br>
 deja はそれをローカルでインデックス化し、<code>/compact</code> をまたいだ文脈維持、<code>deja handoff</code> による作業引き継ぎ、<code>deja restore</code> による上書きコードの復元を可能にします——LLM 不要、単一の Go バイナリ。</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | 日本語 | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -145,7 +145,7 @@ aider の読み取り専用コンテキストファイル、Windows の `cmd /c 
 
 ## できること
 
-**Codex で解決して、Claude が覚えている。** 51 のコーディングエージェントはすべての会話を
+**Codex で解決して、Claude が覚えている。** 52 のコーディングエージェントはすべての会話を
 ローカルファイルに書き出しています。deja はそれらのファイルを、全エージェントが読めるひとつの記憶レイヤーに変えます。
 
 | | |

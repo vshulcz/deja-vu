@@ -253,7 +253,7 @@ Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy
 CodeArts Desktop ·
 Ante ·
 Doubao ·
-Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed.
+Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · TeleAgent · Zed.
 
 각 도구가 MCP 회상, 자동 회상, skill, 명령, resume, handoff 중 무엇을 지원하는지는
 [영문 README의 기능 표](../../README.md#supported-harnesses)에 있습니다. 저장 위치를 바꿨다면 `DEJA_*_ROOT`

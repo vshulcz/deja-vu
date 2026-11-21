@@ -10,6 +10,7 @@ func init() {
 	refuseWriteBack("hermes", "Hermes keeps sessions as rows in its state.db (or Postgres); deja writes back only transcript files")
 	refuseWriteBack("crush", "Crush keeps sessions as rows in its crush.db; deja writes back only transcript files")
 	refuseWriteBack("mimo", "MiMo-Code keeps sessions as rows in its own database (mimocode.db), and the index has none of the message and part ids those rows need; deja writes back only transcript files")
+	refuseWriteBack("teleagent", "TeleAgent keeps sessions as rows in its own per-account databases (teleagent.db), and the index has none of the message and part ids those rows need; deja writes back only transcript files")
 	refuseWriteBack("omnigent", "Omnigent keeps conversations as rows in its chat.db; deja writes back only transcript files")
 	refuseWriteBack("orca", "Orca keeps sessions as rows in its agent-session-journal.db; deja writes back only transcript files")
 }

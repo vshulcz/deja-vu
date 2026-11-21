@@ -3785,3 +3785,90 @@ func TestPrimeAgentDirExpandsTilde(t *testing.T) {
 		t.Errorf("config dir = %q, want %q", got, want)
 	}
 }
+
+// TeleAgent (星辰超级智能体) reads one OpenCode-schema SQLite store per account
+// under ~/.local/share/TeleAgent/users/<account>/teleagent.db. The fixture
+// builds the same session_v2/session_message tables the mimo fixture does —
+// the schemas are identical — into two account directories, and the store
+// enumeration has to surface both while Parse stays per-account.
+
+func TestTeleagentParseAndAccounts(t *testing.T) {
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("sqlite3 not installed")
+	}
+	home := t.TempDir()
+	users := filepath.Join(home, "users")
+	for _, acct := range []string{"2091696589113404", "2091696589113405"} {
+		if err := os.MkdirAll(filepath.Join(users, acct), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		buildSQLiteFixture(t, filepath.Join("..", "..", "fixtures", "registry", "teleagent", "teleagent.sql"), filepath.Join(users, acct, "teleagent.db"))
+	}
+	t.Setenv("DEJA_TELEAGENT_ROOT", home)
+	t.Setenv("TELEAGENT_HOME", "")
+	t.Setenv("XDG_DATA_HOME", "")
+
+	dbs := TeleAgentDBs()
+	if len(dbs) != 2 {
+		t.Fatalf("TeleAgentDBs() = %d stores, want 2", len(dbs))
+	}
+	if filepath.Base(dbs[0]) != "teleagent.db" {
+		t.Fatalf("store basename = %q", dbs[0])
+	}
+	ss := LoadTeleAgent()
+	if len(ss) != 2 {
+		t.Fatalf("LoadTeleAgent() got %d sessions, want 2 (one per account)", len(ss))
+	}
+	for _, s := range ss {
+		if s.Harness != "teleagent" || s.ID != "ses_teleagent_01" {
+			t.Fatalf("got harness=%q id=%q", s.Harness, s.ID)
+		}
+		if s.Title != "Fix token refresh race in auth middleware" {
+			t.Fatalf("Title = %q", s.Title)
+		}
+		if len(s.Messages) < 2 {
+			t.Fatalf("Messages = %d, want >= 2", len(s.Messages))
+		}
+	}
+	since, err := ParseTeleagentDBSince(dbs[0], time.UnixMilli(1744000000000))
+	if err != nil || len(since) != 1 {
+		t.Fatalf("ParseTeleagentDBSince: len=%d err=%v", len(since), err)
+	}
+	zero, err := ParseTeleagentDBSince(dbs[0], time.Time{})
+	if err != nil || len(zero) != 1 {
+		t.Fatalf("ParseTeleagentDBSince zero: len=%d err=%v", len(zero), err)
+	}
+	after, err := ParseTeleagentDBSince(dbs[0], time.UnixMilli(1844000000000))
+	if err != nil || len(after) != 0 {
+		t.Fatalf("ParseTeleagentDBSince future: len=%d err=%v", len(after), err)
+	}
+}
+
+func TestTeleagentPaths(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("DEJA_TELEAGENT_ROOT", "")
+	t.Setenv("TELEAGENT_HOME", "")
+	t.Setenv("XDG_DATA_HOME", "")
+
+	if got, want := TeleAgentDataDir(), filepath.Join(home, ".local", "share", "TeleAgent"); got != want {
+		t.Fatalf("TeleAgentDataDir() default = %q, want %q", got, want)
+	}
+	xdg := filepath.Join(home, "xdg-data")
+	t.Setenv("XDG_DATA_HOME", xdg)
+	if got, want := TeleAgentDataDir(), filepath.Join(xdg, "TeleAgent"); got != want {
+		t.Fatalf("TeleAgentDataDir() XDG = %q, want %q", got, want)
+	}
+	t.Setenv("TELEAGENT_HOME", "~/teleagent-home")
+	if got, want := TeleAgentDataDir(), filepath.Join(home, "teleagent-home"); got != want {
+		t.Fatalf("TeleAgentDataDir() TELEAGENT_HOME = %q, want %q", got, want)
+	}
+	t.Setenv("DEJA_TELEAGENT_ROOT", "~/deja-ta")
+	if got, want := TeleAgentDataDir(), filepath.Join(home, "deja-ta"); got != want {
+		t.Fatalf("TeleAgentDataDir() DEJA_TELEAGENT_ROOT = %q, want %q", got, want)
+	}
+	if got := TeleAgentDBs(); got != nil {
+		t.Fatalf("TeleAgentDBs() on an absent tree = %v, want nil", got)
+	}
+}

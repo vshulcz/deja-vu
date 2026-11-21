@@ -588,7 +588,7 @@ func rereadsWholeSessions(p string) bool {
 		return true
 	}
 	switch storeHarness(p) {
-	case "opencode", "kilocode", "zcode", "mimo":
+	case "opencode", "kilocode", "zcode", "mimo", "teleagent":
 		// Read by session since #4207: a reply's text lands in a part created
 		// before the last pass, so only a touched session read whole carries
 		// it, and adding that to what the index held doubled the turns. Its

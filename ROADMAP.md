@@ -11,10 +11,10 @@ Engineering direction rather than release commitments; shipped work moves to `CH
 
 ## Next
 
-- **Compaction recovery across remaining hosts.** Recovery reaches 36 of the 51 harnesses (capture/reset in 38) via `PreCompact`/`PostCompaction` hooks or catch-up parsers; remaining hosts depend on upstream hook support (`#308`).
+- **Compaction recovery across remaining hosts.** Recovery reaches 36 of the 52 harnesses (capture/reset in 38) via `PreCompact`/`PostCompaction` hooks or catch-up parsers; remaining hosts depend on upstream hook support (`#308`).
 - **Pre-execution plan checks.** `deja check` and `hook-plan` answer proposed plans with prior decisions and reversions on touched files; default hook wiring is gated on precision/noise measurement.
 - **Query-scoped reuse.** Attribute session recall lifts to the matched terms/subject rather than applying a global per-session boost.
-- **Point-of-action coverage.** File-history hints and failure remediation reach 37 of the 51 harnesses; remaining targets are wired as upstream hosts expose tool middleware.
+- **Point-of-action coverage.** File-history hints and failure remediation reach 37 of the 52 harnesses; remaining targets are wired as upstream hosts expose tool middleware.
 
 ## Later
 

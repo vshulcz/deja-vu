@@ -2,7 +2,7 @@
 
 [English](../README.md) | 简体中文 | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-`deja` 的 Orca v2 `trusted-worker` 插件——为 Orca 提供跨五十一个编程工具（Claude Code、Codex CLI、Cursor、opencode、Gemini CLI、Orca 及其他五十个智能体）的本地会话记忆，涵盖安装 `deja` 之前已经记录的历史会话。
+`deja` 的 Orca v2 `trusted-worker` 插件——为 Orca 提供跨五十二个编程工具（Claude Code、Codex CLI、Cursor、opencode、Gemini CLI、Orca 及其他五十一个智能体）的本地会话记忆，涵盖安装 `deja` 之前已经记录的历史会话。
 
 ![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
