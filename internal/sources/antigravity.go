@@ -691,7 +691,7 @@ func antigravityStep(kind, text string, t time.Time) []model.Message {
 	var out []model.Message
 	switch kind {
 	case "RUN_COMMAND", "GENERIC":
-		if cmd := antigravityField(text, "Task Description:"); cmd != "" && IndexCommands() && worthIndexing(cmd) {
+		if cmd := antigravityField(text, "Task Description:"); cmd != "" && IndexCommands() && worthIndexing(cmd) && !IsNonShellTaskDescription(cmd) {
 			out = append(out, model.Message{Role: RoleCommand, Text: "$ " + cmd, Time: t})
 		}
 		if kind == "GENERIC" {
@@ -726,6 +726,18 @@ func antigravityStep(kind, text string, t time.Time) []model.Message {
 		}
 	}
 	return out
+}
+
+// IsNonShellTaskDescription reports whether an Antigravity Task Description
+// header names a scheduler or wait task rather than an interactive shell command.
+func IsNonShellTaskDescription(raw string) bool {
+	low := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(raw), "$ ")))
+	for _, prefix := range []string{"timer:", "cron:", "schedule:", "wait for "} {
+		if strings.HasPrefix(low, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // antigravityToolCalls reads the structured calls a planner row carries —

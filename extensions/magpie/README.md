@@ -6,7 +6,7 @@ English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions
 
 Part of **[★ vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/)
 
-> Cross-agent session memory for Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes, and forty-eight other coding agents in total — injected at the Magpie gateway with zero LLM dependencies.
+> Cross-agent session memory for Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes, and fifty-one other coding agents in total — injected at the Magpie gateway with zero LLM dependencies.
 
 When you route multiple coding agents through a gateway, each client tracks only its own thread and loses context whenever you switch tools or start a fresh session. `@vshulcz/magpie-deja` recalls relevant prior sessions from your local `deja` BM25 index during [Magpie](https://github.com/yetone/magpie) gateway requests across OpenAI (`chat`, `responses`), Anthropic (`anthropic`), and Gemini (`gemini`) protocols.
 
@@ -18,7 +18,7 @@ When you route multiple coding agents through a gateway, each client tracks only
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-`@vshulcz/magpie-deja` depends on `@vshulcz/deja-vu`, so installing the plugin brings the `deja` binary if you do not already have `deja` on `PATH` (via `brew install deja-vu` or `install.sh`). Run `deja index` once to index existing transcripts on disk, or run `deja install --auto` to also wire native MCP tools (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) and lifecycle hooks across all 49 supported coding agents on this machine:
+`@vshulcz/magpie-deja` depends on `@vshulcz/deja-vu`, so installing the plugin brings the `deja` binary if you do not already have `deja` on `PATH` (via `brew install deja-vu` or `install.sh`). Run `deja index` once to index existing transcripts on disk, or run `deja install --auto` to also wire native MCP tools (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) and lifecycle hooks across all 52 supported coding agents on this machine:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -53,7 +53,7 @@ Configure in Magpie's plugin options for `@vshulcz/magpie-deja`:
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents |
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 52 coding agents |
 
 ## Repository memory & handoff
 

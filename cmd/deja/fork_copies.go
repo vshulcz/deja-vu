@@ -2,6 +2,7 @@ package main
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -321,6 +322,7 @@ func dropCopiedHits(dir string, hits []search.Hit) []search.Hit {
 		}
 	}
 	drop := map[int]bool{}
+	dropIdenticalImportedTwins(hits, drop)
 	for _, at := range groups {
 		if len(at) < 2 {
 			continue
@@ -354,6 +356,57 @@ func dropCopiedHits(dir string, hits []search.Hit) []search.Hit {
 		}
 	}
 	return kept
+}
+
+// dropIdenticalImportedTwins removes an imported sync copy (OrigID != "") when
+// its local twin is already in hits with every normalized non-empty message text.
+// Divergent twins are retained so both sides stay visible.
+func dropIdenticalImportedTwins(hits []search.Hit, drop map[int]bool) {
+	hasImported := false
+	for _, h := range hits {
+		if h.Session.OrigID != "" {
+			hasImported = true
+			break
+		}
+	}
+	if !hasImported {
+		return
+	}
+	localIdx := make(map[string]int, len(hits))
+	for i, h := range hits {
+		if h.Session.OrigID == "" {
+			localIdx[h.Session.Harness+"\x00"+h.Session.ID] = i
+		}
+	}
+	localTexts := make(map[int]map[string]bool)
+	for i, h := range hits {
+		if h.Session.OrigID == "" {
+			continue
+		}
+		li, ok := localIdx[h.Session.Harness+"\x00"+h.Session.OrigID]
+		if !ok {
+			continue
+		}
+		srcSet, cached := localTexts[li]
+		if !cached {
+			srcSet = normalizedMessageTexts(hits[li].Session.Messages)
+			localTexts[li] = srcSet
+		}
+		impSet := normalizedMessageTexts(h.Session.Messages)
+		if len(impSet) > 0 && heldTurns(srcSet, impSet) {
+			drop[i] = true
+		}
+	}
+}
+
+func normalizedMessageTexts(msgs []model.Message) map[string]bool {
+	out := make(map[string]bool, len(msgs))
+	for _, m := range msgs {
+		if norm := strings.Join(strings.Fields(m.Text), " "); norm != "" {
+			out[norm] = true
+		}
+	}
+	return out
 }
 
 // heldTurns reports whether every timed message of c is in src, the same role,

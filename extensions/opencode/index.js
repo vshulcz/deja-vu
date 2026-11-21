@@ -1,7 +1,7 @@
 // opencode-deja — the sessions you already have, inside opencode.
 //
 // opencode remembers its own sessions. This plugin answers the other question:
-// what you did in Claude Code, Codex, Cursor, Gemini and forty-five more agents on
+// what you did in Claude Code, Codex, Cursor, Gemini and forty-eight more agents on
 // this machine, including months before deja existed. The index is deja's; this
 // file is the seam: six tools the model can call, plus recall that arrives
 // without being asked for.
@@ -476,10 +476,13 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
       // file path is a file action whatever this version calls it, and a name
       // deja does not recognise is answered with silence.
       const fpath = input?.args?.filePath || input?.args?.path || ""
-      const patchText = input?.args?.patchText || input?.args?.patch || ""
+      const patchText =
+        input?.args?.patchText ||
+        input?.args?.patch ||
+        (String(input?.tool || "").toLowerCase().includes("patch") ? input?.args?.input || "" : "")
       if ((fpath || patchText) && input?.tool !== "bash") {
-        const ftext = output?.output
-        if (!ftext) return
+        if (!output || typeof output !== "object") return
+        const ftext = typeof output.output === "string" ? output.output : ""
         const fpayload = {
           hook_event_name: "PostToolUse",
           tool_name: input?.tool || "read",
@@ -490,7 +493,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         const fraw = await ask(["hook-tool"], JSON.stringify(fpayload))
         if (!fraw) return
         const fextra = JSON.parse(fraw)?.hookSpecificOutput?.additionalContext
-        if (fextra) output.output = ftext + "\n\n" + fextra
+        if (fextra) output.output = ftext ? ftext + "\n\n" + fextra : fextra
         return
       }
       if (input?.tool !== "bash") return

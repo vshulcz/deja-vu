@@ -76,7 +76,11 @@ func ReadGeminiCompactionIfNew(path, nativeSessionID string, seen func(fingerpri
 		return CompactionTranscript{}, false, fmt.Errorf("%w: no parseable gemini session", ErrUnsupportedCompactionTranscript)
 	}
 	var calls []TranscriptToolCall
+	metricComplete := len(records[:cut]) > 0
 	for _, r := range records[:cut] {
+		if !json.Valid(bytes.TrimSpace(r.line)) {
+			metricComplete = false
+		}
 		got, err := geminiCompactionToolCalls(r.line, r.off, r.off+int64(len(r.line))+1, nativeSessionID)
 		if err != nil {
 			return CompactionTranscript{}, false, err
@@ -96,7 +100,7 @@ func ReadGeminiCompactionIfNew(path, nativeSessionID string, seen func(fingerpri
 		SourceSize:          records[cut].off, SourceMTime: mtime,
 		TailOffset:     tailOffset,
 		Truncated:      truncated,
-		MetricComplete: !truncated,
+		MetricComplete: metricComplete,
 		ToolCalls:      calls,
 		tail:           append([]byte(nil), tail...),
 	}

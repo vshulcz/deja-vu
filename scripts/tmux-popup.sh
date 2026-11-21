@@ -106,7 +106,7 @@ OUT="$(
   "$SELF" --list "" | fzf --ansi --disabled \
     --delimiter=$'\t' --with-nth=3.. \
     --prompt="deja recall> " \
-    --header="Type to search 49 agents · Enter: view · Ctrl-R: resume in split · Ctrl-H: copy handoff · Ctrl-Y: yank ID" \
+    --header="Type to search 50 agents · Enter: view · Ctrl-R: resume in split · Ctrl-H: copy handoff · Ctrl-Y: yank ID" \
     --bind "change:reload:$SELF --list {q} || true" \
     --bind "ctrl-h:execute-silent($SELF --handoff {1})" \
     --bind "ctrl-y:execute-silent($SELF --yank {1})" \

@@ -4082,3 +4082,74 @@ func TestTheHandoffModeHandsOverAnotherSession(t *testing.T) {
 		t.Errorf("handoff with explicit project from unscoped cwd failed:\n%s", got)
 	}
 }
+
+func TestMCPDejaAutoAndOmittedModeRouting(t *testing.T) {
+	tmp := hermeticEnv(t)
+	root := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", root)
+
+	work := filepath.Join(tmp, "work", "api")
+	if err := os.MkdirAll(filepath.Join(work, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	relayPath := filepath.Join(work, "relay.go")
+	if err := os.WriteFile(relayPath, []byte("package api\nfunc run() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	store := filepath.Join(root, "-work-api")
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Date(2026, 8, 10, 12, 0, 0, 0, time.UTC)
+	lines := strings.Join([]string{
+		fmt.Sprintf(`{"type":"user","sessionId":"s-auto-1","timestamp":%q,"cwd":%q,"message":{"role":"user","content":"check relay retries"}}`, at.Format(time.RFC3339), work),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"s-auto-1","timestamp":%q,"cwd":%q,"message":{"role":"assistant","content":[{"type":"tool_use","id":"tu1","name":"Edit","input":{"file_path":%q,"old_string":"a","new_string":"b"}},{"type":"text","text":"Decided to cap retries at three in relay.go."}]}}`, at.Add(time.Minute).Format(time.RFC3339), work, relayPath),
+		fmt.Sprintf(`{"type":"user","sessionId":"s-auto-1","timestamp":%q,"cwd":%q,"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu1","content":"ok"}]}}`, at.Add(2*time.Minute).Format(time.RFC3339), work),
+	}, "\n") + "\n"
+	if err := os.WriteFile(filepath.Join(store, "s-auto-1.jsonl"), []byte(lines), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(work)
+
+	for _, tc := range []struct {
+		raw  string
+		want string
+	}{
+		{`{}`, "orient"},
+		{`{"q":""}`, "orient"},
+		{`{"mode":"auto"}`, "orient"},
+		{`{"q":"relay.go"}`, "blame"},
+		{`{"q":"relay.go:2"}`, "blame"},
+		{`{"mode":"auto","path":"relay.go"}`, "blame"},
+		{`{"mode":"auto","q":"FAIL\tpkg/relay\t0.12s\npanic: nil pointer dereference"}`, "fix"},
+		{`{"q":"cap retries at three"}`, "recall"},
+	} {
+		if got := inferAutoMCPMode(json.RawMessage(tc.raw)); got != tc.want {
+			t.Errorf("inferAutoMCPMode(%s) = %q, want %q", tc.raw, got, tc.want)
+		}
+	}
+
+	if got, err := callMCPTool(dir, "deja", json.RawMessage(`{}`)); err != nil || got == "" {
+		t.Errorf(`callMCPTool({}) = (%q, %v), want orient output`, got, err)
+	}
+	if got, err := callMCPTool(dir, "deja", json.RawMessage(`{"mode":"auto"}`)); err != nil || got == "" {
+		t.Errorf(`callMCPTool({"mode":"auto"}) = (%q, %v), want orient output`, got, err)
+	}
+	if got, err := callMCPTool(dir, "deja", json.RawMessage(`{"q":"relay.go"}`)); err != nil || !strings.Contains(got, "cap retries at three") {
+		t.Errorf(`callMCPTool({"q":"relay.go"}) = (%q, %v), want blame hit`, got, err)
+	}
+	if got, err := callMCPTool(dir, "deja", json.RawMessage(`{"q":"cap retries at three"}`)); err != nil || !strings.Contains(got, "cap retries at three") {
+		t.Errorf(`callMCPTool({"q":"cap retries at three"}) = (%q, %v), want recall hit`, got, err)
+	}
+	if _, err := callMCPTool(dir, "deja", json.RawMessage(`{"mode":"auto","q":"FAIL\tpkg/relay\t0.12s\npanic: nil pointer dereference"}`)); err != nil {
+		t.Errorf(`callMCPTool(auto fix) unexpected err: %v`, err)
+	}
+	if _, err := callMCPTool(dir, "deja", json.RawMessage(`{"mode":"recall"}`)); err == nil || !strings.Contains(err.Error(), "query required") {
+		t.Errorf(`callMCPTool({"mode":"recall"}) = %v, want query required`, err)
+	}
+}

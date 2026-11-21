@@ -677,6 +677,7 @@ func TestHandoffCommandTable(t *testing.T) {
 		"omnigent": {"omnigent", "run", "--prompt", "P"},
 		"orca":     {"orca", "P"},
 		"clawcode": {"claw", "-p", "P"},
+		"ante":     {"ante", "-p", "P"},
 	}
 	for target, want := range cases {
 		argv, ok := handoffCommand(target, "P")

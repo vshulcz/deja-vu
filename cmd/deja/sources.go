@@ -212,6 +212,7 @@ func printSourcesTo(w io.Writer, dir string) {
 		{"qoder", filepath.Join(sources.QoderRoot(), "projects"), []string{filepath.Join(sources.QoderRoot(), "projects")}, sources.QoderSessionFiles, sources.LoadQoder},
 		{"codebuddy", strings.Join(sources.CodeBuddyRoots(), string(os.PathListSeparator)), sources.CodeBuddyRoots(), sources.CodeBuddySessionFiles, sources.LoadCodeBuddy},
 		{"codearts", sources.CodeArtsRoot(), []string{sources.CodeArtsRoot()}, sources.CodeArtsFiles, sources.LoadCodeArts},
+		{"doubao", sources.DoubaoRoot(), []string{sources.DoubaoRoot()}, sources.DoubaoFiles, sources.LoadDoubao},
 		{"kimi", filepath.Join(sources.KimiRoot(), "sessions"), []string{filepath.Join(sources.KimiRoot(), "sessions")}, sources.KimiSessionFiles, sources.LoadKimi},
 		{"goose", filepath.Join(sources.GooseRoot(), "sessions"), sources.GooseSessionsDirs(), sources.GooseSessionFiles, sources.LoadGoose},
 		{"hermes", sources.HermesProfilesRoot(), []string{sources.HermesProfilesRoot()}, sources.HermesSessionFiles, sources.LoadHermes},
@@ -226,6 +227,7 @@ func printSourcesTo(w io.Writer, dir string) {
 		{"kimchi", sources.KimchiRoot(), []string{sources.KimchiRoot()}, sources.KimchiSessionFiles, sources.LoadKimchi},
 		{"commandcode", sources.CommandCodeRoot(), []string{sources.CommandCodeRoot()}, sources.CommandCodeSessionFiles, sources.LoadCommandCode},
 		{"clawcode", sources.ClawCodeRoot(), sources.ClawCodeRoots(), sources.ClawCodeSessionFiles, sources.LoadClawCode},
+		{"ante", sources.AnteRoot(), sources.AnteRoots(), sources.AnteSessionFiles, sources.LoadAnte},
 		{"zcode", sources.ZCodeRoot(), []string{sources.ZCodeRoot()}, sources.ZCodeSessionFiles, sources.LoadZCode},
 		{"gjc", sources.GjcRoot(), []string{sources.GjcRoot()}, sources.GjcSessionFiles, sources.LoadGjc},
 		{"continue", filepath.Join(sources.ContinueRoot(), "sessions"), []string{filepath.Join(sources.ContinueRoot(), "sessions")}, sources.ContinueSessionFiles, sources.LoadContinue},
@@ -245,6 +247,7 @@ func printSourcesTo(w io.Writer, dir string) {
 		{"zed", sources.ZedDB(), []string{sources.ZedDB()}, func() []string { return presentFiles(sources.ZedDB()) }, sources.LoadZed},
 		{"devin", filepath.Dir(sources.DevinSessionsDB()), []string{filepath.Dir(sources.DevinSessionsDB())}, sources.DevinFiles, sources.LoadDevin},
 		{"mimo", sources.MimoDB(), []string{sources.MimoDB()}, func() []string { return presentFiles(sources.MimoDB()) }, sources.LoadMimo},
+		{"teleagent", sources.TeleAgentDataDir(), sources.TeleAgentDBs(), sources.TeleAgentSessionFiles, sources.LoadTeleAgent},
 		{"omnigent", sources.OmnigentDB(), []string{sources.OmnigentDB()}, func() []string { return presentFiles(sources.OmnigentDB()) }, sources.LoadOmnigent},
 		{"orca", sources.OrcaDB(), []string{sources.OrcaDB()}, func() []string { return presentFiles(sources.OrcaDB()) }, sources.LoadOrca},
 		// The location is the registry, not a store: Crush keeps one store per

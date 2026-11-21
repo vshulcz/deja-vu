@@ -39,6 +39,30 @@ func shellOnlySigs(text, command string, sigs map[uint64]bool) map[uint64]bool {
 	return shell
 }
 
+func timeoutOnlySigs(text string, sigs map[uint64]bool) map[uint64]bool {
+	timeoutOnly := map[uint64]bool{}
+	other := map[uint64]bool{}
+	for raw := range strings.SplitSeq(text, "\n") {
+		line, ok := FrictionLine(raw)
+		if !ok {
+			continue
+		}
+		h := frictionHash(line)
+		if !sigs[h] {
+			continue
+		}
+		if isGenericTimeoutOrKill(strings.ToLower(trimEnvelopeLabel(strings.TrimSpace(raw)))) {
+			timeoutOnly[h] = true
+		} else {
+			other[h] = true
+		}
+	}
+	for h := range other {
+		delete(timeoutOnly, h)
+	}
+	return timeoutOnly
+}
+
 // shellComplaint reports a line the shell printed about the command line
 // rather than an error a program printed. A missing program the command runs
 // is that program's failure, and the same for every command that runs it.
@@ -46,7 +70,8 @@ func shellComplaint(raw, line, command string) bool {
 	trimmed := trimEnvelopeLabel(strings.TrimSpace(raw))
 	low := strings.ToLower(trimmed)
 	if strings.Contains(low, "not a git repository") ||
-		strings.Contains(low, "not a repository (or any of the parent directories)") {
+		strings.Contains(low, "not a repository (or any of the parent directories)") ||
+		isGenericTimeoutOrKill(low) {
 		return true
 	}
 	if !shellSpoke(trimmed) {
@@ -59,6 +84,21 @@ func shellComplaint(raw, line, command string) bool {
 		return false
 	}
 	return true
+}
+
+func isGenericTimeoutOrKill(low string) bool {
+	for _, needle := range []string{
+		"command timed out",
+		"timed out after",
+		"execution timed out",
+		"context deadline exceeded",
+		"signal: killed",
+	} {
+		if strings.Contains(low, needle) {
+			return true
+		}
+	}
+	return false
 }
 
 func unmatchedGlob(line string) string {

@@ -493,7 +493,7 @@ func doctorSQLite3() doctorComponent {
 // storeNeedsSQLite3 names the harnesses deja reads through the sqlite3 CLI.
 func storeNeedsSQLite3(name string) bool {
 	switch name {
-	case "opencode", "cursor", "grok", "hermes", "goose", "zed", "kilocode", "zcode", "mimo", "omnigent", "orca":
+	case "opencode", "cursor", "grok", "hermes", "goose", "zed", "kilocode", "zcode", "mimo", "teleagent", "omnigent", "orca":
 		return true
 	}
 	return false
@@ -552,6 +552,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"claude", sources.ClaudeRoots(), sources.ClaudeFiles, parseDoctorClaude},
 		{"codex", sources.CodexRoots(), sources.CodexFiles, parseDoctorCodex},
 		{"codearts", []string{sources.CodeArtsRoot()}, sources.CodeArtsFiles, sources.ParseCodeArtsFile},
+		{"doubao", []string{sources.DoubaoRoot()}, sources.DoubaoFiles, sources.ParseDoubaoFile},
 		{"trae", []string{sources.TraeRoot()}, sources.TraeFiles, parseDoctorTrae},
 		{"opencode", []string{sources.OpencodeDB()}, func() []string { return presentDoctorFile(sources.OpencodeDB()) }, doctorProbeOpencode},
 		{"aider", aiderPaths, sources.AiderFiles, sources.ParseAiderFile},
@@ -592,6 +593,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"kimchi", []string{sources.KimchiRoot()}, sources.KimchiSessionFiles, sources.ParseKimchiFile},
 		{"commandcode", []string{sources.CommandCodeRoot()}, sources.CommandCodeSessionFiles, sources.ParseCommandCodeFile},
 		{"clawcode", sources.ClawCodeRoots(), sources.ClawCodeSessionFiles, sources.ParseClawCodeFile},
+		{"ante", sources.AnteRoots(), sources.AnteSessionFiles, sources.ParseAnteFile},
 		// The transcripts and the database, each probed with its own reader:
 		// the transcript reader answers zero for the database, which made the
 		// row read `parsed-zero` (#3675), and leaving the database out made it
@@ -613,6 +615,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 		// the store: the legacy name the pre-rename builds wrote.
 		{"devin", []string{sources.DevinSessionsDB(), sources.DevinLegacySessionsDB()}, sources.DevinFiles, doctorProbeDevin},
 		{"mimo", []string{sources.MimoDB()}, func() []string { return presentDoctorFile(sources.MimoDB()) }, doctorProbeMimo},
+		{"teleagent", []string{sources.TeleAgentDataDir()}, sources.TeleAgentSessionFiles, doctorProbeTeleagent},
 		{"omnigent", []string{sources.OmnigentDB()}, func() []string { return presentDoctorFile(sources.OmnigentDB()) }, sources.ParseOmnigentDB},
 		{"orca", []string{sources.OrcaDB()}, func() []string { return presentDoctorFile(sources.OrcaDB()) }, sources.ParseOrcaDB},
 		{"deja", []string{sources.NotesFile()}, func() []string { return presentDoctorFile(sources.NotesFile()) }, sources.ParseNotesFile},
@@ -700,6 +703,10 @@ func doctorProbeDevin(path string) ([]model.Session, error) {
 }
 
 func doctorProbeMimo(path string) ([]model.Session, error) {
+	return sources.ParseOpencodeNewest(path)
+}
+
+func doctorProbeTeleagent(path string) ([]model.Session, error) {
 	return sources.ParseOpencodeNewest(path)
 }
 

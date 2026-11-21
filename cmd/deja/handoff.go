@@ -536,6 +536,8 @@ func handoffCommand(target, prompt string) ([]string, bool) {
 		return []string{"devin", "-p", prompt}, true
 	case "clawcode":
 		return []string{"claw", "-p", prompt}, true
+	case "ante":
+		return []string{"ante", "-p", prompt}, true
 	default:
 		return nil, false
 	}
@@ -553,7 +555,7 @@ var handoffAlias = map[string]string{
 // capability drift test keeps the two in sync.
 // Roo, Zed, Cherry Studio, JetBrains AI Assistant and Windsurf run the agent
 // inside the app, so there is no command line to hand a prompt to.
-var handoffPasteOnly = map[string]bool{"codearts": true, "roo": true, "cherrystudio": true, "zed": true, "jetbrains": true, "windsurf": true, "qoder": true}
+var handoffPasteOnly = map[string]bool{"codearts": true, "doubao": true, "roo": true, "cherrystudio": true, "zed": true, "jetbrains": true, "windsurf": true, "qoder": true, "teleagent": true}
 
 // pasteOnlyFooter ends a handoff printed for pasting. It named all of
 // handoffTargets inline, a four-line wall at 80 columns; the agents a reader
@@ -598,5 +600,5 @@ func pasteOnlyFooter(prefix string) string {
 func handoffTargets() []string {
 	return []string{"claude", "codex", "opencode", "cursor", "copilot", "copilot-chat", "gemini", "qwen", "antigravity", "aider", "pi", "senpi", "omp", "amp", "prime", "grok", "cline", "goose", "kimi", "crush",
 		"kilocode", "mimo", "omnigent", "orca", "continue", "commandcode", "codebuddy", "trae", "muse", "kiro", "gjc", "kimchi", "codewhale", "junie", "hermes", "openclaw", "deepseek", "reasonix", "zcode", "devin",
-		"mcode", "clawcode"}
+		"mcode", "clawcode", "ante"}
 }

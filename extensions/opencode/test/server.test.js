@@ -53,6 +53,7 @@ test("the helpers read 2.x's shapes", () => {
   assert.equal(resultText({ content: "plain" }), "plain")
   assert.equal(resultText({ content: [{ type: "text", text: "a" }, { type: "file" }, { type: "text", text: "b" }] }), "a\nb")
   assert.equal(resultText({ output: "out" }), "out")
+  assert.equal(resultText("bare"), "bare")
   assert.equal(resultText(undefined), "")
   assert.equal(v1ToolName("subagent"), "task")
   assert.equal(v1ToolName("shell"), "bash")
@@ -182,6 +183,29 @@ test("setup wires every channel the 1.x hooks have onto 2.x's seams", async () =
     const errored = { tool: "shell", sessionID: "s1", input: { command: "x" }, status: "error", error: {} }
     await hooks.tool["execute.after"][0](errored)
     assert.equal(errored.result, undefined)
+
+    const primitive = {
+      tool: "shell",
+      sessionID: "s1",
+      input: { command: "go build ./..." },
+      status: "completed",
+      result: "missing go.sum entry",
+    }
+    await hooks.tool["execute.after"][0](primitive)
+    assert.deepEqual(primitive.result.content, [
+      { type: "text", text: "missing go.sum entry" },
+      { type: "text", text: "ran next: go mod tidy" },
+    ])
+
+    const patched = {
+      tool: "patch",
+      sessionID: "s1",
+      input: { input: "*** Begin Patch\n*** Update File: a.go" },
+      status: "completed",
+      result: { content: [] },
+    }
+    await hooks.tool["execute.after"][0](patched)
+    assert.deepEqual(patched.result.content, [{ type: "text", text: "file history" }])
   })
 })
 

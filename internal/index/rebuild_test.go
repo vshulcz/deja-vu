@@ -390,7 +390,7 @@ func appendTo(t *testing.T, path, body string) {
 // parityStores points every store deja reads at a directory that does not
 // exist, so a test reads only the store it sets up.
 var parityStores = []string{
-	"DEJA_AIDER_ROOTS", "DEJA_AMP_ROOT", "DEJA_ANTIGRAVITY_ROOT", "DEJA_CC_MIRROR_ROOT", "DEJA_CHERRYSTUDIO_ROOTS",
+	"DEJA_AIDER_ROOTS", "DEJA_AMP_ROOT", "DEJA_ANTE_ROOT", "DEJA_ANTE_ROOTS", "ANTE_HOME", "DEJA_ANTIGRAVITY_ROOT", "DEJA_CC_MIRROR_ROOT", "DEJA_CHERRYSTUDIO_ROOTS",
 	"DEJA_CLAUDE_ROOT", "DEJA_CLAWCODE_ROOT", "DEJA_CLINE_ROOT", "DEJA_CLINE_ROOTS", "DEJA_CODEWHALE_ROOT", "DEJA_CODEX_ROOT",
 	"DEJA_COMMANDCODE_ROOT", "DEJA_CONTINUE_ROOT", "DEJA_COPILOT_CHAT_ROOTS", "DEJA_COPILOT_ROOT", "DEJA_CRUSH_ROOT",
 	"DEJA_CURSOR_CLI_ROOT", "DEJA_CURSOR_ROOT", "DEJA_DEEPSEEK_ROOT", "DEJA_GEMINI_ROOT", "DEJA_GJC_ROOT",
@@ -691,6 +691,14 @@ func TestToolResultInTheNextPassSettlesItsCall(t *testing.T) {
 				`{"type":"message","id":"u1","timestamp":"2026-09-01T09:00:01Z","message":{"role":"user","content":[{"type":"text","text":"fix the retry loop"}]}}` + "\n",
 			call: `{"type":"message","id":"a1","timestamp":"2026-09-01T09:02:00Z","message":{"role":"assistant","content":[{"type":"toolCall","id":"c-edit","name":"edit","arguments":{"path":"/tmp/proj/retry.go","edits":[{"oldText":"for {","newText":"for i := 0; i < 3; i++ {"}]}}]}}` + "\n",
 			res:  `{"type":"message","id":"r1","timestamp":"2026-09-01T09:02:01Z","message":{"role":"toolResult","toolCallId":"c-edit","toolName":"edit","content":[{"type":"text","text":"oldText not found"}],"isError":true}}` + "\n",
+		},
+		{
+			name: "ante command exit", env: "DEJA_ANTE_ROOT",
+			file: "ses_01REBUILD/events.jsonl",
+			head: `{"timestamp":"2026-08-14T10:00:00Z","id":"e1","event":{"SessionStart":{"session_id":"ses_01REBUILD","dir":"/Users/alex/payments-api"}}}` + "\n" +
+				`{"timestamp":"2026-08-14T10:00:01Z","id":"e2","event":{"UserInput":"run unit tests"}}` + "\n",
+			call: `{"timestamp":"2026-08-14T10:00:02Z","id":"e3","event":{"ToolStart":{"id":"c1","name":"Bash","args":{"command":"go test ./..."}}}}` + "\n",
+			res:  `{"timestamp":"2026-08-14T10:00:03Z","id":"e4","event":{"ToolEnd":{"tool_use_id":"c1","tool_name":"Bash","status":"Failed","result_json":{"Completed":{"exit_code":2,"stdout":"FAIL"}}}}}` + "\n",
 		},
 	}
 	for _, tc := range cases {

@@ -898,6 +898,7 @@ func TestWriteBackRefusesWithItsReason(t *testing.T) {
 		"zcode":    "CLI database",
 		"trae":     "TRAE CLI",
 		"muse":     "Muse",
+		"ante":     "append-only",
 	} {
 		if CanWriteBack(harness) {
 			t.Errorf("%s: written back, want a refusal", harness)

@@ -81,6 +81,7 @@ type symbolDeclLoc struct {
 
 type repoSymbolMap struct {
 	at         time.Time
+	cwd        string
 	files      []repoFileEntry
 	byStem     map[string][]string
 	byDir      map[string]int
@@ -302,8 +303,9 @@ func loadRepoSymbolMap(cwd string) repoSymbolMap {
 	if scanRoot == "" {
 		return repoSymbolMap{}
 	}
+	cleanCWD := filepath.Clean(cwd)
 	if v, ok := repoSymbolMapCache.Load(scanRoot); ok {
-		if cached, ok := v.(repoSymbolMap); ok && repoSymbolMapFresh(cached) {
+		if cached, ok := v.(repoSymbolMap); ok && cached.cwd == cleanCWD && repoSymbolMapFresh(cached) {
 			return cached
 		}
 	}
@@ -319,6 +321,7 @@ func loadRepoSymbolMap(cwd string) repoSymbolMap {
 		return repoSymbolMap{}
 	}
 	idx := repoSymbolMap{
+		cwd:        cleanCWD,
 		byStem:     map[string][]string{},
 		byDir:      map[string]int{},
 		stemDF:     map[string]int{},

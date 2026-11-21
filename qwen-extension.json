@@ -1,7 +1,7 @@
 {
   "name": "deja",
   "version": "0.24.3",
-  "description": "deja-vu memory for Qwen Code: the coding sessions already on your disk — Qwen Code, Claude Code, Codex, Cursor and forty-five more — searchable and recalled, including work from before it was installed.",
+  "description": "deja-vu memory for Qwen Code: the coding sessions already on your disk — Qwen Code, Claude Code, Codex, Cursor and forty-eight more — searchable and recalled, including work from before it was installed.",
   "contextFileName": "QWEN.md",
   "mcpServers": {
     "deja": {

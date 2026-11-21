@@ -95,6 +95,7 @@ export function createWorker({ run = runDeja, owns = installerOwns } = {}) {
       const stdin = JSON.stringify({
         cwd,
         hook_event_name: "UserPromptSubmit",
+        session_id: payload.sessionId || payload.terminalId || payload.workspaceId || "",
         prompt: payload.prompt,
       })
       const { ok, stdout } = await run(["hook-prompt", "--plain"], {
@@ -120,6 +121,7 @@ export function createWorker({ run = runDeja, owns = installerOwns } = {}) {
       const stdin = JSON.stringify({
         cwd,
         hook_event_name: "UserPromptSubmit",
+        session_id: payload.sessionId || payload.terminalId || payload.workspaceId || "",
         prompt,
       })
       const { ok, stdout } = await run(["hook-prompt", "--plain"], {

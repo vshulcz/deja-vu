@@ -49,7 +49,7 @@ El indexado y la búsqueda son locales: sin llamadas de red y con redacción de 
 
 | Recall | Tokens | Indexado y búsqueda |
 |---|---|---|
-| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas) | **58% menos tokens** (en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 49 agentes de programación |
+| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas) | **58% menos tokens** (en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 50 agentes de programación |
 
 ## Memoria de repositorio y relevo entre agentes
 

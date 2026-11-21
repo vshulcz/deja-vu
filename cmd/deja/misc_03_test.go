@@ -847,6 +847,9 @@ func hermeticEnv(t *testing.T) string {
 	t.Setenv("CODEBUDDY_CONFIG_DIR", "")
 	t.Setenv("WORKBUDDY_CONFIG_DIR", "")
 	t.Setenv("DEJA_CODEBUDDY_ROOTS", "")
+	t.Setenv("ANTE_HOME", "")
+	t.Setenv("DEJA_ANTE_ROOT", "")
+	t.Setenv("DEJA_ANTE_ROOTS", "")
 	t.Setenv("NO_COLOR", "1")
 	return tmp
 }

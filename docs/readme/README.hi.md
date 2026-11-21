@@ -255,7 +255,9 @@ Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Ro
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
 CodeArts Desktop ·
-Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · Zed.
+Ante ·
+Doubao ·
+Qoder · TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsurf / Devin Desktop · MiniMax Code · MiMo Code · Omnigent · Orca · TeleAgent · Zed.
 
 इनमें से हर एक क्या समर्थन करता है — MCP रिकॉल, ऑटोमैटिक रिकॉल, skills, कमांड, resume, handoff — यह
 [अंग्रेज़ी README की क्षमता तालिका](../../README.md#supported-harnesses) में है। अलग स्टोरेज जगहें `DEJA_*_ROOT`

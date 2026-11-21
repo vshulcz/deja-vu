@@ -47,7 +47,7 @@ func writeLeadLine(hb *strings.Builder, h search.Hit, i int, terms []string) {
 		fmt.Fprintf(hb, " · %s", h.Session.Updated.Local().Format("2006-01-02"))
 	}
 	if held := sessionHolds(h.Session, terms); len(held) > 0 {
-		fmt.Fprintf(hb, " · has %s", recallListingLine(strings.Join(held, ", ")))
+		fmt.Fprintf(hb, " · has %s", recallListingLine(joinWordsCapped(held)))
 	}
 	fmt.Fprintf(hb, " · %s\n", recallListingLine(h.Session.ID))
 	if i > 0 {
@@ -253,16 +253,58 @@ func writeFormsLine(b *strings.Builder, result index.SearchResult) {
 	if !result.Stemmed {
 		how = "close spellings"
 	}
-	fmt.Fprintf(b, "No exact match; using %s: %s\n", how, strings.Join(fuzzySummary(result.Variants), ", "))
+	fmt.Fprintf(b, "No exact match; using %s: %s\n", how, joinWordsCapped(fuzzySummary(result.Variants)))
 }
 
-// writeRecallHitHead writes one hit's header, its marks and its excerpts.
-func writeRecallHitHead(hb *strings.Builder, h search.Hit, i int, twins map[string][]string) {
+// writeRecallHitHeadBudgeted writes one hit's header, its marks and its
+// excerpts, capping verbose top hits on standard MCP pages so up to five hits
+// fit inside a single response.
+func writeRecallHitHeadBudgeted(hb *strings.Builder, h search.Hit, i, totalHits, roomLeft, budget int, twins map[string][]string) {
+	before := hb.Len()
 	writeRecallHitLine(hb, h, i)
 	if line := lifecycleLine(h); line != "" {
 		fmt.Fprintf(hb, "%s\n", line)
 	}
-	writeRecallHitMarks(hb, h, twins)
+	writeRecallHitMeta(hb, h, twins)
+	metaUsed := hb.Len() - before
+
+	// Budget only hits 0..4 on standard MCP pages (>=2000B); small budgets
+	// (#1319) and overflow past hit 5 (#5511) keep full snippets.
+	targetHits := min(totalHits, 5)
+	if budget < 2000 || totalHits <= 1 || i >= targetHits {
+		writeRecallHitSnippets(hb, h.Snippets, -1, false)
+		return
+	}
+
+	remaining := targetHits - i
+	futureReserve := (remaining-1)*250 + 170
+	if i == 0 {
+		futureReserve += 500
+	}
+	avail := roomLeft - metaUsed - futureReserve
+	if avail <= 24 && totalHits <= 5 && roomLeft-metaUsed > 180 {
+		avail = 96
+	}
+	if avail <= 0 {
+		return
+	}
+	share := avail
+	if remaining > 1 {
+		pool := roomLeft - 170
+		if i == 0 {
+			pool -= 500
+		}
+		if fair := pool/remaining - metaUsed; fair > 0 {
+			share = max(240, fair)
+		}
+	}
+	if avail > share {
+		avail = share
+	}
+	if i == 0 && avail > 850 {
+		avail = 850
+	}
+	writeRecallHitSnippets(hb, h.Snippets, avail, totalHits <= 5)
 }
 
 // loneWordPageHits is how many sessions a page answered on one word of two
@@ -300,9 +342,7 @@ func writeRecallHitLine(hb *strings.Builder, h search.Hit, i int) {
 	fmt.Fprintln(hb)
 }
 
-// writeRecallHitMarks writes a hit's bracketed notes, the person's rules and
-// its excerpts.
-func writeRecallHitMarks(hb *strings.Builder, h search.Hit, twins map[string][]string) {
+func writeRecallHitMeta(hb *strings.Builder, h search.Hit, twins map[string][]string) {
 	// A session that says it backed an approach out carries a signal the
 	// lifecycle states would carry if anyone set them by hand — on a real
 	// 1160-session store not one did. The wording tells the agent an
@@ -352,24 +392,87 @@ func writeRecallHitMarks(hb *strings.Builder, h search.Hit, twins map[string][]s
 	for _, r := range h.Session.UserRules {
 		fmt.Fprintf(hb, "- %s%s\n", search.UserRuleLabel, recallListingLine(r))
 	}
-	for _, sn := range h.Snippets {
+}
+
+func writeRecallHitSnippets(hb *strings.Builder, snippets []string, maxBytes int, clipFirst bool) {
+	used := 0
+	wrote := 0
+	for _, sn := range snippets {
 		if strings.HasPrefix(sn, search.UserRuleLabel) {
 			continue
 		}
-		fmt.Fprintf(hb, "- %s\n", recallListingLine(sn))
+		text := recallListingLine(sn)
+		line := "- " + text + "\n"
+		if maxBytes >= 0 {
+			rem := maxBytes - used
+			if rem < 24 {
+				break
+			}
+			if len(line) > rem {
+				if wrote == 0 && clipFirst && rem >= 32 {
+					keep := rem - len("- ") - len("…\n")
+					trimmed := trimUTF8(text, keep)
+					if trimmed == "" {
+						break
+					}
+					line = "- " + trimmed + "…\n"
+				} else {
+					continue
+				}
+			}
+		}
+		hb.WriteString(line)
+		used += len(line)
+		wrote++
 	}
+}
+
+func quoteLoosenedQuery(q, tier string) string {
+	if tier == search.TierRelevance && strings.Contains(q, "\"") {
+		return strings.ReplaceAll(q, "\"", " ")
+	}
+	return q
+}
+
+// relevanceMatchTermsFor expands raw query terms with quote loosening, stem and
+// compound parts, matched query variants, and directory tokens for snippet weighting.
+func relevanceMatchTermsFor(q string, res index.SearchResult) []string {
+	terms := index.RelevanceMatchTerms(strings.ReplaceAll(q, "\"", " "))
+	seen := make(map[string]bool, 32)
+	out := make([]string, 0, 32)
+	for _, t := range terms {
+		if t != "" && !seen[t] {
+			seen[t] = true
+			out = append(out, t)
+		}
+	}
+	for _, vs := range res.Variants {
+		for _, v := range vs {
+			if v != "" && !seen[v] {
+				seen[v] = true
+				out = append(out, v)
+			}
+		}
+	}
+	if res.Directory != "" && !seen[res.Directory] {
+		out = append(out, res.Directory)
+	}
+	return out
 }
 
 // writeRecallConclusions writes what the best hit concluded, the files it
 // touched and what it ran, when the budget leaves room for them. With more
-// hits waiting, the block keeps recallConclusionsReserve free for them: on a
-// replay of real recall calls a first hit with thirty thousand matches spent
-// the rest of the page here, and the hit ranked second, the one that
-// answered, arrived as half a header line.
-func writeRecallConclusions(hb *strings.Builder, dir, q string, h search.Hit, o search.Options, budget, headerRoom int, more bool) {
-	block := recallConclusionLines(dir, q, h, o, budget-headerRoom+hb.Len()-recallConclusionsReserve)
-	if more {
-		block = fitLines(block, budget-headerRoom-hb.Len()-recallConclusionsReserve)
+// hits waiting, the block keeps room for them: on a replay of real recall calls
+// a first hit with thirty thousand matches spent the rest of the page here, and
+// subsequent hits arrived cut in half.
+func writeRecallConclusions(hb *strings.Builder, dir, q string, h search.Hit, o search.Options, budget, headerRoom, moreHits int) {
+	reserve := recallConclusionsReserve
+	if moreHits > 0 {
+		reserve = max(recallConclusionsReserve, min(budget/2, moreHits*380))
+	}
+	block := recallConclusionLines(dir, q, h, o, budget-headerRoom+hb.Len()-reserve)
+	if moreHits > 0 {
+		block = fitLines(block, budget-headerRoom-hb.Len()-reserve)
 	}
 	for _, l := range block {
 		hb.WriteString(l)
@@ -590,13 +693,7 @@ func recallRankFrom(dir, q string, o search.Options, result index.SearchResult) 
 	if result.Tier == search.TierError {
 		hits = search.ErrorHits(ss, o.Query)
 	} else if result.Tier == search.TierRelevance {
-		terms := index.RelevanceMatchTerms(q)
-		if result.Directory != "" {
-			// The directory is what these sessions matched on; without it the
-			// snippet chooser looks for the file's words and shows nothing.
-			terms = append(terms, result.Directory)
-		}
-		hits = markStrictHits(search.RelevanceHitsWeighted(ss, terms, result.TermIDF), result)
+		hits = markStrictHits(search.RelevanceHitsWeighted(ss, relevanceMatchTermsFor(q, result), result.TermIDF), result)
 	} else if hits, err = search.Run(ss, o); err != nil {
 		return index.SearchResult{}, o, nil, 0, err
 	}

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Doubao stores its history — session format</title>
+<meta name="description" content="Where Doubao writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/doubao.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where Doubao stores its history — session format">
+<meta property="og:description" content="Where Doubao writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/doubao.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="noindex,follow">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where Doubao stores its history — session format">
+<meta name="twitter:description" content="Where Doubao writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Doubao writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Doubao Desktop","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/doubao.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/doubao.html","name":"Doubao Desktop","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="nav-cta" href="https://github.com/vshulcz/deja-vu"><span class="star-ic" aria-hidden="true">★</span>GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="amp.html">Amp</a><a href="ante.html">Ante</a><a href="antigravity.html">Antigravity</a><a href="cherrystudio.html">Cherry Studio</a><a href="claude-code.html">Claude Code</a><a href="clawcode.html">Claw Code</a><a href="cline.html">Cline</a><a href="codearts.html">CodeArts Desktop</a><a href="codebuddy.html">CodeBuddy Code</a><a href="codewhale.html">CodeWhale</a><a href="codex.html">Codex CLI</a><a href="commandcode.html">Command Code</a><a href="continue.html">Continue</a><a href="copilot.html">Copilot CLI</a><a href="crush.html">Crush</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="devin.html">Devin CLI</a><a href="doubao.html" aria-current="page">Doubao</a><a href="gjc.html">gajae-code</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="jetbrains.html">JetBrains AI Assistant</a><a href="junie.html">Junie</a><a href="kilocode.html">Kilo Code</a><a href="kimchi.html">Kimchi Coding</a><a href="kimi.html">Kimi Code</a><a href="kiro.html">Kiro</a><a href="mimo.html">MiMo-Code</a><a href="mcode.html">MiniMax Code</a><a href="muse.html">Muse Code</a><a href="omnigent.html">Omnigent</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="orca.html">Orca</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qoder.html">Qoder</a><a href="qwen.html">Qwen Code</a><a href="reasonix.html">Reasonix</a><a href="roo.html">Roo Code</a><a href="senpi.html">Senpi</a><a href="teleagent.html">TeleAgent</a><a href="trae.html">TRAE CLI</a><a href="copilot-chat.html">VS Code Copilot Chat</a><a href="windsurf.html">Windsurf / Devin Desktop</a><a href="zcode.html">ZCode</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>Doubao Desktop</h1>
+<ul>
+<li><strong>ID</strong>: <code>doubao</code></li>
+<li><strong>Store</strong>: <code>%LOCALAPPDATA%\Doubao\User Data\&lt;profile&gt;\IndexedDB\chrome_doubao-chat_0.indexeddb.leveldb\</code> — a Chromium IndexedDB database in a LevelDB directory (macOS: <code>~/Library/Application Support/Doubao/</code>, Linux: <code>~/.config/Doubao/</code>)</li>
+<li><strong>Read overrides</strong>: <code>DEJA_DOUBAO_ROOT</code> replaces the user-data root</li>
+<li><strong>Format</strong>: Chromium IndexedDB — LevelDB + snappy + Blink SerializedScriptValue / V8 structured clone</li>
+<li><strong>Needs</strong>: nothing extra</li>
+</ul>
+<p>Doubao Desktop (ByteDance&#39;s 豆包) keeps its conversations in a Chromium IndexedDB database, one LevelDB directory per profile. Only the chat window&#39;s database (<code>chrome_doubao-chat</code>) holds session bodies; the auxiliary windows (background, launcher, office) keep caches.</p>
+<p>deja decodes three layers: LevelDB (SSTables and the write-ahead log, with the internal-key trailer stripped and deleted keys kept as history), Chromium&#39;s IDBValue wrapper (<code>FF 11 02</code> marks a snappy-compressed value), and the V8 structured-serialization stream. It reads the whole version history of every record, because Doubao rewrites the streaming state of the protocol record on every increment and clears it once a reply finishes — the current value alone usually reads as an empty store, and the bodies live in the superseded snapshots. Tasks merge across snapshots by keeping the longest reply per task id.</p>
+<p>Conversation metadata comes from <code>conversation-list-data-*</code> records, merged across the schema variants Doubao writes. Turns come from the protocol record <code>default-chat-im-protocol-store</code> — 2.35+ writes it with an account prefix (<code>im-sdk:user:&lt;uid&gt;:default-chat-im-protocol-store</code>) — one task per question-answer pair, <code>block_type</code> 10000 as the only text-bearing block. 2.37+ writes <code>client_meta.conversation_id</code> as an empty string and carries the id on each received message&#39;s <code>extra</code> instead.</p>
+<p>Only conversations whose local snapshots hold readable text are indexed: Doubao keeps full bodies server-side and clears the local snapshot when a reply finishes, so a store read between sessions yields what it has. Non-text blocks (images, cards) are counted, not turned into placeholder text.</p>
+<p>The store shape was attested by Nwflower/dsh-chat-import (<code>lib/convert/doubao.mjs</code>, the 2.35/2.37 drift adapted in PR #123) and checked against a real 2.35.12 → 2.37.8 store; the synthetic fixture in <code>fixtures/registry/doubao/</code> keeps the reader honest.</p>
+<p><strong>Last verified:</strong> 2026-11-21</p>
+
+<hr>
+<p>deja reads this format and 51 others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

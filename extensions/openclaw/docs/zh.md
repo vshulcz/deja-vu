@@ -6,7 +6,7 @@
 
 **[deja-vu](https://github.com/vshulcz/deja-vu)** 扩展（LongMemEval-S **97.2% R@5**）· [文档](https://vshulcz.github.io/deja-vu/zh/) · [在线演示](https://vshulcz.github.io/deja-vu/view/) · [评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-OpenClaw 记得自己的会话。这个插件回答的是另一个问题：这台机器上 Claude Code、Codex、Cursor、Gemini、Zed 等其他四十八个编程智能体里做过什么，包括装 OpenClaw 之前的那几个月。完全依赖单文件 Go 二进制 `deja` 与本地 BM25 索引在本地运行，无需额外 LLM 或嵌入模型（设置 `DEJA_OFFLINE=1` 可关闭每日检查）。
+OpenClaw 记得自己的会话。这个插件回答的是另一个问题：这台机器上 Claude Code、Codex、Cursor、Gemini、Zed 等其他五十一个编程智能体里做过什么，包括装 OpenClaw 之前的那几个月。完全依赖单文件 Go 二进制 `deja` 与本地 BM25 索引在本地运行，无需额外 LLM 或嵌入模型（设置 `DEJA_OFFLINE=1` 可关闭每日检查）。
 
 ![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -86,7 +86,7 @@ openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 
 | 召回率 | Token 用量 | 索引与检索耗时 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 49 个编程智能体的检索仅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 50 个编程智能体的检索仅 **0.7 ms** |
 
 ## 仓库记忆与跨智能体接力
 
@@ -96,6 +96,6 @@ openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 
 ## 隐私
 
-索引保存在 `~/.cache/deja/index.db`（可用 `DEJA_INDEX_DIR` 修改），在建索引时自动清理 `sk-*`、`ghp_*`、`AKIA*` 与 `Bearer` 等凭据。只有明确运行 `deja embed` 并配置外部模型时才会出网。一键为本机 49 款编程智能体部署完整集成请运行 `deja install --auto`。
+索引保存在 `~/.cache/deja/index.db`（可用 `DEJA_INDEX_DIR` 修改），在建索引时自动清理 `sk-*`、`ghp_*`、`AKIA*` 与 `Bearer` 等凭据。只有明确运行 `deja embed` 并配置外部模型时才会出网。一键为本机 50 款编程智能体部署完整集成请运行 `deja install --auto`。
 
 [deja-vu](https://github.com/vshulcz/deja-vu) 生态组件。MIT 协议。

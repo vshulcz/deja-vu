@@ -53,13 +53,21 @@ func lockDir(dir string) (func(), error) {
 // recovery retry make that safe, while waiting here would stall an MCP tool
 // call for the length of a rebuild.
 func tryLockDir(dir string) (func(), bool, error) {
-	lockPath := dir + ".lock"
 	// Same refusal as lockDir: a reader that decides to build would delete a
 	// file somebody had at this path.
 	if err := checkIndexPath(dir); err != nil {
 		return nil, false, err
 	}
 	chmodIndexDir(dir)
+	unlock, ok, err := tryLockFile(dir + ".lock")
+	if !ok || err != nil {
+		return unlock, ok, err
+	}
+	recoverIndexDir(dir)
+	return unlock, true, nil
+}
+
+func tryLockFile(lockPath string) (func(), bool, error) {
 	if err := mkdirIndexAll(filepath.Dir(lockPath)); err != nil {
 		if Unwritable(err) {
 			return nil, false, nil
@@ -82,7 +90,27 @@ func tryLockDir(dir string) (func(), bool, error) {
 		_ = f.Close()
 		return nil, false, nil //nolint:nilerr // another process holds the lock
 	}
-	recoverIndexDir(dir)
+	return func() {
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		_ = f.Close()
+	}, true, nil
+}
+
+// tryLockWriteFile tries an exclusive non-blocking lock on a writer-only file
+// and returns directory/file open errors (such as permission denial) instead of
+// swallowing them like tryLockFile does for snapshot readers.
+func tryLockWriteFile(lockPath string) (func(), bool, error) {
+	if err := mkdirIndexAll(filepath.Dir(lockPath)); err != nil {
+		return nil, false, err
+	}
+	f, err := openIndexFileWrite(lockPath, os.O_CREATE|os.O_RDWR)
+	if err != nil {
+		return nil, false, err
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		_ = f.Close()
+		return nil, false, nil //nolint:nilerr // another process holds the lock
+	}
 	return func() {
 		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 		_ = f.Close()

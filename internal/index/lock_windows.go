@@ -96,13 +96,21 @@ func unlockFileEx(h syscall.Handle, reserved, low, high uint32, ol *syscall.Over
 // tryLockDir mirrors the unix non-blocking variant using
 // LOCKFILE_FAIL_IMMEDIATELY.
 func tryLockDir(dir string) (func(), bool, error) {
-	lockPath := dir + ".lock"
 	// Same refusal as lockDir: a reader that decides to build would delete a
 	// file somebody had at this path.
 	if err := checkIndexPath(dir); err != nil {
 		return nil, false, err
 	}
 	chmodIndexDir(dir)
+	unlock, ok, err := tryLockFile(dir + ".lock")
+	if !ok || err != nil {
+		return unlock, ok, err
+	}
+	recoverIndexDir(dir)
+	return unlock, true, nil
+}
+
+func tryLockFile(lockPath string) (func(), bool, error) {
 	if err := mkdirIndexAll(filepath.Dir(lockPath)); err != nil {
 		if errors.Is(err, fs.ErrPermission) {
 			return nil, false, nil
@@ -127,7 +135,29 @@ func tryLockDir(dir string) (func(), bool, error) {
 		_ = f.Close()
 		return nil, false, nil //nolint:nilerr // a lock held elsewhere is "not taken", not an error
 	}
-	recoverIndexDir(dir)
+	return func() {
+		var ol2 syscall.Overlapped
+		_ = unlockFileEx(h, 0, 1, 0, &ol2)
+		_ = f.Close()
+	}, true, nil
+}
+
+// tryLockWriteFile tries an exclusive non-blocking lock on a writer-only file
+// and returns directory/file open errors instead of swallowing permission errors.
+func tryLockWriteFile(lockPath string) (func(), bool, error) {
+	if err := mkdirIndexAll(filepath.Dir(lockPath)); err != nil {
+		return nil, false, err
+	}
+	f, err := openIndexFileWrite(lockPath, os.O_CREATE|os.O_RDWR)
+	if err != nil {
+		return nil, false, err
+	}
+	h := syscall.Handle(f.Fd())
+	var ol syscall.Overlapped
+	if err := lockFileEx(h, lockfileExclusiveLock|lockfileFailImmediately, 0, 1, 0, &ol); err != nil {
+		_ = f.Close()
+		return nil, false, nil //nolint:nilerr // a lock held elsewhere is "not taken", not an error
+	}
 	return func() {
 		var ol2 syscall.Overlapped
 		_ = unlockFileEx(h, 0, 1, 0, &ol2)

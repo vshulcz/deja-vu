@@ -80,7 +80,7 @@
 <a href="recover-overwritten-files.html">Recover overwritten files</a>
 <a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
-<details class="grpfold" open><summary>Deleting sessions <span class="n">39</span></summary>
+<details class="grpfold" open><summary>Deleting sessions <span class="n">40</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
 <a href="delete-old-claude-sessions.html">Old sessions</a>
 <a href="delete-codex-sessions.html">Codex</a>
@@ -118,10 +118,11 @@
 <a href="delete-grok-session-history.html">Grok Build</a>
 <a href="delete-devin-session-history.html">Devin CLI</a>
 <a href="delete-mimo-session-history.html">MiMo-Code</a>
+<a href="delete-teleagent-session-history.html">TeleAgent</a>
 <a href="delete-omnigent-session-history.html">Omnigent</a>
 <a href="delete-orca-session-history.html">Orca</a>
 </details>
-<details class="grpfold"><summary>Per-agent guides <span class="n">50</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">51</span></summary>
 <a href="memory-for-aider.html">aider</a>
 <a href="memory-for-amp.html">Amp</a>
 <a href="memory-for-antigravity.html">Antigravity</a>
@@ -153,6 +154,7 @@
 <a href="memory-for-kimi.html">Kimi Code</a>
 <a href="memory-for-kiro.html">Kiro</a>
 <a href="memory-for-mimo.html">MiMo-Code</a>
+<a href="memory-for-teleagent.html">TeleAgent</a>
 <a href="memory-for-mcode.html">MiniMax Code</a>
 <a href="memory-for-muse.html">Muse Code</a>
 <a href="memory-for-oh-my-claudecode.html">oh-my-claudecode</a>
@@ -223,7 +225,7 @@ deja "CodeWhale session about the refactor"</pre>
 <p>The full conversation messages, tool calls (such as <code>read</code>, <code>write</code>, <code>edit</code>, and <code>bash</code>), execution receipts with command exit codes, and diffs. Once deleted, <code>codewhale --resume &lt;id&gt;</code> (or <code>codewhale --session-id &lt;id&gt;</code>) can no longer find or reopen the session.</p>
 
 <h2>Keeping it searchable instead</h2>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads CodeWhale sessions, alongside forty-eight other coding agents on your machine, into one local index:</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads CodeWhale sessions, alongside fifty-one other coding agents on your machine, into one local index:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "codewhale session about the migration"</pre>
 <p><a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session for good when you do want it gone. <code>DEJA_CODEWHALE_ROOT</code> lets you point deja at a backup directory or external disk without moving CodeWhale.</p>

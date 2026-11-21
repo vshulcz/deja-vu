@@ -2077,6 +2077,7 @@ func TestFormatRegistryConformance(t *testing.T) {
 		"DEJA_OMNIGENT_ROOT", "DEJA_OMNIGENT_DB", "OMNIGENT_DATA_DIR",
 		"DEJA_ORCA_ROOT", "DEJA_ORCA_DB",
 		"DEJA_CLAWCODE_ROOT", "DEJA_CLAWCODE_ROOTS", "CLAW_CONFIG_HOME",
+		"DEJA_ANTE_ROOT", "DEJA_ANTE_ROOTS", "ANTE_HOME",
 	} {
 		t.Setenv(key, "")
 	}
@@ -2225,6 +2226,8 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 		sessions, err = ParseCodeBuddyFile(path)
 	case "codearts":
 		sessions, err = ParseCodeArtsFile(path)
+	case "doubao":
+		sessions, err = ParseDoubaoDir(path)
 	case "reasonix":
 		// The 1.x fixture is zstd frames, which only the CLI reads.
 		if filepath.Base(path) == "events.frames" && !ZstdAvailable() {
@@ -2450,6 +2453,21 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 			t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
 		}
 		sessions, err = ParseMimoDB(db)
+	case "teleagent":
+		if !SQLite3Available() {
+			t.Skip("sqlite3 not installed")
+		}
+		sql, readErr := os.ReadFile(path)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		db := filepath.Join(work, "teleagent.db")
+		build := exec.CommandContext(t.Context(), "sqlite3", db)
+		build.Stdin = strings.NewReader(string(sql))
+		if out, runErr := build.CombinedOutput(); runErr != nil {
+			t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
+		}
+		sessions, err = ParseTeleagentDB(db)
 	case "omnigent":
 		if !SQLite3Available() {
 			t.Skip("sqlite3 not installed")
@@ -2485,6 +2503,8 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 		// and a registry fixture that needs an external tool to read cannot be
 		// checked on a machine that lacks it.
 		sessions, err = ParseDeepSeekFile(path)
+	case "ante":
+		sessions, err = ParseAnteFile(path)
 	default:
 		t.Fatalf("no conformance parser for %q", id)
 	}
@@ -2496,7 +2516,7 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 
 // registryFixturesWithCalls are the registry fixtures whose tool calls are
 // read into work records.
-var registryFixturesWithCalls = map[string]bool{"clawcode": true, "deepseek": true, "continue": true, "trae": true, "muse": true, "codebuddy": true, "devin": true, "junie": true, "jetbrains": true, "kimi": true, "mcode": true, "gemini": true, "omnigent": true, "orca": true}
+var registryFixturesWithCalls = map[string]bool{"clawcode": true, "deepseek": true, "continue": true, "trae": true, "muse": true, "codebuddy": true, "devin": true, "junie": true, "jetbrains": true, "kimi": true, "mcode": true, "gemini": true, "omnigent": true, "orca": true, "ante": true}
 
 func validateRegistrySessions(t *testing.T, id string, sessions []model.Session) {
 	t.Helper()

@@ -866,6 +866,50 @@ func TestMCPInitializeTellsClaudeCodeToLoadTheDeferredTool(t *testing.T) {
 	}
 }
 
+func TestMCPInstructionsIncludeActiveProjectTrailerWhenIndexed(t *testing.T) {
+	if got := mcpInstructions(t.TempDir(), ""); strings.Contains(got, "Active project:") {
+		t.Fatalf("unindexed dir unexpectedly produced project trailer: %q", got)
+	}
+
+	tmp := hermeticEnv(t)
+	work := filepath.Join(tmp, "work", "api")
+	if err := os.MkdirAll(filepath.Join(work, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-work-api")
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Date(2026, 8, 12, 10, 0, 0, 0, time.UTC)
+	lines := fmt.Sprintf(`{"type":"user","sessionId":"s-inst-1","timestamp":%q,"cwd":%q,"message":{"role":"user","content":"check retry cap"}}`+"\n"+
+		`{"type":"assistant","sessionId":"s-inst-1","timestamp":%q,"cwd":%q,"message":{"role":"assistant","content":"Decided to cap retries at three."}}`+"\n",
+		at.Format(time.RFC3339), work, at.Add(time.Minute).Format(time.RFC3339), work)
+	if err := os.WriteFile(filepath.Join(store, "s-inst-1.jsonl"), []byte(lines), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(work)
+
+	base := mcpInstructions(t.TempDir(), "")
+	got := mcpInstructions(dir, "")
+	if !strings.HasPrefix(got, base) {
+		t.Fatalf("indexed instructions diverged from base:\ngot:  %q\nbase: %q", got, base)
+	}
+	trailer := strings.TrimPrefix(got, base)
+	if !strings.Contains(trailer, "Active project:") || !strings.Contains(trailer, "1 sessions") || !strings.Contains(trailer, "2026-08-12") {
+		t.Fatalf("unexpected project trailer: %q", trailer)
+	}
+	if len(trailer) > 180 {
+		t.Errorf("trailer exceeded 180 bytes (%d): %q", len(trailer), trailer)
+	}
+	if strings.Contains(trailer, "—") {
+		t.Errorf("trailer must not contain em-dash: %q", trailer)
+	}
+}
+
 // What an agent pulls for itself is the surface with the clearest intent behind
 // it, and it was the one recorded without a receiver: 577 answers on this
 // machine — recall, recall_context, blame — and not one that could be paired

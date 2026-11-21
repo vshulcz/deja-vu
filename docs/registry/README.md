@@ -15,6 +15,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Gemini CLI](gemini.md) | session JSON and replayable JSONL |
 | [aider](aider.md) | append-only Markdown |
 | [Amp](amp.md) | one JSON object per thread |
+| [Ante](ante.md) | JSONL event stream (`events.jsonl`), `meta.json` and `dialog.json` |
 | [Antigravity](antigravity.md) | JSONL transcript |
 | [Grok Build](grok.md) | ACP update JSONL with JSON metadata |
 | [Goose](goose.md) | legacy JSONL and SQLite session store |
@@ -53,10 +54,12 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Zed](zed.md) | SQLite thread store, zstd-compressed bodies |
 | [Devin CLI](devin.md) | one SQLite store of linked message nodes; subagents read as sessions of their own |
 | [MiMo-Code](mimo.md) | OpenCode-schema SQLite relational store, plus a JSON diff file per session |
+| [TeleAgent](teleagent.md) | OpenCode-schema SQLite store per account |
 | [Omnigent](omnigent.md) | SQLite session, message, and typed item store |
 | [Orca](orca.md) | SQLite journal entry and JSON block store |
 | [Claw Code](clawcode.md) | JSONL transcripts and legacy JSON snapshots under `~/.claw/sessions` |
 | [CodeArts Desktop](codearts.md) | JSONL transcript in a two-level session directory |
+| [Doubao](doubao.md) | Chromium IndexedDB in a LevelDB directory; the streaming history keeps the bodies |
 
 ## Reporting drift
 

@@ -5,6 +5,8 @@ package main
 import (
 	"encoding/binary"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -69,6 +71,11 @@ func TestZCodeVersionFromRSRC(t *testing.T) {
 func TestZCodeCandidatePaths(t *testing.T) {
 	origLook := zcodeLookPath
 	defer func() { zcodeLookPath = origLook }()
+	origReg := zcodeRegistryInstallLocations
+	defer func() { zcodeRegistryInstallLocations = origReg }()
+	// The test asserts the fixed candidates; a real registry on the machine
+	// running it must not leak an extra ZCode install in.
+	zcodeRegistryInstallLocations = func() []string { return nil }
 
 	t.Setenv("LOCALAPPDATA", `C:\Users\tester\AppData\Local`)
 	t.Setenv("ProgramFiles", `C:\Program Files`)
@@ -96,4 +103,61 @@ func TestZCodeCandidatePaths(t *testing.T) {
 			t.Errorf("candidate[%d] = %q, want %q", i, got[i], want[i])
 		}
 	}
+}
+
+// TestZCodeCandidatePathsFromRegistry covers an install under a directory none
+// of deja's fixed candidate paths know: the Windows uninstall registry records
+// the actual InstallLocation, and the candidate list has to include it (#6016
+// added PATH and ProgramFiles, but a custom layout like `S:\apps\llm\app\zcode`
+// or `D:\ZCode` still fell through).
+func TestZCodeCandidatePathsFromRegistry(t *testing.T) {
+	origLook := zcodeLookPath
+	defer func() { zcodeLookPath = origLook }()
+	origReg := zcodeRegistryInstallLocations
+	defer func() { zcodeRegistryInstallLocations = origReg }()
+
+	t.Setenv("LOCALAPPDATA", `C:\Users\tester\AppData\Local`)
+	t.Setenv("ProgramFiles", `C:\Program Files`)
+	t.Setenv("ProgramFiles(x86)", `c:\program files (x86)`)
+	t.Setenv("ProgramW6432", `C:/Program Files`)
+	zcodeLookPath = func(string) (string, error) { return "", os.ErrNotExist }
+
+	zcodeRegistryInstallLocations = func() []string {
+		return []string{`S:\apps\llm\app\zcode\ZCode.exe`}
+	}
+
+	got := zcodeCandidatePaths()
+	found := false
+	for _, p := range got {
+		if strings.EqualFold(p, `S:\apps\llm\app\zcode\ZCode.exe`) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("custom install from registry not in candidates: %v", got)
+	}
+}
+
+// TestZCodeRegistryInstallLocationsReal exercises the real registry read on a
+// Windows machine. It is not hermetic — it reads the actual uninstall keys —
+// so it skips (not fails) on a machine with no ZCode installed, and asserts
+// only that a reported InstallLocation is a plausible directory. This is the
+// one place the stdlib syscall registry path actually runs; the hermetic
+// tests above cover the selection logic.
+func TestZCodeRegistryInstallLocationsReal(t *testing.T) {
+	origReg := zcodeRegistryInstallLocations
+	defer func() { zcodeRegistryInstallLocations = origReg }()
+
+	got := zcodeRegistryInstallLocationsReal()
+	for _, loc := range got {
+		if loc == "" {
+			t.Errorf("registry reported an empty install location")
+		}
+		// It must look like an executable path, not a bare directory.
+		if !strings.EqualFold(filepath.Base(loc), "ZCode.exe") {
+			t.Errorf("registry location %q does not name ZCode.exe", loc)
+		}
+	}
+	// No assertion that it is non-empty: a machine without ZCode is fine.
 }

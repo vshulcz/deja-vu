@@ -242,6 +242,10 @@ func (r *doctorStoreRows) laterStores(sqlite bool) {
 	// CodeArts Desktop: one two-level directory tree of JSONL transcripts.
 	caRoot := sources.CodeArtsRoot()
 	r.files("codearts", caRoot, doctorExists(caRoot), sources.CodeArtsFiles())
+	// Doubao Desktop: Chromium IndexedDB LevelDB directories under the
+	// Electron user-data root.
+	doubaoRoot := sources.DoubaoRoot()
+	r.files("doubao", doubaoRoot, doctorExists(doubaoRoot), sources.DoubaoFiles())
 	senpiRoot := sources.SenpiRoot()
 	r.files("senpi", senpiRoot, doctorExists(senpiRoot), sources.SenpiSessionFiles())
 	kimchiRoot := sources.KimchiRoot()
@@ -258,6 +262,9 @@ func (r *doctorStoreRows) laterStores(sqlite bool) {
 	clawRoots := sources.ClawCodeRoots()
 	r.filesSkippingIn("clawcode", clawRoot, clawRoots, doctorAnyExists(clawRoots),
 		sources.ClawCodeSessionFiles(), nil)
+	anteRoots := sources.AnteRoots()
+	r.filesSkippingIn("ante", sources.AnteRoot(), anteRoots, doctorAnyExists(anteRoots),
+		sources.AnteSessionFiles(), sources.AnteSubagentFile, sources.AnteSidecarFiles()...)
 	// ZCode has two stores, the way Kilo does: the project transcripts and the
 	// CLI's SQLite database. The count is the transcripts and the database is
 	// named beside them, or the newest "file" is a database the transcript
@@ -402,6 +409,14 @@ func (r *doctorStoreRows) laterStores(sqlite bool) {
 	r.row("devin", devinLoc, doctorFilePresent(devinDB) || doctorFilePresent(sources.DevinLegacySessionsDB()), devinDetail)
 	mimoDB := sources.MimoDB()
 	r.row("mimo", mimoDB, doctorFilePresent(mimoDB), doctorSQLiteDetail(mimoDB, sqlite))
+	teleAgentDBs := sources.TeleAgentSessionFiles()
+	if len(teleAgentDBs) == 0 {
+		r.row("teleagent", sources.TeleAgentDataDir(), false, "")
+	} else {
+		for _, db := range teleAgentDBs {
+			r.row("teleagent", db, true, doctorSQLiteDetail(db, sqlite))
+		}
+	}
 	omnigentDB := sources.OmnigentDB()
 	r.row("omnigent", omnigentDB, doctorFilePresent(omnigentDB), doctorSQLiteDetail(omnigentDB, sqlite))
 	orcaDB := sources.OrcaDB()

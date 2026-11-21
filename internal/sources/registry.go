@@ -230,6 +230,20 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			}},
 		},
 		{
+			// Doubao Desktop keeps its conversations in a Chromium IndexedDB
+			// LevelDB directory, one store per profile. A change to any of
+			// the directory's files re-reads the store whole: records are
+			// rewritten and superseded in place, so there is no append-only
+			// tail to resume from.
+			Name: "doubao", Load: LoadDoubao, Files: DoubaoFiles,
+			Kinds: []FileKind{{
+				Name:      "doubao",
+				Match:     IsDoubaoLevelDbFile,
+				Parse:     fullParse(ParseDoubaoFile),
+				ParseFrom: dbParseFrom(ParseDoubaoFile, ParseDoubaoFileSince),
+			}},
+		},
+		{
 			Name: "codex", Load: LoadCodex, Files: CodexFiles,
 			Kinds: []FileKind{
 				{
@@ -917,6 +931,21 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			}},
 		},
 		{
+			// TeleAgent (星辰超级智能体): China Telecom TeleAI's desktop client,
+			// one OpenCode-schema SQLite store per account under
+			// ~/.local/share/TeleAgent/users/<account>/teleagent.db.
+			Name: "teleagent", Load: LoadTeleAgent, Files: TeleAgentSessionFiles,
+			Kinds: []FileKind{{
+				Name: "teleagent",
+				Match: func(p string) bool {
+					return filepath.Base(p) == "teleagent.db" &&
+						strings.HasPrefix(filepath.Dir(p), TeleAgentUsersDir()+string(filepath.Separator))
+				},
+				Parse:     dbParse(ParseTeleagentDB, ParseTeleagentDBSince),
+				ParseFrom: dbParseFrom(ParseTeleagentDB, ParseTeleagentDBSince),
+			}},
+		},
+		{
 			// Omnigent: conversations and subagent runs in ~/.omnigent/chat.db.
 			Name: "omnigent", Load: LoadOmnigent, Files: OmnigentFiles,
 			Kinds: []FileKind{{
@@ -934,6 +963,19 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 				Match:     func(p string) bool { return p == OrcaDB() },
 				Parse:     dbParse(ParseOrcaDB, ParseOrcaDBSince),
 				ParseFrom: dbParseFrom(ParseOrcaDB, ParseOrcaDBSince),
+			}},
+		},
+		{
+			// Ante (AntigmaLabs/ante): per-session directory holding events.jsonl,
+			// meta.json and an optional dialog.json snapshot.
+			Name: "ante", Load: LoadAnte, Files: AnteSessionFiles,
+			Kinds: []FileKind{{
+				Name:      "ante",
+				Match:     AnteUnderRoot,
+				Parse:     fullParse(ParseAnteFile),
+				ParseFrom: offsetParse(ParseAnteFileFromOffset),
+				Resumes:   anteResumes,
+				Sidecar:   besideSidecar("meta.json"),
 			}},
 		},
 		{

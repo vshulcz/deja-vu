@@ -30,6 +30,15 @@
       "indexed_sessions": 0
     },
     {
+      "name": "doubao",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.config/Doubao"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "trae",
       "state": "missing",
       "paths": [
@@ -307,6 +316,15 @@
       "indexed_sessions": 0
     },
     {
+      "name": "ante",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.ante/sessions"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "zcode",
       "state": "missing",
       "paths": [
@@ -422,6 +440,15 @@
       "state": "missing",
       "paths": [
         "<tmp>/home/.local/share/mimocode/mimocode.db"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
+      "name": "teleagent",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.local/share/TeleAgent"
       ],
       "files": 0,
       "indexed_sessions": 0
@@ -685,6 +712,11 @@
       "name": "clawcode",
       "state": "config-missing",
       "path": "<tmp>/home/.claw/settings.json"
+    },
+    {
+      "name": "ante",
+      "state": "config-missing",
+      "path": "<tmp>/home/.ante/settings.json"
     },
     {
       "name": "cherrystudio",
@@ -1049,6 +1081,11 @@
       "name": "goose",
       "state": "missing",
       "path": "<tmp>/home/.config/goose/config.yaml"
+    },
+    {
+      "name": "ante",
+      "state": "missing",
+      "path": "<tmp>/home/.agents/skills/deja-history/SKILL.md"
     },
     {
       "name": "antigravity",

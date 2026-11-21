@@ -383,7 +383,7 @@ func searchTierHits(dir string, o *search.Options, result index.SearchResult, ss
 			lead = strings.Replace(lead, "the rest below are ranked by relevance", "they come first and the rest after, each newest first", 1)
 		}
 		fmt.Fprintln(os.Stderr, lead)
-		hits = markStrictHits(search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(o.Query), result.TermIDF), result)
+		hits = markStrictHits(search.RelevanceHitsWeighted(ss, relevanceMatchTermsFor(o.Query, result), result.TermIDF), result)
 		relAt := len(hits)
 		hits = dropCopiedHits(dir, hits)
 		relAt -= len(hits)

@@ -10,7 +10,7 @@ import (
 // interactive screen prints in place of ids. TestAgentNamesMatchRegistry keeps
 // the two in step.
 var agentNames = map[string]string{
-	"aider": "aider", "amp": "Amp", "codearts": "CodeArts Desktop", "antigravity": "Antigravity", "claude": "Claude Code",
+	"aider": "aider", "amp": "Amp", "codearts": "CodeArts Desktop", "doubao": "Doubao", "antigravity": "Antigravity", "claude": "Claude Code",
 	"cline": "Cline", "codex": "Codex CLI", "copilot": "Copilot CLI", "copilot-chat": "VS Code Copilot Chat",
 	"cursor": "Cursor", "deepseek": "DeepSeek Harness", "gemini": "Gemini CLI", "goose": "Goose",
 	"grok": "Grok Build", "hermes": "Hermes", "kimi": "Kimi Code", "omp": "omp (Oh My Pi)",
@@ -21,6 +21,7 @@ var agentNames = map[string]string{
 	"devin": "Devin CLI", "codewhale": "CodeWhale", "junie": "Junie", "jetbrains": "JetBrains AI Assistant",
 	"windsurf": "Windsurf / Devin Desktop", "codebuddy": "CodeBuddy Code", "reasonix": "Reasonix", "trae": "TRAE CLI", "muse": "Muse Code",
 	"mcode": "MiniMax Code", "mimo": "MiMo-Code", "omnigent": "Omnigent", "orca": "Orca",
+	"teleagent": "TeleAgent", "ante": "Ante",
 }
 
 // agentName is the short form for a chip or a card: the parenthesised gloss

@@ -6,7 +6,7 @@
 
 **[deja-vu](https://github.com/vshulcz/deja-vu)** 扩展（LongMemEval-S **97.2% R@5**）· [文档](https://vshulcz.github.io/deja-vu/zh/) · [在线演示](https://vshulcz.github.io/deja-vu/view/) · [评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-pi 记得自己的会话。这个扩展回答的是另一个问题：这台机器上 Claude Code、Codex、Cursor、Gemini、OpenClaw、Hermes 等其他四十八个编程智能体里做过什么，包括装 pi 之前的那几个月。记忆在本地以单文件 Go 二进制 `deja` 运行并建立 BM25 索引，无需额外 LLM、嵌入模型或云端账号；除主动运行的更新与同步命令及可用 `DEJA_OFFLINE=1` 关闭的每日版本检查外，不发起网络请求。
+pi 记得自己的会话。这个扩展回答的是另一个问题：这台机器上 Claude Code、Codex、Cursor、Gemini、OpenClaw、Hermes 等其他五十一个编程智能体里做过什么，包括装 pi 之前的那几个月。记忆在本地以单文件 Go 二进制 `deja` 运行并建立 BM25 索引，无需额外 LLM、嵌入模型或云端账号；除主动运行的更新与同步命令及可用 `DEJA_OFFLINE=1` 关闭的每日版本检查外，不发起网络请求。
 
 ![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -47,7 +47,7 @@ brew install deja-vu
 
 | 召回率 | Token 用量 | 索引与检索耗时 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 49 个编程智能体的检索仅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 50 个编程智能体的检索仅 **0.7 ms** |
 
 ## 仓库记忆与跨智能体接力
 
@@ -57,7 +57,7 @@ brew install deja-vu
 
 ## 隐私与安全
 
-索引保存在 `~/.cache/deja/index.db`（可通过 `DEJA_INDEX_DIR` 修改），在构建时自动脱敏 `sk-*`、`ghp_*`、`AKIA*` 与 `Bearer` 等凭据。所有检索默认纯本地完成；仅在你显式运行 `deja embed` 并配置外部嵌入端点时才会离开本机。完整 CLI 集成（`recall`、`fix`、`blame` 与 `handoff`）可在 49 款智能体上通过 `deja install --auto` 一键启用。
+索引保存在 `~/.cache/deja/index.db`（可通过 `DEJA_INDEX_DIR` 修改），在构建时自动脱敏 `sk-*`、`ghp_*`、`AKIA*` 与 `Bearer` 等凭据。所有检索默认纯本地完成；仅在你显式运行 `deja embed` 并配置外部嵌入端点时才会离开本机。完整 CLI 集成（`recall`、`fix`、`blame` 与 `handoff`）可在 50 款智能体上通过 `deja install --auto` 一键启用。
 
 ## 许可证
 

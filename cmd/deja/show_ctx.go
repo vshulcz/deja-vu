@@ -475,7 +475,7 @@ func cmdCtx(dir string, rest []string) error {
 	} else if result.Tier == search.TierRelevance {
 		o.Strict = result.Strict
 		fmt.Fprintln(os.Stderr, relevanceLead(result.Strict))
-		hits, _ = capTierHits(markStrictHits(search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(o.Query), result.TermIDF), result), o)
+		hits, _ = capTierHits(markStrictHits(search.RelevanceHitsWeighted(ss, relevanceMatchTermsFor(o.Query, result), result.TermIDF), result), o)
 	} else if hits, err = search.Run(ss, o); err != nil {
 		return err
 	}
@@ -529,7 +529,12 @@ func cmdCtx(dir string, rest []string) error {
 		fmt.Fprintln(os.Stderr, line)
 	}
 	search.PrintContextStyled(cw, whole, q, search.ColorOK(os.Stdout), printableWidth(os.Stdout))
-	if blk := changesBlock(whole, search.ContextBudget-cw.n); blk != "" {
+	tier := result.Tier
+	if tier == "" && len(hits) > 0 {
+		tier = hits[0].Tier
+	}
+	requireBind := tier != search.TierExact && (len(hits) == 0 || !hits[0].Strict)
+	if blk := changesBlockForSearch(whole, search.ContextBudget-cw.n, q, requireBind, result.TermIDF, result.SessionIDF, index.TopIDF(dir)); blk != "" {
 		fmt.Fprint(os.Stdout, "\n"+blk)
 	}
 	return nil

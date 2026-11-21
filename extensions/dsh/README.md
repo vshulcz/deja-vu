@@ -10,7 +10,7 @@ DeepSeek Harness (and DSH Desktop, `anywhere-labs/dsh-desktop`, which bundles th
 `session-query` subsystem does. This plugin answers the other question: what you
 did in the *other* agents on this machine.
 
-deja indexes the session files that forty-eight other coding agents — Claude Code,
+deja indexes the session files that fifty-one other coding agents — Claude Code,
 Codex, Cursor, opencode, Antigravity, Grok Build, Kimi, Cline and Zed among
 them — already write to disk. Nothing has to have been recorded ahead of time: the history is already
 there, including the months before deja was installed. If you moved to dsh last
@@ -224,13 +224,20 @@ errors, empty queries, disabling the feature and cleanup.
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 49 coding agents |
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 52 coding agents |
 
 ## Repository memory & handoff
 
 Share vetted project decisions and dead ends through git in `.deja/memory.jsonl` (`deja repo candidates`, `deja repo add <id>`). Entries are redacted on write, stored sorted with `merge=union` so parallel branches merge cleanly, and loaded for any teammate who clones the repository (`{"activations":{"auto":{"repo":false}}}` in the trust policy disables hook injection). [More](https://vshulcz.github.io/deja-vu/guide/repo-memory.html).
 
 Switching tools mid-task? Run `deja handoff --to <agent>` (or use `handoff` via MCP) to transfer the active session's goal, decisions, touched files, passed checks, and open work into another coding agent.
+
+## Permissions and boundaries
+
+- **Host integration:** Registers via `cordis.patch.yml` to add six MCP tools (`deja_recall`, `deja_session`, `deja_blame`, `deja_fix`, `deja_how`, `deja_remember`), the `/deja` command, optional lifecycle hooks (`autoRecall`), and the authenticated `GET /api/deja-search` route plus sidebar and shortcut UI bindings on `web`.
+- **Execution and bounds:** Invokes the local `deja` binary with direct argument arrays (no shell); `GET /api/deja-search` rejects queries longer than 500 characters and bounds calls to 20 seconds and 2 MiB of output.
+- **Filesystem and network:** Reads local agent session stores and `~/.cache/deja/index.db` (`DEJA_INDEX_DIR` overrides), writes recall state only inside the plugin data directory, and makes no outbound network requests unless you explicitly run `deja embed`.
+- **Credential redaction:** Strips common secret patterns (`sk-*`, `ghp_*`, `AKIA*`, `Bearer`, private keys, and URL credentials) during indexing before snippets reach `dsh`.
 
 ## What it does not do
 

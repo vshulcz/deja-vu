@@ -18,7 +18,7 @@
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-Требуются установленный бинарник `deja` (`@vshulcz/deja-vu`, `brew install deja-vu` или `install.sh`) и индекс, собранный командой `deja index`. Чтобы подключить инструменты `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember` и `handoff` ко всем 49 агентам:
+Требуются установленный бинарник `deja` (`@vshulcz/deja-vu`, `brew install deja-vu` или `install.sh`) и индекс, собранный командой `deja index`. Чтобы подключить инструменты `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember` и `handoff` ко всем 50 агентам:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
@@ -50,7 +50,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 | Полнота (Recall) | Расход токенов | Индексация и поиск |
 |---|---|---|
-| **97.2% R@5** на LongMemEval-S (88.9% hit@1 на 470 вопросах) | **на 58% меньше токенов** (на повторных задачах) | **13.6 с** на индекс 19,195 сессий / **0.7 мс** на поиск по 49 кодинг-агентам |
+| **97.2% R@5** на LongMemEval-S (88.9% hit@1 на 470 вопросах) | **на 58% меньше токенов** (на повторных задачах) | **13.6 с** на индекс 19,195 сессий / **0.7 мс** на поиск по 50 кодинг-агентам |
 
 ## Память в репозитории и передача сессии (`handoff`)
 

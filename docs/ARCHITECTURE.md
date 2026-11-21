@@ -5,7 +5,7 @@ This document is for people changing `deja` internals.
 ## Source parsers
 
 Parsers live in `internal/sources` and return `[]model.Session`. The table is
-what the loader registers: the forty-nine coding agents plus deja's own notes,
+what the loader registers: the fifty-two coding agents plus deja's own notes,
 which is what `deja sources` prints. `docs/registry/` describes each store's
 layout in detail, and `internal/sources/registry_test.go` checks that index
 against the loader list.
@@ -22,6 +22,7 @@ keeping real links inside a store out of the walk.
 | opencode | `opencode.go`, `opencode_v2.go`, `opencode_diff.go` | SQLite database at `~/.local/share/opencode/opencode.db` (the 1.x tables and the 2.0 `session_v2`/`session_message` ones), plus `storage/session_diff/*.json` beside it |
 | aider | `aider.go` | `.aider.chat.history.md` files under configured project roots |
 | Amp | `amp.go` | one JSON thread object per `~/.local/share/amp/threads/*.json` |
+| Ante | `ante.go` | JSONL event stream (`events.jsonl`), `meta.json` and `dialog.json` under `~/.ante/sessions` |
 | Gemini CLI | `gemini.go` | JSON and JSONL chats under `~/.gemini/tmp` |
 | Cursor | `cursor.go` | SQLite state stores plus CLI agent transcripts |
 | Antigravity | `antigravity.go` | JSONL transcripts under `~/.gemini/antigravity*` |
@@ -61,10 +62,12 @@ keeping real links inside a store out of the walk.
 | Kimchi Coding | `senpi.go` | JSONL under the harness directory's `sessions`, one directory per encoded cwd |
 | Hermes | `hermes.go`, `hermes_pg.go` | SQLite `state.db` under the Hermes home and per profile, plus Postgres when `DEJA_HERMES_PG_DSN` is set |
 | MiMo-Code | `mimo.go`, `opencode.go`, `opencode_v2.go` | OpenCode-schema SQLite database at `${MIMO_DATA_DIR:-${XDG_DATA_HOME:-~/.local/share}/mimo}/mimo.db` (and `opencode.db`), plus `storage/session_diff/*.json` beside it |
+| TeleAgent | `teleagent.go`, `opencode.go`, `opencode_v2.go` | OpenCode-schema SQLite store per account at `${TELEAGENT_HOME:-${XDG_DATA_HOME:-~/.local/share}/TeleAgent}/users/<account>/teleagent.db` |
 | Omnigent | `omnigent.go` | SQLite store at `${OMNIGENT_HOME:-~/.omnigent}/omnigent.db` (`sessions`, `messages`, `message_items`) |
 | Orca | `orca.go` | SQLite journal store at `~/Library/Application Support/orca-app/orca.db` (`~/.config/orca-app/orca.db` on Linux, `%APPDATA%\orca-app\orca.db` on Windows) |
 | Claw Code | `clawcode.go` | JSONL transcripts (`session_meta`, `prompt_history`, `message`) and legacy JSON snapshots under `${CLAW_CONFIG_HOME:-~/.claw}/sessions` |
 | CodeArts Desktop | `codearts.go` | JSONL with serde content variants under a two-level session directory |
+| Doubao | `doubao.go` | Chromium IndexedDB (LevelDB + snappy + V8 structured clone) under the Electron user-data root |
 | Qoder | `qoder.go` | Claude Code-shaped JSONL under `~/.qoder/projects` |
 | deja notes | `notes.go` | `deja remember` entries in `notes.jsonl` |
 

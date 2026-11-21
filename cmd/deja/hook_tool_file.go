@@ -25,6 +25,10 @@ import (
 )
 
 func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(index.SessionMeta, string) bool) string {
+	return fileHookLineOutsideWithMode(dir, cwd, path, editText, false, self)
+}
+
+func fileHookLineOutsideWithMode(dir, cwd, path, editText string, readOnly bool, self func(index.SessionMeta, string) bool) string {
 	// FileSessions matches on the file's basename, so without scoping "main.go"
 	// or "README.md" collects every project's file of that name — the line then
 	// claims a history this file does not have and points `deja blame` at a
@@ -88,7 +92,11 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 				cold = name + revertedLabel + rev
 			}
 		}
-		for _, tail := range []string{sigCallers, siblingRan} {
+		tails := []string{sigCallers}
+		if !readOnly || cold != "" || sigCallers != "" {
+			tails = append(tails, siblingRan)
+		}
+		for _, tail := range tails {
 			if tail == "" {
 				continue
 			}
@@ -130,10 +138,6 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 	default:
 		dec = selectFileHookDecisionClause(dir, cwd, path, promoted, editSymbols, fileSymbols, allSymbols, inScope, projects, pol, self)
 	}
-	ran := fileHookRanLineFor(dir, path, inScope)
-	if ran == "" {
-		ran = siblingRan
-	}
 	co := fileHookCoChangeLineIn(cwd, path, inScope)
 	if sigCallers != "" {
 		if co == "" {
@@ -141,6 +145,10 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 		} else if len(co)+len(sigCallers) <= 140 {
 			co += sigCallers
 		}
+	}
+	ran := fileHookRanLineFor(dir, path, inScope)
+	if ran == "" && (!readOnly || dec != "" || co != "") {
+		ran = siblingRan
 	}
 	return assembleFileHookLine(head, dec, co, ran)
 }
@@ -1177,6 +1185,7 @@ func fileBreakageLineForSkipping(dir, cwd, path string, editSymbols []string, me
 	var bestTest, bestSym, bestWhy string
 	bestRank := 0
 	var panicLine, panicSym, panicWhy string
+	here := hookProjectMatcher(cwd)
 	for _, p := range pairs {
 		if p.Edit == "" || p.Error == "" {
 			continue
@@ -1190,7 +1199,7 @@ func fileBreakageLineForSkipping(dir, cwd, path string, editSymbols []string, me
 			}
 		}
 		if !inScopeKeys[p.Key] {
-			if p.Project == "" || !pol.Allows(policy.ActivationAuto, p.Project) || !hookProjectIs(cwd, p.Project) {
+			if p.Project == "" || !pol.Allows(policy.ActivationAuto, p.Project) || !here(p.Project) {
 				continue
 			}
 		}

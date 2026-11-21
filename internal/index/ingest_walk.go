@@ -161,6 +161,9 @@ func setDatabaseStoreWatermarks(files map[string]FileState, sessions map[string]
 	for _, db := range sources.CrushDBs() {
 		setStoreLastUpdated(files, sessions, "crush", db)
 	}
+	for _, db := range sources.TeleAgentSessionFiles() {
+		setStoreLastUpdated(files, sessions, "teleagent", db)
+	}
 	if cm := sources.ClaudeMemDBPath(); cm != "" {
 		setStoreLastUpdated(files, sessions, "claude", cm)
 	}
