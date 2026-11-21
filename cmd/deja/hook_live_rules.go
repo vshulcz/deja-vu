@@ -110,12 +110,6 @@ func readLiveHookTranscriptMessages(input promptHookInput, cwd, ws string) []mod
 		Messages:       input.Messages,
 	}
 	tr, reason, _ := compactionSource(pre, ws)
-	if reason != "" && input.SessionID != "" && input.TranscriptPath == "" && len(input.Messages) == 0 {
-		if fallback, err := sources.ReadCompactionSession(input.Harness, input.SessionID, "", ws); err == nil {
-			tr = fallback
-			reason = ""
-		}
-	}
 	if reason == "" && len(tr.Session.Messages) > 0 {
 		tail := tr.Session.Messages
 		if len(tail) > 24 {

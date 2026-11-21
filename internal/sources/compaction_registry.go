@@ -3,6 +3,7 @@ package sources
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -13,7 +14,14 @@ import (
 
 // compactionScanFiles bounds the fallback that looks for a session by its id in
 // files whose path does not name it: the hook runs on the host's critical path.
-const compactionScanFiles = 64
+// compactionProbeWindow and compactionProbeTotalBytes bound how much of each
+// unnamed transcript (head+tail) and total fallback scan we read so an unknown
+// session_id cannot stall a prompt hook reading hundreds of megabytes (#6133).
+const (
+	compactionScanFiles       = 64
+	compactionProbeWindow     = 64 << 10
+	compactionProbeTotalBytes = 8 << 20
+)
 
 // ReadCompactionSession captures a session through the reader that indexes it,
 // for a host whose transcript has no bounded tail reader of its own. The host
@@ -230,6 +238,8 @@ func compactionCandidatesByID(harness, id string) []compactionCandidate {
 		}
 		sort.Slice(recent, func(i, j int) bool { return recent[i].mod > recent[j].mod })
 		var out []compactionCandidate
+		needle := []byte(id)
+		var totalRead int64
 		for i, f := range recent {
 			if i >= compactionScanFiles {
 				break
@@ -238,18 +248,132 @@ func compactionCandidatesByID(harness, id string) []compactionCandidate {
 			if !ok {
 				continue
 			}
-			// A database holds its ids where a byte search may not find them
-			// as written; it is read and asked instead.
-			if strings.HasSuffix(f.path, ".jsonl") || strings.HasSuffix(f.path, ".json") {
-				if b, err := os.ReadFile(f.path); err != nil || !bytes.Contains(b, []byte(id)) {
-					continue
-				}
+			keep, stop := compactionCandidateProbeMatch(h.Name, f.path, id, needle, &totalRead)
+			if stop {
+				break
+			}
+			if !keep {
+				continue
 			}
 			out = append(out, compactionCandidate{h.Name, f.path, k})
 		}
 		return out
 	}
 	return nil
+}
+
+func compactionCandidateProbeMatch(harness, path, id string, needle []byte, totalRead *int64) (keep, stop bool) {
+	switch {
+	case isCompactionCompressedTranscript(path):
+		// Compressed rollouts name the session id in their filename; skip full
+		// archive decompression when probing for an unnamed id.
+		return false, false
+	case isCompactionTextTranscript(path):
+		if *totalRead >= compactionProbeTotalBytes {
+			return false, true
+		}
+		found, n := fileContainsTokenBounded(path, needle, compactionProbeWindow)
+		*totalRead += n
+		return found, false
+	case isCompactionDBPath(path):
+		if checked, found := compactionDBContainsID(harness, path, id); checked {
+			return found, false
+		}
+		return true, false
+	default:
+		return true, false
+	}
+}
+
+func isCompactionTextTranscript(path string) bool {
+	return strings.HasSuffix(path, ".jsonl") ||
+		strings.HasSuffix(path, ".json") ||
+		strings.HasSuffix(path, ".txt") ||
+		strings.HasSuffix(path, ".md")
+}
+
+func isCompactionCompressedTranscript(path string) bool {
+	return strings.HasSuffix(path, ".zst") || strings.HasSuffix(path, ".gz")
+}
+
+func isCompactionDBPath(path string) bool {
+	return strings.HasSuffix(path, ".db") ||
+		strings.HasSuffix(path, ".sqlite") ||
+		strings.HasSuffix(path, ".sqlite3") ||
+		strings.HasSuffix(path, ".vscdb")
+}
+
+func fileContainsTokenBounded(path string, needle []byte, window int64) (bool, int64) {
+	f, err := os.Open(path)
+	if err != nil {
+		return false, 0
+	}
+	defer func() { _ = f.Close() }()
+	info, err := f.Stat()
+	if err != nil || !info.Mode().IsRegular() || info.Size() <= 0 {
+		return false, 0
+	}
+	sz := info.Size()
+	if sz <= 2*window {
+		buf := make([]byte, sz)
+		n, err := io.ReadFull(f, buf)
+		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+			return false, int64(n)
+		}
+		return bytes.Contains(buf[:n], needle), int64(n)
+	}
+	buf := make([]byte, window)
+	n, err := io.ReadFull(f, buf)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		return false, int64(n)
+	}
+	if bytes.Contains(buf[:n], needle) {
+		return true, int64(n)
+	}
+	m, err := f.ReadAt(buf, sz-window)
+	if err != nil && err != io.EOF {
+		return false, int64(n + m)
+	}
+	return bytes.Contains(buf[:m], needle), int64(n + m)
+}
+
+func compactionDBContainsID(harness, path, id string) (checked, found bool) {
+	esc := sqlEscape(id)
+	var queries []string
+	switch harness {
+	case "goose", "hermes", "devin", "crush", "grok":
+		queries = []string{`select 1 from sessions where id='` + esc + `' limit 1`}
+	case "opencode", "kilocode", "mimo", "zcode":
+		queries = []string{`select 1 from session where id='` + esc + `' limit 1`}
+	case "teleagent":
+		queries = []string{
+			`select 1 from session where id='` + esc + `' limit 1`,
+			`select 1 from session_v2 where id='` + esc + `' limit 1`,
+		}
+	case "omnigent":
+		queries = []string{`select 1 from conversations where id='` + esc + `' limit 1`}
+	case "orca":
+		queries = []string{`select 1 from agent_session_records where session_id='` + esc + `' limit 1`}
+	case "zed":
+		queries = []string{`select 1 from threads where id='` + esc + `' limit 1`}
+	case "kiro":
+		queries = []string{`select 1 from conversations_v2 where conversation_id='` + esc + `' limit 1`}
+	case "openclaw":
+		queries = []string{`select 1 from transcript_events where session_id='` + esc + `' limit 1`}
+	default:
+		return false, false
+	}
+	for _, q := range queries {
+		out, err := sqliteOutput(path, q)
+		if err != nil {
+			continue
+		}
+		if strings.TrimSpace(string(out)) != "" {
+			return true, true
+		}
+		checked = true
+	}
+	return checked, false
 }
 
 // compactionSessionWorkspace is the directory a session recorded running in,
