@@ -8,7 +8,7 @@
 
 ![deja-vu 示範](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-將同機其他 48 款程式設計智慧體（Claude Code、Codex、Cursor、Gemini、Zed 等）的對話歷史接入 [OpenClaw](https://openclaw.ai)。完全以單一 Go 執行檔 `deja` 與本地 BM25 索引在本地執行，不需額外 LLM 或向量模型（設定 `DEJA_OFFLINE=1` 可停止每日檢查）。
+將同機其他 51 款程式設計智慧體（Claude Code、Codex、Cursor、Gemini、Zed 等）的對話歷史接入 [OpenClaw](https://openclaw.ai)。完全以單一 Go 執行檔 `deja` 與本地 BM25 索引在本地執行，不需額外 LLM 或向量模型（設定 `DEJA_OFFLINE=1` 可停止每日檢查）。
 
 ## 安裝
 
@@ -86,7 +86,7 @@ openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 
 | 召回率 | Token 用量 | 索引與檢索耗時 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 50 個程式設計代理的檢索僅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 52 個程式設計代理的檢索僅 **0.7 ms** |
 
 ## 儲存庫記憶與跨代理接力
 
@@ -96,6 +96,6 @@ openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 
 ## 隱私
 
-索引位於 `~/.cache/deja/index.db`（可用 `DEJA_INDEX_DIR` 調整），並於寫入時遮罩 `sk-*`、`ghp_*`、`AKIA*` 與 `Bearer` 金鑰。除非明確設定並執行 `deja embed`，否則全程離線運作。使用 `deja install --auto` 可為本機 50 款智慧體統一啟用記憶整合。
+索引位於 `~/.cache/deja/index.db`（可用 `DEJA_INDEX_DIR` 調整），並於寫入時遮罩 `sk-*`、`ghp_*`、`AKIA*` 與 `Bearer` 金鑰。除非明確設定並執行 `deja embed`，否則全程離線運作。使用 `deja install --auto` 可為本機 52 款智慧體統一啟用記憶整合。
 
 [deja-vu](https://github.com/vshulcz/deja-vu) 生態組件。MIT 授權。

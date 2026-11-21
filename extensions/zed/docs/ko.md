@@ -6,7 +6,7 @@
 
 **[deja-vu](https://github.com/vshulcz/deja-vu)** 확장 (LongMemEval-S **97.2% R@5**) · [문서](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [라이브 데모](https://vshulcz.github.io/deja-vu/view/) · [벤치마크](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-[deja](https://github.com/vshulcz/deja-vu)는 Claude Code, Codex, Cursor, opencode 외 45개 코딩 에이전트가 디스크에 이미 기록해 둔 세션 파일을 색인해 답변합니다. 이 확장은 해당 인덱스를 Zed의 에이전트 패널에 context server로 연결해 deja 설치 이전에 작업한 내용까지 검색할 수 있게 해 줍니다.
+[deja](https://github.com/vshulcz/deja-vu)는 Claude Code, Codex, Cursor, opencode 외 48개 코딩 에이전트가 디스크에 이미 기록해 둔 세션 파일을 색인해 답변합니다. 이 확장은 해당 인덱스를 Zed의 에이전트 패널에 context server로 연결해 deja 설치 이전에 작업한 내용까지 검색할 수 있게 해 줍니다.
 
 ![deja-vu 데모](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -49,7 +49,7 @@ Zed 확장 목록에서 설치하세요. 첫 실행 시 Zed가 `deja --version`�
 
 | 재현율 (Recall) | 토큰 사용량 | 인덱싱 & 조회 속도 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1) | **토큰 58% 절감** (반복 저장소 작업) | 19,195개 세션 **13.6초** 인덱싱 / 49개 코딩 에이전트 통합 **0.7 ms** 조회 |
+| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1) | **토큰 58% 절감** (반복 저장소 작업) | 19,195개 세션 **13.6초** 인덱싱 / 52개 코딩 에이전트 통합 **0.7 ms** 조회 |
 
 ## 저장소 메모리 및 에이전트 간 핸드오프
 

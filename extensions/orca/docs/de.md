@@ -2,7 +2,7 @@
 
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | Deutsch | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-Orca-v2-Plugin (`trusted-worker`) für `deja` — bringt Session-Gedächtnis über 50 KI-Coding-Tools hinweg (Claude Code, Codex, Cursor, opencode, Gemini CLI, Orca und mehr), einschließlich Sessions vor der Installation von `deja`.
+Orca-v2-Plugin (`trusted-worker`) für `deja` — bringt Session-Gedächtnis über 52 KI-Coding-Tools hinweg (Claude Code, Codex, Cursor, opencode, Gemini CLI, Orca und mehr), einschließlich Sessions vor der Installation von `deja`.
 
 ![deja-vu Demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -36,7 +36,7 @@ Wenn `deja install orca-auto` bereits den nativen `UserPromptSubmit`-Hook in Orc
 
 | Recall | Tokens | Indexierung & Suche |
 |---|---|---|
-| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 50 Coding-Agents hinweg |
+| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 52 Coding-Agents hinweg |
 
 ## Repository-Gedächtnis & Agenten-Übergabe
 

@@ -5,7 +5,7 @@
 
 為 IntelliJ IDEA、GoLand、PyCharm、WebStorm、RustRover、CLion、PhpStorm 與 Rider（`2024.2+`）提供本地端跨代理會話檢索、AI 程式碼行溯源（AI Line Blame）與跨代理接力。
 
-[deja-vu](https://github.com/vshulcz/deja-vu) 會在本地 SQLite FTS5 中索引 Claude Code、Codex、OpenCode、Cursor、Gemini CLI、Junie、GitHub Copilot、Aider、Windsurf 及其他 39 款程式設計代理寫入磁碟的會話紀錄，輸出前自動脫敏，無需任何雲端服務。
+[deja-vu](https://github.com/vshulcz/deja-vu) 會在本地 BM25 索引中索引 Claude Code、Codex、OpenCode、Cursor、Gemini CLI、Junie、GitHub Copilot、Aider、Windsurf 及其他 43 款程式設計代理寫入磁碟的會話紀錄，輸出前自動脫敏，無需任何雲端服務。
 
 **[文件](https://vshulcz.github.io/deja-vu/)** · **[評測](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
@@ -14,7 +14,7 @@
 ## 功能特色
 
 - **狀態列小工具**：在 IDE 狀態列右側即時顯示目前專案的 `deja statusline` 統計資訊，點擊即可開啟 `deja-vu` 操作彈窗。
-- **搜尋 AI 會話（`Tools → deja-vu → Search AI Sessions...`）**：跨全部 50 款支援的程式設計代理檢索本地會話（`deja search --json`），並在唯讀 Markdown 編輯器分頁中開啟所選會話紀錄。
+- **搜尋 AI 會話（`Tools → deja-vu → Search AI Sessions...`）**：跨全部 52 款支援的程式設計代理檢索本地會話（`deja search --json`），並在唯讀 Markdown 編輯器分頁中開啟所選會話紀錄。
 - **最近 AI 會話（`Tools → deja-vu → Recent AI Sessions`）**：列出本機最近 50 筆會話（`deja last 50 --json`），支援即時快速篩選。
 - **AI 目前行溯源（編輯器右鍵選單 / `Tools → deja-vu → AI Blame Current Line`）**：執行 `deja blame <file>:<line> --json`（若無精確行紀錄則退回 `<file>`），開啟撰寫或修改游標所在行的 AI 會話。
 - **複製跨代理接力摘要（`Tools → deja-vu → Copy Cross-Agent Handoff`）**：在專案根目錄執行 `deja handoff`，將摘要複製到系統剪貼簿並在唯讀 Markdown 分頁中開啟。
@@ -54,7 +54,7 @@ cd extensions/jetbrains
 
 | 召回率 | Token 用量 | 索引與檢索耗時 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 50 個程式設計代理的檢索僅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 52 個程式設計代理的檢索僅 **0.7 ms** |
 
 ## 儲存庫記憶與跨代理接力
 

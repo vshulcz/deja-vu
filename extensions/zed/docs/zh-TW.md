@@ -6,7 +6,7 @@
 
 **[deja-vu](https://github.com/vshulcz/deja-vu)** 擴充套件（LongMemEval-S **97.2% R@5**）· [文件](https://vshulcz.github.io/deja-vu/) · [線上展示](https://vshulcz.github.io/deja-vu/view/) · [評測](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-[deja](https://github.com/vshulcz/deja-vu) 索引程式設計代理寫入磁碟的會話檔案——包含 Claude Code、Codex、Cursor、opencode 與其他 45 款工具——並依此作答。本擴充套件將該索引作為 context server 提供給 Zed 代理面板，使對話可檢索你先前的實作紀錄，包括在安裝 deja 之前留下的工作內容。
+[deja](https://github.com/vshulcz/deja-vu) 索引程式設計代理寫入磁碟的會話檔案——包含 Claude Code、Codex、Cursor、opencode 與其他 48 款工具——並依此作答。本擴充套件將該索引作為 context server 提供給 Zed 代理面板，使對話可檢索你先前的實作紀錄，包括在安裝 deja 之前留下的工作內容。
 
 ![deja-vu 示範](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -49,7 +49,7 @@
 
 | 召回率 | Token 用量 | 索引與檢索耗時 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 50 個程式設計代理的檢索僅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 52 個程式設計代理的檢索僅 **0.7 ms** |
 
 ## 儲存庫記憶與跨代理接力
 

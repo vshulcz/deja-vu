@@ -2,7 +2,7 @@
 
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | Русский | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-Плагин Orca v2 (`trusted-worker`) для `deja` — даёт память по сессиям из 50 инструментов ИИ-разработки (Claude Code, Codex, Cursor, opencode, Gemini CLI, Orca и других), включая историю, записанную ещё до установки `deja`.
+Плагин Orca v2 (`trusted-worker`) для `deja` — даёт память по сессиям из 52 инструментов ИИ-разработки (Claude Code, Codex, Cursor, opencode, Gemini CLI, Orca и других), включая историю, записанную ещё до установки `deja`.
 
 ![Демонстрация deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -36,7 +36,7 @@ deja install orca-auto
 
 | Полнота (Recall) | Расход токенов | Индексация и поиск |
 |---|---|---|
-| **97.2% R@5** на LongMemEval-S (88.9% hit@1 на 470 вопросах) | **на 58% меньше токенов** (на повторных задачах) | **13.6 с** на индекс 19,195 сессий / **0.7 мс** на поиск по 50 кодинг-агентам |
+| **97.2% R@5** на LongMemEval-S (88.9% hit@1 на 470 вопросах) | **на 58% меньше токенов** (на повторных задачах) | **13.6 с** на индекс 19,195 сессий / **0.7 мс** на поиск по 52 кодинг-агентам |
 
 ## Память в репозитории и передача сессии (`handoff`)
 

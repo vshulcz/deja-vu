@@ -2,7 +2,7 @@
 
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | Türkçe | [हिन्दी](hi.md)
 
-CodeWhale için Claude uyumlu eklenti paketi — 50 yapay zeka kodlama aracından gelen oturumlar üzerinde `deja` MCP sunucusunu (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`), `deja-history` becerisini ve `/deja` komutunu sunar.
+CodeWhale için Claude uyumlu eklenti paketi — 52 yapay zeka kodlama aracından gelen oturumlar üzerinde `deja` MCP sunucusunu (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`), `deja-history` becerisini ve `/deja` komutunu sunar.
 
 ![deja-vu demosu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -29,7 +29,7 @@ deja install codewhale-auto
 
 | İsabet (Recall) | Token | İndeksleme ve sorgu |
 |---|---|---|
-| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1) | **%58 daha az token** (tekrarlanan depo işlerinde) | 19,195 oturumu **13.6 sn**'de indeksler / 50 kodlama ajanı genelinde **0.7 ms** sorgu süresi |
+| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1) | **%58 daha az token** (tekrarlanan depo işlerinde) | 19,195 oturumu **13.6 sn**'de indeksler / 52 kodlama ajanı genelinde **0.7 ms** sorgu süresi |
 
 ## Depo belleği ve ajanlar arası devir (`handoff`)
 

@@ -36,7 +36,7 @@ code --install-extension vshulcz.deja-status
 |---|---|
 | LongMemEval-S erişim doğruluğu (470 temizlenmiş soru) | **%97.2 R@5**, **%88.9 hit@1** |
 | Tekrarlanan depo görevlerinde token maliyeti | **%58 daha az token**|
-| Süreç içi sözlüksel sorgu gecikmesi | 50 kodlama ajanı genelinde ortanca **0.7–0.8 ms** |
+| Süreç içi sözlüksel sorgu gecikmesi | 52 kodlama ajanı genelinde ortanca **0.7–0.8 ms** |
 | 19,195 gerçek oturumun ilk indeksleme süresi | **13.6 sn**, API anahtarsız |
 
 ## Depo belleği ve ajanlar arası devir (`handoff`)

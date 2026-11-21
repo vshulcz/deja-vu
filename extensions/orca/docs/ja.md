@@ -2,7 +2,7 @@
 
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | 日本語 | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-Orca v2 向けの `deja` `trusted-worker` プラグインです。Claude Code・Codex・Cursor・opencode・Gemini CLI・Orca など 50 種の AI コーディングツールのセッション記憶を Orca に統合します（`deja` 導入前の履歴も含みます）。
+Orca v2 向けの `deja` `trusted-worker` プラグインです。Claude Code・Codex・Cursor・opencode・Gemini CLI・Orca など 52 種の AI コーディングツールのセッション記憶を Orca に統合します（`deja` 導入前の履歴も含みます）。
 
 ![deja-vu デモ](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -36,7 +36,7 @@ deja install orca-auto
 
 | 再現率 | トークン消費 | インデックス & 検索速度 |
 |---|---|---|
-| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1） | **トークン 58% 削減**（同一リポジトリの反復作業） | 19,195 セッションを **13.6 秒**でインデックス / 50 種のエージェント横断で **0.7 ms** 検索 |
+| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1） | **トークン 58% 削減**（同一リポジトリの反復作業） | 19,195 セッションを **13.6 秒**でインデックス / 52 種のエージェント横断で **0.7 ms** 検索 |
 
 ## リポジトリメモリとエージェント間の引き継ぎ
 

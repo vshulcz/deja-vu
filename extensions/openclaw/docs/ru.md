@@ -8,7 +8,7 @@
 
 ![Демонстрация deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Подключает к [OpenClaw](https://openclaw.ai) историю сессий 48 других кодинг-агентов (Claude Code, Codex, Cursor, Gemini, Zed и др.). Использует единый Go-бинарник `deja` и локальный BM25-индекс без LLM (`DEJA_OFFLINE=1` отключает ежедневную проверку обновлений).
+Подключает к [OpenClaw](https://openclaw.ai) историю сессий 51 другого кодинг-агента (Claude Code, Codex, Cursor, Gemini, Zed и др.). Использует единый Go-бинарник `deja` и локальный BM25-индекс без LLM (`DEJA_OFFLINE=1` отключает ежедневную проверку обновлений).
 
 ## Установка
 
@@ -86,7 +86,7 @@ openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 
 | Полнота (Recall) | Расход токенов | Индексация и поиск |
 |---|---|---|
-| **97.2% R@5** на LongMemEval-S (88.9% hit@1 на 470 вопросах) | **на 58% меньше токенов** (на повторных задачах) | **13.6 с** на индекс 19,195 сессий / **0.7 мс** на поиск по 50 кодинг-агентам |
+| **97.2% R@5** на LongMemEval-S (88.9% hit@1 на 470 вопросах) | **на 58% меньше токенов** (на повторных задачах) | **13.6 с** на индекс 19,195 сессий / **0.7 мс** на поиск по 52 кодинг-агентам |
 
 ## Память в репозитории и передача сессии (`handoff`)
 
@@ -96,6 +96,6 @@ openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 
 ## Приватность
 
-Индекс хранится в `~/.cache/deja/index.db` (`DEJA_INDEX_DIR`), токены `sk-*`, `ghp_*`, `AKIA*` и `Bearer` вырезаются при индексации. Без явного запуска `deja embed` данные никуда не передаются. Для подключения всех 50 агентов сразу выполните `deja install --auto`.
+Индекс хранится в `~/.cache/deja/index.db` (`DEJA_INDEX_DIR`), токены `sk-*`, `ghp_*`, `AKIA*` и `Bearer` вырезаются при индексации. Без явного запуска `deja embed` данные никуда не передаются. Для подключения всех 52 агентов сразу выполните `deja install --auto`.
 
 Часть [deja-vu](https://github.com/vshulcz/deja-vu). Лицензия MIT.

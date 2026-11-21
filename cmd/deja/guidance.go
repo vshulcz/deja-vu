@@ -17,10 +17,11 @@ const (
 
 const guidanceBody = `Before re-deriving past work, search deja when the user refers to past work, previous sessions, or what was decided before, before debugging an error or re-implementing something that may already exist, and when they state that something of theirs already exists that you have no record of ("I already have X", "we use Y for this"). Before telling the user that something on this machine does not exist — a command, a file, a setting, a past decision — recall first. ` + recallBeforeChange + ` Use the deja MCP tool and pick a mode:
 
-- recall: search history with a specific error, function, or decision.
+- recall: search this user's past sessions with 1-3 exact terms (an error string, function name, file path, or flag); not for library docs or general knowledge.
 - context: get a concise digest of the best matching session, with the code it changed.
+- blame / fix / how / orient / remember / handoff: file session history, commands that fixed a verbatim error, real local command flags, project activity summary, store one settled decision, or continue another session.
 
-Example: for "what did we decide about token refresh?", call deja with mode recall and query "token refresh decision", then mode context if the result needs more detail.
+Example: for "what did we decide about token refresh?", call deja with mode recall and query "token refresh", then mode context if the result needs more detail.
 
 When recalled history helps — a reused fix, a skipped re-debug, a hint that changed your approach — open your reply with that one line: "déjà vu: <what it said> — reusing it (deja:<session id>)". One line, at the start, and nothing about recalls that did not help.`
 

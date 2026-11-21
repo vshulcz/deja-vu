@@ -8,7 +8,7 @@ Fait partie de **[★ vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)** (**
 
 ![Démo de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-> Enrichit automatiquement les requêtes traversant [Magpie](https://github.com/yetone/magpie) avec le contexte local issu de 48 autres agents de programmation (Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes, etc.).
+> Enrichit automatiquement les requêtes traversant [Magpie](https://github.com/yetone/magpie) avec le contexte local issu de 51 autres agents de programmation (Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes, etc.).
 
 Fonctionne avec les protocoles OpenAI (`chat`, `responses`), Anthropic (`anthropic`) et Gemini (`gemini`) grâce au binaire Go unique `deja` et son index BM25 local, sans LLM ni embeddings (`DEJA_OFFLINE=1` coupe la vérification quotidienne).
 

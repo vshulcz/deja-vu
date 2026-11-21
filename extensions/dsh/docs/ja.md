@@ -8,7 +8,7 @@
 
 ![deja-vu デモ](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-DeepSeek Harness（`dsh`）および DSH Desktop（`anywhere-labs/dsh-desktop`）向けの `session-query` プラグインです。DSH 自身の会話履歴に加えて、同じマシン上の他 48 種類のコーディングエージェント（Claude Code・Codex・Cursor・Gemini・Hermes など）が保存した履歴を単一 Go バイナリ `deja` とローカル BM25 検索で横断参照します（`DEJA_OFFLINE=1` で日次チェック停止）。
+DeepSeek Harness（`dsh`）および DSH Desktop（`anywhere-labs/dsh-desktop`）向けの `session-query` プラグインです。DSH 自身の会話履歴に加えて、同じマシン上の他 51 種類のコーディングエージェント（Claude Code・Codex・Cursor・Gemini・Hermes など）が保存した履歴を単一 Go バイナリ `deja` とローカル BM25 検索で横断参照します（`DEJA_OFFLINE=1` で日次チェック停止）。
 
 ## インストール
 
@@ -20,7 +20,7 @@ dsh plugin --profile web add dsh-deja
 dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 ```
 
-`deja` 本体がまだない場合は `DEJA_BIN` を指定するか、以下で全 50 エージェントおよび `$DSH_HOME/plugins/deja/` をセットアップします：
+`deja` 本体がまだない場合は `DEJA_BIN` を指定するか、以下で全 52 エージェントおよび `$DSH_HOME/plugins/deja/` をセットアップします：
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -75,7 +75,7 @@ node --test extensions/dsh/test/*.test.js
 
 | 再現率 | トークン消費 | インデックス & 検索速度 |
 |---|---|---|
-| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1） | **トークン 58% 削減**（同一リポジトリの反復作業） | 19,195 セッションを **13.6 秒**でインデックス / 50 種のエージェント横断で **0.7 ms** 検索 |
+| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1） | **トークン 58% 削減**（同一リポジトリの反復作業） | 19,195 セッションを **13.6 秒**でインデックス / 52 種のエージェント横断で **0.7 ms** 検索 |
 
 ## リポジトリメモリとエージェント間の引き継ぎ
 

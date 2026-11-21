@@ -7,9 +7,9 @@
   </a>
 </p>
 
-<p align="center"><b>Gemeinsames lokales Gedächtnis, Agenten-Übergabe und Code-Wiederherstellung für 49 Coding-Agents.</b></p>
+<p align="center"><b>Gemeinsames lokales Gedächtnis, Agenten-Übergabe und Code-Wiederherstellung für 52 Coding-Agents.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes und 42 weitere Agents speichern jede Session ohnehin auf der Platte.<br>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes und 45 weitere Agents speichern jede Session ohnehin auf der Platte.<br>
 deja indiziert alles lokal, damit deine Agents den Kontext über <code>/compact</code> hinweg behalten, Aufgaben per <code>deja handoff</code> übergeben und überschriebenen Code per <code>deja restore</code> wiederherstellen — ohne LLM, ein einziges Go-Binary.</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | Deutsch | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -137,7 +137,7 @@ zeigt es, was indiziert ist und welcher Befehl als Nächstes dran ist.
 
 ## Was du davon hast
 
-**In Codex gelöst, von Claude erinnert.** Dreiundvierzig Coding-Agents schreiben jedes Gespräch in lokale
+**In Codex gelöst, von Claude erinnert.** Zweiundfünfzig Coding-Agents schreiben jedes Gespräch in lokale
 Dateien, und deja macht aus diesen Dateien eine Gedächtnisschicht, die sie alle lesen können.
 
 | | |

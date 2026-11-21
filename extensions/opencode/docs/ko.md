@@ -8,7 +8,7 @@
 
 ![deja-vu 데모](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-[opencode](https://opencode.ai)에서 같은 머신의 다른 48개 코딩 에이전트(Claude Code, Codex, Cursor, Gemini, Hermes, Zed 등) 기록을 함께 활용할 수 있게 해 주는 플러그인입니다. 단일 Go 바이너리 `deja`와 로컬 BM25 색인을 사용하며 LLM 없이 작동합니다(`DEJA_OFFLINE=1`로 일일 업데이트 확인 비활성화 가능).
+[opencode](https://opencode.ai)에서 같은 머신의 다른 51개 코딩 에이전트(Claude Code, Codex, Cursor, Gemini, Hermes, Zed 등) 기록을 함께 활용할 수 있게 해 주는 플러그인입니다. 단일 Go 바이너리 `deja`와 로컬 BM25 색인을 사용하며 LLM 없이 작동합니다(`DEJA_OFFLINE=1`로 일일 업데이트 확인 비활성화 가능).
 
 ## 설치
 
@@ -54,7 +54,7 @@
 - `tools`: 6개 도구 노출 여부(기본값 `true`)
 - `bin`: `deja` 바이너리 경로 직접 지정
 
-49개 전체 도구에 `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff` 8모드 MCP를 연결하려면 `deja install --auto`를 실행하세요([컨텍스트 손실 없는 에이전트 전환 가이드](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)).
+52개 전체 도구에 `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff` 8모드 MCP를 연결하려면 `deja install --auto`를 실행하세요([컨텍스트 손실 없는 에이전트 전환 가이드](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)).
 
 ## 바이너리 탐색 순서
 
@@ -68,7 +68,7 @@
 
 | 재현율 (Recall) | 토큰 사용량 | 인덱싱 & 조회 속도 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1) | **토큰 58% 절감** (반복 저장소 작업) | 19,195개 세션 **13.6초** 인덱싱 / 49개 코딩 에이전트 통합 **0.7 ms** 조회 |
+| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1) | **토큰 58% 절감** (반복 저장소 작업) | 19,195개 세션 **13.6초** 인덱싱 / 52개 코딩 에이전트 통합 **0.7 ms** 조회 |
 
 ## 저장소 메모리 및 에이전트 간 핸드오프
 

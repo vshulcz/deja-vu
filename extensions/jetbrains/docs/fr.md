@@ -5,7 +5,7 @@
 
 Recherche locale de sessions multi-agents, blame de ligne par IA et transfert de contexte pour IntelliJ IDEA, GoLand, PyCharm, WebStorm, RustRover, CLion, PhpStorm et Rider (`2024.2+`).
 
-[deja-vu](https://github.com/vshulcz/deja-vu) indexe localement dans SQLite FTS5 les transcriptions écrites sur disque par Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf et 39 autres agents de code, avec caviardage des secrets avant affichage et sans aucun service cloud.
+[deja-vu](https://github.com/vshulcz/deja-vu) indexe localement avec BM25 les transcriptions écrites sur disque par Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf et 43 autres agents de code, avec caviardage des secrets avant affichage et sans aucun service cloud.
 
 **[Documentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 

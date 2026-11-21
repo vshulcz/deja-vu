@@ -6,7 +6,7 @@
 
 Fait partie de **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** sur LongMemEval-S) · [Documentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Démo en ligne](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-Recherchez et reprenez vos sessions d'agents de code sur Claude Code, Codex, Cursor, OpenCode, Gemini CLI et 44 autres outils directement depuis Raycast.
+Recherchez et reprenez vos sessions d'agents de code sur Claude Code, Codex, Cursor, OpenCode, Gemini CLI et 47 autres outils directement depuis Raycast.
 
 ![Démo de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 

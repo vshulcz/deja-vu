@@ -2,7 +2,7 @@
 
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | Français | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-Plugin `trusted-worker` Orca v2 pour `deja` — apporte la mémoire de session sur 50 outils de développement IA (Claude Code, Codex, Cursor, opencode, Gemini CLI, Orca, etc.), y compris pour les sessions antérieures à l'installation de `deja`.
+Plugin `trusted-worker` Orca v2 pour `deja` — apporte la mémoire de session sur 52 outils de développement IA (Claude Code, Codex, Cursor, opencode, Gemini CLI, Orca, etc.), y compris pour les sessions antérieures à l'installation de `deja`.
 
 ![Démo de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 

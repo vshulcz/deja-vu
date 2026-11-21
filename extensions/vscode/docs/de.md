@@ -36,7 +36,7 @@ code --install-extension vshulcz.deja-status
 |---|---|
 | LongMemEval-S Treffergenauigkeit (470 bereinigte Fragen) | **97.2% R@5**, **88.9% hit@1** |
 | Token-Kosten bei wiederkehrender Repo-Arbeit | **58% weniger Tokens**|
-| Latenz der In-Process-Suche | **0.7–0.8 ms** Median über 50 Coding-Agents hinweg |
+| Latenz der In-Process-Suche | **0.7–0.8 ms** Median über 52 Coding-Agents hinweg |
 | Erstindexierung über 19,195 echte Sessions | **13.6 s**, ohne API-Schlüssel |
 
 ## Repository-Gedächtnis & Agenten-Übergabe

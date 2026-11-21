@@ -10,7 +10,7 @@
 
 ![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-> 在所有通过 [Magpie](https://github.com/yetone/magpie) 发往上游模型的对话请求里，自动附带来自本地 48 款其他编程智能体（Claude Code、Codex、Cursor、Gemini CLI、OpenClaw、Hermes 等）的跨智能体历史记忆。
+> 在所有通过 [Magpie](https://github.com/yetone/magpie) 发往上游模型的对话请求里，自动附带来自本地 51 款其他编程智能体（Claude Code、Codex、Cursor、Gemini CLI、OpenClaw、Hermes 等）的跨智能体历史记忆。
 
 基于单文件 Go 二进制 `deja` 与本地 BM25 全文索引运行，支持 OpenAI（`chat`、`responses`）、Anthropic（`anthropic`）和 Gemini（`gemini`）协议的 Magpie 请求路径，不启用任何额外大模型与云端向量库；除明确运行的命令以及可通过 `DEJA_OFFLINE=1` 关闭的每日版本检查外，扩展自身不产生外发连接。
 
@@ -52,7 +52,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 | 召回率 | Token 用量 | 索引与检索耗时 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 50 个编程智能体的检索仅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 52 个编程智能体的检索仅 **0.7 ms** |
 
 ## 仓库记忆与跨智能体接力
 

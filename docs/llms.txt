@@ -31,7 +31,7 @@
 
 | Tool | Capture & day-zero | Runtime / daemon | LLM key required | Coding agents covered |
 | :--- | :--- | :--- | :--- | :--- |
-| **deja-vu** | Indexes existing disk transcripts + 7 lifecycle hooks + `.deja/memory.jsonl` | One 18.6 MB Go binary, none | No (lexical BM25; optional `deja embed`) | 50 native parsers + MCP |
+| **deja-vu** | Indexes existing disk transcripts + 7 lifecycle hooks + `.deja/memory.jsonl` | One 18.6 MB Go binary, none | No (lexical BM25; optional `deja embed`) | 52 native parsers + MCP |
 | **claude-mem** | Hooks from install on (0 on day zero) | Bun worker + Chroma | Yes (hosted, OpenRouter, Gemini, or Anthropic) | 9 (Claude Code, Codex T3, Cursor, opencode, etc.) |
 | **Mem0 / OpenMemory** | SDK `add` / hooks from install on | Hosted API or Docker server | Yes (`gpt-5-mini` default self-hosted) | Plugins/MCP for 7+ agents |
 | **agentmemory** | Hooks + `import-jsonl` (Claude Code only) | Node daemon on two ports | Optional (BM25 keyless default) | MCP + 12 integrations |

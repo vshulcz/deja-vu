@@ -8,7 +8,7 @@ Teil von **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** auf Lo
 
 ![deja-vu Demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Lokales Gedächtnis für [pi](https://github.com/badlogic/pi-mono) aus den bereits auf Festplatte liegenden Sitzungsprotokollen von 48 weiteren Coding-Agenten (darunter Claude Code, Codex, Cursor, Gemini, OpenClaw und Hermes). Die Einzel-Binary `deja` arbeitet vollständig mit lokalem BM25-Index ohne LLM oder Embeddings; Netzwerkzugriffe erfolgen nur bei expliziten Update-/Sync-Befehlen sowie beim per `DEJA_OFFLINE=1` abschaltbaren täglichen Versionscheck.
+Lokales Gedächtnis für [pi](https://github.com/badlogic/pi-mono) aus den bereits auf Festplatte liegenden Sitzungsprotokollen von 51 weiteren Coding-Agenten (darunter Claude Code, Codex, Cursor, Gemini, OpenClaw und Hermes). Die Einzel-Binary `deja` arbeitet vollständig mit lokalem BM25-Index ohne LLM oder Embeddings; Netzwerkzugriffe erfolgen nur bei expliziten Update-/Sync-Befehlen sowie beim per `DEJA_OFFLINE=1` abschaltbaren täglichen Versionscheck.
 
 ## Installation
 
@@ -32,7 +32,7 @@ Erkennt das Paket eine bereits über `deja install pi-auto` oder `deja install -
 - **Vor Lese-/Schreibaktionen (`tool_result` bei read/edit/write)**: erinnert an frühere Festlegungen zur jeweiligen Datei.
 - **Nach Komprimierung (`session_compact`)**: stellt Aufgabe, Beschlüsse und offene Befehle nach dem Compact-Summary wieder her.
 - **Sitzungsende (`session_shutdown`)**: aktualisiert den lokalen Suchindex.
-- **`/deja <query>`**: durchsucht alle 50 unterstützten Werkzeuge direkt aus der Eingabezeile.
+- **`/deja <query>`**: durchsucht alle 52 unterstützten Werkzeuge direkt aus der Eingabezeile.
 
 ## Welche Binary verwendet wird
 
@@ -47,7 +47,7 @@ Die Suche nach `deja` erfolgt in dieser Reihenfolge:
 
 | Recall | Tokens | Indexierung & Suche |
 |---|---|---|
-| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 50 Coding-Agents hinweg |
+| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 52 Coding-Agents hinweg |
 
 ## Repository-Gedächtnis & Agenten-Übergabe
 
@@ -57,7 +57,7 @@ Werkzeugwechsel mitten in der Aufgabe? Mit `deja handoff --to <agent>` (oder `ha
 
 ## Datenschutz
 
-Der Index liegt in `~/.cache/deja/index.db` (`DEJA_INDEX_DIR` überschreibbar); Geheimnisse wie `sk-*`, `ghp_*`, `AKIA*` und `Bearer` werden beim Indexieren entfernt. Ohne explizites `deja embed` verlässt kein Inhalt den Rechner. Über `deja install --auto` lassen sich `recall`, `fix`, `blame` und `handoff` in allen 50 Agenten aktivieren.
+Der Index liegt in `~/.cache/deja/index.db` (`DEJA_INDEX_DIR` überschreibbar); Geheimnisse wie `sk-*`, `ghp_*`, `AKIA*` und `Bearer` werden beim Indexieren entfernt. Ohne explizites `deja embed` verlässt kein Inhalt den Rechner. Über `deja install --auto` lassen sich `recall`, `fix`, `blame` und `handoff` in allen 52 Agenten aktivieren.
 
 ## Lizenz
 

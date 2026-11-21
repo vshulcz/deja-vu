@@ -9,7 +9,7 @@
 
 <p align="center"><b>Mémoire locale partagée, relais entre agents et récupération de code pour 52 agents de code.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes et 42 autres agents enregistrent déjà chaque session sur le disque.<br>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes et 45 autres agents enregistrent déjà chaque session sur le disque.<br>
 deja indexe tout localement pour que vos agents gardent le contexte après <code>/compact</code>, se passent le relais via <code>deja handoff</code> et récupèrent du code écrasé via <code>deja restore</code> — sans LLM, un seul binaire Go.</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | Français | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -137,7 +137,7 @@ ce qui est indexé et quelle commande lancer ensuite.
 
 ## Ce que ça apporte
 
-**Résolu dans Codex, retenu par Claude.** Quarante-neuf agents de code écrivent chaque conversation dans des
+**Résolu dans Codex, retenu par Claude.** Cinquante-deux agents de code écrivent chaque conversation dans des
 fichiers locaux, et deja transforme ces fichiers en une couche de mémoire qu'ils peuvent tous lire.
 
 | | |

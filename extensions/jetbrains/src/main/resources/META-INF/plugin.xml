@@ -4,7 +4,7 @@
     <vendor url="https://github.com/vshulcz/deja-vu">vshulcz</vendor>
     <description><![CDATA[
         <p>Local cross-agent session recall, AI line blame, and handoff for IntelliJ IDEA, GoLand, PyCharm, WebStorm, RustRover, CLion, PhpStorm, and Rider.</p>
-        <p>Reads the local <code>deja</code> SQLite FTS5 index across 50 coding agents (Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf, and more) with secrets redacted before output and zero cloud dependencies.</p>
+        <p>Reads the local <code>deja</code> BM25 index across 52 coding agents (Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf, and more) with secrets redacted before output and zero cloud dependencies.</p>
         <ul>
             <li><b>Status Bar Widget</b>: Live recall status for the open project; click to open the deja-vu action menu.</li>
             <li><b>Search AI Sessions</b>: Query past sessions across all agents on your machine and open transcripts in a read-only Markdown tab.</li>
@@ -33,11 +33,11 @@
             <action id="DejaVu.SearchSessions"
                     class="com.github.vshulcz.dejavu.DejaSearchAction"
                     text="Search AI Sessions..."
-                    description="Search past AI coding sessions across 50 harnesses"/>
+                    description="Search past AI coding sessions across 52 harnesses"/>
             <action id="DejaVu.RecentSessions"
                     class="com.github.vshulcz.dejavu.DejaLastAction"
                     text="Recent AI Sessions"
-                    description="Browse recent AI coding sessions across 50 harnesses"/>
+                    description="Browse recent AI coding sessions across 52 harnesses"/>
             <action id="DejaVu.BlameLine"
                     class="com.github.vshulcz.dejavu.DejaBlameLineAction"
                     text="AI Blame Current Line"

@@ -8,7 +8,7 @@ Parte do **[★ vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% 
 
 ![Demonstração do deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Plugin `session-query` para DeepSeek Harness (`dsh`) e DSH Desktop (`anywhere-labs/dsh-desktop`). Além das conversas do DSH, indexa localmente sessões de outros 48 agentes de programação na sua máquina (Claude Code, Codex, Cursor, Gemini, Hermes e mais) com o binário único Go `deja` e índice BM25 (`DEJA_OFFLINE=1` desativa a checagem diária).
+Plugin `session-query` para DeepSeek Harness (`dsh`) e DSH Desktop (`anywhere-labs/dsh-desktop`). Além das conversas do DSH, indexa localmente sessões de outros 51 agentes de programação na sua máquina (Claude Code, Codex, Cursor, Gemini, Hermes e mais) com o binário único Go `deja` e índice BM25 (`DEJA_OFFLINE=1` desativa a checagem diária).
 
 ## Instalação
 
@@ -20,7 +20,7 @@ dsh plugin --profile web add dsh-deja
 dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 ```
 
-Caso ainda não tenha o `deja`, aponte `DEJA_BIN` ou configure os 50 agentes e `$DSH_HOME/plugins/deja/`:
+Caso ainda não tenha o `deja`, aponte `DEJA_BIN` ou configure os 52 agentes e `$DSH_HOME/plugins/deja/`:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -75,7 +75,7 @@ Inclui também `extensions/dsh/test/search-browser.html` via React 18 CDN para v
 
 | Recall | Tokens | Indexação e busca |
 |---|---|---|
-| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 50 agentes de código |
+| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 52 agentes de código |
 
 ## Memória do repositório e handoff entre agentes
 

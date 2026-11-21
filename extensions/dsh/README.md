@@ -47,11 +47,14 @@ Having both is fine: this plugin looks for what the installer wrote in
 `$DSH_HOME/plugins/deja/` and contributes only what is missing, so the tools and
 the command are never registered twice.
 
-If `dsh plugin --profile web add dsh-deja` fails with
-`ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED` under stricter pnpm build-script
-policies, allow `dsh-deja` in `pnpm.onlyBuiltDependencies` (neither `dsh-deja`
-nor `@vshulcz/deja-vu` defines build scripts), or run `deja install dsh-auto`
-directly.
+If `dsh plugin --profile <profile> add dsh-deja` fails with
+`ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED` under pnpm 10, pnpm is rejecting an
+existing git-hosted plugin in `~/.dsh/profiles/<profile>/package.json` that
+declares a `prepare` script (for example `dshmarket`, shown on the `[allow
+build]` line in the error output) — neither `dsh-deja` nor `@vshulcz/deja-vu`
+defines build scripts. Add that blocked package name to
+`pnpm.onlyBuiltDependencies` in `~/.dsh/profiles/<profile>/package.json`, or
+bypass pnpm plugin install with `deja install dsh-auto`.
 
 ## What it adds
 

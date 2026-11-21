@@ -2,7 +2,7 @@
 
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | 한국어 | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-CodeWhale용 Claude 호환 플러그인 번들입니다. 49개 AI 코딩 도구의 로컬 세션을 대상으로 `deja` MCP 서버(`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`), `deja-history` 스킬, `/deja` 슬래시 명령을 제공합니다.
+CodeWhale용 Claude 호환 플러그인 번들입니다. 52개 AI 코딩 도구의 로컬 세션을 대상으로 `deja` MCP 서버(`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`), `deja-history` 스킬, `/deja` 슬래시 명령을 제공합니다.
 
 ![deja-vu 데모](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -29,7 +29,7 @@ deja install codewhale-auto
 
 | 재현율 (Recall) | 토큰 사용량 | 인덱싱 & 조회 속도 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1) | **토큰 58% 절감** (반복 저장소 작업) | 19,195개 세션 **13.6초** 인덱싱 / 49개 코딩 에이전트 통합 **0.7 ms** 조회 |
+| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1) | **토큰 58% 절감** (반복 저장소 작업) | 19,195개 세션 **13.6초** 인덱싱 / 52개 코딩 에이전트 통합 **0.7 ms** 조회 |
 
 ## 저장소 메모리 및 에이전트 간 핸드오프
 

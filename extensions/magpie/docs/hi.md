@@ -8,7 +8,7 @@
 
 ![deja-vu डेमो](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-> [Magpie](https://github.com/yetone/magpie) से होकर जाने वाले अनुरोधों में आपकी मशीन पर मौजूद 48 अन्य कोडिंग एजेंट्स (Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes आदि) का पिछला संदर्भ स्वतः जोड़ता है।
+> [Magpie](https://github.com/yetone/magpie) से होकर जाने वाले अनुरोधों में आपकी मशीन पर मौजूद 51 अन्य कोडिंग एजेंट्स (Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes आदि) का पिछला संदर्भ स्वतः जोड़ता है।
 
 यह सिंगल Go बाइनरी `deja` और स्थानीय BM25 इंडेक्स की मदद से बिना किसी अतिरिक्त LLM के OpenAI (`chat`, `responses`), Anthropic (`anthropic`) और Gemini (`gemini`) प्रोटोकॉल पर काम करता है (`DEJA_OFFLINE=1` दैनिक संस्करण जाँच बंद कर देता है)।
 
@@ -18,7 +18,7 @@
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-इसके लिए `deja` बाइनरी (`@vshulcz/deja-vu`, `brew install deja-vu` या `install.sh`) और `deja index` से बना इंडेक्स आवश्यक है। सभी 50 एजेंट्स में `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember` और `handoff` टूल सेट करने के लिए:
+इसके लिए `deja` बाइनरी (`@vshulcz/deja-vu`, `brew install deja-vu` या `install.sh`) और `deja index` से बना इंडेक्स आवश्यक है। सभी 52 एजेंट्स में `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember` और `handoff` टूल सेट करने के लिए:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
@@ -50,7 +50,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 | रिकॉल (Recall) | टोकन | इंडेक्सिंग और खोज |
 |---|---|---|
-| LongMemEval-S पर **97.2% R@5** (470 प्रश्नों पर 88.9% hit@1) | **58% कम टोकन** (दोहराए गए रेपो कार्य पर) | 19,195 सेशन इंडेक्स करने में **13.6 s** / 50 कोडिंग एजेंट्स में **0.7 ms** खोज समय |
+| LongMemEval-S पर **97.2% R@5** (470 प्रश्नों पर 88.9% hit@1) | **58% कम टोकन** (दोहराए गए रेपो कार्य पर) | 19,195 सेशन इंडेक्स करने में **13.6 s** / 52 कोडिंग एजेंट्स में **0.7 ms** खोज समय |
 
 ## रेपो मेमोरी और एजेंट हैंडऑफ़
 

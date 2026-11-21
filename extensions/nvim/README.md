@@ -5,7 +5,7 @@ English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions
 
 Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**< 1 ms** SQLite FTS5 lookup · **~4%** index footprint · **0** LLM tokens at ingest) · [Documentation](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-Search past coding agent transcripts, run line-level AI session blame, recall error fixes, and generate cross-agent handoff digests across Claude Code, Codex CLI, Cursor, opencode, Gemini CLI, and forty-six more harnesses directly from Neovim.
+Search past coding agent transcripts, run line-level AI session blame, recall error fixes, and generate cross-agent handoff digests across Claude Code, Codex CLI, Cursor, opencode, Gemini CLI, and forty-seven more harnesses directly from Neovim.
 
 ![deja-vu demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 

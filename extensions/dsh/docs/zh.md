@@ -20,7 +20,7 @@ dsh plugin --profile web add dsh-deja
 dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 ```
 
-若系统未预先安装 `deja`，请配置 `DEJA_BIN`，或使用安装脚本 / Homebrew 一并完成全机 50 款智能体与 `$DSH_HOME/plugins/deja/` 的配置：
+若系统未预先安装 `deja`，请配置 `DEJA_BIN`，或使用安装脚本 / Homebrew 一并完成全机 52 款智能体与 `$DSH_HOME/plugins/deja/` 的配置：
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -75,7 +75,7 @@ node --test extensions/dsh/test/*.test.js
 
 | 召回率 | Token 用量 | 索引与检索耗时 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 50 个编程智能体的检索仅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 52 个编程智能体的检索仅 **0.7 ms** |
 
 ## 仓库记忆与跨智能体接力
 

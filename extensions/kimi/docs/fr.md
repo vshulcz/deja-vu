@@ -6,7 +6,7 @@
 
 Fait partie de **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** sur LongMemEval-S) · [Documentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Démo en ligne](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-[deja](https://github.com/vshulcz/deja-vu) indexe les fichiers de session déjà écrits sur disque par les agents de code — Claude Code, Codex, Cursor, opencode et 45 autres — et répond à partir de ces données. Ce plugin intègre cet index dans Kimi Code : le rappel arrive avec votre invite et l'agent peut explorer l'historique lui-même.
+[deja](https://github.com/vshulcz/deja-vu) indexe les fichiers de session déjà écrits sur disque par les agents de code — Claude Code, Codex, Cursor, opencode et 48 autres — et répond à partir de ces données. Ce plugin intègre cet index dans Kimi Code : le rappel arrive avec votre invite et l'agent peut explorer l'historique lui-même.
 
 ![Démo de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
