@@ -286,6 +286,9 @@ func lineageCuts(views *metaViews, lr *lineageReader, out map[string]bool, metaF
 // lineageBodyDecodes counts full record-body decodes during lineage checks.
 var lineageBodyDecodes atomic.Int64
 
+// lineageStubDecodes counts record-stub header/timestamp decodes during lineage checks.
+var lineageStubDecodes atomic.Int64
+
 // firstTimed is the time of a session's first timed message.
 func firstTimed(s model.Session) time.Time {
 	for _, msg := range s.Messages {
