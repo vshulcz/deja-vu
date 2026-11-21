@@ -8,7 +8,7 @@
 
 ![deja-vu डेमो](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-आपकी मशीन के 48 अन्य कोडिंग एजेंट्स (Claude Code, Codex, Cursor, Gemini, Zed आदि) का सेशन इतिहास [OpenClaw](https://openclaw.ai) में लाता है। यह सिंगल Go बाइनरी `deja` और स्थानीय BM25 इंडेक्स से बिना LLM के चलता है (`DEJA_OFFLINE=1` दैनिक अपडेट जाँच बंद करता है)।
+आपकी मशीन के 51 अन्य कोडिंग एजेंट्स (Claude Code, Codex, Cursor, Gemini, Zed आदि) का सेशन इतिहास [OpenClaw](https://openclaw.ai) में लाता है। यह सिंगल Go बाइनरी `deja` और स्थानीय BM25 इंडेक्स से बिना LLM के चलता है (`DEJA_OFFLINE=1` दैनिक अपडेट जाँच बंद करता है)।
 
 ## इंस्टॉलेशन
 
@@ -86,7 +86,7 @@ openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 
 | रिकॉल (Recall) | टोकन | इंडेक्सिंग और खोज |
 |---|---|---|
-| LongMemEval-S पर **97.2% R@5** (470 प्रश्नों पर 88.9% hit@1) | **58% कम टोकन** (दोहराए गए रेपो कार्य पर) | 19,195 सेशन इंडेक्स करने में **13.6 s** / 50 कोडिंग एजेंट्स में **0.7 ms** खोज समय |
+| LongMemEval-S पर **97.2% R@5** (470 प्रश्नों पर 88.9% hit@1) | **58% कम टोकन** (दोहराए गए रेपो कार्य पर) | 19,195 सेशन इंडेक्स करने में **13.6 s** / 52 कोडिंग एजेंट्स में **0.7 ms** खोज समय |
 
 ## रेपो मेमोरी और एजेंट हैंडऑफ़
 
@@ -96,6 +96,6 @@ openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 
 ## गोपनीयता
 
-इंडेक्स `~/.cache/deja/index.db` (`DEJA_INDEX_DIR`) में संग्रहीत होता है और `sk-*`, `ghp_*`, `AKIA*`, `Bearer` इंडेक्सिंग के समय हटा दिए जाते हैं। बिना `deja embed` के सब ऑफ़लाइन रहता है। सभी 50 एजेंट्स एक साथ जोड़ने के लिए `deja install --auto` चलाएँ।
+इंडेक्स `~/.cache/deja/index.db` (`DEJA_INDEX_DIR`) में संग्रहीत होता है और `sk-*`, `ghp_*`, `AKIA*`, `Bearer` इंडेक्सिंग के समय हटा दिए जाते हैं। बिना `deja embed` के सब ऑफ़लाइन रहता है। सभी 52 एजेंट्स एक साथ जोड़ने के लिए `deja install --auto` चलाएँ।
 
 [deja-vu](https://github.com/vshulcz/deja-vu) का हिस्सा। MIT लाइसेंस।

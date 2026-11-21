@@ -5,7 +5,7 @@
 
 **[deja-vu](https://github.com/vshulcz/deja-vu)** का हिस्सा (**< 1 ms** SQLite FTS5 क्वेरी · **~4%** इंडेक्स आकार · इंडेक्सिंग में **0** LLM टोकन) · [दस्तावेज़](https://vshulcz.github.io/deja-vu/) · [ब्राउज़र डेमो](https://vshulcz.github.io/deja-vu/view/) · [बेंचमार्क](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-सीधे Neovim से Claude Code, Codex CLI, Cursor, opencode, Gemini CLI और 44 अन्य हार्नेस के पुराने कोडिंग एजेंट ट्रांसक्रिप्ट खोजें, लाइन-स्तरीय AI सेशन ब्लेम चलाएँ, एरर फिक्स वापस पाएँ और क्रॉस-एजेंट हैंडऑफ़ सारांश तैयार करें।
+सीधे Neovim से Claude Code, Codex CLI, Cursor, opencode, Gemini CLI और 47 अन्य हार्नेस के पुराने कोडिंग एजेंट ट्रांसक्रिप्ट खोजें, लाइन-स्तरीय AI सेशन ब्लेम चलाएँ, एरर फिक्स वापस पाएँ और क्रॉस-एजेंट हैंडऑफ़ सारांश तैयार करें।
 
 ![deja-vu डेमो](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -78,7 +78,7 @@ sections = {
 
 | रिकॉल (Recall) | टोकन | इंडेक्सिंग और खोज |
 |---|---|---|
-| LongMemEval-S पर **97.2% R@5** (470 प्रश्नों पर 88.9% hit@1) | **58% कम टोकन** (दोहराए गए रेपो कार्य पर) | 19,195 सेशन इंडेक्स करने में **13.6 s** / 50 कोडिंग एजेंट्स में **0.7 ms** खोज समय |
+| LongMemEval-S पर **97.2% R@5** (470 प्रश्नों पर 88.9% hit@1) | **58% कम टोकन** (दोहराए गए रेपो कार्य पर) | 19,195 सेशन इंडेक्स करने में **13.6 s** / 52 कोडिंग एजेंट्स में **0.7 ms** खोज समय |
 
 ## रेपो मेमोरी और एजेंट हैंडऑफ़
 

@@ -6,7 +6,7 @@
 
 **[deja-vu](https://github.com/vshulcz/deja-vu)** 확장 (LongMemEval-S **97.2% R@5**) · [문서](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [라이브 데모](https://vshulcz.github.io/deja-vu/view/) · [벤치마크](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-[deja](https://github.com/vshulcz/deja-vu)는 Claude Code, Codex, Cursor, opencode 외 45개 코딩 에이전트가 디스크에 남겨 둔 세션 파일을 색인해 답변합니다. 이 플러그인은 그 인덱스를 Kimi Code에 연결해 프롬프트마다 관련 기억을 가져오고 에이전트가 직접 과거 기록을 검색할 수 있게 합니다.
+[deja](https://github.com/vshulcz/deja-vu)는 Claude Code, Codex, Cursor, opencode 외 48개 코딩 에이전트가 디스크에 남겨 둔 세션 파일을 색인해 답변합니다. 이 플러그인은 그 인덱스를 Kimi Code에 연결해 프롬프트마다 관련 기억을 가져오고 에이전트가 직접 과거 기록을 검색할 수 있게 합니다.
 
 ![deja-vu 데모](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -61,7 +61,7 @@ CLI는 `~/.kimi-code/mcp.json`에 같은 MCP 서버를, `config.toml`에 같은 
 
 | 재현율 (Recall) | 토큰 사용량 | 인덱싱 & 조회 속도 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1) | **토큰 58% 절감** (반복 저장소 작업) | 19,195개 세션 **13.6초** 인덱싱 / 49개 코딩 에이전트 통합 **0.7 ms** 조회 |
+| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1) | **토큰 58% 절감** (반복 저장소 작업) | 19,195개 세션 **13.6초** 인덱싱 / 52개 코딩 에이전트 통합 **0.7 ms** 조회 |
 
 ## 저장소 메모리 및 에이전트 간 핸드오프
 

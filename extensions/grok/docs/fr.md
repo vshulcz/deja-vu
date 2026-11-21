@@ -8,7 +8,7 @@ Fait partie de **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** 
 
 ![Démo de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Mémoire locale persistante issue de l'historique de vos sessions Claude Code, Codex, Cursor, opencode, Zed et 44 autres agents de code. Exécutée localement par le binaire Go unique `deja` (`DEJA_OFFLINE=1` coupe la vérification quotidienne).
+Mémoire locale persistante issue de l'historique de vos sessions Claude Code, Codex, Cursor, opencode, Zed et 47 autres agents de code. Exécutée localement par le binaire Go unique `deja` (`DEJA_OFFLINE=1` coupe la vérification quotidienne).
 
 ## Installation
 

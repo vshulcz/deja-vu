@@ -8,7 +8,7 @@
 
 ![deja-vu 示範](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-適用於 DeepSeek Harness（`dsh`）與 DSH Desktop（`anywhere-labs/dsh-desktop`）的 `session-query` 外掛。除了 DSH 自身的對話紀錄，也一併檢索本機其餘 48 款程式設計智慧體（Claude Code、Codex、Cursor、Gemini、Hermes 等）留在磁碟上的工作階段歷史，全部經由本地單一 Go 執行檔 `deja` 與 BM25 索引執行（`DEJA_OFFLINE=1` 可關閉每日版本檢查）。
+適用於 DeepSeek Harness（`dsh`）與 DSH Desktop（`anywhere-labs/dsh-desktop`）的 `session-query` 外掛。除了 DSH 自身的對話紀錄，也一併檢索本機其餘 51 款程式設計智慧體（Claude Code、Codex、Cursor、Gemini、Hermes 等）留在磁碟上的工作階段歷史，全部經由本地單一 Go 執行檔 `deja` 與 BM25 索引執行（`DEJA_OFFLINE=1` 可關閉每日版本檢查）。
 
 ## 安裝
 
@@ -20,7 +20,7 @@ dsh plugin --profile web add dsh-deja
 dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 ```
 
-若系統尚未安裝 `deja`，可透過 `DEJA_BIN` 指定路徑，或執行以下指令一併完成全機 50 款智慧體與 `$DSH_HOME/plugins/deja/` 之設定：
+若系統尚未安裝 `deja`，可透過 `DEJA_BIN` 指定路徑，或執行以下指令一併完成全機 52 款智慧體與 `$DSH_HOME/plugins/deja/` 之設定：
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -75,7 +75,7 @@ node --test extensions/dsh/test/*.test.js
 
 | 召回率 | Token 用量 | 索引與檢索耗時 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 50 個程式設計代理的檢索僅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 52 個程式設計代理的檢索僅 **0.7 ms** |
 
 ## 儲存庫記憶與跨代理接力
 

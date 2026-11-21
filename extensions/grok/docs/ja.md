@@ -8,7 +8,7 @@
 
 ![deja-vu デモ](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-同じマシン上の Claude Code・Codex・Cursor・opencode・Zed ほか 44 種類のコーディングエージェントのセッション履歴を共有記憶として Grok Build へ接続します。単一 Go バイナリの `deja` がローカルだけで動作し、`DEJA_OFFLINE=1` で日次更新確認も停止できます。
+同じマシン上の Claude Code・Codex・Cursor・opencode・Zed ほか 47 種類のコーディングエージェントのセッション履歴を共有記憶として Grok Build へ接続します。単一 Go バイナリの `deja` がローカルだけで動作し、`DEJA_OFFLINE=1` で日次更新確認も停止できます。
 
 ## インストール
 
@@ -51,7 +51,7 @@ grok plugin install deja
 
 | 再現率 | トークン消費 | インデックス & 検索速度 |
 |---|---|---|
-| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1） | **トークン 58% 削減**（同一リポジトリの反復作業） | 19,195 セッションを **13.6 秒**でインデックス / 50 種のエージェント横断で **0.7 ms** 検索 |
+| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1） | **トークン 58% 削減**（同一リポジトリの反復作業） | 19,195 セッションを **13.6 秒**でインデックス / 52 種のエージェント横断で **0.7 ms** 検索 |
 
 ## リポジトリメモリとエージェント間の引き継ぎ
 

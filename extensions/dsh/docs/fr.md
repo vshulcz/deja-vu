@@ -8,7 +8,7 @@ Fait partie de **[★ vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)** (**
 
 ![Démo de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Plugin `session-query` pour DeepSeek Harness (`dsh`) et DSH Desktop (`anywhere-labs/dsh-desktop`). En plus de vos sessions DSH, il interroge localement les journaux de 48 autres agents de code présents sur la machine (Claude Code, Codex, Cursor, Gemini, Hermes, etc.) via l'exécutable Go unique `deja` et son index BM25 (`DEJA_OFFLINE=1` coupe le contrôle quotidien).
+Plugin `session-query` pour DeepSeek Harness (`dsh`) et DSH Desktop (`anywhere-labs/dsh-desktop`). En plus de vos sessions DSH, il interroge localement les journaux de 51 autres agents de code présents sur la machine (Claude Code, Codex, Cursor, Gemini, Hermes, etc.) via l'exécutable Go unique `deja` et son index BM25 (`DEJA_OFFLINE=1` coupe le contrôle quotidien).
 
 ## Installation
 

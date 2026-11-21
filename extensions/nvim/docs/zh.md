@@ -5,7 +5,7 @@
 
 **[deja-vu](https://github.com/vshulcz/deja-vu)** 生态组件（**< 1 ms** SQLite FTS5 查询 · **~4%** 索引空间占用 · 索引阶段 **0** LLM token）· [文档](https://vshulcz.github.io/deja-vu/zh/) · [浏览器演示](https://vshulcz.github.io/deja-vu/view/) · [评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-在 Neovim 中直接检索 Claude Code、Codex CLI、Cursor、opencode、Gemini CLI 以及其他 44 款编程工具的历史会话记录，运行代码行级 AI 会话溯源，召回报错修复方案，并生成跨智能体接力摘要。
+在 Neovim 中直接检索 Claude Code、Codex CLI、Cursor、opencode、Gemini CLI 以及其他 47 款编程工具的历史会话记录，运行代码行级 AI 会话溯源，召回报错修复方案，并生成跨智能体接力摘要。
 
 ![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -78,7 +78,7 @@ sections = {
 
 | 召回率 | Token 用量 | 索引与检索耗时 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 50 个编程智能体的检索仅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 52 个编程智能体的检索仅 **0.7 ms** |
 
 ## 仓库记忆与跨智能体接力
 

@@ -8,7 +8,7 @@ Parte do **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** no Lon
 
 ![Demonstração do deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Memória local para o [pi](https://github.com/badlogic/pi-mono) alimentada pelo histórico de sessões dos outros 48 agentes de programação na sua máquina (Claude Code, Codex, Cursor, Gemini, OpenClaw, Hermes e mais). Roda sobre um único binário Go (`deja`) com índice BM25 local, sem LLM e sem embeddings; a rede só é usada em comandos explícitos ou na checagem diária de release, que `DEJA_OFFLINE=1` desativa.
+Memória local para o [pi](https://github.com/badlogic/pi-mono) alimentada pelo histórico de sessões dos outros 51 agentes de programação na sua máquina (Claude Code, Codex, Cursor, Gemini, OpenClaw, Hermes e mais). Roda sobre um único binário Go (`deja`) com índice BM25 local, sem LLM e sem embeddings; a rede só é usada em comandos explícitos ou na checagem diária de release, que `DEJA_OFFLINE=1` desativa.
 
 ## Instalação
 
@@ -47,7 +47,7 @@ A resolução do binário `deja` segue esta ordem:
 
 | Recall | Tokens | Indexação e busca |
 |---|---|---|
-| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 50 agentes de código |
+| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 52 agentes de código |
 
 ## Memória do repositório e handoff entre agentes
 
@@ -57,7 +57,7 @@ Trocando de ferramenta no meio da tarefa? Execute `deja handoff --to <agent>` (o
 
 ## Privacidade
 
-O índice fica em `~/.cache/deja/index.db` (configurável por `DEJA_INDEX_DIR`) e remove credenciais como `sk-*`, `ghp_*`, `AKIA*` e `Bearer` antes de salvar. Nada sai da máquina, exceto se você rodar `deja embed` manualmente. Configure `recall`, `fix`, `blame` e `handoff` em todos os 50 agentes com `deja install --auto`.
+O índice fica em `~/.cache/deja/index.db` (configurável por `DEJA_INDEX_DIR`) e remove credenciais como `sk-*`, `ghp_*`, `AKIA*` e `Bearer` antes de salvar. Nada sai da máquina, exceto se você rodar `deja embed` manualmente. Configure `recall`, `fix`, `blame` e `handoff` em todos os 52 agentes com `deja install --auto`.
 
 ## Licença
 

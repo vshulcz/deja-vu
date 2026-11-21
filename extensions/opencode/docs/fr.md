@@ -8,7 +8,7 @@ Fait partie de **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** 
 
 ![Démo de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Mémoire locale pour [opencode](https://opencode.ai) nourrie par l'historique des sessions de 48 autres agents de code sur votre machine (Claude Code, Codex, Cursor, Gemini, Hermes, Zed, etc.). Propulsée par le binaire Go unique `deja` et son index BM25 local, sans LLM (`DEJA_OFFLINE=1` coupe le contrôle quotidien).
+Mémoire locale pour [opencode](https://opencode.ai) nourrie par l'historique des sessions de 51 autres agents de code sur votre machine (Claude Code, Codex, Cursor, Gemini, Hermes, Zed, etc.). Propulsée par le binaire Go unique `deja` et son index BM25 local, sans LLM (`DEJA_OFFLINE=1` coupe le contrôle quotidien).
 
 ## Installation
 
@@ -54,7 +54,7 @@ Dans `opencode.ai/config.json` :
 - `tools` : mise à disposition des 6 outils (`true` par défaut).
 - `bin` : chemin explicite vers `deja`.
 
-Pour activer MCP (8 modes : `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) sur les 50 outils compatibles, lancez `deja install --auto` (voir [changer d'agent sans perdre le contexte](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)).
+Pour activer MCP (8 modes : `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) sur les 52 outils compatibles, lancez `deja install --auto` (voir [changer d'agent sans perdre le contexte](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)).
 
 ## Résolution du binaire
 

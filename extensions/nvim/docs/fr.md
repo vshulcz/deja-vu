@@ -5,7 +5,7 @@
 
 Fait partie de **[deja-vu](https://github.com/vshulcz/deja-vu)** (**< 1 ms** SQLite FTS5 · **~4%** d'empreinte d'index · **0** token LLM à l'ingestion) · [Documentation](https://vshulcz.github.io/deja-vu/) · [Démo navigateur](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-Recherchez vos anciennes transcriptions d'agents, lancez un `blame` de ligne par session IA, retrouvez des correctifs d'erreurs et générez des transferts inter-agents couvrant Claude Code, Codex CLI, Cursor, opencode, Gemini CLI et 44 autres outils directement depuis Neovim.
+Recherchez vos anciennes transcriptions d'agents, lancez un `blame` de ligne par session IA, retrouvez des correctifs d'erreurs et générez des transferts inter-agents couvrant Claude Code, Codex CLI, Cursor, opencode, Gemini CLI et 47 autres outils directement depuis Neovim.
 
 ![Démo de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 

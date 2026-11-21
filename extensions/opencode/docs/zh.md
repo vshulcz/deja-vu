@@ -56,7 +56,7 @@ opencode 记得自己的会话。这个插件回答的是另一个问题：你�
 - `tools`：控制是否暴露六个 `deja_*` 工具，默认 `true`。
 - `bin`：指定 `deja` 可执行文件的自定义路径。
 
-如果需要给全机 50 款编程工具统一配置包含 `recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff` 在内的完整 MCP 与无缝切工具交接，请运行 `deja install --auto`（参见[切换智能体不丢上下文](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)）。
+如果需要给全机 52 款编程工具统一配置包含 `recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff` 在内的完整 MCP 与无缝切工具交接，请运行 `deja install --auto`（参见[切换智能体不丢上下文](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)）。
 
 ## 使用哪份二进制
 
@@ -70,7 +70,7 @@ opencode 记得自己的会话。这个插件回答的是另一个问题：你�
 
 | 召回率 | Token 用量 | 索引与检索耗时 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 50 个编程智能体的检索仅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 52 个编程智能体的检索仅 **0.7 ms** |
 
 ## 仓库记忆与跨智能体接力
 

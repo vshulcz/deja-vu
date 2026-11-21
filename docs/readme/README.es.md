@@ -7,9 +7,9 @@
   </a>
 </p>
 
-<p align="center"><b>Memoria local compartida, traspaso entre agentes y recuperación de código para 49 agentes de código.</b></p>
+<p align="center"><b>Memoria local compartida, traspaso entre agentes y recuperación de código para 52 agentes de código.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes y 42 agentes más ya guardan cada sesión en disco.<br>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes y 45 agentes más ya guardan cada sesión en disco.<br>
 deja lo indexa todo localmente para que tus agentes conserven el contexto tras <code>/compact</code>, se pasen la tarea a mitad de camino con <code>deja handoff</code> y recuperen código sobrescrito con <code>deja restore</code> — sin LLM, un solo binario en Go.</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | Español | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -137,7 +137,7 @@ imprime qué está indexado y qué comando ejecutar a continuación.
 
 ## Qué obtienes
 
-**Resuelto en Codex, recordado por Claude.** Cuarenta y nueve agentes de código escriben cada conversación en
+**Resuelto en Codex, recordado por Claude.** Cincuenta y dos agentes de código escriben cada conversación en
 archivos locales y deja convierte esos archivos en una capa de memoria que todos pueden leer.
 
 | | |

@@ -1,7 +1,7 @@
 {
   "name": "@vshulcz/deja-vu",
   "version": "0.0.0",
-  "description": "Local MCP memory, session history search, cross-agent handoff, and code recovery for Claude Code, Codex, Cursor, OpenCode, Gemini CLI, and 46 more coding agents.",
+  "description": "Local MCP memory, session history search, cross-agent handoff, and code recovery for Claude Code, Codex, Cursor, OpenCode, Gemini CLI, and 47 more coding agents.",
   "license": "MIT",
   "repository": {
     "type": "git",

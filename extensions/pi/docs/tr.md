@@ -8,7 +8,7 @@
 
 ![deja-vu demosu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-[pi](https://github.com/badlogic/pi-mono) için makinenizdeki diğer 48 kodlama ajanının (Claude Code, Codex, Cursor, Gemini, OpenClaw, Hermes vb.) diskteki oturum geçmişini yerel belleğe dönüştüren eklenti. Tek Go ikilisi `deja` ve yerel BM25 dizini kullanır; LLM veya embedding gerektirmez ve açıkça çalıştırılan güncelleme/eşitleme komutları ile `DEJA_OFFLINE=1` ile kapatılabilen günlük sürüm denetimi dışında ağa çıkmaz.
+[pi](https://github.com/badlogic/pi-mono) için makinenizdeki diğer 51 kodlama ajanının (Claude Code, Codex, Cursor, Gemini, OpenClaw, Hermes vb.) diskteki oturum geçmişini yerel belleğe dönüştüren eklenti. Tek Go ikilisi `deja` ve yerel BM25 dizini kullanır; LLM veya embedding gerektirmez ve açıkça çalıştırılan güncelleme/eşitleme komutları ile `DEJA_OFFLINE=1` ile kapatılabilen günlük sürüm denetimi dışında ağa çıkmaz.
 
 ## Kurulum
 
@@ -47,7 +47,7 @@ Makinede `deja install pi-auto` veya `deja install --auto` ile kurulmuş bağım
 
 | İsabet (Recall) | Token | İndeksleme ve sorgu |
 |---|---|---|
-| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1) | **%58 daha az token** (tekrarlanan depo işlerinde) | 19,195 oturumu **13.6 sn**'de indeksler / 50 kodlama ajanı genelinde **0.7 ms** sorgu süresi |
+| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1) | **%58 daha az token** (tekrarlanan depo işlerinde) | 19,195 oturumu **13.6 sn**'de indeksler / 52 kodlama ajanı genelinde **0.7 ms** sorgu süresi |
 
 ## Depo belleği ve ajanlar arası devir (`handoff`)
 
@@ -57,7 +57,7 @@ Görevin ortasında araç mı değiştiriyorsunuz? `deja handoff --to <agent>` �
 
 ## Gizlilik
 
-Dizin `~/.cache/deja/index.db` konumunda saklanır (`DEJA_INDEX_DIR` ile değiştirilebilir); `sk-*`, `ghp_*`, `AKIA*` ve `Bearer` anahtarları dizinleme sırasında temizlenir. Açıkça `deja embed` çalıştırılmadıkça veriler cihazdan çıkmaz. 50 kodlama ajanının tamamında `recall`, `fix`, `blame` ve `handoff` kurulumu için `deja install --auto` komutunu kullanabilirsiniz.
+Dizin `~/.cache/deja/index.db` konumunda saklanır (`DEJA_INDEX_DIR` ile değiştirilebilir); `sk-*`, `ghp_*`, `AKIA*` ve `Bearer` anahtarları dizinleme sırasında temizlenir. Açıkça `deja embed` çalıştırılmadıkça veriler cihazdan çıkmaz. 52 kodlama ajanının tamamında `recall`, `fix`, `blame` ve `handoff` kurulumu için `deja install --auto` komutunu kullanabilirsiniz.
 
 ## Lisans
 

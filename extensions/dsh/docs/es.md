@@ -8,7 +8,7 @@ Parte de **[★ vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% 
 
 ![Demostración de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Plugin `session-query` para DeepSeek Harness (`dsh`) y DSH Desktop (`anywhere-labs/dsh-desktop`). Junto con tus conversaciones de DSH, indexa en local el historial de otros 48 agentes de programación en tu equipo (Claude Code, Codex, Cursor, Gemini, Hermes, etc.) usando el binario único en Go `deja` y BM25 (`DEJA_OFFLINE=1` desactiva la comprobación diaria).
+Plugin `session-query` para DeepSeek Harness (`dsh`) y DSH Desktop (`anywhere-labs/dsh-desktop`). Junto con tus conversaciones de DSH, indexa en local el historial de otros 51 agentes de programación en tu equipo (Claude Code, Codex, Cursor, Gemini, Hermes, etc.) usando el binario único en Go `deja` y BM25 (`DEJA_OFFLINE=1` desactiva la comprobación diaria).
 
 ## Instalación
 
@@ -20,7 +20,7 @@ dsh plugin --profile web add dsh-deja
 dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 ```
 
-Si aún no tienes `deja` instalado, define `DEJA_BIN` o instala el binario y configura los 50 agentes junto con `$DSH_HOME/plugins/deja/`:
+Si aún no tienes `deja` instalado, define `DEJA_BIN` o instala el binario y configura los 52 agentes junto con `$DSH_HOME/plugins/deja/`:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -75,7 +75,7 @@ También incluye `extensions/dsh/test/search-browser.html` (React 18 CDN) para p
 
 | Recall | Tokens | Indexado y búsqueda |
 |---|---|---|
-| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas) | **58% menos tokens** (en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 50 agentes de programación |
+| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas) | **58% menos tokens** (en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 52 agentes de programación |
 
 ## Memoria de repositorio y relevo entre agentes
 

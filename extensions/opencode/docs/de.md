@@ -8,7 +8,7 @@ Teil von **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** auf Lo
 
 ![deja-vu Demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Lokales Sitzungsgedächtnis für [opencode](https://opencode.ai) über 48 weitere Coding-Agenten hinweg (u. a. Claude Code, Codex, Cursor, Gemini, Hermes, Zed). Läuft komplett lokal mit der Go-Binary `deja` und BM25 ohne LLM (`DEJA_OFFLINE=1` deaktiviert den täglichen Versionscheck).
+Lokales Sitzungsgedächtnis für [opencode](https://opencode.ai) über 51 weitere Coding-Agenten hinweg (u. a. Claude Code, Codex, Cursor, Gemini, Hermes, Zed). Läuft komplett lokal mit der Go-Binary `deja` und BM25 ohne LLM (`DEJA_OFFLINE=1` deaktiviert den täglichen Versionscheck).
 
 ## Installation
 
@@ -54,7 +54,7 @@ In `opencode.ai/config.json` eintragen:
 - `tools`: sechs Werkzeuge bereitstellen (Standard `true`).
 - `bin`: eigener Pfad zur `deja`-Binary.
 
-Mit `deja install --auto` lassen sich MCP (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) und automatischer Kontext für alle 50 Werkzeuge einrichten (siehe [Agentenwechsel ohne Kontextverlust](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)).
+Mit `deja install --auto` lassen sich MCP (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) und automatischer Kontext für alle 52 Werkzeuge einrichten (siehe [Agentenwechsel ohne Kontextverlust](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)).
 
 ## Welche Binary genutzt wird
 
@@ -68,7 +68,7 @@ Der Index liegt in `~/.cache/deja/index.db` (`DEJA_INDEX_DIR` konfigurierbar); `
 
 | Recall | Tokens | Indexierung & Suche |
 |---|---|---|
-| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 50 Coding-Agents hinweg |
+| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 52 Coding-Agents hinweg |
 
 ## Repository-Gedächtnis & Agenten-Übergabe
 

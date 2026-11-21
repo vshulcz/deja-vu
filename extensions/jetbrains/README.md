@@ -5,7 +5,7 @@ English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions
 
 Local cross-agent session recall, AI line blame, and handoff for IntelliJ IDEA, GoLand, PyCharm, WebStorm, RustRover, CLion, PhpStorm, and Rider (`2024.2+`).
 
-[deja-vu](https://github.com/vshulcz/deja-vu) indexes the session transcripts Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf, and 39 other coding agents write to disk — locally in SQLite FTS5, with secrets redacted before output and no cloud service.
+[deja-vu](https://github.com/vshulcz/deja-vu) indexes the session transcripts Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf, and 43 other coding agents write to disk — in a local BM25 index, with secrets redacted before output and no cloud service.
 
 **[Documentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 

@@ -6,7 +6,7 @@
 
 Teil von **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** auf LongMemEval-S) · [Dokumentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Live-Demo](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-Durchsuche Coding-Agent-Sessions aus Claude Code, Codex, Cursor, OpenCode, Gemini CLI und 44 weiteren Tools direkt aus Raycast und setze sie dort fort.
+Durchsuche Coding-Agent-Sessions aus Claude Code, Codex, Cursor, OpenCode, Gemini CLI und 47 weiteren Tools direkt aus Raycast und setze sie dort fort.
 
 ![deja-vu Demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -33,7 +33,7 @@ brew install deja-vu && deja install --auto
 
 | Recall | Tokens | Indexierung & Suche |
 |---|---|---|
-| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 50 Coding-Agents hinweg |
+| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 52 Coding-Agents hinweg |
 
 ## Repository-Gedächtnis & Agenten-Übergabe
 

@@ -7,9 +7,9 @@
   </a>
 </p>
 
-<p align="center"><b>49 कोडिंग एजेंट्स के लिए साझा लोकल मेमोरी, एजेंट हैंडऑफ़ और कोड रिकवरी।</b></p>
+<p align="center"><b>52 कोडिंग एजेंट्स के लिए साझा लोकल मेमोरी, एजेंट हैंडऑफ़ और कोड रिकवरी।</b></p>
 
-<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes और 42 अन्य एजेंट्स हर सेशन पहले से डिस्क पर सेव करते हैं।<br>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes और 45 अन्य एजेंट्स हर सेशन पहले से डिस्क पर सेव करते हैं।<br>
 deja सब कुछ लोकल रूप से इंडेक्स करता है ताकि आपके एजेंट्स <code>/compact</code> के बाद भी कॉन्टेक्स्ट बनाए रखें, <code>deja handoff</code> से काम आगे बढ़ाएँ और <code>deja restore</code> से ओवरराइट हुआ कोड वापस पाएँ — बिना LLM, एक अकेली Go बाइनरी।</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | हिन्दी</p>
@@ -136,7 +136,7 @@ skill आपके इंस्टॉल किए हुए `deja` बाइन
 
 ## इससे क्या मिलता है
 
-**Codex में हल हुआ, Claude को याद है।** उनचास कोडिंग एजेंट हर बातचीत को लोकल फ़ाइलों में लिखते हैं, और deja उन
+**Codex में हल हुआ, Claude को याद है।** बावन कोडिंग एजेंट हर बातचीत को लोकल फ़ाइलों में लिखते हैं, और deja उन
 फ़ाइलों को एक ऐसी मेमोरी परत में बदल देता है जिसे वे सब पढ़ सकते हैं।
 
 | | |

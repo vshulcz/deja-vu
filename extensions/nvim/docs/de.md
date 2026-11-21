@@ -5,7 +5,7 @@
 
 Teil von **[deja-vu](https://github.com/vshulcz/deja-vu)** (**< 1 ms** SQLite FTS5-Suche · **~4%** Index-Overhead · **0** LLM-Tokens beim Indizieren) · [Dokumentation](https://vshulcz.github.io/deja-vu/) · [Browser-Demo](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-Durchsuche frühere Coding-Agent-Protokolle, starte zeilenweises AI-Session-Blame, finde Fehlerlösungen wieder und erstelle Handoff-Zusammenfassungen über Claude Code, Codex CLI, Cursor, opencode, Gemini CLI und 44 weitere Tools direkt aus Neovim.
+Durchsuche frühere Coding-Agent-Protokolle, starte zeilenweises AI-Session-Blame, finde Fehlerlösungen wieder und erstelle Handoff-Zusammenfassungen über Claude Code, Codex CLI, Cursor, opencode, Gemini CLI und 47 weitere Tools direkt aus Neovim.
 
 ![deja-vu Demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -78,7 +78,7 @@ Führe `:checkhealth deja` in Neovim aus, um Binary-Pfad und aktives Picker-Back
 
 | Recall | Tokens | Indexierung & Suche |
 |---|---|---|
-| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 50 Coding-Agents hinweg |
+| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 52 Coding-Agents hinweg |
 
 ## Repository-Gedächtnis & Agenten-Übergabe
 

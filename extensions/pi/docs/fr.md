@@ -8,7 +8,7 @@ Fait partie de **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** 
 
 ![Démo de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Mémoire locale pour [pi](https://github.com/badlogic/pi-mono) s'appuyant sur les historiques de sessions déjà enregistrés sur disque par 48 autres agents de code (Claude Code, Codex, Cursor, Gemini, OpenClaw, Hermes, etc.). Tout repose sur l'exécutable Go unique `deja` et son index BM25 local, sans LLM ni embeddings ; le réseau n'est utilisé que lors des commandes explicites et de la vérification quotidienne désactivable via `DEJA_OFFLINE=1`.
+Mémoire locale pour [pi](https://github.com/badlogic/pi-mono) s'appuyant sur les historiques de sessions déjà enregistrés sur disque par 51 autres agents de code (Claude Code, Codex, Cursor, Gemini, OpenClaw, Hermes, etc.). Tout repose sur l'exécutable Go unique `deja` et son index BM25 local, sans LLM ni embeddings ; le réseau n'est utilisé que lors des commandes explicites et de la vérification quotidienne désactivable via `DEJA_OFFLINE=1`.
 
 ## Installation
 

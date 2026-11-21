@@ -86,7 +86,7 @@ openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 
 | 召回率 | Token 用量 | 索引与检索耗时 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 50 个编程智能体的检索仅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 52 个编程智能体的检索仅 **0.7 ms** |
 
 ## 仓库记忆与跨智能体接力
 
@@ -96,6 +96,6 @@ openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 
 ## 隐私
 
-索引保存在 `~/.cache/deja/index.db`（可用 `DEJA_INDEX_DIR` 修改），在建索引时自动清理 `sk-*`、`ghp_*`、`AKIA*` 与 `Bearer` 等凭据。只有明确运行 `deja embed` 并配置外部模型时才会出网。一键为本机 50 款编程智能体部署完整集成请运行 `deja install --auto`。
+索引保存在 `~/.cache/deja/index.db`（可用 `DEJA_INDEX_DIR` 修改），在建索引时自动清理 `sk-*`、`ghp_*`、`AKIA*` 与 `Bearer` 等凭据。只有明确运行 `deja embed` 并配置外部模型时才会出网。一键为本机 52 款编程智能体部署完整集成请运行 `deja install --auto`。
 
 [deja-vu](https://github.com/vshulcz/deja-vu) 生态组件。MIT 协议。

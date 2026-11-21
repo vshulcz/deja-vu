@@ -7,9 +7,9 @@
   </a>
 </p>
 
-<p align="center"><b>49 kodlama ajanı arasında paylaşılan yerel bellek, ajanlar arası görev devri ve kod kurtarma.</b></p>
+<p align="center"><b>52 kodlama ajanı arasında paylaşılan yerel bellek, ajanlar arası görev devri ve kod kurtarma.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes ve 42 ajan daha her oturumu zaten diske kaydediyor.<br>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes ve 45 ajan daha her oturumu zaten diske kaydediyor.<br>
 deja tüm geçmişi yerel olarak indeksler; böylece ajanlarınız <code>/compact</code> sonrasında bağlamı korur, <code>deja handoff</code> ile görevi devreder ve <code>deja restore</code> ile üzerine yazılmış kodu kurtarır — LLM yok, tek bir Go ikilisi.</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | Türkçe | <a href="README.hi.md">हिन्दी</a></p>
@@ -137,7 +137,7 @@ bağlıyken neyin indekslendiğini ve sırada hangi komutun çalıştırılacağ
 
 ## Ne kazandırıyor
 
-**Codex'te çözüldü, Claude hatırlıyor.** Kırk dokuz kodlama ajanı her konuşmayı yerel dosyalara yazıyor; deja
+**Codex'te çözüldü, Claude hatırlıyor.** Elli iki kodlama ajanı her konuşmayı yerel dosyalara yazıyor; deja
 bu dosyaları hepsinin okuyabildiği bir bellek katmanına dönüştürüyor.
 
 | | |

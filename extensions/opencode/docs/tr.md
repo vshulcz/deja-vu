@@ -8,7 +8,7 @@
 
 ![deja-vu demosu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-[opencode](https://opencode.ai) için makinenizdeki diğer 48 kodlama ajanının (Claude Code, Codex, Cursor, Gemini, Hermes, Zed vb.) geçmişinden beslenen yerel bellek eklentisi. Tek Go ikilisi `deja` ve yerel BM25 ile LLM olmadan çalışır (`DEJA_OFFLINE=1` günlük sürüm kontrolünü kapatır).
+[opencode](https://opencode.ai) için makinenizdeki diğer 51 kodlama ajanının (Claude Code, Codex, Cursor, Gemini, Hermes, Zed vb.) geçmişinden beslenen yerel bellek eklentisi. Tek Go ikilisi `deja` ve yerel BM25 ile LLM olmadan çalışır (`DEJA_OFFLINE=1` günlük sürüm kontrolünü kapatır).
 
 ## Kurulum
 
@@ -54,7 +54,7 @@
 - `tools`: altı aracı sunar (varsayılan `true`).
 - `bin`: `deja` ikili yolu.
 
-50 aracın tamamında `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember` ve `handoff` olmak üzere 8 MCP kipi için `deja install --auto` çalıştırın ([bağlam kaybetmeden ajan geçişi](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)).
+52 aracın tamamında `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember` ve `handoff` olmak üzere 8 MCP kipi için `deja install --auto` çalıştırın ([bağlam kaybetmeden ajan geçişi](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)).
 
 ## İkili dosya sırası
 
@@ -68,7 +68,7 @@ Dizin `~/.cache/deja/index.db` konumundadır (`DEJA_INDEX_DIR` ile değişir); `
 
 | İsabet (Recall) | Token | İndeksleme ve sorgu |
 |---|---|---|
-| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1) | **%58 daha az token** (tekrarlanan depo işlerinde) | 19,195 oturumu **13.6 sn**'de indeksler / 50 kodlama ajanı genelinde **0.7 ms** sorgu süresi |
+| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1) | **%58 daha az token** (tekrarlanan depo işlerinde) | 19,195 oturumu **13.6 sn**'de indeksler / 52 kodlama ajanı genelinde **0.7 ms** sorgu süresi |
 
 ## Depo belleği ve ajanlar arası devir (`handoff`)
 

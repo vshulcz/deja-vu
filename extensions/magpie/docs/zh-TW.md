@@ -8,7 +8,7 @@
 
 ![deja-vu 示範](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-> 為經由 [Magpie](https://github.com/yetone/magpie) 轉發的所有對話請求，自動注入來自本機 48 款其他程式設計智慧體（Claude Code、Codex、Cursor、Gemini CLI、OpenClaw、Hermes 等）的跨智慧體歷史記憶。
+> 為經由 [Magpie](https://github.com/yetone/magpie) 轉發的所有對話請求，自動注入來自本機 51 款其他程式設計智慧體（Claude Code、Codex、Cursor、Gemini CLI、OpenClaw、Hermes 等）的跨智慧體歷史記憶。
 
 底層呼叫單一 Go 執行檔 `deja` 與本地 BM25 索引，涵蓋 Magpie 的 OpenAI（`chat`、`responses`）、Anthropic（`anthropic`）與 Gemini（`gemini`）協定路由，不需要額外模型；除明確執行的指令與可用 `DEJA_OFFLINE=1` 停用的每日版本檢查外，擴充套件本身不會發起網路請求。
 
@@ -18,7 +18,7 @@
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-外掛需要系統中存在可執行的 `deja`（透過 `@vshulcz/deja-vu`、`brew install deja-vu` 或 `install.sh`）並以 `deja index` 建立本地索引。若要同時為本機全部 50 款程式設計智慧體安裝原生 `recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember` 與 `handoff` 工具：
+外掛需要系統中存在可執行的 `deja`（透過 `@vshulcz/deja-vu`、`brew install deja-vu` 或 `install.sh`）並以 `deja index` 建立本地索引。若要同時為本機全部 52 款程式設計智慧體安裝原生 `recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember` 與 `handoff` 工具：
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
@@ -50,7 +50,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 | 召回率 | Token 用量 | 索引與檢索耗時 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 50 個程式設計代理的檢索僅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 52 個程式設計代理的檢索僅 **0.7 ms** |
 
 ## 儲存庫記憶與跨代理接力
 
