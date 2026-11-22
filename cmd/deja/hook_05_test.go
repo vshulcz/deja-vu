@@ -3620,7 +3620,7 @@ create table prompt_history (
     id integer primary key autoincrement, content text, timestamp integer,
     session_id text, is_shell integer not null default 0
 );
-insert into sessions values ('devin-c1', %q, 'cli', 'swe-2', 'normal', 1785600000, 1785600090, 'fix retry', 7, 0);
+insert into sessions values ('devin-c1', '%s', 'cli', 'swe-2', 'normal', 1785600000, 1785600090, 'fix retry', 7, 0);
 insert into message_nodes (session_id, node_id, parent_node_id, chat_message, created_at, metadata) values
 ('devin-c1', 1, null, '{"message_id":"s1","role":"system","content":"<system_info>x</system_info>"}', 1785600001, '{"is_system_prefix":true}'),
 ('devin-c1', 2, 1, '{"message_id":"u1","role":"user","content":"fix the retry loop in retry.go"}', 1785600002, null),
@@ -3629,7 +3629,7 @@ insert into message_nodes (session_id, node_id, parent_node_id, chat_message, cr
 ('devin-c1', 5, 4, '{"message_id":"a2","role":"assistant","content":"We decided to bound retry.go with i <= n so the final attempt runs."}', 1785600005, null),
 ('devin-c1', 6, null, '{"message_id":"s2","role":"system","content":"<system_info>rebuilt</system_info>"}', 1785600010, '{"is_system_prefix":true}'),
 ('devin-c1', 7, 6, '{"message_id":"u2","role":"user","content":"Summary of prior turns"}', 1785600011, '{"extensions":{"compact/prior_node_ids":[2,3,4,5]}}');
-`, workspace, filepath.Join(workspace, "retry.go"))
+`, strings.ReplaceAll(workspace, "'", "''"), filepath.Join(workspace, "retry.go"))
 
 	cmd := exec.CommandContext(t.Context(), "sqlite3", db)
 	cmd.Stdin = strings.NewReader(sql)
