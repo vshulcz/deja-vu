@@ -2,7 +2,7 @@
 
 English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/zh.md) | [繁體中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/zh-TW.md) | [日本語](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/ja.md) | [한국어](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/ko.md) | [Español](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/es.md) | [Português](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/pt.md) | [Français](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/fr.md) | [Deutsch](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/de.md) | [Русский](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/ru.md) | [Türkçe](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/tr.md) | [हिन्दी](https://github.com/vshulcz/deja-vu/blob/main/extensions/magpie/docs/hi.md)
 
-[![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=social)](https://github.com/vshulcz/deja-vu)
+[![#1 Go Repository Of The Day](https://trendshift.io/api/badge/trendshift/repositories/83640/daily?language=Go)](https://trendshift.io/repositories/83640) [![GitHub Stars](https://img.shields.io/github/stars/vshulcz/deja-vu?style=social)](https://github.com/vshulcz/deja-vu)
 
 Part of **[★ vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S) · [Website & live search](https://vshulcz.github.io/deja-vu/) · [Browser demo](https://vshulcz.github.io/deja-vu/view/)
 
