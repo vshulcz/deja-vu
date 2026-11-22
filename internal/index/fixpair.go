@@ -559,6 +559,12 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 		// same command corrected.
 		env := commandLevelFailure(m.Text, line)
 		failedCmd := resolveFailedCommand(ms, i, line, env)
+		// Viewing files, diffs, or search matches prints matching lines as stdout
+		// rather than a failure of the viewer itself; shell-level invocation
+		// failures (`env == true`) stay mined (#2163, #3720).
+		if m.Role == roleToolOutput && !env && failedCmd != "" && ViewerCommand(failedCmd) {
+			continue
+		}
 		// The first file the session changed after the error, kept in case the
 		// window holds no command that answers it.
 		edited := ""

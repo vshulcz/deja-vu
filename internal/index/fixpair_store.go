@@ -434,7 +434,7 @@ func FixesForCommand(dir, command, text string, limit int, allow func(project st
 		if len(timeoutOnly) > 0 && !p.answers(without(sigs, timeoutOnly)) && !sameFailingCommand(p, command) {
 			continue
 		}
-		if remedyIsTheFailure(p) || remedyIsIrreversible(p.Command) || (p.Edit != "" && !looksLikeEditedPath(p.Edit)) {
+		if remedyIsTheFailure(p) || remedyIsIrreversible(p.Command) || (p.Edit != "" && !looksLikeEditedPath(p.Edit)) || IsViewerFixPair(p) {
 			continue
 		}
 		if !sigs[p.Sig] && (p.Repaired || p.Substitute) && !repairedAlsoAnswers(p, text, command) {
@@ -548,6 +548,24 @@ func remedyIsTheFailure(p FixPair) bool {
 	return normalizeCommand(p.Failed) == normalizeCommand(p.Command)
 }
 
+// IsViewerFixPair reports whether a stored pair originated from viewer stdout
+// (`rg`, `grep`, `cat`, `git diff`, etc.) or grep/source noise rather than a
+// real command or test failure. Shell-level invocation failures stay eligible.
+func IsViewerFixPair(p FixPair) bool {
+	if p.Failed != "" && !isShellOrEnvError(p.Error) && ViewerCommand(normalizeCommand(p.Failed)) {
+		return true
+	}
+	trimmed := trimEnvelopeLabel(strings.TrimSpace(p.Error))
+	if looksLikeGrepContextLine(trimmed) {
+		return true
+	}
+	norm := normalizeFriction(trimmed)
+	if namedTestFailure(norm) {
+		return false
+	}
+	return looksLikeGrepContextLine(norm) || looksLikeSource(norm)
+}
+
 // remedyIsIrreversible drops a pair whose remedy cannot be taken back: a merge,
 // a deleted branch, a force push, a hard reset, a dropped stash, a recursive
 // delete, a change to a cluster. What a session did next after an error is
@@ -641,7 +659,7 @@ func FixCandidateSeen(dir, text string, allow func(project string) bool) bool {
 		}
 		// A sighting FixesFor would drop is not one a second session can
 		// promote into an answer, so it is not "waiting for a second sighting".
-		if remedyIsTheFailure(p) || remedyIsIrreversible(p.Command) || (p.Edit != "" && !looksLikeEditedPath(p.Edit)) {
+		if remedyIsTheFailure(p) || remedyIsIrreversible(p.Command) || (p.Edit != "" && !looksLikeEditedPath(p.Edit)) || IsViewerFixPair(p) {
 			continue
 		}
 		if !sigs[p.Sig] && (p.Repaired || p.Substitute) && !repairedAlsoAnswers(p, text, "") {

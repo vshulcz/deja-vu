@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/sources"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -1696,5 +1698,45 @@ func TestHookStatusLinesAreTheHosts(t *testing.T) {
 	}
 	if got := StripHarnessBlocks(pasted); got != "что за ошибка в нашем диалоге? потенциальный баг в deja?" {
 		t.Errorf("the bar did not come off the question: %q", got)
+	}
+}
+
+func TestCompactionContextNormalizesWorktreeModifiedPaths(t *testing.T) {
+	ws := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(ws, "pkg"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, rel := range []string{"b.go", "c.go", "d.go"} {
+		if err := os.WriteFile(filepath.Join(ws, "pkg", rel), []byte("package pkg\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	at := time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC)
+	s := model.Session{
+		ID:      "comp-wt",
+		Harness: "claude",
+		Project: "app",
+		Messages: []model.Message{
+			{Role: "user", Text: "Normalize modified files across worktrees", Time: at},
+			{Role: sources.RoleEdit, Text: filepath.Join(ws, ".claude", "worktrees", "feat", "pkg", "a.go") + "\n-a\n+b", Time: at.Add(time.Minute)},
+			{Role: sources.RoleEdit, Text: filepath.Join(ws, "pkg", "a.go") + "\n-b\n+c", Time: at.Add(2 * time.Minute)},
+			{Role: sources.RoleWrote, Text: "/repo/.git/worktrees/wt1/pkg/b.go\npackage pkg", Time: at.Add(3 * time.Minute)},
+			{Role: sources.RoleEdit, Text: "/tmp/wt-other/pkg/c.go\n-x\n+y", Time: at.Add(4 * time.Minute)},
+			{Role: sources.RoleEdit, Text: `D:\tmp\wt-win\.claude\worktrees\w1\pkg\d.go` + "\n-x\n+y", Time: at.Add(5 * time.Minute)},
+		},
+	}
+
+	c := ExtractCompactionContext(s, ExtractOptions{Workspace: ws})
+	got := make([]string, 0, len(c.Modified))
+	for _, f := range c.Modified {
+		got = append(got, f.Text)
+	}
+	want := []string{"pkg/a.go", "pkg/b.go", "pkg/c.go", "pkg/d.go"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("Modified = %v, want %v", got, want)
+	}
+	if win := normalizeModifiedFilePath(`D:\tmp\wt-win\.claude\worktrees\w1\pkg\d.go`, `D:\tmp\wt-win`); win != "pkg/d.go" {
+		t.Fatalf("normalizeModifiedFilePath(Windows worktree) = %q, want pkg/d.go", win)
 	}
 }

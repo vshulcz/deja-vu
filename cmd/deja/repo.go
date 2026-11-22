@@ -9,11 +9,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
@@ -595,7 +597,7 @@ func inferRepoKind(text string) string {
 	if _, ok := index.GiveUpLine(text); ok {
 		return "rejected"
 	}
-	low := " " + strings.ToLower(strings.TrimSpace(text)) + " "
+	low := " " + strings.ToLower(strings.TrimSpace(stripQuotedAndCodeSpans(text))) + " "
 	for _, kw := range []string{
 		" rejected ", " reverted ", " dropped ", " abandoned ",
 		" отказались ", " отбросили ", " откатили ", " не подошёл ", " не подошел ",
@@ -614,6 +616,40 @@ func inferRepoKind(text string) string {
 		}
 	}
 	return "decision"
+}
+
+func stripQuotedAndCodeSpans(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	n := len(s)
+	for i := 0; i < n; {
+		r, sz := utf8.DecodeRuneInString(s[i:])
+		var closeSeq string
+		switch r {
+		case '`':
+			closeSeq = "`"
+		case '"':
+			closeSeq = `"`
+		case '«':
+			closeSeq = "»"
+		case '“':
+			closeSeq = "”"
+		}
+		if closeSeq != "" {
+			lineEnd := n
+			if nl := strings.IndexByte(s[i+sz:], '\n'); nl >= 0 {
+				lineEnd = i + sz + nl
+			}
+			if end := strings.Index(s[i+sz:lineEnd], closeSeq); end >= 0 && end <= 200 {
+				b.WriteByte(' ')
+				i = i + sz + end + len(closeSeq)
+				continue
+			}
+		}
+		b.WriteString(s[i : i+sz])
+		i += sz
+	}
+	return b.String()
 }
 
 // readRepoMemoryAndNotes reads .deja/memory.jsonl and merges any repo-scoped
@@ -759,7 +795,139 @@ func readLiveRuleRecords(p string) []liveRuleRecord {
 			Symbols: cleanSyms,
 		})
 	}
+	return dedupeLiveRuleRecords(out)
+}
+
+func dedupeLiveRuleRecords(in []liveRuleRecord) []liveRuleRecord {
+	if len(in) <= 1 {
+		return in
+	}
+	// Walk newest-to-oldest so the newest wording wins while preserving order.
+	keptRev := make([]liveRuleRecord, 0, len(in))
+	for _, cand := range slices.Backward(in) {
+		dup := false
+		for _, prev := range keptRev {
+			if liveRuleDuplicate(cand, prev) {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			keptRev = append(keptRev, cand)
+		}
+	}
+	out := make([]liveRuleRecord, len(keptRev))
+	for i, r := range keptRev {
+		out[len(keptRev)-1-i] = r
+	}
 	return out
+}
+
+func liveRuleDuplicate(a, b liveRuleRecord) bool {
+	if a.ID != "" && a.ID == b.ID {
+		return true
+	}
+	if strings.EqualFold(strings.TrimSpace(a.Text), strings.TrimSpace(b.Text)) {
+		return true
+	}
+	ca := canonicalRuleText(a.Text)
+	cb := canonicalRuleText(b.Text)
+	if ca == "" || cb == "" {
+		return false
+	}
+	if ca == cb {
+		return true
+	}
+	if a.Kind != b.Kind || !liveRuleScopeOverlaps(a, b) {
+		return false
+	}
+	tokA, negA := ruleIntentTokens(ca)
+	tokB, negB := ruleIntentTokens(cb)
+	if negA != negB || len(tokA) < 3 || len(tokB) < 3 {
+		return false
+	}
+	inter := 0
+	for t := range tokA {
+		if tokB[t] {
+			inter++
+		}
+	}
+	union := len(tokA) + len(tokB) - inter
+	if union == 0 {
+		return false
+	}
+	if float64(inter)/float64(union) >= 0.75 {
+		return true
+	}
+	return inter >= 4 && float64(inter)/float64(max(len(tokA), len(tokB))) >= 0.65
+}
+
+func liveRuleScopeOverlaps(a, b liveRuleRecord) bool {
+	if len(a.Files) == 0 && len(b.Files) == 0 && len(a.Symbols) == 0 && len(b.Symbols) == 0 {
+		return true
+	}
+	for _, fa := range a.Files {
+		for _, fb := range b.Files {
+			if strings.EqualFold(fa, fb) {
+				return true
+			}
+		}
+	}
+	for _, sa := range a.Symbols {
+		for _, sb := range b.Symbols {
+			if strings.EqualFold(sa, sb) {
+				return true
+			}
+		}
+	}
+	return len(a.Files) == 0 && len(b.Files) == 0
+}
+
+func canonicalRuleText(text string) string {
+	s := strings.TrimSpace(text)
+	for {
+		trimmed := strings.TrimLeft(s, "-*+• \t")
+		if trimmed == s {
+			break
+		}
+		s = trimmed
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	lastSpace := true
+	for _, r := range strings.ToLower(s) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' || r == '_' || r == '/' || r == '.' {
+			b.WriteRune(r)
+			lastSpace = false
+		} else if !lastSpace {
+			b.WriteByte(' ')
+			lastSpace = true
+		}
+	}
+	return strings.TrimSpace(b.String())
+}
+
+func ruleIntentTokens(canonical string) (map[string]bool, bool) {
+	tokens := map[string]bool{}
+	hasNeg := false
+	for tok := range strings.FieldsSeq(canonical) {
+		tok = strings.Trim(tok, "._-/")
+		if tok == "" {
+			continue
+		}
+		switch tok {
+		case "not", "never", "avoid", "dont", "don't", "mustn't", "не", "нельзя", "никогда", "запрещено":
+			hasNeg = true
+			tokens[tok] = true
+			continue
+		case "a", "an", "the", "to", "in", "for", "of", "on", "is", "are", "be", "with", "use", "using", "do", "always", "please", "и", "в", "на", "по", "для":
+			continue
+		}
+		if utf8.RuneCountInString(tok) >= 2 {
+			tokens[tok] = true
+		}
+	}
+	return tokens, hasNeg
 }
 
 func appendLiveRule(targetPath string, entry sources.RepoEntry, syms []string) {
@@ -769,14 +937,15 @@ func appendLiveRule(targetPath string, entry sources.RepoEntry, syms []string) {
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
 		return
 	}
+	incoming := liveRuleRecord{RepoEntry: entry, Symbols: syms}
 	existing := readLiveRuleRecords(targetPath)
 	var kept []liveRuleRecord
 	for _, e := range existing {
-		if e.ID != entry.ID && !strings.EqualFold(strings.TrimSpace(e.Text), strings.TrimSpace(entry.Text)) {
+		if !liveRuleDuplicate(e, incoming) {
 			kept = append(kept, e)
 		}
 	}
-	kept = append(kept, liveRuleRecord{RepoEntry: entry, Symbols: syms})
+	kept = append(kept, incoming)
 	if len(kept) > 20 {
 		kept = kept[len(kept)-20:]
 	}

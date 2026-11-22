@@ -337,7 +337,7 @@ func captureCompactionFrom(dir string, input precompactHookInput, read func(work
 			transcript.Session.Messages[i].Text = digest.StripHarnessBlocks(m.Text)
 		}
 	}
-	data := digest.ExtractCompactionContext(transcript.Session, digest.ExtractOptions{})
+	data := digest.ExtractCompactionContext(transcript.Session, digest.ExtractOptions{Workspace: workspace})
 	withCommandOutcomes(&data, transcript.Session)
 	data.Truncated = data.Truncated || transcript.Truncated
 	data.Freshness = compactionFreshness(workspace)

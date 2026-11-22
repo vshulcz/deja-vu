@@ -986,6 +986,9 @@ func orientProjectFixes(dir string, projects []string, cwd, activation string) [
 	seen := map[string]bool{}
 	var out []string
 	for _, p := range pairs {
+		if index.IsViewerFixPair(p) {
+			continue
+		}
 		rawErr := strings.TrimSpace(search.SafeLine(p.Error))
 		if orientSkipFixError(rawErr) {
 			continue

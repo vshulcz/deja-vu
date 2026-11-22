@@ -1640,28 +1640,34 @@ func addPromptIdentifierTaskWords(
 }
 
 func scoreTaskTargetCandidates(dir, cwd, asked, focused string, codeSpans, quotedPhrases []string, idx *repoSymbolMap, skip map[string]bool) []string {
-	histBoost, histSessions := historicalTitleTouchedBoost(dir, cwd, asked, skip)
-	var bm25Boost map[string]float64
-	var bm25Sessions map[string]int
-	if dir != "" {
-		bm25Boost, bm25Sessions = bm25SessionTouchedBoost(dir, cwd, asked, skip)
-	}
-	fixBoost, fixHits := fixPairTargetBoost(dir, cwd, asked, skip)
 	structRareCap := max(10, idx.numFiles/30)
 	structVeryRareCap := max(5, idx.numFiles/55)
 	bodyRareCap := max(6, idx.numFiles/42)
 	projSelf := selfProjectWordSet(cwd)
 	qWords, boostWords := selectPrioritizedTaskWords(focused, codeSpans, quotedPhrases, projSelf, idx, structVeryRareCap, 52)
 	addPromptIdentifierTaskWords(asked, idx, projSelf, structVeryRareCap, qWords, boostWords)
+	dirScopes := extractExplicitRepoDirScopes(focused, idx)
+	diagBoost := matchDiagnosticPhraseFiles(cwd, idx, quotedPhrases, projSelf)
+	memBoost := repoMemoryTargetBoost(cwd, asked, projSelf)
+	fixBoost, fixHits := fixPairTargetBoost(dir, cwd, asked, skip)
+	if len(qWords) == 0 && len(dirScopes) == 0 && len(diagBoost) == 0 && len(memBoost) == 0 && len(fixBoost) == 0 {
+		return nil
+	}
+	histBoost, histSessions := historicalTitleTouchedBoost(dir, cwd, asked, skip)
+	var bm25Boost map[string]float64
+	var bm25Sessions map[string]int
+	if dir != "" {
+		bm25Boost, bm25Sessions = bm25SessionTouchedBoost(dir, cwd, asked, skip)
+	}
 	namedBases := explicitFileRefBasenames(asked)
 	params := taskScoreParams{
 		idx:               idx,
 		qWords:            qWords,
 		boostWords:        boostWords,
 		bridgedOnly:       collectBridgedOnlyTaskWords(focused, codeSpans, quotedPhrases, qWords),
-		dirScopes:         extractExplicitRepoDirScopes(focused, idx),
-		diagBoost:         matchDiagnosticPhraseFiles(cwd, idx, quotedPhrases, projSelf),
-		memBoost:          repoMemoryTargetBoost(cwd, asked, projSelf),
+		dirScopes:         dirScopes,
+		diagBoost:         diagBoost,
+		memBoost:          memBoost,
 		fixBoost:          fixBoost,
 		fixHits:           fixHits,
 		histBoost:         histBoost,
@@ -3558,27 +3564,15 @@ func rankedTouchedConsensusLineForPrompt(dir, cwd, asked string, ranked []model.
 	return line, tok
 }
 
-func hasNonASCIILetter(s string) bool {
-	for _, r := range s {
-		if r > 127 && unicode.IsLetter(r) {
-			return true
-		}
-	}
-	return false
-}
-
-func allowTwoTermLeafMatch(asked string, qWords map[string]bool, touched []string, fileSessionDF map[string]int, byRel map[string]repoFileEntry, hubFileCap int) bool {
-	if len(touched) == 0 || len(touched) > 4 || len(fileSessionDF) == 0 {
+func allowTwoTermLeafMatch(qWords map[string]bool, touched []string, fileSessionDF map[string]int, byRel map[string]repoFileEntry, hubFileCap int) bool {
+	if len(qWords) == 0 || len(touched) == 0 || len(touched) > 4 || len(fileSessionDF) == 0 {
 		return false
 	}
 	df := fileSessionDF[touched[0]]
 	if df <= 0 || df > hubFileCap {
 		return false
 	}
-	if len(qWords) > 0 {
-		return fileMatchesQueryWords(byRel, touched[0], qWords)
-	}
-	return hasNonASCIILetter(asked)
+	return fileMatchesQueryWords(byRel, touched[0], qWords)
 }
 
 func singleStrongSessionTouchedLineWithDF(dir, cwd, asked string, ranked []model.Session, matched, strong []int, seen, skip map[string]bool, pol policy.Policy, fileSessionDF map[string]int, hubFileCap int) (string, string) {
@@ -3602,7 +3596,7 @@ func singleStrongSessionTouchedLineWithDF(dir, cwd, asked string, ranked []model
 		if i < len(strong) {
 			s0Count = strong[i]
 		}
-		allowTwoTermLeaf := i == 0 && m0 >= 2 && s0Count == 0 && (len(qWords) > 0 || hasNonASCIILetter(asked))
+		allowTwoTermLeaf := i == 0 && m0 >= 2 && s0Count == 0 && len(qWords) > 0
 		if m0 < 2 || (!allowTwoTermLeaf && s0Count < 1 && m0 < 3) {
 			continue
 		}
@@ -3620,7 +3614,7 @@ func singleStrongSessionTouchedLineWithDF(dir, cwd, asked string, ranked []model
 		}
 		if allowTwoTermLeaf {
 			ensureRepoFileByRel(cwd, qWords, &symIdx, &byRel)
-			if !allowTwoTermLeafMatch(asked, qWords, touched0, fileSessionDF, byRel, hubFileCap) {
+			if !allowTwoTermLeafMatch(qWords, touched0, fileSessionDF, byRel, hubFileCap) {
 				continue
 			}
 		}
