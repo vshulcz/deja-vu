@@ -71,6 +71,7 @@ type mcpServer struct {
 	open  sync.WaitGroup // requests not answered yet
 	// contextOnly serves the External Context profile instead of deja's tool.
 	contextOnly bool
+	handler     func(string, rpcRequest) (any, int, string)
 
 	mu      sync.Mutex
 	werr    error
@@ -108,6 +109,7 @@ func newMCPServer(dir string, enc *json.Encoder) *mcpServer {
 		dir:     dir,
 		enc:     enc,
 		slots:   make(chan struct{}, mcpWorkers),
+		handler: mcpHandler,
 		pending: map[string]*mcpPending{},
 		running: map[string]*mcpWork{},
 		late:    map[string]mcpLate{},
@@ -280,6 +282,9 @@ func (s *mcpServer) overdue(p *mcpPending) {
 func (s *mcpServer) handle(req rpcRequest) (any, int, string) {
 	if s.contextOnly {
 		return handleContextMCP(s.dir, req)
+	}
+	if s.handler != nil {
+		return s.handler(s.dir, req)
 	}
 	return mcpHandler(s.dir, req)
 }
