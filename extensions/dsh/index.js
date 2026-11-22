@@ -116,7 +116,7 @@ function tools(ctx) {
   guarded(() => ctx.tools.register(defineTool({
     name: "deja_recall",
     description:
-      "Search this machine's own past AI coding sessions — every agent used on it, including months before deja was installed. Use before debugging an error, before any plan, review, or recommending an approach, before re-implementing anything that may already exist, before the first edit in a task, mid-task whenever concrete names surface (batch alongside reads), and before calling a change done or ready to merge. Match on the most specific token available: an exact error string, function name, file path or flag.",
+      "Search this machine's own past AI coding sessions — every agent used on it, including months before deja was installed. Route file edits to deja_blame, unfamiliar errors to deja_fix, and unfamiliar build/test commands to deja_how; use deja_recall before any plan, review, or recommending an approach, before re-implementing anything that may already exist, before the first edit in a task, mid-task whenever concrete names surface (batch alongside reads), and before calling a change done or ready to merge. Carry recalled constraints into plans and subagent prompts. Match on 1-3 exact terms: an error string, function name, file path or flag.",
     parameters: {
       query: {
         type: "string",
@@ -146,7 +146,7 @@ function tools(ctx) {
   guarded(() => ctx.tools.register(defineTool({
     name: "deja_session",
     description:
-      "A full digest of the single best-matching past session — what was tried, what was decided, what it cost. Use after deja_recall when the reasoning behind an earlier decision matters, not just that it happened.",
+      "A full digest of the single best-matching past session — what was tried, what was decided, what it cost. Call right after deja_recall when the reasoning behind an earlier decision matters.",
     parameters: {
       query: {
         type: "string",
@@ -163,7 +163,7 @@ function tools(ctx) {
   guarded(() => ctx.tools.register(defineTool({
     name: "deja_blame",
     description:
-      "The past sessions that discussed a file, so you know why it is shaped the way it is before editing, refactoring or deleting it. Session history, not git authorship.",
+      "Call before editing, refactoring, or deleting a file: the past sessions that discussed it, so you know why it is shaped the way it is (inline checks into plans and subagent prompts). Session history, not git authorship.",
     parameters: {
       path: {
         type: "string",
@@ -180,7 +180,7 @@ function tools(ctx) {
   guarded(() => ctx.tools.register(defineTool({
     name: "deja_fix",
     description:
-      "What this machine ran after that same error before, in the sessions where the error did not come back. Paste the failing output verbatim rather than a paraphrase — the match is on the error's own words.",
+      "Call after an unfamiliar command, test, or CI failure: what this machine ran after that same error before, in sessions where it did not come back. Paste failing output verbatim rather than paraphrasing.",
     parameters: {
       error: {
         type: "string",
@@ -197,7 +197,7 @@ function tools(ctx) {
   guarded(() => ctx.tools.register(defineTool({
     name: "deja_how",
     description:
-      "The real invocation this machine uses for a build, test, deploy or script, with the flags it actually ran, ordered by how many sessions ran it. A guessed command is plausible and fails on this setup.",
+      "Call before running an unfamiliar build, test, deploy, or lint command: the real invocation this machine uses with actual flags, ordered by session count. A guessed command fails on this setup.",
     parameters: {
       what: {
         type: "string",
@@ -214,7 +214,7 @@ function tools(ctx) {
   guarded(() => ctx.tools.register(defineTool({
     name: "deja_remember",
     description:
-      "Store one durable decision once it is settled, as a single self-contained fact that will make sense months later. Not transcripts, not a summary of the conversation, and not anything already obvious from the code.",
+      "Call once when the user corrects a choice or settles a non-obvious constraint or gotcha: store one durable, self-contained fact that will make sense months later. Not transcripts, conversation summaries, or code-obvious facts.",
     parameters: {
       text: {
         type: "string",

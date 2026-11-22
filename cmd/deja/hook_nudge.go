@@ -505,6 +505,97 @@ func liveRecallBrief(dir, cwd, query string) string {
 	return liveRecallBriefScoped(dir, cwd, "", 0, query)
 }
 
+func resolveRecallCausalPath(cwd, query string) string {
+	if cwd == "" {
+		return ""
+	}
+	cand := strings.TrimSpace(strings.Trim(strings.TrimSpace(query), "\"'`"))
+	cand = candidatePathWithoutLine(cand)
+	if cand == "" || strings.ContainsAny(cand, " \t\r\n") {
+		return ""
+	}
+	if sources.IsAgentScratchPath(filepath.ToSlash(cand)) {
+		return ""
+	}
+	if filepath.IsAbs(cand) {
+		clean := filepath.Clean(cand)
+		if sources.IsAgentScratchPath(filepath.ToSlash(clean)) || !fileThere(clean) {
+			return ""
+		}
+		if recallPathWithinRoot(cwd, clean) || recallPathWithinRoot(sources.RepoRoot(cwd), clean) {
+			return clean
+		}
+		return ""
+	}
+	cleanRel := filepath.ToSlash(filepath.Clean(cand))
+	if cleanRel != "." && cleanRel != ".." && !strings.HasPrefix(cleanRel, "../") && !sources.IsAgentScratchPath(cleanRel) {
+		disk := filepath.Join(cwd, filepath.FromSlash(cleanRel))
+		if !sources.IsAgentScratchPath(filepath.ToSlash(disk)) && fileThere(disk) {
+			return disk
+		}
+	}
+	if !policy.SourceHintsOff() && looksLikePromptFileRef(cand) {
+		if resolved := orientRepoTree(cwd).resolveRel(cand); resolved != "" && !sources.IsAgentScratchPath(resolved) {
+			disk := filepath.Join(cwd, filepath.FromSlash(resolved))
+			if !sources.IsAgentScratchPath(filepath.ToSlash(disk)) && fileThere(disk) {
+				return disk
+			}
+		}
+	}
+	return ""
+}
+
+func recallPathWithinRoot(root, target string) bool {
+	if root == "" || target == "" {
+		return false
+	}
+	check := func(r, t string) bool {
+		rel, err := filepath.Rel(filepath.Clean(r), filepath.Clean(t))
+		if err != nil {
+			return false
+		}
+		rel = filepath.ToSlash(rel)
+		return rel == "." || (rel != ".." && !strings.HasPrefix(rel, "../"))
+	}
+	if check(root, target) {
+		return true
+	}
+	rEval, err1 := filepath.EvalSymlinks(root)
+	tEval, err2 := filepath.EvalSymlinks(target)
+	return err1 == nil && err2 == nil && check(rEval, tEval)
+}
+
+func capRecallCausalLine(line string, maxBytes int) string {
+	line = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "deja: "))
+	if line == "" || maxBytes <= 0 {
+		return ""
+	}
+	line = truncateToolLine(line, maxBytes)
+	if len(line) <= maxBytes {
+		return strings.TrimSpace(line)
+	}
+	runes := []rune(line)
+	for len(runes) > 0 && len(string(runes)) > maxBytes {
+		runes = runes[:len(runes)-1]
+	}
+	return strings.TrimSpace(string(runes))
+}
+
+func sameRecallBriefLine(a, b string) bool {
+	if a == "" || b == "" {
+		return false
+	}
+	if a == b || dedupeFact(a) == dedupeFact(b) {
+		return true
+	}
+	_, ta, okA := strings.Cut(a, " — ")
+	_, tb, okB := strings.Cut(b, " — ")
+	if okA && okB && ta != "" && tb != "" {
+		return ta == tb || strings.HasPrefix(ta, tb) || strings.HasPrefix(tb, ta)
+	}
+	return false
+}
+
 func liveRecallBriefScoped(dir, cwd, project string, offset int, query string) string {
 	if policy.SourceHintsOff() || offset > 0 {
 		return ""
@@ -518,12 +609,27 @@ func liveRecallBriefScoped(dir, cwd, project string, offset int, query string) s
 	}
 	pol := policy.Load()
 	var parts []string
+	var causal string
+	if cp := resolveRecallCausalPath(cwd, query); cp != "" {
+		if line := fileHookLineOutsideWithMode(dir, cwd, cp, "", true, nil); line != "" {
+			causal = capRecallCausalLine(line, 320)
+		}
+	}
+	if causal != "" {
+		parts = append(parts, causal)
+	}
 
 	if fb, _ := promptFileBriefLine(dir, cwd, query, nil); fb != "" {
-		parts = append(parts, strings.TrimSpace(fb))
+		fb = strings.TrimSpace(fb)
+		if !sameRecallBriefLine(fb, causal) {
+			parts = append(parts, fb)
+		}
 	}
 	if sb, _ := promptSymbolBriefLine(cwd, query, nil); sb != "" {
-		parts = append(parts, strings.TrimSpace(sb))
+		sb = strings.TrimSpace(sb)
+		if !sameRecallBriefLine(sb, causal) {
+			parts = append(parts, sb)
+		}
 	}
 	if len(parts) == 0 {
 		if loc, _ := promptTaskTargetsLine(dir, cwd, query, nil, nil); loc != "" && liveLikelyTargetMatchesQuery(loc, query) {

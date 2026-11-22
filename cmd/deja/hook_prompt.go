@@ -63,6 +63,7 @@ type promptHookInput struct {
 	HookEventName string          `json:"hook_event_name"`
 	Harness       string          `json:"harness"`
 	Messages      json.RawMessage `json:"messages"`
+	SkipIDs       []string        `json:"skip_ids"`
 	// Grok spells all of this in camelCase. See hook_grok.go.
 	grokEnvelope
 }
@@ -302,6 +303,11 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		inProject = seenFile.recentInProject(projectKey, injectionCooldown)
 	}
 	skip := promptHookSkipSet(recent, inProject)
+	for _, id := range input.SkipIDs {
+		if id != "" {
+			skip[id] = true
+		}
+	}
 	// The asker and what counts as it: a spawn's parent, a sub-agent's parent,
 	// the sub-agents it spawned (#4548), a fork's source (#4549).
 	self, cut := askerLineageCutForHarness(dir, input.SessionID, input.TranscriptPath, input.Harness, input.ParentSessionID)

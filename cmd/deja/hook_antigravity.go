@@ -132,9 +132,15 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 		if line := editFileCallLines(dir, editCalls, input.ConversationID, projectWorkspace); line != "" {
 			steps = append(steps, antigravityInjectStep{EphemeralMessage: line})
 		}
+		if failedOut == "" {
+			if cmdLine := commandCallLines(dir, latestCommandCallsFromSteps(tailSteps), input.ConversationID, projectWorkspace); cmdLine != "" {
+				steps = append(steps, antigravityInjectStep{EphemeralMessage: cmdLine})
+			}
+		}
 		if block != "" {
 			steps = append(steps, antigravityInjectStep{EphemeralMessage: block})
 		}
+		steps = coalesceAntigravitySteps(steps)
 		if len(steps) == 0 {
 			fmt.Fprintln(stdout, "{}")
 			return nil
@@ -167,25 +173,27 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	digest, _, projects = attachClaudeAutoMemory(dir, input.ConversationID, input.TranscriptPath, "antigravity", hookCWD(projectWorkspace), digest, projects)
 	rememberDigestInjected(dir, input.ConversationID)
 	if digest != "" {
+		if len(ids) > 0 {
+			rememberInjectedIDs(dir, input.ConversationID, ids...)
+		}
 		digest = frameRecall(startLead(antigravityLead) + digest)
 		usage.RecordDigestPolicySessionsFrom(dir, usage.KindHook, digest, "", sessions, raw,
 			policy.Load().Describe(policy.ActivationAuto), ids, projects)
 		steps = append(steps, antigravityInjectStep{EphemeralMessage: digest})
-	} else {
-		failedOut := latestToolFailureFromSteps(tailSteps)
-		if failedOut == "" && latestToolStepSucceededFromSteps(tailSteps) {
-			coordResetFailStreak(dir, input.ConversationID, projectWorkspace)
-		}
-		block := antigravityFixPair(dir, failedOut,
-			input.ConversationID, projectWorkspace)
-		if block == "" {
-			block = antigravityPromptBlock(dir, latestUserRequestFromSteps(tailSteps),
-				input.ConversationID, projectWorkspace)
-		}
-		if block != "" {
-			steps = append(steps, antigravityInjectStep{EphemeralMessage: block})
-		}
 	}
+	failedOut := latestToolFailureFromSteps(tailSteps)
+	if failedOut == "" && latestToolStepSucceededFromSteps(tailSteps) {
+		coordResetFailStreak(dir, input.ConversationID, projectWorkspace)
+	}
+	block := antigravityFixPair(dir, failedOut, input.ConversationID, projectWorkspace)
+	if block == "" {
+		block = antigravityPromptBlockSkipping(dir, latestUserRequestFromSteps(tailSteps),
+			input.ConversationID, projectWorkspace, ids)
+	}
+	if block != "" {
+		steps = append(steps, antigravityInjectStep{EphemeralMessage: block})
+	}
+	steps = coalesceAntigravitySteps(steps)
 	if len(steps) == 0 {
 		fmt.Fprintln(stdout, "{}")
 		return nil
@@ -197,6 +205,71 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	}
 	fmt.Fprintln(stdout, string(b))
 	return nil
+}
+
+func isSingleRecallFrame(msg string) bool {
+	trimmed := strings.TrimSpace(msg)
+	_, body, ok := cutFrameHeader(trimmed)
+	if !ok {
+		return false
+	}
+	_, after, ok := strings.Cut(body, recallFrameFooter)
+	return ok && strings.TrimSpace(after) == ""
+}
+
+func appendUnwrappedRecallParts(dst []string, msg string, seen map[string]bool) []string {
+	rest := strings.TrimSpace(msg)
+	for rest != "" {
+		_, body, ok := cutFrameHeader(rest)
+		if !ok {
+			if !seen[rest] {
+				seen[rest] = true
+				dst = append(dst, rest)
+			}
+			break
+		}
+		if before, after, ok := strings.Cut(body, recallFrameFooter); ok {
+			if part := strings.TrimSpace(before); part != "" && !seen[part] {
+				seen[part] = true
+				dst = append(dst, part)
+			}
+			rest = strings.TrimSpace(after)
+			continue
+		}
+		if part := strings.TrimSpace(body); part != "" && !seen[part] {
+			seen[part] = true
+			dst = append(dst, part)
+		}
+		break
+	}
+	return dst
+}
+
+// coalesceAntigravitySteps merges multiple hook messages (recovery packet,
+// edit/command file lines, fix pairs, digest, and prompt recall) into a single
+// framed EphemeralMessage so trust headers appear once per invocation.
+func coalesceAntigravitySteps(steps []antigravityInjectStep) []antigravityInjectStep {
+	var nonEmpty []antigravityInjectStep
+	for _, s := range steps {
+		if strings.TrimSpace(s.EphemeralMessage) != "" {
+			nonEmpty = append(nonEmpty, s)
+		}
+	}
+	if len(nonEmpty) == 0 {
+		return nil
+	}
+	if len(nonEmpty) == 1 && (isSingleRecallFrame(nonEmpty[0].EphemeralMessage) || !strings.Contains(nonEmpty[0].EphemeralMessage, "<deja-recall>")) {
+		return nonEmpty
+	}
+	seen := make(map[string]bool, len(nonEmpty))
+	var parts []string
+	for _, s := range nonEmpty {
+		parts = appendUnwrappedRecallParts(parts, s.EphemeralMessage, seen)
+	}
+	if len(parts) == 0 {
+		return nil
+	}
+	return []antigravityInjectStep{{EphemeralMessage: frameRecall(strings.Join(parts, "\n\n"))}}
 }
 
 // antigravityCompactionPacket captures a compaction the transcript shows and

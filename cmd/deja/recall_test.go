@@ -2613,3 +2613,53 @@ func TestRecallCoverageAndLeadCapLongWordListsWithinPageBudget(t *testing.T) {
 		}
 	}
 }
+
+func TestRecallFilePathPrependsCausalHistoryInCLIAndMCP(t *testing.T) {
+	hermeticEnv(t)
+	repo := filepath.Join(t.TempDir(), "app")
+	invoice := filepath.Join(repo, "pkg", "billing", "invoice.go")
+	if err := os.MkdirAll(filepath.Dir(invoice), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(invoice, []byte("package billing\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if resolved, err := filepath.EvalSymlinks(repo); err == nil {
+		repo = resolved
+		invoice = filepath.Join(repo, "pkg", "billing", "invoice.go")
+	}
+	t.Chdir(repo)
+
+	proj := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-work-app")
+	for i, id := range []string{"inv-1", "inv-2", "inv-3"} {
+		ts := time.Date(2026, 8, 1+i, 10, 0, 0, 0, time.UTC).Format(time.RFC3339)
+		writeClaudeFixture(t, filepath.Join(proj, id+".jsonl"), id, []string{
+			fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":%q,"timestamp":%q,"message":{"role":"user","content":"update pkg/billing/invoice.go"}}`, id, repo, ts),
+			fmt.Sprintf(`{"type":"assistant","sessionId":%q,"cwd":%q,"timestamp":%q,"message":{"role":"assistant","content":[{"type":"tool_use","id":"u1","name":"Edit","input":{"file_path":%q,"old_string":"a","new_string":"b"}},{"type":"text","text":"Decision: keep invoice rounding deterministic."}]}}`, id, repo, ts, invoice),
+		})
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	var cliOut bytes.Buffer
+	if err := runRecall(dir, []string{"pkg/billing/invoice.go"}, &cliOut); err != nil {
+		t.Fatal(err)
+	}
+	mcpOut, err := callMCPTool(dir, "deja", json.RawMessage(`{"mode":"recall","q":"pkg/billing/invoice.go"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, got := range map[string]string{"cli": cliOut.String(), "mcp": mcpOut} {
+		if !strings.Contains(got, "invoice.go has been worked on in 3 sessions") {
+			t.Errorf("%s recall did not prepend causal file history:\n%s", name, got)
+		}
+	}
+	if len(mcpOut) > recallMCPBudget {
+		t.Errorf("mcp recall len = %d, exceeds recallMCPBudget %d", len(mcpOut), recallMCPBudget)
+	}
+	if !strings.HasPrefix(mcpOut, strings.TrimRight(cliOut.String(), "\n")) {
+		t.Errorf("CLI and MCP recall disagree.\ncli:\n%s\nmcp:\n%s", cliOut.String(), mcpOut)
+	}
+}

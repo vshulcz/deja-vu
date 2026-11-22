@@ -291,6 +291,27 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 	return nil
 }
 
+// isExternalMCPToolWithSuffix reports whether name is a non-deja MCP tool ending in one of suffixes.
+func isExternalMCPToolWithSuffix(name string, suffixes ...string) bool {
+	lower := strings.ToLower(strings.TrimSpace(name))
+	if !strings.HasPrefix(lower, "mcp_") && !strings.HasPrefix(lower, "mcp__") {
+		return false
+	}
+	if isDejaMCPToolCall(lower) {
+		return false
+	}
+	for _, suf := range suffixes {
+		if strings.HasSuffix(lower, suf) {
+			return true
+		}
+	}
+	return false
+}
+
+func isExternalMCPCommandTool(name string) bool {
+	return isExternalMCPToolWithSuffix(name, "_cmd", "_exec", "_shell", "_command")
+}
+
 // isCommandTool reports whether this tool runs a command. File edits fail in
 // ways a shell error signature does not describe, and the pre-tool hook already
 // speaks for them.
@@ -300,7 +321,7 @@ func isCommandTool(name string) bool {
 		// Claude Code's shell on Windows (#4489), and the pi-coding-agent's
 		// under Senpi and Kimchi (#4523).
 		"PowerShell", "powershell",
-		"run_shell_command", "run_terminal_command", "run_commands",
+		"run_shell_command", "run_terminal_command", "run_terminal_cmd", "run_commands", "command_execution",
 		// Command Code's payload carries the internal name, not the SHELL its
 		// matcher sees (#4371); that matcher is a case-insensitive regex, so it
 		// fires on powershell too (#4540).
@@ -314,7 +335,7 @@ func isCommandTool(name string) bool {
 		"exec":
 		return true
 	}
-	return false
+	return isExternalMCPCommandTool(name)
 }
 
 // toolResponseText pulls whatever the harness called the output. Claude Code

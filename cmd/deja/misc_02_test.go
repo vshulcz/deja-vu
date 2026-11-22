@@ -1340,6 +1340,7 @@ func TestBundledSkillsMatchInstaller(t *testing.T) {
 		"antigravity-plugin/skills/deja-history/SKILL.md",
 		"extensions/kimi/skills/deja-history/SKILL.md",
 		"extensions/grok/skills/deja-history/SKILL.md",
+		"extensions/codewhale/skills/deja-history/SKILL.md",
 	} {
 		got := string(repoFile(t, p))
 		if want := guidanceText("claude"); got != want {
@@ -1368,40 +1369,63 @@ func TestCodexPluginHooks(t *testing.T) {
 	want := map[string]struct {
 		sub, matcher string
 		omitMatcher  bool
+		timeout      int
 	}{
 		// Codex fires SessionStart with source "compact" after compaction. The
 		// documented every-source form has no matcher, matching codex-auto.
 		"SessionStart":     {sub: "hook-context", omitMatcher: true},
 		"UserPromptSubmit": {sub: "hook-prompt", omitMatcher: true},
 		"PreToolUse":       {sub: "hook-tool", matcher: "Bash|apply_patch"},
+		"PostToolUse":      {sub: "hook-tool-after", matcher: "Bash"},
 		"PreCompact":       {sub: "hook-precompact", matcher: "manual|auto"},
 		// The session just quit is back in the next one's MCP recall (#4545).
-		"SessionEnd": {sub: "hook-session-end", omitMatcher: true},
+		"SessionEnd": {sub: "hook-session-end", omitMatcher: true, timeout: 3},
 	}
-	for event, want := range want {
-		groups, ok := file.Hooks[event]
-		if !ok || len(groups) == 0 || len(groups[0].Hooks) == 0 {
-			t.Fatalf("no %s hook in the plugin", event)
+	checkFile := func(rel, cmdPrefix string) {
+		var f struct {
+			Hooks map[string][]struct {
+				Matcher *string `json:"matcher"`
+				Hooks   []struct {
+					Type    string `json:"type"`
+					Command string `json:"command"`
+					Timeout int    `json:"timeout"`
+				} `json:"hooks"`
+			} `json:"hooks"`
 		}
-		cmd := groups[0].Hooks[0].Command
-		if !strings.HasPrefix(cmd, "${PLUGIN_ROOT}/hooks/deja.sh ") || !strings.HasSuffix(cmd, want.sub) {
-			t.Fatalf("%s runs %q, not the plugin's own script with %s", event, cmd, want.sub)
+		if err := json.Unmarshal(repoFile(t, rel), &f); err != nil {
+			t.Fatalf("%s: %v", rel, err)
 		}
-		if groups[0].Hooks[0].Type != "command" || groups[0].Hooks[0].Timeout <= 0 {
-			t.Fatalf("%s entry is not a command with a timeout: %+v", event, groups[0].Hooks[0])
-		}
-		if want.omitMatcher {
-			if groups[0].Matcher != nil {
-				t.Fatalf("%s matcher = %q, want omitted", event, *groups[0].Matcher)
+		for event, want := range want {
+			groups, ok := f.Hooks[event]
+			if !ok || len(groups) == 0 || len(groups[0].Hooks) == 0 {
+				t.Fatalf("%s: no %s hook in the plugin", rel, event)
 			}
-		} else if groups[0].Matcher == nil || *groups[0].Matcher != want.matcher {
-			got := ""
-			if groups[0].Matcher != nil {
-				got = *groups[0].Matcher
+			cmd := groups[0].Hooks[0].Command
+			if !strings.HasPrefix(cmd, cmdPrefix) || !strings.HasSuffix(cmd, want.sub) {
+				t.Fatalf("%s: %s runs %q, not the plugin's own script with %s", rel, event, cmd, want.sub)
 			}
-			t.Fatalf("%s matcher = %q, want %q", event, got, want.matcher)
+			if groups[0].Hooks[0].Type != "command" || groups[0].Hooks[0].Timeout <= 0 {
+				t.Fatalf("%s: %s entry is not a command with a timeout: %+v", rel, event, groups[0].Hooks[0])
+			}
+			if want.timeout > 0 && groups[0].Hooks[0].Timeout != want.timeout {
+				t.Fatalf("%s: %s timeout = %d, want %d", rel, event, groups[0].Hooks[0].Timeout, want.timeout)
+			}
+			if want.omitMatcher {
+				if groups[0].Matcher != nil {
+					t.Fatalf("%s: %s matcher = %q, want omitted", rel, event, *groups[0].Matcher)
+				}
+			} else if groups[0].Matcher == nil || *groups[0].Matcher != want.matcher {
+				got := ""
+				if groups[0].Matcher != nil {
+					got = *groups[0].Matcher
+				}
+				t.Fatalf("%s: %s matcher = %q, want %q", rel, event, got, want.matcher)
+			}
 		}
 	}
+	checkFile("codex-plugin/hooks/hooks.json", "${PLUGIN_ROOT}/hooks/deja.sh ")
+	checkFile(".codex-plugin/hooks.json", "${PLUGIN_ROOT}/codex-plugin/hooks/deja.sh ")
+	_ = file
 
 	script := filepath.Join("..", "..", "codex-plugin", "hooks", "deja.sh")
 	if _, err := os.Stat(script); err != nil {
@@ -1545,8 +1569,8 @@ func TestRootCodexPluginManifest(t *testing.T) {
 	if err := json.Unmarshal(repoFile(t, ".codex-plugin/hooks.json"), &hooksFile); err != nil {
 		t.Fatalf(".codex-plugin/hooks.json: %v", err)
 	}
-	if len(hooksFile.Hooks) != 5 {
-		t.Fatalf(".codex-plugin/hooks.json declares %d hook events, want 5", len(hooksFile.Hooks))
+	if len(hooksFile.Hooks) != 6 {
+		t.Fatalf(".codex-plugin/hooks.json declares %d hook events, want 6", len(hooksFile.Hooks))
 	}
 	for event, entries := range hooksFile.Hooks {
 		for _, entry := range entries {

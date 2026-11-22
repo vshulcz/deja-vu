@@ -56,6 +56,20 @@ func latestEditCallsFromSteps(steps []transcriptStep) []sources.EditCall {
 	return nil
 }
 
+// latestCommandCallsFromSteps returns shell commands invoked by the newest
+// planner row of the current turn before any prior USER_INPUT boundary.
+func latestCommandCallsFromSteps(steps []transcriptStep) []string {
+	for _, step := range steps {
+		if step.Type == "USER_INPUT" {
+			return nil
+		}
+		if calls, ok := step.ToolCalls.([]any); ok && len(calls) > 0 {
+			return sources.AntigravityCommandCalls(calls)
+		}
+	}
+	return nil
+}
+
 // antigravityProjectWorkspace narrows a home-directory or empty workspace to
 // the git repository the recent transcript steps actually work in, so sessions
 // launched from ~ still scope per-prompt recall and .deja/memory.jsonl to the
@@ -210,6 +224,22 @@ func editFileLines(dir string, paths []string, conversationID, workspace string)
 	return editFileCallLines(dir, calls, conversationID, workspace)
 }
 
+func runAntigravityHookTool(dir string, body map[string]any) string {
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return ""
+	}
+	var out bytes.Buffer
+	if runHookTool(dir, bytes.NewReader(payload), &out) != nil {
+		return ""
+	}
+	var resp sessionStartHookResponse
+	if json.Unmarshal(bytes.TrimSpace(out.Bytes()), &resp) != nil {
+		return ""
+	}
+	return resp.HookSpecificOutput.AdditionalContext
+}
+
 func editFileCallLines(dir string, calls []sources.EditCall, conversationID, workspace string) string {
 	var lines []string
 	seen := make(map[string]bool, len(calls))
@@ -230,23 +260,36 @@ func editFileCallLines(dir string, calls []sources.EditCall, conversationID, wor
 		if c.ToolName != "" && !sources.IsCompactionEditTool(c.ToolName) {
 			toolName = "read_file"
 		}
-		payload, err := json.Marshal(map[string]any{
+		if line := runAntigravityHookTool(dir, map[string]any{
 			"hook_event_name": "PostToolUse",
 			"tool_name":       toolName,
 			"tool_input":      toolInput,
 			"session_id":      conversationID,
 			"cwd":             workspace,
-		})
-		if err != nil {
+		}); line != "" {
+			lines = append(lines, line)
+		}
+	}
+	return strings.Join(lines, "\n\n")
+}
+
+func commandCallLines(dir string, cmds []string, conversationID, workspace string) string {
+	var lines []string
+	seen := make(map[string]bool, len(cmds))
+	for _, cmd := range cmds {
+		cmd = strings.TrimSpace(cmd)
+		if cmd == "" || seen[cmd] {
 			continue
 		}
-		var out bytes.Buffer
-		if runHookTool(dir, bytes.NewReader(payload), &out) != nil {
-			continue
-		}
-		var resp sessionStartHookResponse
-		if json.Unmarshal(bytes.TrimSpace(out.Bytes()), &resp) == nil && resp.HookSpecificOutput.AdditionalContext != "" {
-			lines = append(lines, resp.HookSpecificOutput.AdditionalContext)
+		seen[cmd] = true
+		if line := runAntigravityHookTool(dir, map[string]any{
+			"hook_event_name": "PostToolUse",
+			"tool_name":       "Bash",
+			"tool_input":      map[string]string{"command": cmd},
+			"session_id":      conversationID,
+			"cwd":             workspace,
+		}); line != "" {
+			lines = append(lines, line)
 		}
 	}
 	return strings.Join(lines, "\n\n")
@@ -324,6 +367,10 @@ func userRequestText(content string) string {
 // ordinary prompt hook rather than reimplementing the ranking: the budget, the
 // dedupe and the kill switch are the ones every other harness gets.
 func antigravityPromptBlock(dir, question, conversationID, workspace string) string {
+	return antigravityPromptBlockSkipping(dir, question, conversationID, workspace, nil)
+}
+
+func antigravityPromptBlockSkipping(dir, question, conversationID, workspace string, skipIDs []string) string {
 	question = strings.TrimSpace(question)
 	if question == "" {
 		return ""
@@ -336,11 +383,15 @@ func antigravityPromptBlock(dir, question, conversationID, workspace string) str
 		}
 		rememberInjectedIDs(dir, dKey, qKey)
 	}
-	payload, err := json.Marshal(map[string]string{
+	body := map[string]any{
 		"prompt":     question,
 		"session_id": conversationID,
 		"cwd":        workspace,
-	})
+	}
+	if len(skipIDs) > 0 {
+		body["skip_ids"] = skipIDs
+	}
+	payload, err := json.Marshal(body)
 	if err != nil {
 		return ""
 	}
@@ -422,6 +473,30 @@ func workspaceFromConversation(transcriptPath, conversationID string) string {
 	return best
 }
 
+func stripAntigravityToolHeader(body string) string {
+	lines := strings.Split(body, "\n")
+	i := 0
+	for i < len(lines) {
+		trimmed := strings.TrimSpace(lines[i])
+		if trimmed == "" || strings.HasPrefix(trimmed, "Created At:") || strings.HasPrefix(trimmed, "Completed At:") {
+			i++
+			continue
+		}
+		if strings.HasPrefix(trimmed, "[") {
+			if closeIdx := strings.Index(trimmed, "]"); closeIdx > 0 && strings.Contains(trimmed[:closeIdx], "| exit=") {
+				rest := strings.TrimSpace(trimmed[closeIdx+1:])
+				if rest == "" {
+					i++
+					continue
+				}
+				lines[i] = rest
+			}
+		}
+		break
+	}
+	return strings.TrimSpace(strings.Join(lines[i:], "\n"))
+}
+
 func latestToolFailureFromSteps(steps []transcriptStep) string {
 	for _, step := range steps {
 		if step.Type == "USER_INPUT" {
@@ -439,7 +514,7 @@ func latestToolFailureFromSteps(steps []transcriptStep) string {
 				return strings.TrimSpace(after)
 			}
 		}
-		return strings.TrimSpace(body)
+		return stripAntigravityToolHeader(body)
 	}
 	return ""
 }

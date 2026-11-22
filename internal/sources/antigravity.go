@@ -970,6 +970,58 @@ type EditCall struct {
 	NewString string
 }
 
+func isAntigravityExternalMCPTool(name string, suffixes ...string) bool {
+	lower := strings.ToLower(strings.TrimSpace(name))
+	if !strings.HasPrefix(lower, "mcp_") && !strings.HasPrefix(lower, "mcp__") {
+		return false
+	}
+	if strings.HasPrefix(lower, "mcp_deja_") || strings.HasPrefix(lower, "mcp__deja__") || strings.HasPrefix(lower, "deja__") {
+		return false
+	}
+	for _, suf := range suffixes {
+		if strings.HasSuffix(lower, suf) {
+			return true
+		}
+	}
+	return false
+}
+
+func isAntigravityTrackedFileTool(name string) bool {
+	switch name {
+	case "replace_file_content", "multi_replace_file_content", "write_to_file", "edit_file", "write_file", "read_file", "view_file", "read_many_files":
+		return true
+	}
+	return isAntigravityExternalMCPTool(name, "_read", "_read_file", "_view_file", "_edit", "_edit_file", "_write", "_write_file", "_create_file")
+}
+
+func antigravityStringSliceArg(args map[string]any, keys ...string) []string {
+	for _, key := range keys {
+		switch v := args[key].(type) {
+		case []string:
+			return slices.Clone(v)
+		case []any:
+			out := make([]string, 0, len(v))
+			for _, item := range v {
+				if s, ok := item.(string); ok {
+					out = append(out, s)
+				}
+			}
+			if len(out) > 0 {
+				return out
+			}
+		case string:
+			raw := antigravityArg(args, key)
+			if strings.HasPrefix(strings.TrimSpace(raw), "[") {
+				var out []string
+				if json.Unmarshal([]byte(raw), &out) == nil && len(out) > 0 {
+					return out
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // AntigravityEditCalls are the files a planner row's calls edit, create, or
 // read before an edit, in call order, including target and replacement snippets
 // when present.
@@ -979,21 +1031,25 @@ func AntigravityEditCalls(toolCalls any) []EditCall {
 	for _, c := range calls {
 		call, _ := c.(map[string]any)
 		args, _ := call["args"].(map[string]any)
-		switch str(call["name"]) {
-		case "replace_file_content", "multi_replace_file_content", "write_to_file", "edit_file", "write_file", "read_file", "view_file":
-		default:
+		name := str(call["name"])
+		if !isAntigravityTrackedFileTool(name) {
 			continue
 		}
-		p := antigravityArg(args, "TargetFile")
-		if p == "" {
-			p = antigravityArg(args, "AbsolutePath")
-		}
-		if p == "" {
-			p = antigravityArg(args, "Path")
-		}
-		p = decodeURIPath(strings.TrimPrefix(p, "file://"))
-		if p == "" {
-			continue
+		p := firstNonEmpty(
+			antigravityArg(args, "TargetFile"),
+			antigravityArg(args, "AbsolutePath"),
+			antigravityArg(args, "Path"),
+			antigravityArg(args, "path"),
+			antigravityArg(args, "file_path"),
+			antigravityArg(args, "filePath"),
+			antigravityArg(args, "target_file"),
+			antigravityArg(args, "absolute_path"),
+		)
+		var paths []string
+		if p != "" {
+			paths = []string{p}
+		} else {
+			paths = antigravityStringSliceArg(args, "paths", "Paths")
 		}
 		oldS := firstNonEmpty(
 			antigravityArg(args, "Target"),
@@ -1027,7 +1083,42 @@ func AntigravityEditCalls(toolCalls any) []EditCall {
 				}
 			}
 		}
-		out = append(out, EditCall{ToolName: str(call["name"]), FilePath: p, OldString: oldS, NewString: newS})
+		for _, rawP := range paths {
+			cleanP := decodeURIPath(strings.TrimPrefix(strings.TrimSpace(rawP), "file://"))
+			if cleanP == "" || IsAgentScratchPath(filepath.ToSlash(cleanP)) {
+				continue
+			}
+			out = append(out, EditCall{ToolName: name, FilePath: cleanP, OldString: oldS, NewString: newS})
+		}
+	}
+	return out
+}
+
+// AntigravityCommandCalls returns the command strings run by a planner row's
+// built-in or external MCP shell tools.
+func AntigravityCommandCalls(toolCalls any) []string {
+	calls, _ := toolCalls.([]any)
+	var out []string
+	for _, c := range calls {
+		call, _ := c.(map[string]any)
+		args, _ := call["args"].(map[string]any)
+		if args == nil {
+			continue
+		}
+		name := str(call["name"])
+		if name != "run_command" && !isAntigravityExternalMCPTool(name, "_cmd", "_exec", "_shell", "_command") {
+			continue
+		}
+		cmd := firstNonEmpty(
+			antigravityArg(args, "CommandLine"),
+			antigravityArg(args, "command_line"),
+			antigravityArg(args, "cmd"),
+			antigravityArg(args, "command"),
+			antigravityArg(args, "script"),
+		)
+		if strings.TrimSpace(cmd) != "" {
+			out = append(out, cmd)
+		}
 	}
 	return out
 }

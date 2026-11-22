@@ -1129,3 +1129,42 @@ func TestAntigravitySkipsSchedulerTaskDescriptionsButKeepsGenericCommand(t *test
 		t.Fatalf("commands = %q, want only golangci-lint run", cmds)
 	}
 }
+
+func TestAntigravityEditCallsExtractsMCPPathsAndSkipsScratch(t *testing.T) {
+	toolCalls := []any{
+		map[string]any{
+			"name": "mcp_fs_read",
+			"args": map[string]any{
+				"paths": []any{
+					"/Users/alex/.gemini/antigravity/brain/conv-1/scratch/plan.md",
+					"/work/app/pkg/billing/invoice.go",
+				},
+			},
+		},
+		map[string]any{
+			"name": "mcp_fs_write",
+			"args": map[string]any{
+				"AbsolutePath": "file:///work/app/pkg/billing/ledger.go",
+				"Target":       "oldTotal",
+				"Replacement":  "newTotal",
+			},
+		},
+	}
+
+	got := AntigravityEditCalls(toolCalls)
+	want := []EditCall{
+		{
+			ToolName: "mcp_fs_read",
+			FilePath: "/work/app/pkg/billing/invoice.go",
+		},
+		{
+			ToolName:  "mcp_fs_write",
+			FilePath:  "/work/app/pkg/billing/ledger.go",
+			OldString: "oldTotal",
+			NewString: "newTotal",
+		},
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("AntigravityEditCalls() = %+v, want %+v", got, want)
+	}
+}

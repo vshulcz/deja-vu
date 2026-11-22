@@ -168,7 +168,7 @@ export default {
         (ctx) => ({
           name: "deja_recall",
           description:
-            "Search this machine's own past AI coding sessions — every agent used on it, including months before deja was installed. Use before debugging an error, before any plan, review, or recommending an approach, before re-implementing something that may already exist, before the first edit in a task, mid-task whenever concrete names surface (batch alongside reads), before calling a change done or ready to merge, and whenever the user implies the work happened before.",
+            "Search this machine's own past AI coding sessions — every agent used on it, including months before deja was installed. Route file edits to deja_blame and unfamiliar errors to deja_fix; use deja_recall before any plan, review, or recommending an approach, before re-implementing something that may already exist, before the first edit in a task, mid-task whenever concrete names surface (batch alongside reads), before calling a change done or ready to merge, and whenever the user implies the work happened before. Carry recalled constraints into plans and subagent prompts.",
           parameters: RECALL_SCHEMA,
           async execute(_id, params) {
             // The page the MCP recall tool serves, framed and budgeted by deja.
@@ -183,7 +183,7 @@ export default {
         (ctx) => ({
           name: "deja_fix",
           description:
-            "What this machine ran after that same error before, in the sessions where the error did not come back. Paste the failing output verbatim rather than a paraphrase.",
+            "Call after an unfamiliar command, test, or CI failure: what this machine ran after that same error before, in sessions where it did not come back. Paste failing output verbatim rather than paraphrasing.",
           parameters: FIX_SCHEMA,
           async execute(_id, params) {
             return answer(await ask(["--framed", ...argv("fix", [], params.error)], undefined, 120000, workspace(ctx)))
@@ -195,7 +195,7 @@ export default {
         (ctx) => ({
           name: "deja_blame",
           description:
-            "The past sessions that discussed a file, so you know why it is shaped the way it is before editing, refactoring or deleting it. Session history, not git authorship.",
+            "Call before editing, refactoring, or deleting a file: the past sessions that discussed it, so you know why it is shaped the way it is (inline checks into plans and subagent prompts). Session history, not git authorship.",
           parameters: BLAME_SCHEMA,
           async execute(_id, params) {
             return answer(await ask(["--framed", ...argv("blame", [], params.path)], undefined, 120000, workspace(ctx)))

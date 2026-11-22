@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -70,8 +71,16 @@ type toolHookInput struct {
 	// when tool_name is missing (#4731).
 	LLMToolName string `json:"llm_tool_name"`
 	ToolInput   struct {
-		Command  string `json:"command"`
-		FilePath string `json:"file_path"`
+		Command          string   `json:"command"`
+		CommandLine      string   `json:"CommandLine"`
+		CommandLineSnake string   `json:"command_line"`
+		Cmd              string   `json:"cmd"`
+		Script           string   `json:"script"`
+		FilePath         string   `json:"file_path"`
+		AbsolutePath     string   `json:"AbsolutePath"`
+		AbsolutePathSnk  string   `json:"absolute_path"`
+		Paths            []string `json:"paths"`
+		PathsUpper       []string `json:"Paths"`
 		// Claude's NotebookEdit names its file here and not under file_path
 		// (#4489).
 		NotebookPath string `json:"notebook_path"`
@@ -86,12 +95,14 @@ type toolHookInput struct {
 		FilePathCamel string `json:"filePath"`
 		// OpenCode and OpenAI-style apply_patch pass the patch text under
 		// patchText or patch when not under command.
-		PatchText string `json:"patchText"`
-		Patch     string `json:"patch"`
-		OldString string `json:"old_string"`
-		NewString string `json:"new_string"`
-		OldStr    string `json:"oldStr"`
-		NewStr    string `json:"newStr"`
+		PatchText         string          `json:"patchText"`
+		Patch             string          `json:"patch"`
+		NestedToolArgs    json.RawMessage `json:"toolArgs"`
+		NestedToolArgsSnk json.RawMessage `json:"tool_args"`
+		OldString         string          `json:"old_string"`
+		NewString         string          `json:"new_string"`
+		OldStr            string          `json:"oldStr"`
+		NewStr            string          `json:"newStr"`
 
 		// Multi-harness edit field dialects
 		OldText            string `json:"oldText"`
@@ -124,6 +135,7 @@ type toolHookInput struct {
 	// Copilot CLI sends the tool's arguments as toolArgs: {command} for bash,
 	// {path} for edit and create (1.0.92).
 	ToolArgs       json.RawMessage `json:"toolArgs"`
+	ToolArgsSnake  json.RawMessage `json:"tool_args"`
 	SessionID      string          `json:"session_id"`
 	ConversationID string          `json:"conversation_id"`
 	TranscriptPath string          `json:"transcript_path"`
@@ -254,6 +266,66 @@ func stripReadPathSelectors(cwd, p string) string {
 	return p
 }
 
+// cleanHookFilePath strips surrounding quotes and file:// prefixes.
+func cleanHookFilePath(p string) string {
+	p = strings.TrimSpace(p)
+	if len(p) >= 2 && ((p[0] == '"' && p[len(p)-1] == '"') || (p[0] == '\'' && p[len(p)-1] == '\'')) {
+		p = strings.TrimSpace(p[1 : len(p)-1])
+	}
+	if after, ok := strings.CutPrefix(p, "file://"); ok {
+		p = after
+		if dec, err := url.PathUnescape(p); err == nil {
+			p = dec
+		}
+	}
+	return strings.TrimSpace(p)
+}
+
+func firstNonScratchPath(paths ...string) string {
+	for _, raw := range paths {
+		p := cleanHookFilePath(raw)
+		if p == "" {
+			continue
+		}
+		if sources.IsAgentScratchPath(filepath.ToSlash(p)) {
+			continue
+		}
+		return p
+	}
+	return ""
+}
+
+func firstNonScratchSliceFromAny(v any) string {
+	switch s := v.(type) {
+	case []string:
+		return firstNonScratchPath(s...)
+	case []any:
+		cands := make([]string, 0, len(s))
+		for _, item := range s {
+			if str, ok := item.(string); ok {
+				cands = append(cands, str)
+			}
+		}
+		return firstNonScratchPath(cands...)
+	case string:
+		if trimmed := strings.TrimSpace(s); strings.HasPrefix(trimmed, "[") {
+			var cands []string
+			if json.Unmarshal([]byte(trimmed), &cands) == nil {
+				return firstNonScratchPath(cands...)
+			}
+		}
+	}
+	return ""
+}
+
+func isExternalMCPEditTool(name string) bool {
+	return isExternalMCPToolWithSuffix(name, "_write", "_edit", "_create_file", "_write_file", "_edit_file")
+}
+
+func isExternalMCPReadTool(name string) bool {
+	return isExternalMCPToolWithSuffix(name, "_read", "_read_file", "_view_file")
+}
+
 // adopt fills in what grok spells differently. Without the tool name and its
 // command this hook cannot tell a spawn from an edit, and has nothing to look
 // the action up by.
@@ -261,31 +333,54 @@ func (i *toolHookInput) adopt() {
 	i.SessionID, i.TranscriptPath, i.WorkspaceRoots = i.adoptCommon(i.SessionID, i.ConversationID, i.TranscriptPath, i.WorkspaceRoots)
 	i.ToolName = adoptGrok(adoptGrok(i.ToolName, i.grokEnvelope.ToolName), i.LLMToolName)
 	i.ToolInput.Command = adoptGrok(i.ToolInput.Command, i.grokEnvelope.ToolInput.Command)
+	i.ToolInput.Command = firstNonEmpty(
+		i.ToolInput.Command,
+		i.ToolInput.CommandLine,
+		i.ToolInput.CommandLineSnake,
+		i.ToolInput.Cmd,
+		i.ToolInput.Script,
+	)
 	i.ToolInput.FilePath = adoptGrok(i.ToolInput.FilePath, i.grokEnvelope.ToolInput.FilePath)
+	i.ToolInput.FilePath = firstNonEmpty(
+		i.ToolInput.FilePath,
+		i.ToolInput.NotebookPath,
+		i.ToolInput.Path,
+		i.ToolInput.FilePathCamel,
+		i.ToolInput.TargetFile,
+		i.ToolInput.AbsolutePath,
+		i.ToolInput.AbsolutePathSnk,
+	)
 	if i.ToolInput.FilePath == "" {
-		i.ToolInput.FilePath = i.ToolInput.NotebookPath
+		i.ToolInput.FilePath = firstNonScratchPath(i.ToolInput.Paths...)
 	}
 	if i.ToolInput.FilePath == "" {
-		i.ToolInput.FilePath = i.ToolInput.Path
+		i.ToolInput.FilePath = firstNonScratchPath(i.ToolInput.PathsUpper...)
 	}
-	if i.ToolInput.FilePath == "" {
-		i.ToolInput.FilePath = i.ToolInput.FilePathCamel
-	}
-	if i.ToolInput.FilePath == "" {
-		i.ToolInput.FilePath = i.ToolInput.TargetFile
-	}
-	if args := copilotToolArgs(i.ToolArgs); args != nil {
+	for _, rawArgs := range []json.RawMessage{
+		i.ToolArgs, i.ToolArgsSnake, i.ToolInput.NestedToolArgs, i.ToolInput.NestedToolArgsSnk,
+	} {
+		args := copilotToolArgs(rawArgs)
+		if args == nil {
+			continue
+		}
 		if i.ToolInput.Command == "" {
-			i.ToolInput.Command, _ = args["command"].(string)
+			i.ToolInput.Command = mapString(args, "command", "CommandLine", "command_line", "cmd", "script")
 		}
 		if i.ToolInput.FilePath == "" {
-			i.ToolInput.FilePath = mapString(args, "path", "file_path", "filePath", "target_file")
+			i.ToolInput.FilePath = mapString(args, "path", "file_path", "filePath", "target_file", "AbsolutePath", "absolute_path")
+		}
+		if i.ToolInput.FilePath == "" {
+			i.ToolInput.FilePath = firstNonScratchSliceFromAny(args["paths"])
+		}
+		if i.ToolInput.FilePath == "" {
+			i.ToolInput.FilePath = firstNonScratchSliceFromAny(args["Paths"])
 		}
 	}
+	i.ToolInput.FilePath = cleanHookFilePath(i.ToolInput.FilePath)
 	if isCommandTool(i.ToolName) && strings.TrimSpace(i.ToolInput.Command) != "" {
 		i.ToolInput.Command += sources.CommandArgs(i.ToolInput.Args)
 	}
-	if strings.EqualFold(strings.TrimSpace(i.ToolName), "read") && i.ToolInput.FilePath != "" {
+	if isReadOnlyFileTool(i.ToolName) && i.ToolInput.FilePath != "" {
 		i.ToolInput.FilePath = stripReadPathSelectors(hookProjectPath(i.CWD, i.WorkspaceRoots), i.ToolInput.FilePath)
 	}
 	i.normalizeEditStrings()
@@ -598,6 +693,9 @@ func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string
 		// Command Code sends its internal names; EDIT and WRITE are only what
 		// its matcher sees (#4371).
 		"edit_file", "write_file",
+		// Antigravity, Devin, and generic search-replace editors/writers.
+		"replace_file_content", "multi_replace_file_content", "write_to_file",
+		"str_replace_editor", "str_replace_based_edit_tool", "view_file", "read_many_files",
 		// Copilot CLI writes a new file with create (path in toolArgs), and
 		// VS Code Copilot Chat edits with these, the path under filePath.
 		"create", "replace_string_in_file", "create_file", "insert_edit_into_file",
@@ -644,6 +742,10 @@ func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string
 			return applyPatchLine(dir, cwd, patch, askerSkip(dir, input))
 		}
 		return fileLineFor(dir, cwd, input)
+	default:
+		if isExternalMCPEditTool(input.ToolName) || isExternalMCPReadTool(input.ToolName) {
+			return fileLineFor(dir, cwd, input)
+		}
 	}
 	return ""
 }
@@ -677,6 +779,9 @@ func applyPatchLine(dir, cwd, patch string, self func(index.SessionMeta, string)
 	for _, path := range applyPatchFiles(patch) {
 		// A shell `cd sub && apply_patch` edits sub/<header> (#5306).
 		path = sources.ShellPatchPath(patch, cwd, path)
+		if sources.IsAgentScratchPath(filepath.ToSlash(path)) {
+			continue
+		}
 		line := fileHookLineOutsideWithEdit(dir, cwd, path, patch, self)
 		if assertLine := testAssertionLiteralLine(cwd, path, oldPatch, newPatch); assertLine != "" {
 			if line == "" {
@@ -722,7 +827,7 @@ func fileLineFor(dir, cwd string, input toolHookInput) string {
 			path = ""
 		}
 	}
-	if path == "" {
+	if path == "" || sources.IsAgentScratchPath(filepath.ToSlash(path)) {
 		return ""
 	}
 	oldStr := input.ToolInput.OldString
@@ -786,16 +891,17 @@ func fileLineFor(dir, cwd string, input toolHookInput) string {
 // isReadOnlyFileTool reports whether toolName is a file-read PostToolUse channel.
 func isReadOnlyFileTool(toolName string) bool {
 	switch strings.TrimSpace(toolName) {
-	case "read", "read_file", "Read":
+	case "read", "read_file", "Read", "view_file", "read_many_files":
 		return true
 	}
-	return false
+	return isExternalMCPReadTool(toolName)
 }
 
 // isSearchReplaceEditTool reports whether toolName is a search-and-replace edit tool.
 func isSearchReplaceEditTool(toolName string) bool {
 	switch strings.ToLower(strings.TrimSpace(toolName)) {
-	case "edit", "edit_file", "replace", "replace_file_content", "multi_replace_file_content", "str_replace", "str_replace_editor":
+	case "edit", "edit_file", "replace", "replace_file_content", "multi_replace_file_content",
+		"replace_string_in_file", "str_replace", "str_replace_editor", "str_replace_based_edit_tool":
 		return true
 	}
 	return false

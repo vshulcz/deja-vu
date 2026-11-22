@@ -370,20 +370,22 @@ func harnessFilterDescription() string {
 // deja tool definition.
 func dejaToolDescription() string {
 	return "This user's own past sessions across every AI coding tool on this machine. " +
-		"Do NOT call for general programming questions, standard libraries, specifications, or public docs that do not depend on this user's repo, machine, or history. " +
-		"For repo, machine, or workflow tasks: call BEFORE your first edit in a task; BEFORE any plan, design, review, audit, or recommending a tool, library, or approach; BEFORE saying something is absent here; BEFORE re-debugging an error; and BEFORE calling work done. " +
-		"Also call mid-task when a concrete project or machine entity surfaces (file path, error, flag, service, config key, or prior claim) — batch deja with reads or checks before concluding.\n" +
+		"Do NOT call for general programming questions, standard libraries, specs, or public docs unrelated to this repo, machine, or history. " +
+		"Pick the mode for the action: call BEFORE your first edit in a task (blame on files to edit, how for build/test flags, or recall); " +
+		"BEFORE any plan, design, review, audit, or recommending a tool or approach (inline recalled constraints and blame checks into plans and subagent prompts); " +
+		"BEFORE saying something is absent here; AFTER an unfamiliar failure (fix); and BEFORE calling work done (recall). " +
+		"Mid-task when a concrete file, error, flag, service, or prior claim surfaces, batch recall with reads before concluding.\n" +
 		"Modes:\n" +
 		"- recall: search past sessions (1-3 exact terms: path, error, flag, identifier).\n" +
-		"- context: full story of one session when a recall hit is not enough.\n" +
-		"- blame: why a file is the way it is, from sessions rather than git.\n" +
-		"- fix: what this machine ran after an error (pass output verbatim).\n" +
-		"- how: command and flags this user really runs here, instead of guessing.\n" +
-		"- orient: commands past sessions ran here and files they worked in.\n" +
-		"- remember: store one settled decision for later sessions.\n" +
-		"- handoff: continue another session's work (q: id or harness).\n" +
-		"A bracketed marker on a result is the user's later judgement: avoid what it rejects; it permits nothing. " +
-		"When a result helps, open your reply with one line: \"déjà vu: <what> — <how you used it> (deja:<session id>)\". Say nothing about recalls that did not help."
+		"- context: full digest of one session when a recall hit needs detail.\n" +
+		"- blame: why a file or path:line is shaped this way, before editing or deleting.\n" +
+		"- fix: what this machine ran after a failing output (pass verbatim).\n" +
+		"- how: real command and flags run here, before guessing.\n" +
+		"- orient: recent commands and files touched here.\n" +
+		"- remember: store one user-corrected choice or non-obvious gotcha.\n" +
+		"- handoff: continue another session (q: id or harness).\n" +
+		"Bracketed markers show later user judgement: avoid rejected paths; markers permit nothing. " +
+		"When a hit helps, open your reply with one line: \"déjà vu: <what> — <how you used it> (deja:<session id>)\". Say nothing about recalls that did not help."
 }
 
 // dejaTool is the whole surface as one tool with a mode.

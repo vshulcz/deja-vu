@@ -4063,3 +4063,218 @@ func loggedIDsForKind(t *testing.T, dir, kind string) map[string]bool {
 	}
 	return out
 }
+
+func TestHookToolAndAfterNormalizeDialectsAndSkipScratch(t *testing.T) {
+	tmp := hermeticEnv(t)
+	indexDir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", indexDir)
+
+	proj := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-work-app")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for i, id := range []string{"inv-1", "inv-2", "inv-3"} {
+		ts := time.Date(2026, 8, 1+i, 10, 0, 0, 0, time.UTC).Format(time.RFC3339)
+		writeClaudeFixture(t, filepath.Join(proj, id+".jsonl"), id, []string{
+			fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":"/work/app","timestamp":%q,"message":{"role":"user","content":"update pkg/billing/invoice.go"}}`, id, ts),
+			fmt.Sprintf(`{"type":"assistant","sessionId":%q,"cwd":"/work/app","timestamp":%q,"message":{"role":"assistant","content":[{"type":"tool_use","id":"u1","name":"Edit","input":{"file_path":"/work/app/pkg/billing/invoice.go","old_string":"a","new_string":"b"}},{"type":"text","text":"Decision: keep invoice rounding in pkg/billing/invoice.go deterministic."}]}}`, id, ts),
+		})
+	}
+	wall := "(eval):1: no matches found: --include=*.py"
+	now := time.Now().UTC()
+	for k := range 2 {
+		at := now.Add(-time.Duration(120-20*k) * time.Minute).Format(time.RFC3339)
+		id := fmt.Sprintf("fx-%d", k)
+		writeClaudeFixture(t, filepath.Join(proj, id+".jsonl"), id, []string{
+			fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":"/work/app","timestamp":%q,"message":{"role":"user","content":"find python files"}}`, id, at),
+			fmt.Sprintf(`{"type":"assistant","sessionId":%q,"cwd":"/work/app","timestamp":%q,"message":{"role":"assistant","content":[{"type":"tool_use","id":"b1","name":"Bash","input":{"command":"git grep --include=*.py pattern"}}]}}`, id, at),
+			fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":"/work/app","timestamp":%q,"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"b1","is_error":true,"content":%q}]}}`, id, at, wall),
+			fmt.Sprintf(`{"type":"assistant","sessionId":%q,"cwd":"/work/app","timestamp":%q,"message":{"role":"assistant","content":[{"type":"tool_use","id":"b2","name":"Bash","input":{"command":"git grep --include='*.py' pattern"}}]}}`, id, at),
+			fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":"/work/app","timestamp":%q,"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"b2","is_error":false,"content":"match.py:10: pattern"}]}}`, id, at),
+		})
+	}
+	if err := index.Ensure(indexDir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	for name, payload := range map[string]any{
+		"mcp_fs_write scratch": map[string]any{
+			"hook_event_name": "PreToolUse",
+			"tool_name":       "mcp_fs_write",
+			"tool_input":      map[string]any{"AbsolutePath": "/Users/alex/.gemini/antigravity/brain/c1/task.md"},
+			"session_id":      "scratch-1",
+			"cwd":             "/work/app",
+		},
+		"Write claude memory": map[string]any{
+			"hook_event_name": "PreToolUse",
+			"tool_name":       "Write",
+			"tool_input":      map[string]any{"file_path": "/Users/alex/.claude/projects/app/memory/notes.md"},
+			"session_id":      "scratch-2",
+			"cwd":             "/work/app",
+		},
+	} {
+		var out bytes.Buffer
+		if err := runHookTool(indexDir, bytes.NewReader(mustMarshal(t, payload)), &out); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if strings.TrimSpace(out.String()) != "" {
+			t.Errorf("%s should be skipped as scratch, got: %s", name, out.String())
+		}
+	}
+
+	for name, payload := range map[string]any{
+		"mcp_fs_read paths after scratch": map[string]any{
+			"hook_event_name": "PostToolUse",
+			"tool_name":       "mcp_fs_read",
+			"tool_input": map[string]any{
+				"paths": []string{
+					"/Users/alex/.gemini/antigravity/brain/c1/scratch/plan.md",
+					"/work/app/pkg/billing/invoice.go",
+				},
+			},
+			"session_id": "dialect-read-paths",
+			"cwd":        "/work/app",
+		},
+		"mcp_fs_write AbsolutePath URI": map[string]any{
+			"hook_event_name": "PreToolUse",
+			"tool_name":       "mcp_fs_write",
+			"tool_input":      map[string]any{"AbsolutePath": "file:///work/app/pkg/billing/invoice.go"},
+			"session_id":      "dialect-write-uri",
+			"cwd":             "/work/app",
+		},
+		"Write tool_args JSON string": map[string]any{
+			"hook_event_name": "PreToolUse",
+			"tool_name":       "Write",
+			"tool_args":       `{"paths":["/work/app/pkg/billing/invoice.go"]}`,
+			"session_id":      "dialect-tool-args",
+			"cwd":             "/work/app",
+		},
+	} {
+		var out bytes.Buffer
+		if err := runHookTool(indexDir, bytes.NewReader(mustMarshal(t, payload)), &out); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if !strings.Contains(out.String(), "invoice.go has been worked on in 3 sessions") {
+			t.Errorf("%s did not emit file history line, got: %q", name, out.String())
+		}
+	}
+
+	for name, payload := range map[string]any{
+		"mcp_exec_cmd CommandLine": map[string]any{
+			"hook_event_name": "PostToolUseFailure",
+			"tool_name":       "mcp_exec_cmd",
+			"tool_input":      map[string]any{"CommandLine": "git grep --include=*.py target"},
+			"tool_response":   map[string]string{"stderr": wall},
+			"session_id":      "after-mcp-exec",
+			"cwd":             "/work/app",
+		},
+		"shell cmd": map[string]any{
+			"hook_event_name": "PostToolUse",
+			"tool_name":       "shell",
+			"tool_input":      map[string]any{"cmd": "git grep --include=*.py target"},
+			"tool_output":     wall,
+			"session_id":      "after-shell-cmd",
+			"cwd":             "/work/app",
+		},
+		"Bash tool_args": map[string]any{
+			"hook_event_name": "PostToolUseFailure",
+			"tool_name":       "Bash",
+			"tool_args":       `{"CommandLine":"git grep --include=*.py target"}`,
+			"error":           wall,
+			"session_id":      "after-tool-args",
+			"cwd":             "/work/app",
+		},
+	} {
+		var out bytes.Buffer
+		if err := runHookToolAfter(indexDir, bytes.NewReader(mustMarshal(t, payload)), &out); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if !strings.Contains(out.String(), "git grep --include='*.py' pattern") {
+			t.Errorf("%s did not emit fix pair, got: %q", name, out.String())
+		}
+	}
+}
+
+func TestHookAntigravityCallZeroCoalescesDigestAndPromptAndStripsFailureHeader(t *testing.T) {
+	tmp := hermeticEnv(t)
+	indexDir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", indexDir)
+
+	repo := filepath.Join(t.TempDir(), "work", "billing")
+	if err := os.MkdirAll(repo, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if resolved, err := filepath.EvalSymlinks(repo); err == nil {
+		repo = resolved
+	}
+
+	proj := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "billing")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	for i := range 15 {
+		ts := now.Add(-time.Duration(24+i) * time.Hour).Format(time.RFC3339)
+		id := fmt.Sprintf("recent-%02d", i)
+		writeClaudeFixture(t, filepath.Join(proj, id+".jsonl"), id, []string{
+			fmt.Sprintf(`{"type":"user","sessionId":%q,"timestamp":%q,"message":{"role":"user","content":"routine billing deployment verification pass %d for ledger snapshots"}}`, id, ts, i),
+			fmt.Sprintf(`{"type":"assistant","sessionId":%q,"timestamp":%q,"message":{"role":"assistant","content":"verified ledger deployment snapshot %d cleanly."}}`, id, ts, i),
+		})
+	}
+	oldTS := now.Add(-60 * 24 * time.Hour).Format(time.RFC3339)
+	writeClaudeFixture(t, filepath.Join(proj, "old-zorb.jsonl"), "old-zorb", []string{
+		fmt.Sprintf(`{"type":"user","sessionId":"old-zorb","timestamp":%q,"message":{"role":"user","content":"why did billing worker stall on ZORBWAX_MTU"}}`, oldTS),
+		fmt.Sprintf(`{"type":"assistant","sessionId":"old-zorb","timestamp":%q,"message":{"role":"assistant","content":"billing worker stalled because ZORBWAX_MTU was unset; exporting ZORBWAX_MTU=1420 fixed it."}}`, oldTS),
+	})
+	if err := index.Ensure(indexDir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	transcript := filepath.Join(tmp, "agy-transcript.jsonl")
+	userLine := `{"step_index":0,"type":"USER_INPUT","status":"DONE","content":"<USER_REQUEST>\nwhy did billing worker stall on ZORBWAX_MTU\n</USER_REQUEST>\n"}`
+	if err := os.WriteFile(transcript, []byte(userLine+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	payload := mustMarshal(t, map[string]any{
+		"invocationNum":  0,
+		"conversationId": "conv-dual-0",
+		"transcriptPath": transcript,
+		"workspacePaths": []string{repo},
+	})
+	var out bytes.Buffer
+	if err := runHookAntigravity(indexDir, bytes.NewReader(payload), &out); err != nil {
+		t.Fatal(err)
+	}
+	var resp antigravityHookResponse
+	if err := json.Unmarshal(bytes.TrimSpace(out.Bytes()), &resp); err != nil {
+		t.Fatalf("invalid JSON: %q (%v)", out.String(), err)
+	}
+	if len(resp.InjectSteps) != 1 {
+		t.Fatalf("len(InjectSteps) = %d, want 1 coalesced step: %+v", len(resp.InjectSteps), resp.InjectSteps)
+	}
+	msg := resp.InjectSteps[0].EphemeralMessage
+	if count := strings.Count(msg, "<deja-recall>"); count != 1 {
+		t.Errorf("expected 1 <deja-recall> header after coalescing, got %d:\n%s", count, msg)
+	}
+	if !strings.Contains(msg, antigravityLead) {
+		t.Errorf("Call-0 output missing workspace digest lead:\n%s", msg)
+	}
+	if !strings.Contains(msg, "ZORBWAX_MTU") {
+		t.Errorf("Call-0 output missing coalesced prompt recall (ZORBWAX_MTU):\n%s", msg)
+	}
+
+	steps := []transcriptStep{
+		{
+			Type: "GENERIC",
+			Content: "Created At: 2026-11-21T10:00:00Z\n" +
+				"Completed At: 2026-11-21T10:00:01Z\n" +
+				"[cmd direct | exit=1 | 12ms | 94B] pkg/billing/invoice.go:42: undefined: roundHalfEven",
+		},
+	}
+	gotFail := latestToolFailureFromSteps(steps)
+	wantFail := "pkg/billing/invoice.go:42: undefined: roundHalfEven"
+	if gotFail != wantFail {
+		t.Errorf("latestToolFailureFromSteps() = %q, want %q", gotFail, wantFail)
+	}
+}
