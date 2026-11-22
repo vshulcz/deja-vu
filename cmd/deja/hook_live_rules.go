@@ -18,13 +18,62 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
+func isSubagentTranscriptPath(path string) bool {
+	p := strings.ToLower(filepath.ToSlash(strings.TrimSpace(path)))
+	if p == "" {
+		return false
+	}
+	if strings.Contains(p, "/subagents/") {
+		return true
+	}
+	base := filepath.Base(p)
+	return strings.HasPrefix(base, "agent-") && strings.HasSuffix(base, ".jsonl")
+}
+
+func isSubagentOrProbePrompt(text string) bool {
+	t := strings.TrimSpace(text)
+	if t == "" {
+		return true
+	}
+	low := strings.ToLower(t)
+	for _, tag := range []string{
+		"<system_message>", "<system-message>", "<system-reminder>",
+		"<local-command-caveat>", "<task-notification>", "<task_notification>",
+		"<deja-recall>", "<additional_metadata>", "<command-name>",
+		"[plan review due]", "[cron:",
+	} {
+		if strings.Contains(low, tag) {
+			return true
+		}
+	}
+	for _, prefix := range []string{
+		"you are a ", "you are an ", "act as a ", "acting as a ",
+		"your role is", "your task is", "task prompt:", "subagent brief:",
+		"probe:", "eval:",
+	} {
+		if strings.HasPrefix(low, prefix) {
+			return true
+		}
+	}
+	for _, marker := range []string{
+		"as a subagent", "subagent task", "return only json", "output only json",
+		"respond only with", "reply only with", "do not edit any files",
+		"do not modify any files", "never modify any files", "without editing any files",
+		"read-only audit", "read-only verification",
+	} {
+		if strings.Contains(low, marker) {
+			return true
+		}
+	}
+	return false
+}
+
 func maybePinLiveUserRule(dir, cwd, sessionID, prompt string) {
 	t := strings.TrimSpace(prompt)
 	if len(t) < 12 || len(t) > 1200 {
 		return
 	}
-	lower := strings.ToLower(t)
-	if strings.Contains(lower, "<system_message>") || strings.Contains(lower, "<system-message>") {
+	if isSubagentOrProbePrompt(t) {
 		return
 	}
 	rules := digest.ExtractStandingRules(model.Session{
@@ -35,6 +84,9 @@ func maybePinLiveUserRule(dir, cwd, sessionID, prompt string) {
 		return
 	}
 	for _, r := range rules {
+		if isMalformedStandingRuleText(r.Text) || isSubagentOrProbePrompt(r.Text) {
+			continue
+		}
 		pinExtractedLiveRule(dir, cwd, sessionID, r.Text)
 	}
 }
@@ -44,17 +96,30 @@ func maybePinLiveUserRule(dir, cwd, sessionID, prompt string) {
 // store when available) and returns the preceding assistant message text.
 func syncLiveSessionRules(dir, cwd string, input promptHookInput, asked string) string {
 	msgs, prevRules, prevAssistant := liveSessionRecentMessages(dir, cwd, input, asked)
+	if input.ParentSessionID != "" || isSubagentTranscriptPath(input.TranscriptPath) {
+		return prevAssistant
+	}
 	if len(msgs) == 0 && len(prevRules) == 0 {
 		maybePinLiveUserRule(dir, cwd, input.SessionID, asked)
 		return prevAssistant
 	}
+	filtered := make([]model.Message, 0, len(msgs))
+	for _, m := range msgs {
+		if m.Role == "user" && isSubagentOrProbePrompt(m.Text) {
+			continue
+		}
+		filtered = append(filtered, m)
+	}
 	rules := digest.ExtractStandingRules(model.Session{
 		ID:       input.SessionID,
 		Harness:  input.Harness,
-		Messages: msgs,
+		Messages: filtered,
 	}, prevRules)
 	for _, r := range rules {
-		ctxTerms := turnPairContextTerms(msgs, r.Text)
+		if isMalformedStandingRuleText(r.Text) || isSubagentOrProbePrompt(r.Text) {
+			continue
+		}
+		ctxTerms := turnPairContextTerms(filtered, r.Text)
 		pinExtractedLiveRule(dir, cwd, input.SessionID, r.Text, ctxTerms...)
 	}
 	return prevAssistant
@@ -306,7 +371,7 @@ func syncAntigravitySessionRules(dir, cwd, conversationID string, steps []transc
 				msgs = append(msgs, model.Message{Role: "assistant", Text: st.Content})
 			}
 		case "USER_INPUT":
-			if q := userRequestText(st.Content); q != "" {
+			if q := userRequestText(st.Content); q != "" && !isSubagentOrProbePrompt(q) {
 				msgs = append(msgs, model.Message{Role: "user", Text: q})
 			}
 		}
@@ -320,6 +385,9 @@ func syncAntigravitySessionRules(dir, cwd, conversationID string, steps []transc
 		Messages: msgs,
 	}, prevRules)
 	for _, r := range rules {
+		if isMalformedStandingRuleText(r.Text) || isSubagentOrProbePrompt(r.Text) {
+			continue
+		}
 		ctxTerms := turnPairContextTerms(msgs, r.Text)
 		pinExtractedLiveRule(dir, cwd, conversationID, r.Text, ctxTerms...)
 	}
@@ -506,9 +574,10 @@ func extractLiveRulePathsAndSymbols(cwd, text string) ([]string, []string) {
 			break
 		}
 		s = after
-		if strings.Contains(item, "/") || isCodeFilePath(item) {
+		if isCodeFilePath(item) {
 			addPath(item)
-		} else if len(item) >= 2 {
+		} else if len(item) >= 2 && !strings.Contains(item, " ") &&
+			((strings.HasPrefix(item, "/") && !strings.Contains(item[1:], "/")) || !strings.Contains(item, "/")) {
 			addSym(item)
 		}
 	}
@@ -543,18 +612,111 @@ func extractLiveRulePathsAndSymbols(cwd, text string) ([]string, []string) {
 }
 
 func isCodeFilePath(p string) bool {
-	low := strings.ToLower(p)
-	exts := []string{
-		".go", ".ts", ".js", ".py", ".rs", ".json", ".yaml", ".yml",
-		".toml", ".md", ".sh", ".c", ".h", ".cpp", ".html", ".css",
+	p = strings.TrimSpace(p)
+	if p == "" || strings.ContainsAny(p, " \t\r\n") {
+		return false
 	}
+	low := strings.ToLower(p)
+	if strings.HasPrefix(low, "http://") || strings.HasPrefix(low, "https://") ||
+		strings.HasPrefix(low, "file://") || strings.Contains(p, "...") {
+		return false
+	}
+	exts := []string{
+		".go", ".ts", ".tsx", ".js", ".jsx", ".py", ".rs", ".json", ".jsonl",
+		".yaml", ".yml", ".toml", ".md", ".sh", ".bash", ".zsh", ".c", ".h",
+		".cc", ".cpp", ".hpp", ".html", ".css", ".scss", ".sql", ".proto",
+		".mod", ".sum", ".lock", ".txt",
+	}
+	base := filepath.Base(low)
 	for _, ext := range exts {
-		if strings.HasSuffix(low, ext) {
+		if strings.HasSuffix(low, ext) && len(base) > len(ext) && !strings.HasSuffix(low, "."+ext) {
 			return true
 		}
+	}
+	switch base {
+	case "makefile", "dockerfile", "jenkinsfile", "brewfile", "procfile", "justfile", "rakefile":
+		return true
+	}
+	if !strings.Contains(p, "/") {
+		return false
 	}
 	if strings.HasPrefix(p, "/") && !strings.Contains(p[1:], "/") {
 		return false
 	}
-	return strings.Contains(p, "/") && !strings.Contains(p, " ")
+	return looksLikeStructuredRepoPath(p)
+}
+
+func looksLikeStructuredRepoPath(p string) bool {
+	slash := filepath.ToSlash(p)
+	if proseSlashPair[strings.ToLower(slash)] {
+		return false
+	}
+	hasRelativePrefix := strings.HasPrefix(slash, "./") || strings.HasPrefix(slash, "../")
+	hasAbsPrefix := strings.HasPrefix(slash, "/")
+	trimmed := strings.TrimPrefix(strings.TrimPrefix(strings.TrimPrefix(slash, "./"), "../"), "/")
+	segs := strings.Split(trimmed, "/")
+	if len(segs) < 2 {
+		return false
+	}
+	allDigits := true
+	hasIdentifierHint := false
+	allShortAcronym := true
+	for _, seg := range segs {
+		if seg == "" || seg == "." || seg == ".." {
+			return false
+		}
+		segHasUpper, segHasLower, segHasDigit := false, false, false
+		for _, r := range seg {
+			if r > 127 {
+				return false
+			}
+			switch {
+			case r >= 'A' && r <= 'Z':
+				segHasUpper = true
+			case r >= 'a' && r <= 'z':
+				segHasLower = true
+			case r >= '0' && r <= '9':
+				segHasDigit = true
+			case r == '_' || r == '-' || r == '.':
+				hasIdentifierHint = true
+			default:
+				return false
+			}
+		}
+		if segHasLower || !segHasDigit {
+			allDigits = false
+		}
+		if segHasLower && segHasUpper {
+			hasIdentifierHint = true
+		}
+		if len(seg) > 5 || segHasLower {
+			allShortAcronym = false
+		}
+	}
+	if allDigits || allShortAcronym {
+		return false
+	}
+	if hasRelativePrefix || hasAbsPrefix || hasIdentifierHint || len(segs) >= 3 {
+		return true
+	}
+	return commonCodeDirRoots[strings.ToLower(segs[0])]
+}
+
+var proseSlashPair = map[string]bool{
+	"yes/no": true, "true/false": true, "read/write": true, "and/or": true,
+	"or/and": true, "on/off": true, "in/out": true, "before/after": true,
+	"old/new": true, "src/dst": true, "min/max": true, "left/right": true,
+	"top/bottom": true, "start/end": true, "up/down": true, "hooks/mcp": true,
+	"cli/mcp": true, "mcp/cli": true,
+}
+
+var commonCodeDirRoots = map[string]bool{
+	"cmd": true, "internal": true, "pkg": true, "src": true, "lib": true,
+	"app": true, "apps": true, "api": true, "web": true, "docs": true,
+	"doc": true, "scripts": true, "script": true, "test": true, "tests": true,
+	"bin": true, "config": true, "configs": true, "deploy": true, "infra": true,
+	"tools": true, "tool": true, "examples": true, "testdata": true, "assets": true,
+	"ui": true, "server": true, "client": true, "core": true, "common": true,
+	"shared": true, "utils": true, "util": true, "models": true, "model": true,
+	"handlers": true, "services": true, "store": true, "stores": true,
 }

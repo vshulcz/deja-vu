@@ -67,7 +67,9 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 		convFallback = workspaceFromConversation(input.TranscriptPath, input.ConversationID)
 	}
 	workspace, projectWorkspace := selectAntigravityWorkspaces(input.WorkspacePaths, convFallback, tailSteps)
-	syncAntigravitySessionRules(dir, projectWorkspace, input.ConversationID, tailSteps)
+	if !isSubagentTranscriptPath(input.TranscriptPath) {
+		syncAntigravitySessionRules(dir, projectWorkspace, input.ConversationID, tailSteps)
+	}
 	coordRecordAntigravitySteps(dir, projectWorkspace, input.ConversationID, tailSteps)
 	// A compaction throws away the blocks this conversation was shown while the
 	// record of having sent them outlives them, so the memory it just lost is
@@ -107,8 +109,8 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 		block := antigravityFixPair(dir, failedOut,
 			input.ConversationID, projectWorkspace)
 		if block == "" {
-			block = antigravityPromptBlock(dir, latestUserRequestFromSteps(tailSteps),
-				input.ConversationID, projectWorkspace)
+			block = antigravityPromptBlockFrom(dir, latestUserRequestFromSteps(tailSteps),
+				input.ConversationID, projectWorkspace, input.TranscriptPath, nil)
 		}
 		// The line the pre-tool hook gives before an edit, for the file the
 		// last call edited: PreToolUse cannot say it here, so it rides the
@@ -187,8 +189,8 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	}
 	block := antigravityFixPair(dir, failedOut, input.ConversationID, projectWorkspace)
 	if block == "" {
-		block = antigravityPromptBlockSkipping(dir, latestUserRequestFromSteps(tailSteps),
-			input.ConversationID, projectWorkspace, ids)
+		block = antigravityPromptBlockFrom(dir, latestUserRequestFromSteps(tailSteps),
+			input.ConversationID, projectWorkspace, input.TranscriptPath, ids)
 	}
 	if block != "" {
 		steps = append(steps, antigravityInjectStep{EphemeralMessage: block})

@@ -99,8 +99,14 @@ func FrictionSignature(l string) (string, uint64, bool) {
 // that went wrong, and returns it in the form two sessions can be compared on.
 func FrictionLine(l string) (string, bool) {
 	l = trimEnvelopeLabel(strings.TrimSpace(l))
+	if looksLikeGrepContextLine(l) {
+		return l, false
+	}
 	shell := shellErrorPrefix(l)
 	l = normalizeFriction(l)
+	if looksLikeGrepContextLine(l) {
+		return l, false
+	}
 	// A shell only prints its position marker in front of something it could
 	// not do, so the marker is the signal and what follows may be short. This
 	// machine's transcripts hold 89 sightings of `(eval):1: == not found` —
@@ -372,17 +378,36 @@ var leadingTimestamp = regexp.MustCompile(`^\[?\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:
 // struct field, a code span — none of which appears in what a tool prints:
 // 130 of the 192 lines of this repo's own source that read as friction (#2436).
 func looksLikeSource(l string) bool {
+	if looksLikeGrepContextLine(l) {
+		return true
+	}
+	if sourceFragmentLooksLikeCode(l) {
+		return true
+	}
+	if code := stripSourcePositionPrefix(l); code != l && code != "" {
+		if looksLikeGrepContextLine(code) || sourceFragmentLooksLikeCode(code) {
+			return true
+		}
+	}
+	return false
+}
+
+func sourceFragmentLooksLikeCode(l string) bool {
 	for _, source := range []string{"echo ", "printf ", "$(", "=~", "print("} {
 		if strings.Contains(l, source) {
 			return true
 		}
 	}
-	if strings.HasPrefix(l, "\"") || strings.Contains(l, "\": \"") {
+	if strings.HasPrefix(l, "\"") || strings.HasPrefix(l, "'") || strings.Contains(l, "\": \"") {
 		return true
 	}
 	if strings.Contains(l, `("`) || strings.Contains(l, `, "`) ||
 		strings.Contains(l, `:= "`) || strings.Contains(l, `= "`) ||
-		strings.Contains(l, `: "`) && strings.HasSuffix(l, `"},`) ||
+		strings.Contains(l, `('`) || strings.Contains(l, `, '`) ||
+		strings.Contains(l, `:= '`) || strings.Contains(l, `= '`) ||
+		strings.Contains(l, ":= `") || strings.Contains(l, "= `") ||
+		strings.Contains(l, `case "`) ||
+		keyedStringLiteralValue(l) ||
 		strings.HasPrefix(l, "`") || strings.Contains(l, "` ") {
 		return true
 	}
@@ -396,6 +421,128 @@ func looksLikeSource(l string) bool {
 		}
 	}
 	return false
+}
+
+// keyedStringLiteralValue reports lines shaped like `Key: "value",` /
+// `{Role: "x", Text: "value"},` without matching diagnostic prose like
+// `AssertionError: "x" != "y"` or `error: "bad"`.
+func keyedStringLiteralValue(l string) bool {
+	isIdent := func(b byte) bool {
+		return (b >= 'A' && b <= 'Z') || (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') || b == '_'
+	}
+	for off := 0; off < len(l); {
+		rel := strings.Index(l[off:], `: "`)
+		if rel < 0 {
+			return false
+		}
+		idx := off + rel
+		off = idx + 3
+		if idx == 0 || !isIdent(l[idx-1]) {
+			continue
+		}
+		start := idx - 1
+		for start > 0 && isIdent(l[start-1]) {
+			start--
+		}
+		if start > 0 {
+			switch l[start-1] {
+			case ' ', '\t', '{', '(', ',':
+			default:
+				continue
+			}
+		}
+		rest := l[idx+3:]
+		closeQ := -1
+		for i := 0; i < len(rest); i++ {
+			if rest[i] == '\\' {
+				i++
+				continue
+			}
+			if rest[i] == '"' {
+				closeQ = i
+				break
+			}
+		}
+		if closeQ < 0 {
+			continue
+		}
+		switch strings.TrimSpace(rest[closeQ+1:]) {
+		case ",", "}", "},", ")", "),":
+			return true
+		}
+	}
+	return false
+}
+
+// looksLikeGrepContextLine matches `rg -C` / `grep -C` context lines formatted
+// as `<line>-<content>` or `<path>-<line>-<content>`.
+func looksLikeGrepContextLine(l string) bool {
+	trimmed := strings.TrimSpace(l)
+	if trimmed == "" {
+		return false
+	}
+	if digitsDashContext(trimmed) {
+		return true
+	}
+	firstDash := strings.IndexByte(trimmed, '-')
+	for firstDash > 0 {
+		tok := trimmed[:firstDash]
+		if strings.ContainsAny(tok, " \t\"'`") {
+			return false
+		}
+		if (strings.ContainsRune(tok, '/') || strings.ContainsRune(tok, '.')) && digitsDashContext(trimmed[firstDash+1:]) {
+			return true
+		}
+		next := strings.IndexByte(trimmed[firstDash+1:], '-')
+		if next < 0 {
+			break
+		}
+		firstDash += 1 + next
+	}
+	return false
+}
+
+func digitsDashContext(s string) bool {
+	i := 0
+	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+		i++
+	}
+	if i == 0 || i >= len(s) || s[i] != '-' {
+		return false
+	}
+	rest := s[i+1:]
+	return rest == "" || rest[0] == ' ' || rest[0] == '\t' || rest[0] == '/' || rest[0] == '#' || rest[0] == '"' || rest[0] == '\'' || rest[0] == '`'
+}
+
+func stripSourcePositionPrefix(l string) string {
+	// Bare `<lineno>:<content>` from `rg -n --no-filename`.
+	i := 0
+	for i < len(l) && l[i] >= '0' && l[i] <= '9' {
+		i++
+	}
+	if i > 0 && i < len(l) && l[i] == ':' {
+		return strings.TrimSpace(l[i+1:])
+	}
+	// `<path>:<lineno>[:<col>]:<content>` from `rg -n` / `grep -Hn`, without path length cap.
+	first := strings.IndexByte(l, ':')
+	if first <= 0 || strings.ContainsAny(l[:first], " \t`\"'") {
+		return l
+	}
+	rest := l[first+1:]
+	second := strings.IndexByte(rest, ':')
+	if second <= 0 {
+		return l
+	}
+	if _, err := strconv.Atoi(rest[:second]); err != nil {
+		return l
+	}
+	afterLine := rest[second+1:]
+	if third := strings.IndexByte(afterLine, ':'); third > 0 {
+		if _, err := strconv.Atoi(afterLine[:third]); err == nil {
+			return strings.TrimSpace(afterLine[third+1:])
+		}
+	}
+	return strings.TrimSpace(afterLine)
 }
 
 // isDejaOwnReport reports whether the line is something deja printed. Its own

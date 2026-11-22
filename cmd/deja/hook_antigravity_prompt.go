@@ -371,6 +371,10 @@ func antigravityPromptBlock(dir, question, conversationID, workspace string) str
 }
 
 func antigravityPromptBlockSkipping(dir, question, conversationID, workspace string, skipIDs []string) string {
+	return antigravityPromptBlockFrom(dir, question, conversationID, workspace, "", skipIDs)
+}
+
+func antigravityPromptBlockFrom(dir, question, conversationID, workspace, transcriptPath string, skipIDs []string) string {
 	question = strings.TrimSpace(question)
 	if question == "" {
 		return ""
@@ -387,6 +391,9 @@ func antigravityPromptBlockSkipping(dir, question, conversationID, workspace str
 		"prompt":     question,
 		"session_id": conversationID,
 		"cwd":        workspace,
+	}
+	if strings.TrimSpace(transcriptPath) != "" {
+		body["transcript_path"] = transcriptPath
 	}
 	if len(skipIDs) > 0 {
 		body["skip_ids"] = skipIDs

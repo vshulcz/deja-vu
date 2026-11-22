@@ -1217,7 +1217,7 @@ func confirmedCommandTrapLine(dir, cwd, cmd string) string {
 		if p.Command == "" || p.Error == "" {
 			continue
 		}
-		if p.Project == "" || !allow(p.Project) || isUnitTestFailureLine(p.Error) || orientSkipFixError(p.Error) {
+		if p.Project == "" || !allow(p.Project) || index.IsViewerFixPair(p) || isUnitTestFailureLine(p.Error) || orientSkipFixError(p.Error) {
 			continue
 		}
 		rawCmd, ok := withoutFailedExit(strings.TrimPrefix(strings.TrimSpace(search.SafeText(p.Command)), "$ "))

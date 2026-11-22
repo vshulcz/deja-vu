@@ -160,19 +160,63 @@ func reflexiveSuffix(rest string) bool {
 // backticks or quotation marks as a metalinguistic token rather than used as a
 // statement of action.
 func phraseQuotedOrCode(low string, phraseAt, phraseLen int) bool {
-	if phraseAt <= 0 {
+	if phraseAt <= 0 || phraseAt+phraseLen > len(low) {
 		return false
 	}
-	before := low[:phraseAt]
-	after := low[phraseAt+phraseLen:]
-	for _, q := range []string{"`", `"`, "'", "«", "“"} {
-		if strings.HasSuffix(before, q) {
+	lineStart := strings.LastIndexByte(low[:phraseAt], '\n') + 1
+	lineEnd := len(low)
+	if nl := strings.IndexByte(low[phraseAt+phraseLen:], '\n'); nl >= 0 {
+		lineEnd = phraseAt + phraseLen + nl
+	}
+	before := low[lineStart:phraseAt]
+	after := low[phraseAt+phraseLen : lineEnd]
+
+	// 1. Enclosing inline backticks on the same line (`* reverted…`).
+	if strings.Count(before, "`")%2 == 1 && strings.ContainsRune(after, '`') {
+		if open := strings.LastIndexByte(before, '`'); open >= 0 {
+			if closeRel := strings.IndexByte(after, '`'); closeRel >= 0 && (len(before)-open)+phraseLen+closeRel <= 200 {
+				return true
+			}
+		}
+	}
+
+	// 2. Asymmetric paired quote delimiters (`«...»`, `“...”`) on the same line.
+	for _, pair := range [][2]string{{"«", "»"}, {"“", "”"}} {
+		openIdx := strings.LastIndex(before, pair[0])
+		if openIdx < 0 {
+			continue
+		}
+		if closeInBefore := strings.LastIndex(before, pair[1]); closeInBefore > openIdx {
+			continue
+		}
+		closeIdx := strings.Index(after, pair[1])
+		if closeIdx < 0 {
+			continue
+		}
+		if nextOpen := strings.Index(after, pair[0]); nextOpen >= 0 && nextOpen < closeIdx {
+			continue
+		}
+		if (len(before)-openIdx)+phraseLen+closeIdx <= 200 {
 			return true
 		}
 	}
-	for _, q := range []string{"`", `"`, "'", "»", "”"} {
-		if strings.HasPrefix(after, q) {
-			return true
+
+	// 3. Straight double quotes (`"..."`) enclosing the phrase on the same line.
+	if strings.Count(before, `"`)%2 == 1 {
+		if open := strings.LastIndexByte(before, '"'); open >= 0 {
+			if closeRel := strings.IndexByte(after, '"'); closeRel >= 0 && (len(before)-open)+phraseLen+closeRel <= 180 {
+				return true
+			}
+		}
+	}
+
+	// 4. Single quotes (`'...'`) when the opening mark is non-contraction (at token boundary).
+	if open := strings.LastIndexByte(before, '\''); open >= 0 {
+		prevIsBoundary := open == 0 || before[open-1] == ' ' || before[open-1] == '\t' || before[open-1] == '(' || before[open-1] == ':'
+		if prevIsBoundary && !strings.ContainsRune(before[open+1:], '\'') {
+			if closeRel := strings.IndexByte(after, '\''); closeRel >= 0 && (len(before)-open)+phraseLen+closeRel <= 120 {
+				return true
+			}
 		}
 	}
 	return false

@@ -1168,3 +1168,77 @@ func TestAntigravityEditCallsExtractsMCPPathsAndSkipsScratch(t *testing.T) {
 		t.Fatalf("AntigravityEditCalls() = %+v, want %+v", got, want)
 	}
 }
+
+func TestAntigravityExternalMCPFiltersDejaAndExtractsSlicesChunksAndCommands(t *testing.T) {
+	if isAntigravityExternalMCPTool("mcp_deja_deja", "_deja") ||
+		isAntigravityExternalMCPTool("mcp__deja__recall", "_recall") ||
+		isAntigravityExternalMCPTool("deja__orient", "_orient") ||
+		isAntigravityExternalMCPTool("read_file", "_file") {
+		t.Fatal("expected deja and built-in tool names to return false from isAntigravityExternalMCPTool")
+	}
+	if !isAntigravityExternalMCPTool("mcp_fs_edit_file", "_edit_file") ||
+		!isAntigravityExternalMCPTool("mcp__runner__exec", "_exec") {
+		t.Fatal("expected external MCP tool suffixes to match")
+	}
+
+	toolCalls := []any{
+		map[string]any{
+			"name": "mcp_deja_read",
+			"args": map[string]any{"Path": "/work/app/ignored.go"},
+		},
+		map[string]any{
+			"name": "mcp_fs_read_file",
+			"args": map[string]any{
+				"paths": []string{"/work/app/one.go", "/work/app/two.go"},
+			},
+		},
+		map[string]any{
+			"name": "mcp_fs_view_file",
+			"args": map[string]any{
+				"Paths": `["/work/app/three.go","/work/app/four.go"]`,
+			},
+		},
+		map[string]any{
+			"name": "edit_file",
+			"args": map[string]any{
+				"file_path":  "/work/app/five.go",
+				"old_string": "oldFive",
+				"new_string": "newFive",
+			},
+		},
+		map[string]any{
+			"name": "multi_replace_file_content",
+			"args": map[string]any{
+				"TargetFile":        "/work/app/six.go",
+				"ReplacementChunks": `[{"TargetContent":"oldA","ReplacementContent":"newA"},{"TargetContent":"oldB","ReplacementContent":"newB"}]`,
+			},
+		},
+	}
+
+	gotEdits := AntigravityEditCalls(toolCalls)
+	wantEdits := []EditCall{
+		{ToolName: "mcp_fs_read_file", FilePath: "/work/app/one.go"},
+		{ToolName: "mcp_fs_read_file", FilePath: "/work/app/two.go"},
+		{ToolName: "mcp_fs_view_file", FilePath: "/work/app/three.go"},
+		{ToolName: "mcp_fs_view_file", FilePath: "/work/app/four.go"},
+		{ToolName: "edit_file", FilePath: "/work/app/five.go", OldString: "oldFive", NewString: "newFive"},
+		{ToolName: "multi_replace_file_content", FilePath: "/work/app/six.go", OldString: "oldA\noldB", NewString: "newA\nnewB"},
+	}
+	if !slices.Equal(gotEdits, wantEdits) {
+		t.Fatalf("AntigravityEditCalls() = %+v, want %+v", gotEdits, wantEdits)
+	}
+
+	cmdCalls := []any{
+		map[string]any{"name": "run_command", "args": nil},
+		map[string]any{"name": "run_command", "args": map[string]any{"CommandLine": "go test ./..."}},
+		map[string]any{"name": "mcp_runner_exec", "args": map[string]any{"cmd": "make lint"}},
+		map[string]any{"name": "mcp_box_shell", "args": map[string]any{"script": "echo ok"}},
+		map[string]any{"name": "mcp__remote__command", "args": map[string]any{"command": "pwd"}},
+		map[string]any{"name": "mcp_deja_cmd", "args": map[string]any{"cmd": "ignored"}},
+	}
+	gotCmds := AntigravityCommandCalls(cmdCalls)
+	wantCmds := []string{"go test ./...", "make lint", "echo ok", "pwd"}
+	if !slices.Equal(gotCmds, wantCmds) {
+		t.Fatalf("AntigravityCommandCalls() = %q, want %q", gotCmds, wantCmds)
+	}
+}

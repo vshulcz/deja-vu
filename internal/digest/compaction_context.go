@@ -2,6 +2,8 @@ package digest
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -34,6 +36,7 @@ type ExtractOptions struct {
 	MaxRecords   int
 	MaxTextBytes int
 	MaxItems     int
+	Workspace    string
 }
 
 func (o ExtractOptions) normalized() ExtractOptions {
@@ -63,7 +66,7 @@ func ExtractCompactionContext(s model.Session, opts ExtractOptions) model.Compac
 		c.Goal = goal
 	}
 	c.Rules = ExtractStandingRules(s, nil)
-	c.Modified = extractModifiedFiles(s, opts.MaxItems)
+	c.Modified = extractModifiedFiles(s, opts.MaxItems, opts.Workspace)
 	verdicts := runOutputVerdicts(s.Messages)
 
 	for _, m := range slices.Backward(window) {
@@ -505,7 +508,7 @@ func reverseOpenItems(items []model.ContextOpenItem) { slices.Reverse(items) }
 // the session (in transcript order, newest set capped at maxItems) so a
 // resumed agent after compaction sees which files were already updated without
 // re-reading each one to check.
-func extractModifiedFiles(s model.Session, maxItems int) []model.ContextFact {
+func extractModifiedFiles(s model.Session, maxItems int, workspace string) []model.ContextFact {
 	if maxItems <= 0 {
 		maxItems = defaultContextItems
 	}
@@ -521,16 +524,115 @@ func extractModifiedFiles(s model.Session, maxItems int) []model.ContextFact {
 		}
 		path, _, _ := strings.Cut(m.Text, "\n")
 		path = strings.TrimSpace(path)
-		if path == "" || len(path) > 200 || strings.ContainsAny(stripDriveLetterPrefix(path), " \t\"'`$(){}[]=;:,*") || hasFact(rev, path) {
+		if path == "" || len(path) > 200 || strings.ContainsAny(stripDriveLetterPrefix(path), " \t\"'`$(){}[]=;:,*") {
 			continue
 		}
-		rev = append(rev, model.ContextFact{Text: path, Provenance: contextRef(s, m)})
+		norm := normalizeModifiedFilePath(path, workspace)
+		if norm == "" || hasFact(rev, norm) {
+			continue
+		}
+		rev = append(rev, model.ContextFact{Text: norm, Provenance: contextRef(s, m)})
 		if len(rev) >= maxItems {
 			break
 		}
 	}
 	reverseFacts(rev)
 	return rev
+}
+
+func normalizeModifiedFilePath(path, workspace string) string {
+	collapsed := collapseWorktreeFilePath(path)
+	if workspace == "" {
+		return collapsed
+	}
+	var bases []string
+	addBase := func(b string) {
+		b = strings.TrimSpace(b)
+		if b == "" {
+			return
+		}
+		if !slices.Contains(bases, b) {
+			bases = append(bases, b)
+		}
+		if noPriv := strings.TrimPrefix(b, "/private"); noPriv != b && !slices.Contains(bases, noPriv) {
+			bases = append(bases, noPriv)
+		}
+	}
+	addBase(workspace)
+	addBase(collapseWorktreeFilePath(workspace))
+	if root := sources.RepoRoot(workspace); root != "" {
+		addBase(root)
+	}
+	candidates := []string{collapsed}
+	if collapsed != path {
+		candidates = append(candidates, path)
+	}
+	for _, cand := range candidates {
+		noPrivCand := strings.TrimPrefix(cand, "/private")
+		for _, base := range bases {
+			for _, c := range []string{cand, noPrivCand} {
+				if rel, ok := relUnderWorkspaceBase(base, c); ok {
+					return rel
+				}
+			}
+		}
+	}
+	for _, cand := range candidates {
+		if rel := resolveForeignWorktreeFileSuffix(cand, bases); rel != "" {
+			return rel
+		}
+	}
+	return collapsed
+}
+
+func collapseWorktreeFilePath(p string) string {
+	collapsed := sources.CollapseWorktreePath(p)
+	slash := filepath.ToSlash(collapsed)
+	if before, rest, ok := strings.Cut(slash, "/.git/worktrees/"); ok {
+		if _, after, ok := strings.Cut(rest, "/"); ok && after != "" {
+			return before + "/" + after
+		}
+	}
+	return collapsed
+}
+
+func relUnderWorkspaceBase(base, target string) (string, bool) {
+	cleanBase := filepath.Clean(filepath.FromSlash(strings.ReplaceAll(base, `\`, "/")))
+	cleanTarget := filepath.Clean(filepath.FromSlash(strings.ReplaceAll(target, `\`, "/")))
+	if cleanBase == "" || cleanTarget == "" {
+		return "", false
+	}
+	rel, err := filepath.Rel(cleanBase, cleanTarget)
+	if err != nil {
+		return "", false
+	}
+	rel = filepath.ToSlash(rel)
+	if rel == "." || rel == ".." || strings.HasPrefix(rel, "../") {
+		return "", false
+	}
+	return rel, true
+}
+
+func resolveForeignWorktreeFileSuffix(p string, bases []string) string {
+	slash := strings.ReplaceAll(strings.TrimSpace(p), `\`, "/")
+	stripped := stripDriveLetterPrefix(slash)
+	low := strings.ToLower(stripped)
+	if !strings.HasPrefix(low, "/tmp/") && !strings.HasPrefix(low, "/private/tmp/") && !strings.Contains(low, "/worktrees/") {
+		return ""
+	}
+	parts := strings.Split(strings.TrimPrefix(stripped, "/"), "/")
+	for _, base := range bases {
+		for i := 1; i < len(parts); i++ {
+			rel := strings.Join(parts[i:], "/")
+			if rel == "" {
+				continue
+			}
+			if _, err := os.Stat(filepath.Join(base, filepath.FromSlash(rel))); err == nil {
+				return rel
+			}
+		}
+	}
+	return ""
 }
 
 func stripDriveLetterPrefix(p string) string {
