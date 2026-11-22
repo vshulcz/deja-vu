@@ -516,6 +516,9 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 		// Run spawn coordination even on cold stores so live parent briefs reach subagents.
 		return runHookSpawn(dir, input, raw, stdout)
 	}
+	if isPlanTool(input.ToolName) {
+		return emitHookPlanFromTool(dir, raw, stdout, shape)
+	}
 	if strings.TrimSpace(input.SessionID) == "" {
 		switch {
 		case strings.TrimSpace(input.TranscriptPath) != "":

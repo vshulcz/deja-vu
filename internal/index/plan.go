@@ -5,6 +5,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -32,6 +34,7 @@ type planWallCluster struct {
 
 type planIndexedTerm struct {
 	text     string
+	ident    bool
 	sessions map[uint32]bool
 }
 
@@ -225,10 +228,15 @@ func PlanFrictionMatches(dir string, steps [][]string, keep func(SessionMeta) bo
 // FrictionMinSessions standing between the two.
 func planWallSharesTerm(wallText string, steps [][]planIndexedTerm) bool {
 	for _, terms := range steps {
-		for _, term := range terms {
-			if planTextHasTerm(wallText, term.text) {
+		matched, matchedIdent := planStepMatchesText(wallText, terms)
+		if planTermsHaveIdent(terms) {
+			if matchedIdent >= 1 || matched >= 2 {
 				return true
 			}
+			continue
+		}
+		if matched >= 1 {
+			return true
 		}
 	}
 	return false
@@ -316,8 +324,9 @@ func planIndexedSteps(dir string, manifest Manifest, steps [][]string) ([][]plan
 			// 1.09, hermes-agent 1.21) started at 1.09, so
 			// planIdentifierIDFFloor sits at the gap between them.
 			// Non-identifier terms still need the full floor.
+			ident := planIsIdentifierTerm(raw)
 			floor := dejaVuIDFFloor
-			if planIsIdentifierTerm(term) {
+			if ident {
 				floor = planIdentifierIDFFloor
 			}
 			idf := math.Log(totalDocs / float64(len(sessions)+1))
@@ -326,6 +335,7 @@ func planIndexedSteps(dir string, manifest Manifest, steps [][]string) ([][]plan
 			}
 			terms = append(terms, planIndexedTerm{
 				text:     term,
+				ident:    ident,
 				sessions: sessions,
 			})
 		}
@@ -334,14 +344,18 @@ func planIndexedSteps(dir string, manifest Manifest, steps [][]string) ([][]plan
 		}
 
 		counts := map[uint32]int{}
+		identCounts := map[uint32]int{}
 		for _, term := range terms {
 			for ord := range term.sessions {
 				counts[ord]++
+				if term.ident {
+					identCounts[ord]++
+				}
 			}
 		}
 		matched := map[uint32]bool{}
 		for ord, count := range counts {
-			if count >= need {
+			if count >= need && (identCounts[ord] >= 1 || count >= 2) {
 				matched[ord] = true
 			}
 		}
@@ -355,6 +369,23 @@ func planIndexedSteps(dir string, manifest Manifest, steps [][]string) ([][]plan
 	return indexed, candidates, needs
 }
 
+var planGenericVerb = map[string]bool{
+	"update": true, "updated": true, "updates": true, "updating": true,
+	"change": true, "changed": true, "changes": true, "changing": true,
+	"create": true, "created": true, "creates": true, "creating": true,
+	"remove": true, "removed": true, "removes": true, "removing": true,
+	"delete": true, "deleted": true, "deletes": true, "deleting": true,
+	"modify": true, "modified": true,
+	"refactor": true, "rename": true, "verify": true, "inspect": true,
+	"repair": true, "switch": true, "ensure": true,
+	"handle": true, "handling": true, "return": true, "returns": true,
+	"replace": true, "extract": true, "implement": true,
+	"support": true, "document": true,
+	"before": true, "after": true, "across": true, "inside": true,
+	"without": true, "should": true, "follow": true, "checks": true,
+	"adding": true, "making": true, "running": true, "testing": true,
+}
+
 // planHasIdentifierTerm reports whether any term in a step is
 // identifier-shaped (see planIsIdentifierTerm). Used to size the step's need
 // (1 term vs. 2) at both the raw-term-selection layer (cmd/deja) and here.
@@ -362,20 +393,43 @@ func planHasIdentifierTerm(terms []string) bool {
 	return slices.ContainsFunc(terms, planIsIdentifierTerm)
 }
 
-// planIsIdentifierTerm mirrors cmd/deja's hasIdentifierTerm at the single-term
-// level: a term is identifier-shaped when it is long (>=6) or carries a
-// symbol/digit an English word wouldn't. Duplicated rather than imported
-// because cmd/deja depends on internal/index, not the other way around.
-func planIsIdentifierTerm(t string) bool {
-	if len(t) >= 6 {
-		return true
-	}
-	for _, r := range t {
-		if r == '_' || r == '.' || r == '/' || r == '-' || (r >= '0' && r <= '9') {
+func planTermsHaveIdent(terms []planIndexedTerm) bool {
+	for _, term := range terms {
+		if term.ident {
 			return true
 		}
 	}
 	return false
+}
+
+// planIsIdentifierTerm mirrors cmd/deja's hasIdentifierTerm at the single-term
+// level: a term is identifier-shaped when it carries a symbol/digit, mixed
+// case, or is a non-generic word of length >= 6. Duplicated rather than
+// imported because cmd/deja depends on internal/index, not the other way around.
+func planIsIdentifierTerm(raw string) bool {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return false
+	}
+	hasUpper, hasLower := false, false
+	for _, r := range raw {
+		if r == '_' || r == '.' || r == '/' || r == '-' || (r >= '0' && r <= '9') {
+			return true
+		}
+		if r >= 'A' && r <= 'Z' {
+			hasUpper = true
+		} else if r >= 'a' && r <= 'z' {
+			hasLower = true
+		}
+	}
+	if hasUpper && hasLower {
+		return true
+	}
+	low := strings.ToLower(raw)
+	if planGenericVerb[low] {
+		return false
+	}
+	return len(low) >= 6
 }
 
 func planTermSessions(dir, term string) map[uint32]bool {
@@ -421,13 +475,12 @@ func planCommandForStep(session model.Session, terms []planIndexedTerm, need int
 		if command == "" || len(command) > 160 || namesAnEphemeralPath(command) {
 			continue
 		}
-		matched := 0
-		for _, term := range terms {
-			if planTextHasTerm(command, term.text) {
-				matched++
-			}
+		trimmed := strings.TrimSpace(strings.TrimPrefix(command, "$ "))
+		if strings.Contains(command, " → exit ") || InspectionCommand(trimmed) || ViewerCommand(trimmed) {
+			continue
 		}
-		if matched < need {
+		matched, matchedIdent := planStepMatchesText(command, terms)
+		if matched < need || (matchedIdent == 0 && matched < 2) {
 			continue
 		}
 		if matched > bestMatches ||
@@ -448,12 +501,10 @@ func planWallCommand(
 ) (string, []SessionMeta) {
 	groups := map[string]map[string]SessionMeta{}
 	for step, terms := range steps {
-		sharesTerm := false
-		for _, term := range terms {
-			if planTextHasTerm(wallText, term.text) {
-				sharesTerm = true
-				break
-			}
+		matched, matchedIdent := planStepMatchesText(wallText, terms)
+		sharesTerm := matched >= 1
+		if planTermsHaveIdent(terms) {
+			sharesTerm = matchedIdent >= 1 || matched >= 2
 		}
 		if !sharesTerm {
 			continue
@@ -495,10 +546,69 @@ func planWallCommand(
 	return best, out
 }
 
+func planStepMatchesText(text string, terms []planIndexedTerm) (matched, matchedIdent int) {
+	for _, term := range terms {
+		if planTextHasTerm(text, term.text) {
+			matched++
+			if term.ident {
+				matchedIdent++
+			}
+		}
+	}
+	return matched, matchedIdent
+}
+
 func planTextHasTerm(text, term string) bool {
 	terms, phrases := query.QueryParts(term)
 	if len(terms) == 0 && len(phrases) == 0 {
 		return false
 	}
-	return query.MatchesParts(text, terms, phrases, nil)
+	if !query.MatchesParts(text, terms, phrases, nil) {
+		return false
+	}
+	low := query.Lower(text)
+	for _, tok := range terms {
+		if !hasPlanTokenBoundary(low, tok) {
+			return false
+		}
+	}
+	return true
+}
+
+func hasPlanTokenBoundary(low, tok string) bool {
+	if tok == "" {
+		return false
+	}
+	start := 0
+	for start <= len(low)-len(tok) {
+		rel := strings.Index(low[start:], tok)
+		if rel < 0 {
+			return false
+		}
+		pos := start + rel
+		end := pos + len(tok)
+		prevOK := true
+		if pos > 0 {
+			prev, _ := utf8.DecodeLastRuneInString(low[:pos])
+			prevOK = !isPlanIdentRune(prev)
+		}
+		nextOK := true
+		if end < len(low) {
+			next, _ := utf8.DecodeRuneInString(low[end:])
+			nextOK = !isPlanIdentRune(next)
+		}
+		if prevOK && nextOK {
+			return true
+		}
+		_, w := utf8.DecodeRuneInString(low[pos:])
+		if w <= 0 {
+			w = 1
+		}
+		start = pos + w
+	}
+	return false
+}
+
+func isPlanIdentRune(r rune) bool {
+	return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_'
 }

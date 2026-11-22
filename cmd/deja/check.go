@@ -35,7 +35,7 @@ func runCheckTo(dir string, args []string, stdin io.Reader, stdout, stderr io.Wr
 	if err != nil {
 		return fmt.Errorf("check: read plan: %w", err)
 	}
-	findings := planFindings(dir, string(plan), "")
+	findings := planFindingsIn(dir, hookCWD(""), string(plan), "")
 	for _, finding := range findings {
 		fmt.Fprintln(stdout, finding)
 	}

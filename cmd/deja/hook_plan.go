@@ -5,7 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"regexp"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -19,7 +23,11 @@ import (
 	"github.com/vshulcz/deja-vu/internal/prompt"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
+	"github.com/vshulcz/deja-vu/internal/usage"
 )
+
+// maxPlanFileBytes bounds disk reads when a plan hook names a plan file path.
+const maxPlanFileBytes = 64 << 10
 
 // planHookBudget is the complete framed payload budget. Findings receive the
 // remainder after the existing untrusted-history frame takes its share.
@@ -31,20 +39,143 @@ const (
 	planTermLimit    = 4
 )
 
+type planToolArgs struct {
+	Plan              string          `json:"plan"`
+	PlanUpper         string          `json:"Plan"`
+	Content           string          `json:"content"`
+	Summary           string          `json:"summary"`
+	PlanFilePath      string          `json:"planFilePath"`
+	PlanFilePathSnake string          `json:"plan_file_path"`
+	FilePath          string          `json:"file_path"`
+	FilePathCamel     string          `json:"filePath"`
+	Path              string          `json:"path"`
+	NestedToolArgs    json.RawMessage `json:"toolArgs"`
+	NestedToolArgsSnk json.RawMessage `json:"tool_args"`
+}
+
+func (a planToolArgs) planText() string {
+	return firstNonEmpty(a.Plan, a.PlanUpper, a.Content, a.Summary)
+}
+
+func (a planToolArgs) planPath() string {
+	return firstNonEmpty(a.PlanFilePath, a.PlanFilePathSnake, a.FilePath, a.FilePathCamel, a.Path)
+}
+
 type planHookInput struct {
-	HookEventName string `json:"hook_event_name"`
-	ToolName      string `json:"tool_name"`
-	ToolInput     struct {
-		Plan         string `json:"plan"`
-		PlanFilePath string `json:"planFilePath"`
-	} `json:"tool_input"`
-	SessionID string `json:"session_id"`
-	CWD       string `json:"cwd"`
+	HookEventName       string          `json:"hook_event_name"`
+	HookEventNameCamel  string          `json:"hookEventName"`
+	ToolName            string          `json:"tool_name"`
+	ToolNameCamel       string          `json:"toolName"`
+	LLMToolName         string          `json:"llm_tool_name"`
+	ToolInput           planToolArgs    `json:"tool_input"`
+	ToolInputCamel      planToolArgs    `json:"toolInput"`
+	ToolArgs            json.RawMessage `json:"toolArgs"`
+	ToolArgsSnake       json.RawMessage `json:"tool_args"`
+	SessionID           string          `json:"session_id"`
+	SessionIDCamel      string          `json:"sessionId"`
+	ConversationID      string          `json:"conversation_id"`
+	ConversationIDCamel string          `json:"conversationId"`
+	TranscriptPath      string          `json:"transcript_path"`
+	TranscriptPathCamel string          `json:"transcriptPath"`
+	CWD                 string          `json:"cwd"`
+	WorkspaceRoot       string          `json:"workspaceRoot"`
+	WorkspaceRoots      []string        `json:"workspace_roots"`
+}
+
+func decodePlanToolArgs(raw json.RawMessage, dst *planToolArgs) {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 || bytes.Equal(raw, []byte("null")) {
+		return
+	}
+	if raw[0] == '"' {
+		var nested string
+		if json.Unmarshal(raw, &nested) != nil {
+			return
+		}
+		nested = strings.TrimSpace(nested)
+		if nested == "" {
+			return
+		}
+		raw = []byte(nested)
+	}
+	_ = json.Unmarshal(raw, dst)
+}
+
+func (in *planHookInput) adopt() {
+	in.HookEventName = adoptGrok(in.HookEventName, in.HookEventNameCamel)
+	in.ToolName = adoptGrok(adoptGrok(in.ToolName, in.ToolNameCamel), in.LLMToolName)
+	in.SessionID = firstNonEmpty(in.SessionID, in.SessionIDCamel, in.ConversationID, in.ConversationIDCamel)
+	in.TranscriptPath = adoptGrok(in.TranscriptPath, in.TranscriptPathCamel)
+	in.WorkspaceRoots = adoptGrokRoots(in.WorkspaceRoots, in.WorkspaceRoot)
+	if strings.TrimSpace(in.CWD) == "" {
+		in.CWD = hookProjectPath(in.CWD, in.WorkspaceRoots)
+	}
+
+	var argsRoot, argsSnake, nestedCamel, nestedSnake, camelNestedCamel, camelNestedSnake planToolArgs
+	decodePlanToolArgs(in.ToolArgs, &argsRoot)
+	decodePlanToolArgs(in.ToolArgsSnake, &argsSnake)
+	decodePlanToolArgs(in.ToolInput.NestedToolArgs, &nestedCamel)
+	decodePlanToolArgs(in.ToolInput.NestedToolArgsSnk, &nestedSnake)
+	decodePlanToolArgs(in.ToolInputCamel.NestedToolArgs, &camelNestedCamel)
+	decodePlanToolArgs(in.ToolInputCamel.NestedToolArgsSnk, &camelNestedSnake)
+
+	in.ToolInput.Plan = firstNonEmpty(
+		in.ToolInput.planText(),
+		in.ToolInputCamel.planText(),
+		argsRoot.planText(),
+		argsSnake.planText(),
+		nestedCamel.planText(),
+		nestedSnake.planText(),
+		camelNestedCamel.planText(),
+		camelNestedSnake.planText(),
+	)
+	in.ToolInput.PlanFilePath = firstNonEmpty(
+		in.ToolInput.planPath(),
+		in.ToolInputCamel.planPath(),
+		argsRoot.planPath(),
+		argsSnake.planPath(),
+		nestedCamel.planPath(),
+		nestedSnake.planPath(),
+		camelNestedCamel.planPath(),
+		camelNestedSnake.planPath(),
+	)
+}
+
+func isPlanTool(name string) bool {
+	low := strings.ToLower(strings.TrimSpace(name))
+	switch low {
+	case "exitplanmode", "exit_plan_mode", "plan_exit", "submit_plan", "submitplan", "finalize_plan":
+		return true
+	}
+	return isExternalMCPToolWithSuffix(low, "_exit_plan_mode", "_plan_exit", "_submit_plan", "_finalize_plan")
+}
+
+func resolvePlanText(cwd, inlinePlan, planFilePath string) string {
+	if strings.TrimSpace(inlinePlan) != "" {
+		return inlinePlan
+	}
+	p := cleanHookFilePath(planFilePath)
+	if p == "" {
+		return ""
+	}
+	if !filepath.IsAbs(p) && cwd != "" {
+		p = filepath.Join(cwd, p)
+	}
+	fi, err := os.Stat(p)
+	if err != nil || fi.IsDir() || fi.Size() <= 0 || fi.Size() > maxPlanFileBytes {
+		return ""
+	}
+	data, err := os.ReadFile(p)
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }
 
 type planFinding struct {
 	line     string
 	sessions []index.SessionMeta
+	token    string
 }
 
 // indexDamaged is a variable for the same reason indexFormatDirection is: a
@@ -70,8 +201,19 @@ var planFrictionLookup = index.PlanFrictionMatches
 // runHookPlan is the ExitPlanMode PreToolUse hook. Silence is the miss
 // contract, including malformed input and an unavailable index.
 func runHookPlan(dir string, stdin io.Reader, stdout io.Writer) error {
+	return runHookPlanMode(dir, stdin, stdout, hookToolClaude)
+}
+
+func runHookPlanMode(dir string, stdin io.Reader, stdout io.Writer, shape hookToolShape) error {
+	raw := readHookPayload(stdin, hookStdinWait)
+	return emitHookPlanFromTool(dir, raw, stdout, shape)
+}
+
+func emitHookPlanFromTool(dir string, raw []byte, stdout io.Writer, shape hookToolShape) error {
 	var input planHookInput
-	_ = json.NewDecoder(bytes.NewReader(readHookPayload(stdin, hookStdinWait))).Decode(&input)
+	_ = json.NewDecoder(bytes.NewReader(raw)).Decode(&input)
+	input.adopt()
+
 	// The kill switch, before anything is read. It reached the session-start
 	// hook and nothing else, so a machine with recall off still had text drawn
 	// from its own indexed sessions injected here (#2701).
@@ -79,21 +221,46 @@ func runHookPlan(dir string, stdin io.Reader, stdout io.Writer) error {
 		return nil
 	}
 
-	// The matcher should guarantee ExitPlanMode, but a hook wired with a
-	// wider matcher must not answer for tools it was never designed to read.
-	if input.ToolName != "ExitPlanMode" {
+	// Only plan submission needs a check; everything else returns quietly so an
+	// unrelated PreToolUse invocation never pays a delay or receives noise.
+	if !isPlanTool(input.ToolName) {
 		return nil
 	}
 
 	cwd := hookCWD(input.CWD)
-	lines := planFindingsIn(dir, cwd, input.ToolInput.Plan, input.SessionID)
+	planText := resolvePlanText(cwd, input.ToolInput.Plan, input.ToolInput.PlanFilePath)
+	lines := planFindingsIn(dir, cwd, planText, input.SessionID)
 	if len(lines) == 0 {
 		return nil
 	}
 
+	framed := frameRecall(strings.Join(lines, "\n"))
+	usage.RecordDigestInto(dir, usage.KindTool, framed, input.SessionID, len(lines), int64(len(planText)), nil)
+	event := firstNonEmpty(input.HookEventName, "PreToolUse")
+	switch shape {
+	case hookToolPlain:
+		fmt.Fprintln(stdout, framed)
+		return nil
+	case hookToolCrush:
+		b, err := json.Marshal(struct {
+			Context string `json:"context"`
+		}{Context: framed})
+		if err != nil {
+			return nil //nolint:nilerr // a reply that cannot marshal means no reply
+		}
+		fmt.Fprintln(stdout, string(b))
+		return nil
+	case hookToolCopilot:
+		emitCopilotContext(stdout, framed)
+		return nil
+	case hookToolMcode:
+		emitMcodeContext(stdout, event, framed)
+		return nil
+	case hookToolClaude:
+	}
 	var resp sessionStartHookResponse
-	resp.HookSpecificOutput.HookEventName = "PreToolUse"
-	resp.HookSpecificOutput.AdditionalContext = frameRecall(strings.Join(lines, "\n"))
+	resp.HookSpecificOutput.HookEventName = event
+	resp.HookSpecificOutput.AdditionalContext = framed
 	b, err := json.Marshal(resp)
 	if err != nil {
 		return nil //nolint:nilerr // a reply that cannot marshal means no reply
@@ -116,15 +283,33 @@ func planFindingsIn(dir, cwd, plan, sessionID string) []string {
 
 	pol := policy.Load()
 	seen := alreadyInjected(dir, sessionID)
-	var extraFindings []planFinding
-	var extraTokens []string
+	var projects []string
 	if cwd != "" {
-		rmFindings, rmTokens := planRepoMemoryFindings(cwd, plan, pol, seen)
-		extraFindings = append(extraFindings, rmFindings...)
-		extraTokens = append(extraTokens, rmTokens...)
+		projects = digest.ProjectNameCandidates(cwd)
+	}
+	scopeToProject := false
+	if len(projects) > 0 {
+		if metas, err := index.AllMeta(dir); err == nil && len(metas) > 0 {
+			for _, m := range metas {
+				if planMetaInProject(m, projects) {
+					scopeToProject = true
+					break
+				}
+			}
+		}
+	}
+	var extraFindings []planFinding
+	if cwd != "" {
+		extraFindings = append(extraFindings, planRepoMemoryFindings(cwd, plan, pol, seen)...)
 	}
 	keep := func(meta index.SessionMeta) bool {
+		if sources.HarnessExcluded(meta.Harness) || pol.Ignored(meta.Path, meta.Project) {
+			return false
+		}
 		if !pol.Allows(policy.ActivationAuto, meta.Project) {
+			return false
+		}
+		if scopeToProject && !planMetaInProject(meta, projects) {
 			return false
 		}
 		if sessionID != "" && (meta.ID == sessionID || seen[meta.ID]) {
@@ -149,8 +334,8 @@ func planFindingsIn(dir, cwd, plan, sessionID string) []string {
 			return nil
 		}
 		findings := budgetPlanFindings(extraFindings, planHookBudget-recallFrameOverhead)
-		if sessionID != "" && len(extraTokens) > 0 {
-			rememberInjectedIDs(dir, sessionID, extraTokens...)
+		if sessionID != "" {
+			rememberPlanFindings(dir, sessionID, findings)
 		}
 		lines := make([]string, 0, len(findings))
 		for _, f := range findings {
@@ -160,9 +345,8 @@ func planFindingsIn(dir, cwd, plan, sessionID string) []string {
 	}
 
 	if cwd != "" {
-		cpFindings, cpTokens := planCoupledFileFindings(dir, cwd, plan, extraFindings, seen)
-		extraFindings = append(extraFindings, cpFindings...)
-		extraTokens = append(extraTokens, cpTokens...)
+		extraFindings = append(extraFindings, planFileGuardrailFindings(dir, cwd, plan, pol, projects, sessionID, extraFindings, seen)...)
+		extraFindings = append(extraFindings, planCoupledFileFindings(dir, cwd, plan, pol, projects, sessionID, extraFindings, seen)...)
 	}
 
 	matches := planFrictionLookup(dir, steps, keep, planFindingLimit)
@@ -231,9 +415,6 @@ func planFindingsIn(dir, cwd, plan, sessionID string) []string {
 	}
 	if sessionID != "" {
 		rememberPlanFindings(dir, sessionID, findings)
-		if len(extraTokens) > 0 {
-			rememberInjectedIDs(dir, sessionID, extraTokens...)
-		}
 	}
 
 	lines := make([]string, 0, len(findings))
@@ -243,17 +424,16 @@ func planFindingsIn(dir, cwd, plan, sessionID string) []string {
 	return lines
 }
 
-func planRepoMemoryFindings(cwd, plan string, pol policy.Policy, seen map[string]bool) ([]planFinding, []string) {
+func planRepoMemoryFindings(cwd, plan string, pol policy.Policy, seen map[string]bool) []planFinding {
 	root := sources.RepoRoot(cwd)
 	if root == "" || !pol.Allows(policy.ActivationAuto, sources.RepoMemoryProject(root)) {
-		return nil, nil
+		return nil
 	}
 	entries, _, err := readRepoMemoryAndNotes(root)
 	if err != nil || len(entries) == 0 {
-		return nil, nil
+		return nil
 	}
 	var out []planFinding
-	var tokens []string
 	for _, e := range entries {
 		matched := commandTouchesRepoEntryFiles(plan, e.Files)
 		if !matched {
@@ -279,26 +459,209 @@ func planRepoMemoryFindings(cwd, plan string, pol policy.Policy, seen map[string
 		if seen[tok] {
 			continue
 		}
-		out = append(out, planFinding{line: line})
-		tokens = append(tokens, tok)
+		out = append(out, planFinding{line: line, token: tok})
 		if len(out) >= 2 {
 			break
 		}
 	}
-	return out, tokens
+	return out
 }
 
-func planCoupledFileFindings(dir, cwd, plan string, existing []planFinding, seen map[string]bool) ([]planFinding, []string) {
-	names := digest.ProjectNameCandidates(cwd)
-	if len(names) == 0 {
-		return nil, nil
+func planRepoRoot(cwd string) string {
+	if root := sources.RepoRoot(cwd); root != "" {
+		return root
 	}
-	pairs := orientCoChangePairs(dir, names, cwd, orientFiles(dir, names, cwd), policy.ActivationAuto)
-	if len(pairs) == 0 {
-		return nil, nil
+	return cwd
+}
+
+func planMetaInProject(meta index.SessionMeta, projects []string) bool {
+	if len(projects) == 0 {
+		return true
+	}
+	proj := meta.BareProject()
+	for _, cand := range projects {
+		if cand == "" {
+			continue
+		}
+		if index.ProjectInScope(meta.Project, cand) {
+			return true
+		}
+		if proj != "" && strings.HasSuffix(cand, "/"+proj) {
+			return true
+		}
+	}
+	return false
+}
+
+func planReferencedRepoFiles(cwd, plan string) []string {
+	root := planRepoRoot(cwd)
+	if root == "" || strings.TrimSpace(plan) == "" {
+		return nil
+	}
+	tree := orientRepoTree(root)
+	if len(tree.rel) == 0 {
+		return nil
+	}
+	cands := make([]string, 0, len(tree.rel))
+	for rel := range tree.rel {
+		cands = append(cands, rel)
+	}
+	sort.Strings(cands)
+	var out []string
+	for _, rel := range cands {
+		if commandTouchesRepoEntryFiles(plan, []string{rel}) {
+			out = append(out, rel)
+			if len(out) >= 12 {
+				break
+			}
+		}
+	}
+	return out
+}
+
+func planScopedMetasForFile(dir, root, fullPath string, pol policy.Policy, projects []string, sessionID string) []index.SessionMeta {
+	var inScope []index.SessionMeta
+	for _, meta := range index.FileSessions(dir, fullPath) {
+		if sources.HarnessExcluded(meta.Harness) || pol.Ignored(meta.Path, meta.Project) {
+			continue
+		}
+		if !pol.Allows(policy.ActivationAuto, meta.Project) {
+			continue
+		}
+		if len(projects) > 0 && !planMetaInProject(meta, projects) {
+			continue
+		}
+		if !fileMetaMatchesRepoSubpath(meta, root, fullPath) {
+			continue
+		}
+		if sessionID != "" && meta.ID == sessionID {
+			continue
+		}
+		inScope = append(inScope, meta)
+	}
+	return inScope
+}
+
+func planFindingAlreadyCovered(existing []planFinding, a, b string) bool {
+	aLow, bLow := strings.ToLower(a), strings.ToLower(b)
+	aBase, bBase := strings.ToLower(baseName(a)), strings.ToLower(baseName(b))
+	for _, ex := range existing {
+		low := strings.ToLower(ex.line)
+		hasA := strings.Contains(low, aLow) || (aBase != "" && strings.Contains(low, aBase))
+		hasB := strings.Contains(low, bLow) || (bBase != "" && strings.Contains(low, bBase))
+		if hasA && hasB {
+			return true
+		}
+	}
+	return false
+}
+
+// planCoupledPairToken keys coupled-file dedupe on the sorted basename pair so
+// direct file-session and project orient lookups share one session token.
+func planCoupledPairToken(a, b string) string {
+	norm := func(p string) string {
+		if base := strings.ToLower(strings.TrimSpace(baseName(p))); base != "" {
+			return base
+		}
+		return strings.ToLower(filepath.ToSlash(strings.TrimSpace(p)))
+	}
+	x, y := norm(a), norm(b)
+	if x > y {
+		x, y = y, x
+	}
+	return "plan:co:" + shortHash(x+"\x00"+y)
+}
+
+func planFileGuardrailFindings(
+	dir, cwd, plan string,
+	pol policy.Policy,
+	projects []string,
+	sessionID string,
+	existing []planFinding,
+	seen map[string]bool,
+) []planFinding {
+	root := planRepoRoot(cwd)
+	refs := planReferencedRepoFiles(root, plan)
+	if len(refs) == 0 {
+		return nil
+	}
+	selfSkip := map[string]bool{}
+	if sessionID != "" {
+		selfSkip[sessionID] = true
 	}
 	var out []planFinding
-	var tokens []string
+	for _, rel := range refs {
+		fullPath := filepath.Join(root, rel)
+		inScope := planScopedMetasForFile(dir, root, fullPath, pol, projects, sessionID)
+		clause := turn0FileGuardrail(dir, root, fullPath, inScope, selfSkip)
+		if clause == "" || strings.HasPrefix(clause, repoDecisionLabel) {
+			continue
+		}
+		detail := strings.TrimSpace(strings.TrimPrefix(clause, " — "))
+		if detail == "" {
+			continue
+		}
+		line := fmt.Sprintf("%s: %s", search.SafePath(rel), neutralPlanEvidence(detail))
+		tok := "plan:fg:" + shortHash(line)
+		if seen[tok] || planFindingAlreadyCovered(existing, rel, detail) || planFindingAlreadyCovered(out, rel, detail) {
+			continue
+		}
+		out = append(out, planFinding{line: line, token: tok})
+		if len(out) >= 2 {
+			break
+		}
+	}
+	return out
+}
+
+func planCoupledFileFindings(
+	dir, cwd, plan string,
+	pol policy.Policy,
+	projects []string,
+	sessionID string,
+	existing []planFinding,
+	seen map[string]bool,
+) []planFinding {
+	root := planRepoRoot(cwd)
+	refs := planReferencedRepoFiles(root, plan)
+	covered := append([]planFinding{}, existing...)
+	var out []planFinding
+	for _, rel := range refs {
+		fullPath := filepath.Join(root, rel)
+		inScope := planScopedMetasForFile(dir, root, fullPath, pol, projects, sessionID)
+		comp, coCount, total := coChangeCompanionIn(root, fullPath, inScope)
+		if comp == "" {
+			continue
+		}
+		if commandTouchesRepoEntryFiles(plan, []string{comp}) || slices.Contains(refs, comp) {
+			continue
+		}
+		pairText := fmt.Sprintf("%s ↔ %s (%d/%d sessions)", rel, comp, coCount, total)
+		if len(orientFilterCoupledByRepoMemory(root, []string{pairText})) == 0 {
+			continue
+		}
+		if planFindingAlreadyCovered(covered, rel, comp) {
+			continue
+		}
+		line := fmt.Sprintf("coupled files: %s is usually edited alongside %s (%d/%d sessions), which is not named in this plan", search.SafePath(rel), comp, coCount, total)
+		tok := planCoupledPairToken(rel, comp)
+		if seen[tok] {
+			covered = append(covered, planFinding{line: line})
+			continue
+		}
+		f := planFinding{line: line, token: tok}
+		covered = append(covered, f)
+		out = append(out, f)
+		if len(out) >= 2 {
+			return out
+		}
+	}
+
+	names := digest.ProjectNameCandidates(cwd)
+	if len(names) == 0 {
+		return out
+	}
+	pairs := orientCoChangePairs(dir, names, cwd, orientFiles(dir, names, cwd), policy.ActivationAuto)
 	for _, pair := range pairs {
 		parts := strings.SplitN(pair, " (", 2)
 		if len(parts) != 2 {
@@ -319,30 +682,23 @@ func planCoupledFileFindings(dir, cwd, plan string, existing []planFinding, seen
 		if inB {
 			named, missing = fileB, fileA
 		}
-		alreadyCovered := false
-		for _, ex := range existing {
-			low := strings.ToLower(ex.line)
-			if strings.Contains(low, strings.ToLower(named)) && strings.Contains(low, strings.ToLower(missing)) {
-				alreadyCovered = true
-				break
-			}
-		}
-		if alreadyCovered {
+		if planFindingAlreadyCovered(covered, named, missing) {
 			continue
 		}
 		stats := strings.TrimSuffix(parts[1], ")")
 		line := fmt.Sprintf("coupled files: %s is usually edited alongside %s (%s), which is not named in this plan", named, missing, stats)
-		tok := "plan:co:" + shortHash(line)
+		tok := planCoupledPairToken(named, missing)
 		if seen[tok] {
 			continue
 		}
-		out = append(out, planFinding{line: line})
-		tokens = append(tokens, tok)
+		f := planFinding{line: line, token: tok}
+		covered = append(covered, f)
+		out = append(out, f)
 		if len(out) >= 2 {
 			break
 		}
 	}
-	return out, tokens
+	return out
 }
 
 func filterPlanMetas(metas []index.SessionMeta, keep func(index.SessionMeta) bool, members map[string]bool) []index.SessionMeta {
@@ -367,18 +723,29 @@ func planMetaKey(meta index.SessionMeta) string {
 }
 
 func rememberPlanFindings(dir, sessionID string, findings []planFinding) {
-	seen := map[string]bool{}
+	seenSessions := map[string]bool{}
 	var sessions []model.Session
+	seenTokens := map[string]bool{}
+	var tokens []string
 	for _, finding := range findings {
 		for _, meta := range finding.sessions {
-			if meta.ID == "" || seen[meta.ID] {
+			if meta.ID == "" || seenSessions[meta.ID] {
 				continue
 			}
-			seen[meta.ID] = true
+			seenSessions[meta.ID] = true
 			sessions = append(sessions, model.Session{ID: meta.ID})
 		}
+		if finding.token != "" && !seenTokens[finding.token] {
+			seenTokens[finding.token] = true
+			tokens = append(tokens, finding.token)
+		}
 	}
-	rememberInjected(dir, sessionID, sessions)
+	if len(sessions) > 0 {
+		rememberInjected(dir, sessionID, sessions)
+	}
+	if len(tokens) > 0 {
+		rememberInjectedIDs(dir, sessionID, tokens...)
+	}
 }
 
 // extractPlanSteps prefers explicit Markdown steps. Prose lines are considered
@@ -496,6 +863,13 @@ func planRemedy(dir, wall string) string {
 // is budgeted, and a command longer than this is a script rather than a step.
 const planCommandMax = 120
 
+func planSessionCount(n int) string {
+	if n == 1 {
+		return "1 session"
+	}
+	return fmt.Sprintf("%d sessions", n)
+}
+
 // formatPlanFinding reports the wall recurrence — the fact a census
 // verified (internal/index/plan.go's PlanCooccurrence doc) — and, only when
 // one was actually found, appends the command clause as a bonus, not a
@@ -511,15 +885,15 @@ func formatPlanFinding(match index.PlanCooccurrence) string {
 		since = " since " + oldest.Local().Format("2006-01-02")
 	}
 	wall := strconv.Quote(neutralPlanEvidence(match.Wall.Text))
-	line := fmt.Sprintf("wall hit in %d sessions%s: %s", len(match.Wall.Sessions), since, wall)
+	line := fmt.Sprintf("wall hit in %s%s: %s", planSessionCount(len(match.Wall.Sessions)), since, wall)
 
 	if len(match.CommandSessions) == 0 || strings.TrimSpace(match.Command) == "" {
 		return line
 	}
 	command := strconv.Quote(neutralPlanEvidence(match.Command))
 	return fmt.Sprintf(
-		"%s; past sessions also ran %s (%d sessions)",
-		line, command, len(match.CommandSessions),
+		"%s; past sessions also ran %s (%s)",
+		line, command, planSessionCount(len(match.CommandSessions)),
 	)
 }
 

@@ -99,15 +99,17 @@ deja fix "$stderr_line" --json | jq -r '.fixes[0].command // empty'
 If your harness has hooks, deja is designed to be called from them and to
 answer on stdout, which is the channel harnesses feed back to the model.
 The commands are `deja hook-context` (session start, once per session),
-`deja hook-prompt` (per prompt), `deja hook-tool` (before a Bash or Edit call),
-`deja hook-tool-after` (after one failed) and `deja hook-plan` (before a plan is
-accepted). `deja install` wires the first four wherever the harness has the
-event; it wires `hook-plan` nowhere, the default Claude Code install included,
-because whether an agent changes a plan it is about to run has not been
-measured. To try it, add a `PreToolUse` hook matched on `ExitPlanMode` that runs
-`deja hook-plan`; it ignores any other tool. Each reads its harness's JSON event on stdin and writes at most a
-bounded block on stdout — 1,536 bytes for a prompt, 480 before a tool call and
-420 after a failed one; the one-time compaction packet is 4 KB.
+`deja hook-prompt` (per prompt), `deja hook-tool` (before a Bash, Edit or
+plan-exit call), `deja hook-tool-after` (after one failed) and `deja hook-plan`
+(before a plan is accepted). `deja install` wires the first four wherever the
+harness has the event, including `ExitPlanMode` through `hook-tool` on Claude
+Code and Grok (`hook-antigravity` handles `exit_plan_mode` on the next
+invocation). Standalone `deja hook-plan` supports `--plain`, `--crush`,
+`--copilot` and `--mcode` alongside Claude's `PreToolUse` envelope and reads
+`planFilePath` (`<= 64 KB`) when inline plan text is omitted. Each reads its
+harness's JSON event on stdin and writes at most a bounded block on stdout —
+1,536 bytes for a prompt, 480 before a tool call, 420 after a failed one and
+2,048 for a plan check; the one-time compaction packet is 4 KB.
 There is one harness-shaped exception, `deja hook-antigravity`, because
 Antigravity fires a single PreInvocation event and nothing else; if your hook
 model does not fit the five above, that is the shape to copy.
