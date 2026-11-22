@@ -496,9 +496,9 @@ func parseCoordPayloadView(raw []byte, fallbackCWD string, fallback toolHookInpu
 
 	ti := extractToolInputMap(doc)
 	if ti != nil {
-		out.Command = firstJSONString(ti, "command", "cmd")
+		out.Command = firstJSONString(ti, "command", "CommandLine", "command_line", "cmd", "script")
 		if out.Command == "" {
-			out.Command = firstJSONString(doc, "command")
+			out.Command = firstJSONString(doc, "command", "CommandLine", "command_line")
 		}
 		out.ToolInputCmd = out.Command
 		out.Patch = coordExtractPatchText(out.ToolName, ti)
@@ -560,14 +560,14 @@ func collectToolInputPaths(ti map[string]any) []string {
 			add(s)
 		}
 	}
-	for _, k := range []string{"paths", "files"} {
+	for _, k := range []string{"paths", "Paths", "files"} {
 		if arr, ok := ti[k].([]any); ok {
 			for _, item := range arr {
 				switch v := item.(type) {
 				case string:
 					add(v)
 				case map[string]any:
-					add(firstJSONString(v, "file_path", "filePath", "path", "target_file", "targetFile"))
+					add(firstJSONString(v, "file_path", "filePath", "path", "target_file", "targetFile", "absolute_path", "AbsolutePath"))
 				}
 			}
 		}
@@ -622,8 +622,11 @@ func coordToolAction(toolName string, tiCmd string, hasPatch bool) coordActionKi
 		"read_notebook", "open_file", "cat_file", "file_read", "get_file", "read_many_files":
 		return coordActionRead
 	}
-	if strings.HasPrefix(lower, "write_") || strings.HasPrefix(lower, "edit_") || strings.Contains(lower, "replace_file") {
+	if strings.HasPrefix(lower, "write_") || strings.HasPrefix(lower, "edit_") || strings.Contains(lower, "replace_file") || isExternalMCPEditTool(lower) {
 		return coordActionEdit
+	}
+	if isExternalMCPReadTool(lower) {
+		return coordActionRead
 	}
 	if hasPatch && !isCommandTool(toolName) {
 		return coordActionEdit
@@ -646,8 +649,11 @@ func coordActionPaths(cwd string, view coordPayloadView) (coordActionKind, []str
 	seen := map[string]bool{}
 	out := make([]string, 0, len(rawPaths))
 	for _, rp := range rawPaths {
+		if sources.IsAgentScratchPath(filepath.ToSlash(rp)) {
+			continue
+		}
 		cp := coordCanonicalPath(cwd, rp)
-		if cp != "" && !seen[cp] {
+		if cp != "" && !seen[cp] && !sources.IsAgentScratchPath(filepath.ToSlash(cp)) {
 			seen[cp] = true
 			out = append(out, cp)
 		}
@@ -712,7 +718,10 @@ func coordHandleToolFile(dir, cwd string, input toolHookInput, raw []byte) strin
 			seen := map[string]bool{}
 			for _, pf := range patchFiles {
 				pf = sources.ShellPatchPath(view.Command, view.CWD, pf)
-				if cp := coordCanonicalPath(view.CWD, pf); cp != "" && !seen[cp] {
+				if sources.IsAgentScratchPath(filepath.ToSlash(pf)) {
+					continue
+				}
+				if cp := coordCanonicalPath(view.CWD, pf); cp != "" && !seen[cp] && !sources.IsAgentScratchPath(filepath.ToSlash(cp)) {
 					seen[cp] = true
 					paths = append(paths, cp)
 				}

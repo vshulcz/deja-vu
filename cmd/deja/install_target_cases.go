@@ -52,11 +52,9 @@ func installTargetCase(target string) (installTargetFunc, bool) {
 		"zed": func(exe string, uninstall bool) (installResult, error) {
 			return installZedMCP(sources.ZedSettingsPath(), exe, uninstall)
 		},
-		"devin":      installDevinMCP,
-		"devin-auto": installDevinAuto,
-		"cline": func(exe string, uninstall bool) (installResult, error) {
-			return installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall)
-		},
+		"devin":             installDevinMCP,
+		"devin-auto":        installDevinAuto,
+		"cline":             installClineMCP,
 		"roo":               installRoo,
 		"kilocode":          installKilocode,
 		"kilocode-auto":     installKilocodeAuto,
@@ -275,6 +273,23 @@ func installTargetKimiAuto(exe string, uninstall bool) (installResult, error) {
 	return wroteAll(mcp, hooks, status), nil
 }
 
+// installClineMCP wires Cline's MCP entry and sets alwaysAllow: ["deja"] on install.
+func installClineMCP(exe string, uninstall bool) (installResult, error) {
+	path := sources.ClineMCPSettingsPath()
+	res, err := installMCPJSON(path, exe, uninstall)
+	if err != nil || uninstall {
+		return res, err
+	}
+	changed, err := rooAllowDejasTool(path)
+	if err != nil {
+		return installResult{}, err
+	}
+	if changed && res.Action == "unchanged" {
+		res.Action = "updated"
+	}
+	return res, nil
+}
+
 // installTargetClineAuto wires cline's MCP entry and its plugin.
 func installTargetClineAuto(exe string, uninstall bool) (installResult, error) {
 	if !uninstall {
@@ -282,7 +297,7 @@ func installTargetClineAuto(exe string, uninstall bool) (installResult, error) {
 			return installResult{}, err
 		}
 	}
-	mcp, err := installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall)
+	mcp, err := installClineMCP(exe, uninstall)
 	if err != nil {
 		return installResult{}, err
 	}

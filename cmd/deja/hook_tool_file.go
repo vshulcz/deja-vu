@@ -29,6 +29,9 @@ func fileHookLineOutsideWithEdit(dir, cwd, path, editText string, self func(inde
 }
 
 func fileHookLineOutsideWithMode(dir, cwd, path, editText string, readOnly bool, self func(index.SessionMeta, string) bool) string {
+	if sources.IsAgentScratchPath(filepath.ToSlash(path)) {
+		return ""
+	}
 	// FileSessions matches on the file's basename, so without scoping "main.go"
 	// or "README.md" collects every project's file of that name — the line then
 	// claims a history this file does not have and points `deja blame` at a

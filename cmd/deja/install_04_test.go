@@ -4171,3 +4171,93 @@ func TestCommandFilesMatchEachHarnessShape(t *testing.T) {
 		}
 	}
 }
+
+func TestInstallAntigravityPluginRulesAndPreservesUserEdits(t *testing.T) {
+	hermeticEnv(t)
+	dir := filepath.Join(antigravityConfigHome(), "plugins", antigravityPluginName)
+	rulesPath := filepath.Join(dir, "rules", "AGENTS.md")
+
+	if _, err := installAntigravityPlugin("/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(rulesPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != antigravityPluginRules {
+		t.Fatalf("installed rules/AGENTS.md mismatch:\ngot:\n%s\nwant:\n%s", got, antigravityPluginRules)
+	}
+
+	if err := os.WriteFile(rulesPath, []byte(retiredAntigravityPluginRules[0]), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installAntigravityPlugin("/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	if upgraded, rerr := os.ReadFile(rulesPath); rerr != nil || string(upgraded) != antigravityPluginRules {
+		t.Fatalf("retired rules were not upgraded: err=%v, got=%q", rerr, upgraded)
+	}
+
+	custom := antigravityPluginRules + "\nCustom team rule.\n"
+	if err := os.WriteFile(rulesPath, []byte(custom), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installAntigravityPlugin("/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	if kept, rerr := os.ReadFile(rulesPath); rerr != nil || string(kept) != custom {
+		t.Fatalf("user-edited rules overwritten on reinstall: err=%v, got=%q", rerr, kept)
+	}
+
+	if _, err := installAntigravityPlugin("/usr/local/bin/deja", true); err != nil {
+		t.Fatal(err)
+	}
+	for _, removed := range []string{filepath.Join(dir, "plugin.json"), filepath.Join(dir, "hooks.json")} {
+		if _, err := os.Stat(removed); !os.IsNotExist(err) {
+			t.Errorf("%s survived uninstall with edited rules", removed)
+		}
+	}
+	if kept, rerr := os.ReadFile(rulesPath); rerr != nil || string(kept) != custom {
+		t.Fatalf("user-edited rules did not survive uninstall: err=%v, got=%q", rerr, kept)
+	}
+
+	if err := os.WriteFile(rulesPath, []byte(antigravityPluginRules), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installAntigravityPlugin("/usr/local/bin/deja", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("plugin dir %s survived uninstall of unedited rules", dir)
+	}
+}
+
+func TestInstallClineAllowsDejaMCPTool(t *testing.T) {
+	for _, target := range []string{"cline", "cline-auto"} {
+		t.Run(target, func(t *testing.T) {
+			hermeticEnv(t)
+			if _, err := installTarget(target, "/usr/local/bin/deja", false); err != nil {
+				t.Fatal(err)
+			}
+			raw, err := os.ReadFile(sources.ClineMCPSettingsPath())
+			if err != nil {
+				t.Fatal(err)
+			}
+			var doc struct {
+				MCPServers map[string]struct {
+					AlwaysAllow []string `json:"alwaysAllow"`
+				} `json:"mcpServers"`
+			}
+			if err := json.Unmarshal(raw, &doc); err != nil {
+				t.Fatal(err)
+			}
+			entry, ok := doc.MCPServers["deja"]
+			if !ok {
+				t.Fatalf("missing mcpServers.deja in %s:\n%s", sources.ClineMCPSettingsPath(), raw)
+			}
+			if !slices.Contains(entry.AlwaysAllow, "deja") {
+				t.Fatalf("alwaysAllow = %v, want to contain %q\n%s", entry.AlwaysAllow, "deja", raw)
+			}
+		})
+	}
+}

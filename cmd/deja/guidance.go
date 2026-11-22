@@ -15,13 +15,13 @@ const (
 	guidanceEnd   = "<!-- deja guidance:end -->"
 )
 
-const guidanceBody = `Before re-deriving past work, search deja when the user refers to past work, previous sessions, or what was decided before, before debugging an error or re-implementing something that may already exist, and when they state that something of theirs already exists that you have no record of ("I already have X", "we use Y for this"). Before telling the user that something on this machine does not exist — a command, a file, a setting, a past decision — recall first. ` + recallBeforeChange + ` Use the deja MCP tool and pick a mode:
+const guidanceBody = `Before re-deriving past work, search deja when the user refers to past work, previous sessions, or what was decided before, before debugging an error or re-implementing something that may already exist, and when they state that something of theirs already exists that you have no record of ("I already have X", "we use Y for this"). Before telling the user that something on this machine does not exist — a command, a file, a setting, a past decision — recall first. ` + recallBeforeChange + ` Use the deja MCP tool and pick the mode for the action:
 
-- recall: search this user's past sessions with 1-3 exact terms (an error string, function name, file path, or flag); not for library docs or general knowledge.
-- context: get a concise digest of the best matching session, with the code it changed.
-- blame / fix / how / orient / remember / handoff: file session history, commands that fixed a verbatim error, real local command flags, project activity summary, store one settled decision, or continue another session.
+- recall / context: search this user's past sessions with 1-3 exact terms (an error string, function name, file path, or flag) — not library docs or general knowledge — and follow with context when full session detail matters.
+- blame: before editing, refactoring, or deleting a file, check prior sessions that shaped it.
+- how / fix / orient / remember / handoff: real local flags before guessing commands (how), verbatim error fixes (fix), repo activity summary (orient), store one user-corrected choice or settled gotcha (remember), or continue another session (handoff).
 
-Example: for "what did we decide about token refresh?", call deja with mode recall and query "token refresh", then mode context if the result needs more detail.
+Example: before changing token refresh, call deja mode blame on the file or mode recall with "token refresh", then mode context if a hit needs more detail; inline any recalled constraint into your plan or subagent prompt.
 
 When recalled history helps — a reused fix, a skipped re-debug, a hint that changed your approach — open your reply with that one line: "déjà vu: <what it said> — reusing it (deja:<session id>)". One line, at the start, and nothing about recalls that did not help.`
 
@@ -43,16 +43,16 @@ If the deja tool is not available in this session, the same index is reachable t
 
 ## Finding something
 
-These are the modes of the one deja tool, passed as ` + "`mode`" + `.
+Pick from the modes of the one deja tool by what you are about to do instead of defaulting every lookup to ` + "`recall`" + `:
 
-- recall: search with the most specific token available — an exact error string, function name, file path, or flag. One to three terms: every word has to match for an exact hit. Not for library docs or general knowledge; only this user's own sessions.
-- context: a full digest of the single best-matching session, with the code it changed, once a recall hit looks right and the reasoning behind it matters.
-- blame: before editing, refactoring or deleting a file, the prior sessions that discussed it, so you know why it is shaped the way it is. Session history, not git authorship.
-- fix: paste a failing output verbatim to see the commands that followed that same error before, in sessions where it did not come back.
-- how: the real command with the real flags this machine runs for a build, test, deploy or script, ordered by how many sessions ran it. A guessed invocation is plausible and fails on this setup.
-- orient: at the start of work in a project, the commands past sessions ran there and the files they worked in, before you go reading.
-- remember: store one durable decision after it is settled, as a single self-contained fact. Not transcripts, not anything already obvious from the code. Only when the user asks for it to go into the repository, set project to ` + "`repo:`" + ` (or ` + "`repo:rejected`" + `, ` + "`repo:gotcha`" + `): it is written to this repository's ` + "`.deja/memory.jsonl`" + ` for the team, and the user reviews the diff and commits it.
-- handoff: continue another session's work. Pass its id or harness.
+- recall: before a plan, design, review, recommendation, denial, or calling work done — and mid-task batched with reads when concrete names appear — search with 1-3 exact terms (error string, function name, file path, flag). Every word has to match for an exact hit; not for library docs or general knowledge, only this user's own sessions.
+- context: a full digest of the single best-matching session, with the code it changed, once a recall hit looks right and the reasoning behind it matters. Inline recalled constraints, real commands, and ` + "`blame`" + ` checks into any written plan or subagent prompt so execution steps retain them.
+- blame: before editing, refactoring or deleting a file (` + "`path`" + ` or ` + "`path:line`" + `), the prior sessions that discussed it, so you know why it is shaped the way it is. Session history, not git authorship.
+- fix: after an unfamiliar failure, paste the failing output verbatim to see the commands that followed that same error before, in sessions where it did not come back.
+- how: before running an unfamiliar build, test, deploy or lint command, the real flags this machine runs, ordered by how many sessions ran it. A guessed invocation is plausible and fails on this setup.
+- orient: at the start of work in an unfamiliar project, the commands past sessions ran there and the files they worked in, before you go reading.
+- remember: store one durable decision once when the user corrects a choice or settles a non-obvious constraint or gotcha, as a single self-contained fact. Not transcripts, not anything already obvious from the code. Only when the user asks for it to go into the repository, set project to ` + "`repo:`" + ` (or ` + "`repo:rejected`" + `, ` + "`repo:gotcha`" + `): it is written to this repository's ` + "`.deja/memory.jsonl`" + ` for the team, and the user reviews the diff and commits it.
+- handoff: continue another session's work or hand a task off across agents. Pass its id or harness.
 
 ## Reading a result
 
