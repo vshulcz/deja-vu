@@ -416,8 +416,8 @@ func TestPlanGuardAntigravityPlanStepRidesNextInvocation(t *testing.T) {
 	initPlanGuardGitRepo(t, repo)
 
 	base := time.Now().Add(-24 * time.Hour).UTC()
-	invFile := filepath.Join(repo, "internal", "billing", "invoice.go")
-	invTest := filepath.Join(repo, "internal", "billing", "invoice_test.go")
+	invFile := "internal/billing/invoice.go"
+	invTest := "internal/billing/invoice_test.go"
 	for i := range 4 {
 		id := fmt.Sprintf("ag-inv-%d", i)
 		ts := base.Add(time.Duration(i) * time.Minute).Format(time.RFC3339)
@@ -428,6 +428,14 @@ func TestPlanGuardAntigravityPlanStepRidesNextInvocation(t *testing.T) {
 	}
 	if _, err := captureRun(t, "index"); err != nil {
 		t.Fatal(err)
+	}
+
+	firstDirect := planFindingsIn(dir, repo, "1. Update internal/billing/invoice.go rounding logic\n", "direct-dedup-sess")
+	if !strings.Contains(strings.Join(firstDirect, "\n"), "invoice_test.go") {
+		t.Fatalf("expected first direct planFindingsIn call to report invoice_test.go, got %v", firstDirect)
+	}
+	if secondDirect := planFindingsIn(dir, repo, "1. Update internal/billing/invoice.go rounding logic\n", "direct-dedup-sess"); len(secondDirect) != 0 {
+		t.Fatalf("expected second direct planFindingsIn call to dedupe coupled pair across direct and orient paths, got %v", secondDirect)
 	}
 
 	transcript := filepath.Join(tmp, "ag-transcript.jsonl")

@@ -175,6 +175,7 @@ func resolvePlanText(cwd, inlinePlan, planFilePath string) string {
 type planFinding struct {
 	line     string
 	sessions []index.SessionMeta
+	token    string
 }
 
 // indexDamaged is a variable for the same reason indexFormatDirection is: a
@@ -298,11 +299,8 @@ func planFindingsIn(dir, cwd, plan, sessionID string) []string {
 		}
 	}
 	var extraFindings []planFinding
-	var extraTokens []string
 	if cwd != "" {
-		rmFindings, rmTokens := planRepoMemoryFindings(cwd, plan, pol, seen)
-		extraFindings = append(extraFindings, rmFindings...)
-		extraTokens = append(extraTokens, rmTokens...)
+		extraFindings = append(extraFindings, planRepoMemoryFindings(cwd, plan, pol, seen)...)
 	}
 	keep := func(meta index.SessionMeta) bool {
 		if sources.HarnessExcluded(meta.Harness) || pol.Ignored(meta.Path, meta.Project) {
@@ -336,8 +334,8 @@ func planFindingsIn(dir, cwd, plan, sessionID string) []string {
 			return nil
 		}
 		findings := budgetPlanFindings(extraFindings, planHookBudget-recallFrameOverhead)
-		if sessionID != "" && len(extraTokens) > 0 {
-			rememberInjectedIDs(dir, sessionID, extraTokens...)
+		if sessionID != "" {
+			rememberPlanFindings(dir, sessionID, findings)
 		}
 		lines := make([]string, 0, len(findings))
 		for _, f := range findings {
@@ -347,13 +345,8 @@ func planFindingsIn(dir, cwd, plan, sessionID string) []string {
 	}
 
 	if cwd != "" {
-		fgFindings, fgTokens := planFileGuardrailFindings(dir, cwd, plan, pol, projects, sessionID, extraFindings, seen)
-		extraFindings = append(extraFindings, fgFindings...)
-		extraTokens = append(extraTokens, fgTokens...)
-
-		cpFindings, cpTokens := planCoupledFileFindings(dir, cwd, plan, pol, projects, sessionID, extraFindings, seen)
-		extraFindings = append(extraFindings, cpFindings...)
-		extraTokens = append(extraTokens, cpTokens...)
+		extraFindings = append(extraFindings, planFileGuardrailFindings(dir, cwd, plan, pol, projects, sessionID, extraFindings, seen)...)
+		extraFindings = append(extraFindings, planCoupledFileFindings(dir, cwd, plan, pol, projects, sessionID, extraFindings, seen)...)
 	}
 
 	matches := planFrictionLookup(dir, steps, keep, planFindingLimit)
@@ -422,9 +415,6 @@ func planFindingsIn(dir, cwd, plan, sessionID string) []string {
 	}
 	if sessionID != "" {
 		rememberPlanFindings(dir, sessionID, findings)
-		if len(extraTokens) > 0 {
-			rememberInjectedIDs(dir, sessionID, extraTokens...)
-		}
 	}
 
 	lines := make([]string, 0, len(findings))
@@ -434,17 +424,16 @@ func planFindingsIn(dir, cwd, plan, sessionID string) []string {
 	return lines
 }
 
-func planRepoMemoryFindings(cwd, plan string, pol policy.Policy, seen map[string]bool) ([]planFinding, []string) {
+func planRepoMemoryFindings(cwd, plan string, pol policy.Policy, seen map[string]bool) []planFinding {
 	root := sources.RepoRoot(cwd)
 	if root == "" || !pol.Allows(policy.ActivationAuto, sources.RepoMemoryProject(root)) {
-		return nil, nil
+		return nil
 	}
 	entries, _, err := readRepoMemoryAndNotes(root)
 	if err != nil || len(entries) == 0 {
-		return nil, nil
+		return nil
 	}
 	var out []planFinding
-	var tokens []string
 	for _, e := range entries {
 		matched := commandTouchesRepoEntryFiles(plan, e.Files)
 		if !matched {
@@ -470,13 +459,12 @@ func planRepoMemoryFindings(cwd, plan string, pol policy.Policy, seen map[string
 		if seen[tok] {
 			continue
 		}
-		out = append(out, planFinding{line: line})
-		tokens = append(tokens, tok)
+		out = append(out, planFinding{line: line, token: tok})
 		if len(out) >= 2 {
 			break
 		}
 	}
-	return out, tokens
+	return out
 }
 
 func planRepoRoot(cwd string) string {
@@ -531,7 +519,7 @@ func planReferencedRepoFiles(cwd, plan string) []string {
 	return out
 }
 
-func planScopedMetasForFile(dir, root, fullPath string, pol policy.Policy, projects []string, sessionID string, seen map[string]bool) []index.SessionMeta {
+func planScopedMetasForFile(dir, root, fullPath string, pol policy.Policy, projects []string, sessionID string) []index.SessionMeta {
 	var inScope []index.SessionMeta
 	for _, meta := range index.FileSessions(dir, fullPath) {
 		if sources.HarnessExcluded(meta.Harness) || pol.Ignored(meta.Path, meta.Project) {
@@ -546,7 +534,7 @@ func planScopedMetasForFile(dir, root, fullPath string, pol policy.Policy, proje
 		if !fileMetaMatchesRepoSubpath(meta, root, fullPath) {
 			continue
 		}
-		if sessionID != "" && (meta.ID == sessionID || seen[meta.ID]) {
+		if sessionID != "" && meta.ID == sessionID {
 			continue
 		}
 		inScope = append(inScope, meta)
@@ -568,6 +556,22 @@ func planFindingAlreadyCovered(existing []planFinding, a, b string) bool {
 	return false
 }
 
+// planCoupledPairToken keys coupled-file dedupe on the sorted basename pair so
+// direct file-session and project orient lookups share one session token.
+func planCoupledPairToken(a, b string) string {
+	norm := func(p string) string {
+		if base := strings.ToLower(strings.TrimSpace(baseName(p))); base != "" {
+			return base
+		}
+		return strings.ToLower(filepath.ToSlash(strings.TrimSpace(p)))
+	}
+	x, y := norm(a), norm(b)
+	if x > y {
+		x, y = y, x
+	}
+	return "plan:co:" + shortHash(x+"\x00"+y)
+}
+
 func planFileGuardrailFindings(
 	dir, cwd, plan string,
 	pol policy.Policy,
@@ -575,18 +579,21 @@ func planFileGuardrailFindings(
 	sessionID string,
 	existing []planFinding,
 	seen map[string]bool,
-) ([]planFinding, []string) {
+) []planFinding {
 	root := planRepoRoot(cwd)
 	refs := planReferencedRepoFiles(root, plan)
 	if len(refs) == 0 {
-		return nil, nil
+		return nil
+	}
+	selfSkip := map[string]bool{}
+	if sessionID != "" {
+		selfSkip[sessionID] = true
 	}
 	var out []planFinding
-	var tokens []string
 	for _, rel := range refs {
 		fullPath := filepath.Join(root, rel)
-		inScope := planScopedMetasForFile(dir, root, fullPath, pol, projects, sessionID, seen)
-		clause := turn0FileGuardrail(dir, root, fullPath, inScope, seen)
+		inScope := planScopedMetasForFile(dir, root, fullPath, pol, projects, sessionID)
+		clause := turn0FileGuardrail(dir, root, fullPath, inScope, selfSkip)
 		if clause == "" || strings.HasPrefix(clause, repoDecisionLabel) {
 			continue
 		}
@@ -596,16 +603,15 @@ func planFileGuardrailFindings(
 		}
 		line := fmt.Sprintf("%s: %s", search.SafePath(rel), neutralPlanEvidence(detail))
 		tok := "plan:fg:" + shortHash(line)
-		if seen[tok] || planFindingAlreadyCovered(append(existing, out...), rel, detail) {
+		if seen[tok] || planFindingAlreadyCovered(existing, rel, detail) || planFindingAlreadyCovered(out, rel, detail) {
 			continue
 		}
-		out = append(out, planFinding{line: line})
-		tokens = append(tokens, tok)
+		out = append(out, planFinding{line: line, token: tok})
 		if len(out) >= 2 {
 			break
 		}
 	}
-	return out, tokens
+	return out
 }
 
 func planCoupledFileFindings(
@@ -615,14 +621,14 @@ func planCoupledFileFindings(
 	sessionID string,
 	existing []planFinding,
 	seen map[string]bool,
-) ([]planFinding, []string) {
+) []planFinding {
 	root := planRepoRoot(cwd)
 	refs := planReferencedRepoFiles(root, plan)
+	covered := append([]planFinding{}, existing...)
 	var out []planFinding
-	var tokens []string
 	for _, rel := range refs {
 		fullPath := filepath.Join(root, rel)
-		inScope := planScopedMetasForFile(dir, root, fullPath, pol, projects, sessionID, seen)
+		inScope := planScopedMetasForFile(dir, root, fullPath, pol, projects, sessionID)
 		comp, coCount, total := coChangeCompanionIn(root, fullPath, inScope)
 		if comp == "" {
 			continue
@@ -634,24 +640,26 @@ func planCoupledFileFindings(
 		if len(orientFilterCoupledByRepoMemory(root, []string{pairText})) == 0 {
 			continue
 		}
-		if planFindingAlreadyCovered(existing, rel, comp) || planFindingAlreadyCovered(out, rel, comp) {
+		if planFindingAlreadyCovered(covered, rel, comp) {
 			continue
 		}
 		line := fmt.Sprintf("coupled files: %s is usually edited alongside %s (%d/%d sessions), which is not named in this plan", search.SafePath(rel), comp, coCount, total)
-		tok := "plan:co:" + shortHash(line)
+		tok := planCoupledPairToken(rel, comp)
 		if seen[tok] {
+			covered = append(covered, planFinding{line: line})
 			continue
 		}
-		out = append(out, planFinding{line: line})
-		tokens = append(tokens, tok)
+		f := planFinding{line: line, token: tok}
+		covered = append(covered, f)
+		out = append(out, f)
 		if len(out) >= 2 {
-			return out, tokens
+			return out
 		}
 	}
 
 	names := digest.ProjectNameCandidates(cwd)
 	if len(names) == 0 {
-		return out, tokens
+		return out
 	}
 	pairs := orientCoChangePairs(dir, names, cwd, orientFiles(dir, names, cwd), policy.ActivationAuto)
 	for _, pair := range pairs {
@@ -674,22 +682,23 @@ func planCoupledFileFindings(
 		if inB {
 			named, missing = fileB, fileA
 		}
-		if planFindingAlreadyCovered(existing, named, missing) || planFindingAlreadyCovered(out, named, missing) {
+		if planFindingAlreadyCovered(covered, named, missing) {
 			continue
 		}
 		stats := strings.TrimSuffix(parts[1], ")")
 		line := fmt.Sprintf("coupled files: %s is usually edited alongside %s (%s), which is not named in this plan", named, missing, stats)
-		tok := "plan:co:" + shortHash(line)
+		tok := planCoupledPairToken(named, missing)
 		if seen[tok] {
 			continue
 		}
-		out = append(out, planFinding{line: line})
-		tokens = append(tokens, tok)
+		f := planFinding{line: line, token: tok}
+		covered = append(covered, f)
+		out = append(out, f)
 		if len(out) >= 2 {
 			break
 		}
 	}
-	return out, tokens
+	return out
 }
 
 func filterPlanMetas(metas []index.SessionMeta, keep func(index.SessionMeta) bool, members map[string]bool) []index.SessionMeta {
@@ -714,18 +723,29 @@ func planMetaKey(meta index.SessionMeta) string {
 }
 
 func rememberPlanFindings(dir, sessionID string, findings []planFinding) {
-	seen := map[string]bool{}
+	seenSessions := map[string]bool{}
 	var sessions []model.Session
+	seenTokens := map[string]bool{}
+	var tokens []string
 	for _, finding := range findings {
 		for _, meta := range finding.sessions {
-			if meta.ID == "" || seen[meta.ID] {
+			if meta.ID == "" || seenSessions[meta.ID] {
 				continue
 			}
-			seen[meta.ID] = true
+			seenSessions[meta.ID] = true
 			sessions = append(sessions, model.Session{ID: meta.ID})
 		}
+		if finding.token != "" && !seenTokens[finding.token] {
+			seenTokens[finding.token] = true
+			tokens = append(tokens, finding.token)
+		}
 	}
-	rememberInjected(dir, sessionID, sessions)
+	if len(sessions) > 0 {
+		rememberInjected(dir, sessionID, sessions)
+	}
+	if len(tokens) > 0 {
+		rememberInjectedIDs(dir, sessionID, tokens...)
+	}
 }
 
 // extractPlanSteps prefers explicit Markdown steps. Prose lines are considered
