@@ -350,3 +350,46 @@ func TestCooccurBinRejectsMalformedInputs(t *testing.T) {
 		}
 	}
 }
+
+func TestCooccurBinFallbackAndGuardCases(t *testing.T) {
+	emptyDir := t.TempDir()
+	if got := lookupCooccurNeighbors("", "alpha"); got != nil {
+		t.Fatalf("empty dir returned %v", got)
+	}
+	if got := lookupCooccurNeighbors(emptyDir, ""); got != nil {
+		t.Fatalf("empty tok returned %v", got)
+	}
+	if got := lookupCooccurNeighbors(emptyDir, cooccurDiscourseKey); got != nil {
+		t.Fatalf("discourse key returned %v", got)
+	}
+	if _, ok := lookupCooccurMany("", []string{"alpha"}); ok {
+		t.Fatal("empty dir lookupCooccurMany unexpectedly ok")
+	}
+	if _, ok := lookupCooccurMany(emptyDir, []string{"alpha"}); ok {
+		t.Fatal("missing cooccur.gob lookupCooccurMany unexpectedly ok")
+	}
+	if err := writeCooccurBinBuild(emptyDir, nil); err == nil {
+		t.Fatal("expected writeCooccurBinBuild error on empty dir")
+	}
+	if err := writeCooccurBinAtomic(emptyDir, nil); err == nil {
+		t.Fatal("expected writeCooccurBinAtomic error on empty dir")
+	}
+	if err := os.WriteFile(cooccurPath(emptyDir), []byte("bad-gob"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := lookupCooccurMany(emptyDir, []string{"alpha"}); ok {
+		t.Fatal("corrupt cooccur.gob unexpectedly ok")
+	}
+	raw := map[string][]string{
+		"alpha":             {"beta"},
+		cooccurDiscourseKey: {"ignored"},
+	}
+	if err := writeGobAtomic(cooccurPath(emptyDir), raw); err != nil {
+		t.Fatal(err)
+	}
+	// No cooccur.bin on disk: lookupCooccurMany falls back directly to gob.
+	got, ok := lookupCooccurMany(emptyDir, []string{"", cooccurDiscourseKey, "alpha"})
+	if !ok || !reflect.DeepEqual(got["alpha"], []string{"beta"}) || len(got) != 1 {
+		t.Fatalf("fallback lookupCooccurMany = (%v, %v), want {alpha:[beta]}", got, ok)
+	}
+}

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/binary"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -155,13 +157,13 @@ func TestBM25SessionTouchedBoostSkipsRecordLogAndResolvesPromotedNote(t *testing
 		t.Fatal(err)
 	}
 
-	srcRecs := `{"type":"user","sessionId":"src-1","timestamp":"2026-07-01T10:00:00Z","cwd":` + `"` + repo + `"` + `,"message":{"role":"user","content":"adjust helper spacing"}}` + "\n" +
-		`{"type":"assistant","sessionId":"src-1","timestamp":"2026-07-01T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":` + `"` + targetFile + `"` + `,"old_string":"a","new_string":"b"}}]}}` + "\n"
+	srcRecs := `{"type":"user","sessionId":"src-1","timestamp":"2026-07-01T10:00:00Z","cwd":` + strconv.Quote(repo) + `,"message":{"role":"user","content":"adjust helper spacing"}}` + "\n" +
+		`{"type":"assistant","sessionId":"src-1","timestamp":"2026-07-01T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":` + strconv.Quote(targetFile) + `,"old_string":"a","new_string":"b"}}]}}` + "\n"
 	if err := os.WriteFile(filepath.Join(claudeProj, "src-1.jsonl"), []byte(srcRecs), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	otherRecs := `{"type":"user","sessionId":"src-2","timestamp":"2026-07-01T09:00:00Z","cwd":` + `"` + repo + `"` + `,"message":{"role":"user","content":"quokkaflow retry backoff unrelated handler"}}` + "\n" +
-		`{"type":"assistant","sessionId":"src-2","timestamp":"2026-07-01T09:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t2","name":"Edit","input":{"file_path":` + `"` + otherFile + `"` + `,"old_string":"x","new_string":"y"}}]}}` + "\n"
+	otherRecs := `{"type":"user","sessionId":"src-2","timestamp":"2026-07-01T09:00:00Z","cwd":` + strconv.Quote(repo) + `,"message":{"role":"user","content":"quokkaflow retry backoff unrelated handler"}}` + "\n" +
+		`{"type":"assistant","sessionId":"src-2","timestamp":"2026-07-01T09:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t2","name":"Edit","input":{"file_path":` + strconv.Quote(otherFile) + `,"old_string":"x","new_string":"y"}}]}}` + "\n"
 	if err := os.WriteFile(filepath.Join(claudeProj, "src-2.jsonl"), []byte(otherRecs), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -201,5 +203,119 @@ func TestBM25SessionTouchedBoostSkipsRecordLogAndResolvesPromotedNote(t *testing
 	boostAfter, countAfter := bm25SessionTouchedBoost(dir, repo, "quokkaflow retry backoff", nil)
 	if !reflect.DeepEqual(boostAfter, boostBefore) || !reflect.DeepEqual(countAfter, countBefore) {
 		t.Fatalf("without records.bin mismatch:\ngot  boost=%v count=%v\nwant boost=%v count=%v", boostAfter, countAfter, boostBefore, countBefore)
+	}
+}
+
+func TestRepoSymbolDiskCacheGuardsAndNilMaps(t *testing.T) {
+	tmp := hermeticEnv(t)
+	dir := filepath.Join(tmp, "index.db")
+	repo := filepath.Join(tmp, "repo")
+	if err := os.MkdirAll(repo, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	f := filepath.Join(repo, "a.go")
+	if err := os.WriteFile(f, []byte("package repo\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dirInfo, err := os.Stat(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fileInfo, err := os.Stat(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if repoSymbolMapMtimesMatch(repoSymbolMap{}) {
+		t.Fatal("expected empty dirMtimes to fail match")
+	}
+	if repoSymbolMapMtimesMatch(repoSymbolMap{dirMtimes: map[string]int64{filepath.Join(tmp, "missing"): 1}}) {
+		t.Fatal("expected missing dir to fail match")
+	}
+	if repoSymbolMapMtimesMatch(repoSymbolMap{
+		dirMtimes:  map[string]int64{repo: dirInfo.ModTime().UnixNano()},
+		fileMtimes: map[string]int64{filepath.Join(tmp, "missing.go"): 1},
+	}) {
+		t.Fatal("expected missing file to fail match")
+	}
+	if repoSymbolMapMtimesMatch(repoSymbolMap{
+		dirMtimes:  map[string]int64{repo: dirInfo.ModTime().UnixNano()},
+		fileMtimes: map[string]int64{f: fileInfo.ModTime().UnixNano()},
+		fileSizes:  map[string]int64{f: fileInfo.Size() + 10},
+	}) {
+		t.Fatal("expected mismatched file size to fail match")
+	}
+
+	prevDir := getActiveDejaDir()
+	t.Cleanup(func() { setActiveDejaDir(prevDir) })
+	setActiveDejaDir(dir)
+	if _, ok := repoSymbolDiskCacheAllowed(); ok {
+		t.Fatal("expected cache disallowed when manifest is missing")
+	}
+	prevMaxFiles := repoSymbolScanMaxFiles
+	repoSymbolScanMaxFiles = 10
+	if _, ok := repoSymbolDiskCacheAllowed(); ok {
+		repoSymbolScanMaxFiles = prevMaxFiles
+		t.Fatal("expected cache disallowed with non-default scan cap")
+	}
+	repoSymbolScanMaxFiles = prevMaxFiles
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if gotDir, ok := repoSymbolDiskCacheAllowed(); !ok || gotDir != dir {
+		t.Fatalf("expected cache allowed for %s, got %q ok=%v", dir, gotDir, ok)
+	}
+
+	capped := repoSymbolMap{at: time.Now(), capped: true}
+	cappedBytes, ok := encodeRepoSymbolMap(capped)
+	if !ok || len(cappedBytes) != repoSymbolDiskHdrLen {
+		t.Fatalf("unexpected capped encode: len=%d ok=%v", len(cappedBytes), ok)
+	}
+	if _, decOK := decodeRepoSymbolMap(cappedBytes, repo); decOK {
+		t.Fatal("expected capped header to be rejected on decode")
+	}
+
+	zeroAt := make([]byte, repoSymbolDiskHdrLen)
+	copy(zeroAt, cappedBytes)
+	zeroAt[12] = 0
+	binary.LittleEndian.PutUint64(zeroAt[13:21], 0)
+	if _, hdrOK := parseRepoSymbolHeader(zeroAt); hdrOK {
+		t.Fatal("expected zero timestamp header to be rejected")
+	}
+	expired := make([]byte, repoSymbolDiskHdrLen)
+	copy(expired, cappedBytes)
+	expired[12] = 0
+	binary.LittleEndian.PutUint64(expired[13:21], uint64(time.Now().Add(-2*repoSymbolDiskTTL).UnixNano()))
+	if _, expOK := parseRepoSymbolHeader(expired); expOK {
+		t.Fatal("expected expired header to be rejected")
+	}
+	if _, shortOK := parseRepoSymbolHeader(expired[:4]); shortOK {
+		t.Fatal("expected short header to be rejected")
+	}
+
+	nilMaps := repoSymbolMap{
+		at:         time.Now().Round(time.Nanosecond),
+		cwd:        repo,
+		dirMtimes:  map[string]int64{repo: dirInfo.ModTime().UnixNano()},
+		fileMtimes: map[string]int64{f: fileInfo.ModTime().UnixNano()},
+		fileSizes:  map[string]int64{f: fileInfo.Size()},
+		numFiles:   1,
+	}
+	encoded, encOK := encodeRepoSymbolMap(nilMaps)
+	if !encOK {
+		t.Fatal("encodeRepoSymbolMap with nil maps failed")
+	}
+	saveRepoSymbolMapToDisk(dir, repo, repo, nilMaps)
+	loaded, loadOK := loadRepoSymbolMapFromDisk(dir, repo, repo)
+	if !loadOK || loaded.numFiles != 1 || loaded.files != nil || loaded.firstDecl != nil {
+		t.Fatalf("unexpected nil-map round-trip: ok=%v loaded=%+v", loadOK, loaded)
+	}
+	for cut := repoSymbolDiskHdrLen; cut < len(encoded); cut++ {
+		if _, truncOK := decodeRepoSymbolMap(encoded[:cut], repo); truncOK {
+			t.Fatalf("expected decode failure for truncation at %d/%d", cut, len(encoded))
+		}
+	}
+	if _, trailOK := decodeRepoSymbolMap(append(append([]byte(nil), encoded...), 0x01), repo); trailOK {
+		t.Fatal("expected decode failure with trailing bytes")
 	}
 }

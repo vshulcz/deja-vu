@@ -484,10 +484,10 @@ func (b *bucketReader) bucketFiles(tok string) ([]string, bool) {
 		layers = bucketLayers(p)
 		b.layers[p] = layers
 	}
-	files := make([]string, 0, 1+len(layers))
-	files = append(files, p)
-	files = append(files, layers...)
-	return files, true
+	if len(layers) == 0 {
+		return []string{p}, true
+	}
+	return append([]string{p}, layers...), true
 }
 
 func (b *bucketReader) postings(tok string) ([]posting, error) {

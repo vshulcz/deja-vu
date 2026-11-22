@@ -367,3 +367,56 @@ func TestCopyCheckAndRecallEpisodeEdgeBranches(t *testing.T) {
 		t.Fatalf("unexpected episode stub decoding: huge=%v cmdStub=%v toolStub=%v", sawHuge, sawCmdStub, sawToolStub)
 	}
 }
+
+func TestCopyCheckEdgeAndFallbackCases(t *testing.T) {
+	if got := wrapCorruptDecodeErr(errCorruptIndex); !errors.Is(got, errCorruptIndex) {
+		t.Fatalf("wrapCorruptDecodeErr(sentinel) = %v", got)
+	}
+	if got := wrapCorruptDecodeErr(os.ErrInvalid); !errors.Is(got, errCorruptIndex) || !errors.Is(got, os.ErrInvalid) {
+		t.Fatalf("wrapCorruptDecodeErr(other) = %v", got)
+	}
+
+	// Missing manifest returns an error cleanly.
+	if _, err := FindManyForCopyCheck(t.TempDir(), []Identity{{Harness: "claude", ID: "x"}}); err == nil {
+		t.Fatal("expected error when manifest is absent")
+	}
+
+	// Short sessions only: triggers !anyMarathon fallback to windowed tail.
+	t0 := time.Date(2026, 9, 21, 10, 0, 0, 0, time.UTC)
+	shortDir := t.TempDir()
+	shortSess := model.Session{
+		Harness: "claude",
+		ID:      "short-1",
+		Project: "work/proj",
+		Path:    "/work/proj/short-1.jsonl",
+		Started: t0,
+		Updated: t0.Add(time.Minute),
+		Messages: []model.Message{
+			{Role: "user", Text: "short trigger prompt", Time: t0},
+			{Role: "assistant", Text: "short reply", Time: t0.Add(time.Second)},
+		},
+	}
+	writeCopyCheckTestIndex(t, shortDir, []model.Session{shortSess})
+
+	out, err := FindManyForCopyCheck(shortDir, []Identity{{Harness: "claude", ID: "short-1"}})
+	if err != nil || len(out) != 1 || len(out[0].Messages) != 2 {
+		t.Fatalf("short-only FindManyForCopyCheck = (len=%d, %v), want 1 session with 2 msgs", len(out), err)
+	}
+
+	// Removing recoffsets.bin drops through !handled fallback without failing.
+	_ = os.Remove(filepath.Join(shortDir, "recoffsets.bin"))
+	out2, err := FindManyForCopyCheck(shortDir, []Identity{{Harness: "claude", ID: "short-1"}})
+	if err != nil || len(out2) != 1 {
+		t.Fatalf("missing recoffsets FindManyForCopyCheck = (len=%d, %v), want 1", len(out2), err)
+	}
+
+	// Removing records.bin returns open error cleanly from copyCheckSessionsIn.
+	m, err := readManifest(shortDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = os.Remove(filepath.Join(shortDir, "records.bin"))
+	if _, _, derr := copyCheckSessionsIn(shortDir, m, []SessionMeta{m.Sessions["claude:short-1"]}); derr == nil {
+		t.Fatal("expected open error when records.bin is missing")
+	}
+}
