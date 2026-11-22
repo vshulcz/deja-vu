@@ -1,6 +1,7 @@
 package index
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -9,9 +10,18 @@ import (
 
 func TestInspectionCommandSplitsPipesGroupsAndEnvPrefixes(t *testing.T) {
 	narrowInspect := []string{
+		"   ",
+		"$ git status",
 		"(cd /work/app && git status)",
+		`(echo "a)b" && echo \) && git status)`,
+		`echo a\;b && cat "x\"y.go" || ls`,
+		`cat 'a\b.go' || head -n 5`,
 		"FOO=1 BAR=baz cat a.go | head -n 5",
 		"{ git diff; cat foo.go; }",
+		"cd /work/app; { git status; ls; }",
+		"git stash list",
+		"(cat a.go) | (head -n 5)",
+		"echo {",
 	}
 	for _, cmd := range narrowInspect {
 		if !InspectionCommand(cmd) {
@@ -32,6 +42,7 @@ func TestInspectionCommandSplitsPipesGroupsAndEnvPrefixes(t *testing.T) {
 		"gh api --method=get /repos/acme/app/issues",
 		"gh run watch 42",
 		"gh pr checks 42 --watch",
+		"go env GOPATH",
 	}
 	for _, cmd := range investigations {
 		if !investigationCommand(cmd) {
@@ -41,6 +52,9 @@ func TestInspectionCommandSplitsPipesGroupsAndEnvPrefixes(t *testing.T) {
 
 	nonInspect := []string{
 		"go test ./...",
+		"git stash push -m wip",
+		"FOO=1",
+		"FOO=1 then",
 	}
 	for _, cmd := range nonInspect {
 		if InspectionCommand(cmd) {
@@ -49,13 +63,22 @@ func TestInspectionCommandSplitsPipesGroupsAndEnvPrefixes(t *testing.T) {
 	}
 
 	mutating := []string{
+		"FOO=1",
+		"FOO=1 then",
 		"gh api -X POST repos/acme/app/issues",
 		"gh api --method POST repos/acme/app/issues",
 		"gh api repos/acme/app/issues -f title=hi",
+		"gh api repos/acme/app/issues --input body.json",
+		"gh api repos/acme/app/issues --raw-field body=x",
 		"gh pr merge 1",
 		"rm -rf build",
 		`echo "{a,b}" && rm -f tmp.out`,
+		`echo foo{ bar } && rm -f tmp.out`,
+		"touch {a,b}.txt && rm -f a.txt",
 		"ls (foo && rm -rf build",
+		"(ls}",
+		"sed --in-place 's/a/b/' a.go",
+		"sed --in-place=.bak 's/a/b/' a.go",
 	}
 	for _, cmd := range mutating {
 		if InspectionCommand(cmd) {
@@ -65,18 +88,37 @@ func TestInspectionCommandSplitsPipesGroupsAndEnvPrefixes(t *testing.T) {
 			t.Errorf("investigationCommand(%q) = true, want false", cmd)
 		}
 	}
+
+	if !shellBraceStartsGroup("ls && { git status; }", 0, 6) {
+		t.Error("shellBraceStartsGroup after && = false, want true")
+	}
+	for _, bad := range []string{"{", "{a,b}", "(ls}", "(cat a.go) | (head -n 5)", `(echo "unclosed)`} {
+		if got, ok := unwrapShellGroup(bad); ok {
+			t.Errorf("unwrapShellGroup(%q) = (%q, true), want false", bad, got)
+		}
+	}
 }
 
 func TestViewerCommandDistinguishesViewersFromTestRunners(t *testing.T) {
 	viewers := []string{
+		"   ",
+		"cd /work/app && git log -n 1",
 		`rg "connection refused" internal/`,
 		"grep -C 3 panic handler.go",
 		"cat internal/app/main.go",
 		"git status",
+		"git blame internal/app/main.go",
 		"git diff HEAD~1",
 		"git show HEAD:cmd/app/main.go",
 		"sed -n '1,20p' internal/app/main.go",
 		"FOO=1 rg err internal/ | head -n 20",
+		"gh search issues bug",
+		"gh api repos/acme/app/issues",
+		"gh api -XGET repos/acme/app/issues",
+		"gh pr view 1",
+		"gh pr diff 1",
+		"gh run list",
+		"gh issue status",
 	}
 	for _, cmd := range viewers {
 		if !ViewerCommand(cmd) {
@@ -85,10 +127,17 @@ func TestViewerCommandDistinguishesViewersFromTestRunners(t *testing.T) {
 	}
 
 	nonViewers := []string{
+		"FOO=1",
+		"git checkout -b feat",
 		"go test ./...",
 		"go vet ./...",
 		"pytest tests/",
 		"sed -i '' 's/a/b/' internal/app/main.go",
+		"sed --in-place 's/a/b/' internal/app/main.go",
+		"gh pr create --title test",
+		"gh api -XPOST repos/acme/app/issues",
+		"gh api repos/acme/app/issues --input body.json",
+		"gh api repos/acme/app/issues --raw-field body=x",
 		"make build",
 	}
 	for _, cmd := range nonViewers {
@@ -101,15 +150,38 @@ func TestViewerCommandDistinguishesViewersFromTestRunners(t *testing.T) {
 func TestFrictionLineDropsGrepContextAndLongPathSource(t *testing.T) {
 	dropped := []string{
 		"42- // panic: connection refused",
+		"2026-09-10T10:00:00Z 42- // panic: connection refused",
 		"internal/very/long/subpackage/handler.go-42- fatal: repository not found",
+		"cmd/my-service/handler.go-42- fatal: repository not found",
 		"internal/very/long/subpackage/handler.go:42: // panic: connection refused",
 		`internal/very/long/subpackage/handler.go:42:10: case "connection refused":`,
+		`42: case "connection refused":`,
+		"42: // panic: connection refused",
 		`{Role: "tool-output", Text: "psql: connection refused on port 5432"},`,
+		`{Role: "a\"b", Text: "psql: connection refused on port 5432"},`,
+		`{Text: "connection \"refused\" on port 5432"},`,
 		`Text: "psql: connection refused on port 5432",`,
 	}
 	for _, line := range dropped {
 		if got, ok := FrictionLine(line); ok {
 			t.Errorf("FrictionLine(%q) = (%q, true), want false", line, got)
+		}
+	}
+	if !looksLikeSource("42- // panic: connection refused") {
+		t.Error("looksLikeSource(grep context line) = false, want true")
+	}
+	if !looksLikeSource("42: // panic: connection refused") {
+		t.Error("looksLikeSource(bare lineno source line) = false, want true")
+	}
+	if !looksLikeSource(`{Role: "a\"b", Text: "psql: connection refused on port 5432"},`) {
+		t.Error("looksLikeSource(keyed escaped Role+Text line) = false, want true")
+	}
+	if looksLikeGrepContextLine(`"foo"-42- fatal: repository not found`) {
+		t.Error("looksLikeGrepContextLine(quoted token) = true, want false")
+	}
+	for _, nonLiteral := range []string{`: "bad",`, `foo.Text: "bad",`, `Text: "unclosed`} {
+		if keyedStringLiteralValue(nonLiteral) {
+			t.Errorf("keyedStringLiteralValue(%q) = true, want false", nonLiteral)
 		}
 	}
 
@@ -155,9 +227,16 @@ func TestFixPairsSkipsViewerStdoutKeepsEnvFailureAndFiltersStoredViewerPairs(t *
 	viewerSig := frictionHash(mustFriction(t, `fatal: repository "https://example.invalid/repo.git" not found`))
 	testSig := frictionHash(mustFriction(t, "--- FAIL: TestCheckout (0.02s)"))
 	storedViewer := FixPair{
-		Sig:     viewerSig,
-		Failed:  "$ rg -n fatal internal/",
-		Error:   `fatal: repository "https://example.invalid/repo.git" not found`,
+		Sig:       viewerSig,
+		Failed:    "$ rg -n fatal internal/",
+		Error:     `fatal: repository "https://example.invalid/repo.git" not found`,
+		Command:   "$ go test ./...",
+		Project:   "app",
+		Candidate: true,
+	}
+	storedGrepErr := FixPair{
+		Failed:  "$ make check",
+		Error:   "internal/app/foo.go-42- fatal: repository not found",
 		Command: "$ go test ./...",
 		Project: "app",
 	}
@@ -171,6 +250,9 @@ func TestFixPairsSkipsViewerStdoutKeepsEnvFailureAndFiltersStoredViewerPairs(t *
 	if !IsViewerFixPair(storedViewer) {
 		t.Fatalf("IsViewerFixPair(storedViewer) = false, want true")
 	}
+	if !IsViewerFixPair(storedGrepErr) {
+		t.Fatalf("IsViewerFixPair(storedGrepErr) = false, want true")
+	}
 	if IsViewerFixPair(storedTest) {
 		t.Fatalf("IsViewerFixPair(storedTest) = true, want false")
 	}
@@ -178,6 +260,9 @@ func TestFixPairsSkipsViewerStdoutKeepsEnvFailureAndFiltersStoredViewerPairs(t *
 
 	if got := FixesForCommand(dir, "go test ./...", `fatal: repository "https://example.invalid/repo.git" not found`, 3, nil); len(got) != 0 {
 		t.Fatalf("FixesForCommand returned legacy viewer pair: %+v", got)
+	}
+	if FixCandidateSeen(dir, `fatal: repository "https://example.invalid/repo.git" not found`, nil) {
+		t.Fatal("FixCandidateSeen = true for stored viewer candidate, want false")
 	}
 	if got := FixesForCommand(dir, "go test ./internal/checkout/...", "--- FAIL: TestCheckout (0.02s)", 3, nil); len(got) != 1 || got[0].Sig != testSig {
 		t.Fatalf("FixesForCommand(test) = %+v, want storedTest", got)
@@ -187,6 +272,7 @@ func TestFixPairsSkipsViewerStdoutKeepsEnvFailureAndFiltersStoredViewerPairs(t *
 func TestGiveUpLineIgnoresEnclosingQuotesAndBackticks(t *testing.T) {
 	quoted := []string{
 		"the marker `* reverted: ...` is documented in notes",
+		"header\nthe doc mentions `reverted` token\nfooter",
 		"в заметке было написано «откатили обратно вчера»",
 		`he quoted “reverted the cache” from another doc`,
 		`she wrote "rolled back the migration" inside the issue`,
@@ -201,10 +287,20 @@ func TestGiveUpLineIgnoresEnclosingQuotesAndBackticks(t *testing.T) {
 	genuine := []string{
 		"we reverted the migration after staging broke",
 		`"fast path" was broken so we reverted the patch`,
+		"«кэш» откатили после деплоя на стейджинге",
+		"«мы откатили миграцию после сбоя базы",
 	}
 	for _, line := range genuine {
 		if _, ok := GiveUpLine(line); !ok {
 			t.Errorf("GiveUpLine(%q) = false, want true", line)
 		}
+	}
+
+	nested := "«а откатили «б»"
+	if phraseQuotedOrCode(nested, strings.Index(nested, "откатили"), len("откатили")) {
+		t.Error("phraseQuotedOrCode(nested guillemet) = true, want false")
+	}
+	if phraseQuotedOrCode("reverted", 0, len("reverted")) {
+		t.Error("phraseQuotedOrCode(phraseAt=0) = true, want false")
 	}
 }
