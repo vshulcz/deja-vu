@@ -57,7 +57,7 @@ func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip 
 	}
 	var neighbours map[string][]string
 	if hasStrongTerm && !shouldBlockSameScriptBridge(dir, m, terms, idfOf, projectOrds) {
-		neighbours = readCooccur(dir)
+		neighbours, _ = lookupCooccurMany(dir, terms)
 	}
 	have := make(map[string]bool, len(terms))
 	for _, t := range terms {

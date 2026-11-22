@@ -51,14 +51,18 @@ func OtherWordForms(dir string, terms []string) map[string][]string {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	catalog, err := tokenCatalogCached(dir)
-	if err != nil {
-		return nil
-	}
+	br := newBucketReader(dir)
+	defer br.close()
 	out := map[string][]string{}
 	for _, term := range terms {
+		matches, err := stemMatchesWith(term, func(form string) (bool, error) {
+			return br.hasToken("t" + form)
+		})
+		if err != nil {
+			return nil
+		}
 		var others []string
-		for _, form := range stemMatches(term, catalog) {
+		for _, form := range matches {
 			if form != term {
 				others = append(others, form)
 			}

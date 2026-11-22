@@ -498,6 +498,40 @@ func fitLines(lines []string, room int) []string {
 	return lines
 }
 
+func loadRecallConclusionSession(dir, q string, h search.Hit, o search.Options) model.Session {
+	whole := h.Session
+	roles := map[string]bool{
+		"user":               true,
+		"assistant":          true,
+		"edit":               true,
+		"wrote":              true,
+		"command":            true,
+		index.RoleStubOthers: true,
+	}
+	for _, m := range h.Session.Messages {
+		if m.Role != "" {
+			roles[m.Role] = true
+		}
+	}
+	if _, hasCut := o.ExcludeUpTo[whole.ID]; hasCut {
+		if full, ok, ferr := wholeSessionForMCPInRoles(dir, whole, roles); ferr == nil && ok {
+			return cutSession(full, o)
+		}
+		return whole
+	}
+	quoted := make([]string, 0, len(h.QuotedMessages()))
+	for _, qm := range h.QuotedMessages() {
+		if !digest.IsCompactionSummary(qm) {
+			quoted = append(quoted, qm)
+		}
+	}
+	needAllChanges := !hasExistingTranscript(whole) && len(changeQueryTerms(q)) > 0
+	if full, ok, ferr := index.FindForRecallConclusions(dir, whole, quoted, longSessionTurns, needAllChanges, roles); ferr == nil && ok {
+		return full
+	}
+	return whole
+}
+
 // recallConclusionLines is the block writeRecallConclusions writes, one line
 // per string, given the room the conclusions may take.
 func recallConclusionLines(dir, q string, h search.Hit, o search.Options, left int) []string {
@@ -515,23 +549,7 @@ func recallConclusionLines(dir, q string, h search.Hit, o search.Options, left i
 		// usually worded nothing like the query — is not in it. Read the
 		// whole session for the best hit alone, the same upgrade
 		// recall_context makes for the same reason (#1011).
-		whole := h.Session
-		roles := map[string]bool{
-			"user":               true,
-			"assistant":          true,
-			"edit":               true,
-			"wrote":              true,
-			"command":            true,
-			index.RoleStubOthers: true,
-		}
-		for _, m := range h.Session.Messages {
-			if m.Role != "" {
-				roles[m.Role] = true
-			}
-		}
-		if full, ok, ferr := wholeSessionForMCPInRoles(dir, whole, roles); ferr == nil && ok {
-			whole = cutSession(full, o)
-		}
+		whole := loadRecallConclusionSession(dir, q, h, o)
 		// Not the line already shown as this hit's answer. The answer
 		// under the excerpt and the newest conclusion are usually the
 		// same sentence, and printing it twice charged the agent twice

@@ -394,7 +394,7 @@ func eachRecordForKeysByOffsetsWindowedTail(f *os.File, dir string, t *recordTab
 	// When the caller has already windowed each session (or total offsets fit
 	// comfortably in maxAddressedOffsets), always use addressed reads rather
 	// than walking an 855 MiB log (#5901).
-	if matchedByKey == nil && tail <= 0 && roles == nil && len(want) > 1 && len(offs) > maxAddressedOffsets && ro.records > 0 && int64(len(offs)) > ro.records/offsetsWalkShare {
+	if matchedByKey == nil && tail <= 0 && len(want) > 1 && len(offs) > maxAddressedOffsets && ro.records > 0 && int64(len(offs)) > ro.records/offsetsWalkShare {
 		return false, nil
 	}
 	atomic.AddInt64(&recordOffsetReads, 1)

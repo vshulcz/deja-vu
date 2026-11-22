@@ -811,6 +811,30 @@ func ProjectRelevantNaming(dir string, projects, terms []string, n int, skip map
 // source from the fork point on, and a source whose only match was in the
 // turns the fork copied is not served at all (#5335).
 func ProjectRelevantNamingCut(dir string, projects, terms []string, n int, skip map[string]bool, cut map[string]time.Time) ([]model.Session, []int, []int, []int, map[string]float64, error) {
+	var r projectRelevantRead
+	err := withLockedProjectRelevantDir(dir, func(d string) error {
+		var rerr error
+		r, rerr = projectRelevantIn(d, projects, terms, n, skip, cut)
+		return rerr
+	})
+	return r.out, r.matched, r.strong, r.naming, r.idf, err
+}
+
+// ProjectRelevantMetas ranks project sessions for terms from the manifest and
+// posting buckets without hydrating session transcripts from records.bin.
+func ProjectRelevantMetas(dir string, projects, terms []string, n int, skip map[string]bool) ([]SessionMeta, []int, []int, error) {
+	var r projectRelevantMetasRead
+	err := withLockedProjectRelevantDir(dir, func(d string) error {
+		var rerr error
+		r, rerr = projectRelevantMetasIn(d, projects, terms, n, skip)
+		return rerr
+	})
+	return r.metas, r.matched, r.strong, err
+}
+
+// withLockedProjectRelevantDir runs fn under the non-blocking read lock and
+// a single generation pinned to dir.
+func withLockedProjectRelevantDir(dir string, fn func(string) error) error {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -819,7 +843,7 @@ func ProjectRelevantNamingCut(dir string, projects, terms []string, n int, skip 
 	// rebuild — which every user hits on an index-format upgrade.
 	unlock, ok, err := tryLockDir(dir)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return err
 	}
 	if ok {
 		defer unlock()
@@ -828,10 +852,10 @@ func ProjectRelevantNamingCut(dir string, projects, terms []string, n int, skip 
 	// bucket and its overlays left the ranking the old bucket, where the
 	// session's postings were the dead ones, and no overlay with its live
 	// ones: the session the question named fell out (#5459).
-	r, err := inOneGeneration(dir, func() (projectRelevantRead, error) {
-		return projectRelevantIn(dir, projects, terms, n, skip, cut)
+	_, err = inOneGeneration(dir, func() (struct{}, error) {
+		return struct{}{}, fn(dir)
 	})
-	return r.out, r.matched, r.strong, r.naming, r.idf, err
+	return err
 }
 
 // projectRelevantRead is what ProjectRelevantNamingCut hands back.
@@ -841,12 +865,19 @@ type projectRelevantRead struct {
 	idf                     map[string]float64
 }
 
-// projectRelevantIn is the read ProjectRelevantNamingCut makes, without the
-// lock.
-func projectRelevantIn(dir string, projects, terms []string, n int, skip map[string]bool, cut map[string]time.Time) (projectRelevantRead, error) {
+// projectRelevantMetasRead is what ProjectRelevantMetas hands back.
+type projectRelevantMetasRead struct {
+	metas           []SessionMeta
+	matched, strong []int
+}
+
+// rankProjectRelevant ranks project sessions from manifest and posting buckets.
+func rankProjectRelevant(dir string, projects, terms []string, n int, skip map[string]bool) (
+	metas []SessionMeta, matched, strong, naming []int, idf map[string]float64, offsets map[uint32][]int64, err error,
+) {
 	m, err := readManifestCached(dir)
 	if err != nil {
-		return projectRelevantRead{}, err
+		return nil, nil, nil, nil, nil, nil, err
 	}
 	var keep func(SessionMeta) bool
 	if len(skip) > 0 {
@@ -857,14 +888,47 @@ func projectRelevantIn(dir string, projects, terms []string, n int, skip map[str
 		// A corrupt or unreadable bucket. The hook never rebuilds, so surface
 		// it rather than inject a silently short-ranked déjà vu; the caller
 		// stays quiet on an error.
-		return projectRelevantRead{}, rerr
+		return nil, nil, nil, nil, nil, nil, rerr
 	}
-	metas, matched, strong, naming, idf, offsets := rank.metas, rank.informative, rank.strong, rank.naming, rank.idf, rank.offsets
+	metas, matched, strong, naming, idf, offsets = rank.metas, rank.informative, rank.strong, rank.naming, rank.idf, rank.offsets
 	if bm, bmatched, bstrong, _, bidf, boffsets, ok := bridgedRetry(dir, m, projects, terms, n, skip, strong, idf); ok {
 		metas, matched, strong, naming, idf, offsets = bm, bmatched, bstrong, nil, bidf, boffsets
 	}
-	if len(metas) == 0 {
-		return projectRelevantRead{}, nil
+	return metas, matched, strong, naming, idf, offsets, nil
+}
+
+// projectRelevantMetasIn is the read ProjectRelevantMetas makes, without the
+// lock.
+func projectRelevantMetasIn(dir string, projects, terms []string, n int, skip map[string]bool) (projectRelevantMetasRead, error) {
+	metas, matched, strong, _, _, _, err := rankProjectRelevant(dir, projects, terms, n, skip)
+	if err != nil || len(metas) == 0 {
+		return projectRelevantMetasRead{}, err
+	}
+	pol, excluded := metaIgnoredOrExcludedLoad()
+	keptMetas := make([]SessionMeta, 0, len(metas))
+	keptMatched := make([]int, 0, len(matched))
+	keptStrong := make([]int, 0, len(strong))
+	for i, meta := range metas {
+		if metaIgnoredOrExcluded(pol, excluded, meta) {
+			continue
+		}
+		keptMetas = append(keptMetas, meta)
+		if i < len(matched) {
+			keptMatched = append(keptMatched, matched[i])
+		}
+		if i < len(strong) {
+			keptStrong = append(keptStrong, strong[i])
+		}
+	}
+	return projectRelevantMetasRead{keptMetas, keptMatched, keptStrong}, nil
+}
+
+// projectRelevantIn is the read ProjectRelevantNamingCut makes, without the
+// lock.
+func projectRelevantIn(dir string, projects, terms []string, n int, skip map[string]bool, cut map[string]time.Time) (projectRelevantRead, error) {
+	metas, matched, strong, naming, idf, offsets, err := rankProjectRelevant(dir, projects, terms, n, skip)
+	if err != nil || len(metas) == 0 {
+		return projectRelevantRead{}, err
 	}
 	out, err := sessionsServableWindowed(dir, metas, offsets, query.Options{ExcludeUpTo: cut})
 	if err != nil {
