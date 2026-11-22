@@ -136,7 +136,7 @@ func grokHooksUpdate(exe string, uninstall bool) (path string, old, next []byte,
 	// spawn_subagent. On 1.0.41 the context reaches the model too, as a
 	// system reminder after the tool's result, so the file line goes out at
 	// the read, the step before an edit, as well as at the edit.
-	root = updateClaudeHook(root, "PreToolUse", hookRun(exe, "hook-tool"), "Bash|Read|Edit|Write|MultiEdit|NotebookEdit|Task|Agent", false)
+	root = updateClaudeHook(root, "PreToolUse", hookRun(exe, "hook-tool"), "Bash|Read|Edit|Write|MultiEdit|NotebookEdit|Task|Agent|ExitPlanMode", false)
 	// Grok fires PostToolUse for a run_terminal_command that exited non-zero
 	// and hands the hook's context to the model with the result, so a failure
 	// gets the earlier fix the way claude's does (#4499). PostToolUseFailure

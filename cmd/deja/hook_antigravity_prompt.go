@@ -10,6 +10,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/sources"
+	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 // Antigravity has no per-prompt event. PreInvocation is the only place a hook
@@ -68,6 +69,51 @@ func latestCommandCallsFromSteps(steps []transcriptStep) []string {
 		}
 	}
 	return nil
+}
+
+// latestPlanFromSteps returns the plan text from the newest planner row in the
+// current turn before any prior USER_INPUT boundary.
+func latestPlanFromSteps(steps []transcriptStep, workspace string) string {
+	for _, step := range steps {
+		if step.Type == "USER_INPUT" {
+			return ""
+		}
+		calls, ok := step.ToolCalls.([]any)
+		if !ok || len(calls) == 0 {
+			continue
+		}
+		for _, rawCall := range calls {
+			call, _ := rawCall.(map[string]any)
+			name := mapString(call, "name", "tool_name", "toolName")
+			if !isPlanTool(name) {
+				continue
+			}
+			args, _ := call["args"].(map[string]any)
+			return resolvePlanText(
+				hookCWD(workspace),
+				mapString(args, "plan", "Plan", "content", "summary"),
+				mapString(args, "planFilePath", "plan_file_path", "file_path", "filePath", "path"),
+			)
+		}
+		return ""
+	}
+	return ""
+}
+
+// antigravityPlanBlock evaluates plan findings for the newest plan step in
+// steps so Antigravity receives coupled-file and guardrail warnings on its next invocation.
+func antigravityPlanBlock(dir string, steps []transcriptStep, convID, workspace string) string {
+	plan := latestPlanFromSteps(steps, workspace)
+	if plan == "" {
+		return ""
+	}
+	lines := planFindingsIn(dir, hookCWD(workspace), plan, convID)
+	if len(lines) == 0 {
+		return ""
+	}
+	framed := frameRecall(strings.Join(lines, "\n"))
+	usage.RecordDigestInto(dir, usage.KindTool, framed, convID, len(lines), int64(len(plan)), nil)
+	return framed
 }
 
 // antigravityProjectWorkspace narrows a home-directory or empty workspace to

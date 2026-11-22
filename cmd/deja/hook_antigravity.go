@@ -139,6 +139,9 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 				steps = append(steps, antigravityInjectStep{EphemeralMessage: cmdLine})
 			}
 		}
+		if planLine := antigravityPlanBlock(dir, tailSteps, input.ConversationID, projectWorkspace); planLine != "" {
+			steps = append(steps, antigravityInjectStep{EphemeralMessage: planLine})
+		}
 		if block != "" {
 			steps = append(steps, antigravityInjectStep{EphemeralMessage: block})
 		}
@@ -191,6 +194,9 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	if block == "" {
 		block = antigravityPromptBlockFrom(dir, latestUserRequestFromSteps(tailSteps),
 			input.ConversationID, projectWorkspace, input.TranscriptPath, ids)
+	}
+	if planLine := antigravityPlanBlock(dir, tailSteps, input.ConversationID, projectWorkspace); planLine != "" {
+		steps = append(steps, antigravityInjectStep{EphemeralMessage: planLine})
 	}
 	if block != "" {
 		steps = append(steps, antigravityInjectStep{EphemeralMessage: block})

@@ -60,7 +60,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash|PowerShell|Edit|Write|MultiEdit|NotebookEdit|Task|Agent",
+        "matcher": "Bash|PowerShell|Edit|Write|MultiEdit|NotebookEdit|Task|Agent|ExitPlanMode",
         "hooks": [
           {
             "type": "command",

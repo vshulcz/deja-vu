@@ -254,11 +254,13 @@ var commands = map[string]command{
 		runHookMCPCall(dir, os.Stdin, os.Stdout)
 		return nil
 	},
-	"hook-plan": func(dir string, _ []string) error {
+	"hook-plan": func(dir string, rest []string) error {
 		if sayIfTypedByHand("hook-plan") {
 			return nil
 		}
-		return runHookPlan(dir, os.Stdin, os.Stdout)
+		return endLineOnTerminal(os.Stdout, func(w io.Writer) error {
+			return runHookPlanMode(dir, os.Stdin, w, hookToolShapeOf(rest))
+		})
 	},
 	"hook-tool": func(dir string, rest []string) error {
 		if sayIfTypedByHand("hook-tool") {
