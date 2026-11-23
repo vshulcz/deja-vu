@@ -146,7 +146,7 @@ func liveSessionRecentMessages(dir, cwd string, input promptHookInput, asked str
 			}
 		}
 	}
-	msgs = append(msgs, readLiveHookTranscriptMessages(input, cwd, ws)...)
+	msgs = append(msgs, readLiveHookTranscriptMessages(dir, input, cwd, ws)...)
 	t := strings.TrimSpace(asked)
 	if t != "" {
 		if len(msgs) == 0 || msgs[len(msgs)-1].Role != "user" || strings.TrimSpace(msgs[len(msgs)-1].Text) != t {
@@ -163,7 +163,14 @@ func liveSessionRecentMessages(dir, cwd string, input promptHookInput, asked str
 	return msgs, prevRules, prevAssistant
 }
 
-func readLiveHookTranscriptMessages(input promptHookInput, cwd, ws string) []model.Message {
+// readLiveHookTranscriptMessages is the tail of the live session, for the
+// rules it set. A host that names no transcript (Codex may send a null
+// transcript_path) is looked up where the index last saw the session, and no
+// further: finding it by id means listing the harness's whole store, which on
+// a large store and a busy disk took the prompt hook's whole deadline before a
+// byte was read (#6162). A session too new for the index goes without this
+// optional context until it is indexed; PreCompact still searches the store.
+func readLiveHookTranscriptMessages(dir string, input promptHookInput, cwd, ws string) []model.Message {
 	if input.TranscriptPath == "" && len(input.Messages) == 0 && input.Harness == "" && input.SessionID == "" {
 		return nil
 	}
@@ -173,6 +180,10 @@ func readLiveHookTranscriptMessages(input promptHookInput, cwd, ws string) []mod
 		CWD:            cwd,
 		Harness:        input.Harness,
 		Messages:       input.Messages,
+		noStoreScan:    true,
+	}
+	if pre.TranscriptPath == "" && len(pre.Messages) == 0 {
+		pre.TranscriptPath = indexedTranscriptPath(dir, input.Harness, input.SessionID)
 	}
 	tr, reason, _ := compactionSource(pre, ws)
 	if reason == "" && len(tr.Session.Messages) > 0 {
@@ -196,6 +207,23 @@ func readLiveHookTranscriptMessages(input promptHookInput, cwd, ws string) []mod
 		out = append(out, parseGenericHookMessages(input.Messages)...)
 	}
 	return out
+}
+
+// indexedTranscriptPath is the file the index read harness's session id from,
+// or "" when the index has no such session or the file is no longer one of
+// that harness's transcripts. It reads the manifest, never the store.
+func indexedTranscriptPath(dir, harness, id string) string {
+	if harness == "" || id == "" {
+		return ""
+	}
+	meta, ok := index.MetaForKey(dir, model.SessionKey(harness, id))
+	if !ok || meta.Path == "" || sources.CompactionTranscriptHarness(meta.Path) != harness {
+		return ""
+	}
+	if info, err := os.Stat(meta.Path); err != nil || !info.Mode().IsRegular() {
+		return ""
+	}
+	return meta.Path
 }
 
 func parseGenericTranscriptTail(path string) []model.Message {

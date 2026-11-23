@@ -76,7 +76,7 @@ func compactionSource(input precompactHookInput, workspace string) (sources.Comp
 	case input.Harness != "":
 		defaultStage = "read_store"
 		transcript, err = sources.ReadCompactionStore(input.Harness, input.SessionID)
-		if errors.Is(err, sources.ErrUnsupportedCompactionTranscript) {
+		if errors.Is(err, sources.ErrUnsupportedCompactionTranscript) && !input.noStoreScan {
 			defaultStage = "read_session"
 			transcript, err = sources.ReadCompactionSession(input.Harness, input.SessionID, "", workspace)
 		}
