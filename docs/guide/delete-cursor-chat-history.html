@@ -4,16 +4,16 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Delete Cursor chat history from state.vscdb — deja-vu</title>
-<meta name="description" content="How to delete Cursor chat history — where the chats live in state.vscdb, why deleting the file resets more than chats, and what the CLI writes separately.">
+<title>Delete Cursor Chat History and Archived Chats — deja-vu</title>
+<meta name="description" content="Permanently delete Cursor archived chats and chat history: Archive vs Delete in the UI, Developer: Delete Old Chats, state.vscdb rows, and CLI transcripts.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html">
 <link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html">
 <link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/delete-cursor-chat-history.html">
 <link rel="alternate" hreflang="ru" href="https://vshulcz.github.io/deja-vu/ru/guide/delete-cursor-chat-history.html">
 <link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Delete Cursor chat history from state.vscdb">
-<meta property="og:description" content="How to delete Cursor chat history — where the chats live in state.vscdb, why deleting the file resets more than chats, and what the CLI writes separately.">
+<meta property="og:title" content="Delete Cursor Chat History and Archived Chats">
+<meta property="og:description" content="Permanently delete Cursor archived chats and chat history: Archive vs Delete in the UI, Developer: Delete Old Chats, state.vscdb rows, and CLI transcripts.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -28,14 +28,14 @@
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
-<meta name="twitter:title" content="Delete Cursor chat history from state.vscdb">
-<meta name="twitter:description" content="How to delete Cursor chat history — where the chats live in state.vscdb, why deleting the file resets more than chats, and what the CLI writes separately.">
+<meta name="twitter:title" content="Delete Cursor Chat History and Archived Chats">
+<meta name="twitter:description" content="Permanently delete Cursor archived chats and chat history: Archive vs Delete in the UI, Developer: Delete Old Chats, state.vscdb rows, and CLI transcripts.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete Cursor chat history, and what you lose", "description": "How to delete Cursor chat history — where the chats live in state.vscdb, why deleting the file resets more than chats, and what the CLI writes separately.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-15", "dateModified": "2026-11-18"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete Cursor chat history, and what you lose", "description": "Permanently delete Cursor archived chats and chat history: Archive vs Delete in the UI, Developer: Delete Old Chats, state.vscdb rows, and CLI transcripts.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-15", "dateModified": "2026-11-23"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Cursor chat history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html"}]}</script>
 </head>
 <body>
@@ -198,9 +198,17 @@
 
 <p>Cursor does not keep one file per conversation. The IDE stores chats as rows in <code>state.vscdb</code>, a SQLite database that also holds the rest of its state, and the CLI writes transcripts as ordinary files somewhere else entirely. Which one you are trying to delete decides what you can safely do.</p>
 
-<div class="save-first"><b>Before you wipe chats to free space:</b> Cursor keeps no archive once a chat row is deleted from <code>state.vscdb</code>. Index them first with <a href="https://github.com/vshulcz/deja-vu">deja-vu</a>: it reads both <code>state.vscdb</code> and the CLI transcripts locally, so past fixes stay searchable from Cursor, Claude Code or Codex after the database is gone.<div class="save-actions"><div class="save-cmd"><span class="p">$</span><code>brew install deja-vu &amp;&amp; deja index</code><button type="button">copy</button></div><div class="save-cmd"><span class="p">$</span><code>npx @vshulcz/deja-vu index</code><button type="button">copy</button></div><a class="save-btn" href="https://github.com/vshulcz/deja-vu">deja-vu on GitHub</a><a class="save-demo" href="getting-started.html">Other ways to install &rarr;</a></div></div>
+<div class="save-first"><b>Before you permanently delete chats to free space:</b> Cursor's Archive button only hides a chat in the sidebar, while permanent deletion removes its rows from <code>state.vscdb</code> with no trash or undo. Index them first with <a href="https://github.com/vshulcz/deja-vu">deja-vu</a>: it reads both <code>state.vscdb</code> and the CLI transcripts locally, so past fixes stay searchable from Cursor, Claude Code or Codex after the database is gone.<div class="save-actions"><div class="save-cmd"><span class="p">$</span><code>brew install deja-vu &amp;&amp; deja index</code><button type="button">copy</button></div><div class="save-cmd"><span class="p">$</span><code>npx @vshulcz/deja-vu index</code><button type="button">copy</button></div><a class="save-btn" href="https://github.com/vshulcz/deja-vu">deja-vu on GitHub</a><a class="save-demo" href="getting-started.html">Other ways to install &rarr;</a></div></div>
 
-<h2>Where the chats are</h2>
+<h2 id="delete-archived-chats">How to delete archived chats in Cursor</h2>
+<p>In newer Cursor Agent and Composer sidebars, the action on a thread is <b>Archive</b> rather than <b>Delete</b>, and there is no one-click "delete all archived chats" button. Archiving only hides the chat from the active sidebar — its <code>composerData:</code> and <code>bubbleId:</code> rows stay inside <code>state.vscdb</code> and keep taking disk space.</p>
+<ul>
+<li><b>Delete one chat permanently in the editor UI:</b> open the chat history dropdown from a regular editor window (not the Agent sidebar), click the <code>...</code> menu on the thread, and choose <b>Delete</b>. That removes the chat's messages, checkpoints, and diffs rather than archiving it.</li>
+<li><b>Bulk-delete old and archived chats by age:</b> open the Command Palette (<code>Cmd+Shift+P</code> on macOS, <code>Ctrl+Shift+P</code> on Windows/Linux) and run <code>Developer: Delete Old Chats…</code> to purge threads older than a day cutoff, then run <code>Developer: GC Agent KV Blobs</code> to drop orphaned blobs. If disk usage still does not drop, see <a href="cursor-state-vscdb-too-large.html">how to compact state.vscdb</a>.</li>
+<li><b>Clear everything on disk:</b> quit Cursor completely first, then remove the workspace directory or <code>state.vscdb</code> below (or delete Cursor CLI <code>.jsonl</code> files separately).</li>
+</ul>
+
+<h2 id="where-the-chats-are">Where the chats are</h2>
 <p>The user directory is <code>~/Library/Application Support/Cursor/User</code> on macOS and <code>~/.config/Cursor/User</code> elsewhere, with <code>state.vscdb</code> under <code>globalStorage/</code> and under each <code>workspaceStorage/&lt;id&gt;/</code>. Inside it, the <code>cursorDiskKV</code> table holds one value per chat at <code>composerData:&lt;id&gt;</code> and one per message at <code>bubbleId:&lt;chat-id&gt;:&lt;bubble-id&gt;</code>. Cursor CLI is the simple case: <code>~/.cursor/projects/&lt;encoded-path&gt;/agent-transcripts/**/*.jsonl</code>, one file per transcript.</p>
 <pre data-nosnippet># the IDE store
 ls -lh ~/Library/Application\ Support/Cursor/User/globalStorage/state.vscdb
@@ -212,7 +220,7 @@ sqlite3 ~/Library/Application\ Support/Cursor/User/globalStorage/state.vscdb \
 # the CLI transcripts, which are plain files
 ls -t ~/.cursor/projects/*/agent-transcripts/**/*.jsonl | head</pre>
 
-<h2>How to delete it</h2>
+<h2 id="how-to-delete-it">How to delete it</h2>
 <p>Delete a chat from the Cursor UI. That is not a hedge — the database is live state the IDE owns, and editing it underneath a running editor is how people lose window layouts and extension settings along with the chat they meant to remove.</p>
 <p>If you want the history gone from disk rather than from the list, close Cursor first, and know what you are removing:</p>
 <pre data-nosnippet># chats and every other bit of state in this database
@@ -223,17 +231,17 @@ rm -rf ~/Library/Application\ Support/Cursor/User/workspaceStorage/&lt;id&gt;
 
 # CLI transcripts only, which are nothing but transcripts
 rm -rf ~/.cursor/projects/&lt;encoded-path&gt;/agent-transcripts</pre>
-<p>There is no archive to restore from. The <a href="../registry/cursor.html">format registry</a> documents both stores field by field, including the bubble types and the millisecond timestamps.</p>
+<p>Once deleted from <code>state.vscdb</code>, there is no trash or backup to restore from. The <a href="../registry/cursor.html">format registry</a> documents both stores field by field, including the bubble types and the millisecond timestamps.</p>
 
 <p>If the reason is size, a database of tens of gigabytes, <a href="cursor-state-vscdb-too-large.html">find what fills it</a> before deleting all of it.</p>
 
-<h2>Delete one session with deja</h2>
+<h2 id="delete-one-session-with-deja">Delete one session with deja</h2>
 <p>If deja is installed, run <code>deja last</code> and copy the session id. Preview the deletion, then run it from a terminal and confirm:</p>
 <pre>deja delete &lt;id&gt; --dry-run
 deja delete &lt;id&gt;</pre>
 <p>The dry run lists the paths without removing them. After confirmation, deja removes those paths and forgets its own copy of the session. This cannot be undone. This supports CLI chats only and also removes their matching <code>chats/&lt;hash&gt;/&lt;id&gt;</code> directory. deja refuses IDE chats in the shared <code>state.vscdb</code>; delete those through Cursor. deja refuses deletion if a file or directory to be removed was written in the last 5 minutes; end the session and wait before deleting it.</p>
 
-<h2>What you lose</h2>
+<h2 id="what-you-lose">What you lose</h2>
 <p>The chats are the record of what you worked out and what the agent ran. Cursor's own search over them goes with the rows, and so does any future search: a question you answered in March is answerable only while the history of March exists somewhere.</p>
 <p>deja reads both stores — the IDE database through <code>sqlite3</code> and the CLI transcripts directly — along with every other agent's history on the machine, so what you settled in Cursor comes back in Claude Code or Codex. Sessions already in its index stay searchable after you delete the originals through Cursor or by hand, and in the screen bare <code>deja</code> opens, <code>o</code> carries one into another agent. A CLI transcript removed by hand is listed under the screen's Deleted tab; deja does not write a chat back into either Cursor store.</p>
 
