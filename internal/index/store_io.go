@@ -1087,6 +1087,17 @@ func EachRecordOfRoleWhere(dir, role string, keepSession func(SessionMeta) bool,
 				_, ok := keep[k]
 				return ok
 			}
+			if len(m.Sessions) > 0 && int64(len(keep))*offsetsWalkShare <= int64(len(m.Sessions)) {
+				want := make(map[string]bool, len(keep))
+				for k := range keep {
+					want[k] = true
+				}
+				return eachRecordForKeysInRoles(filepath.Join(dir, "records.bin"), tablesFromManifest(m), want, map[string]bool{role: true}, func(r Record) {
+					if meta, ok := keep[r.Key]; ok {
+						fn(meta, r)
+					}
+				})
+			}
 		}
 		return eachRecordInRolesWhere(filepath.Join(dir, "records.bin"), tablesFromManifest(m),
 			map[string]bool{role: true}, keepKey, func(r Record) {

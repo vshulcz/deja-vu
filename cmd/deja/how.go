@@ -319,10 +319,6 @@ func howEntriesWithFallback(dir string, terms []string, projects []string, widen
 	// answered "how do I run this here" — and the default rule is the temp tree
 	// a background agent makes for itself (#2630).
 	scoped := bucket{hidden: map[string]bool{}, ignored: map[string]bool{}, byCmd: map[string]*howEntry{}}
-	var wider bucket
-	if widen {
-		wider = bucket{hidden: map[string]bool{}, ignored: map[string]bool{}, byCmd: map[string]*howEntry{}}
-	}
 	const (
 		metaUnseen  uint8 = 0
 		metaAllowed uint8 = 1
@@ -383,59 +379,54 @@ func howEntriesWithFallback(dir string, terms []string, projects []string, widen
 			e.Last = r.Time
 		}
 	}
-	scopedMeta := map[string]bool{}
-	keepSession := func(meta index.SessionMeta) bool {
+	scanCommand := func(b *bucket) func(index.SessionMeta, index.Record) {
+		return func(meta index.SessionMeta, r index.Record) {
+			// Without the outcome codex and opencode append: "$ make test  → exit
+			// 2" is the same command as "$ make test", and counting them apart put
+			// one command on two rows of this screen (#2590).
+			rawBody, code, hasExit := index.CommandExitOutcome(strings.TrimRight(r.Text, " \t\r\n"))
+			line := strings.TrimSpace(firstCommandLine(rawBody))
+			cmd := index.CanonicalRecurringCommand(line)
+			// Measured on the form the screen prints, as it always was: the whole
+			// command is what the row groups and the JSON hands over, and a long
+			// one-liner is still a row.
+			if cmd == "" || (len(cmd) > howCommandMax && len(howScreenCommand(cmd)) > howCommandMax) {
+				return
+			}
+			low := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(cmd, "$ ")))
+			for _, t := range lowTerms {
+				if !commandMentions(low, t) {
+					return
+				}
+			}
+			recordInto(b, meta, r, cmd, low, code, hasExit)
+		}
+	}
+	scopedKeep := func(meta index.SessionMeta) bool {
 		if len(excluded) > 0 && excluded[strings.ToLower(strings.TrimSpace(meta.Harness))] {
 			return false
 		}
-		inScope := howProjectMatches(meta.Project, projects)
-		if inScope {
-			scopedMeta[meta.Key()] = true
-		}
-		if !widen && !inScope {
-			return false
-		}
-		return true
+		return howProjectMatches(meta.Project, projects)
 	}
-	err := index.EachRecordOfRoleWhere(dir, "command", keepSession, func(meta index.SessionMeta, r index.Record) {
-		inScope := !widen || scopedMeta[r.Key]
-		if !inScope && !widen {
-			return
-		}
-		// Without the outcome codex and opencode append: "$ make test  → exit
-		// 2" is the same command as "$ make test", and counting them apart put
-		// one command on two rows of this screen (#2590).
-		rawBody, code, hasExit := index.CommandExitOutcome(strings.TrimRight(r.Text, " \t\r\n"))
-		line := strings.TrimSpace(firstCommandLine(rawBody))
-		cmd := index.CanonicalRecurringCommand(line)
-		// Measured on the form the screen prints, as it always was: the whole
-		// command is what the row groups and the JSON hands over, and a long
-		// one-liner is still a row.
-		if cmd == "" || (len(cmd) > howCommandMax && len(howScreenCommand(cmd)) > howCommandMax) {
-			return
-		}
-		low := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(cmd, "$ ")))
-		for _, t := range lowTerms {
-			if !commandMentions(low, t) {
-				return
-			}
-		}
-		if inScope {
-			recordInto(&scoped, meta, r, cmd, low, code, hasExit)
-		}
-		if widen && len(scoped.byCmd) == 0 && len(scoped.hidden) == 0 && len(scoped.ignored) == 0 {
-			recordInto(&wider, meta, r, cmd, low, code, hasExit)
-		}
-	})
-	if err != nil {
-		return nil, len(scoped.hidden), len(scoped.ignored), false, fmt.Errorf("read: %w", err)
-	}
+	err := index.EachRecordOfRoleWhere(dir, "command", scopedKeep, scanCommand(&scoped))
 	chosen := &scoped
 	widened := false
-	if widen && len(scoped.byCmd) == 0 && len(scoped.hidden) == 0 && len(scoped.ignored) == 0 &&
-		(len(wider.byCmd) > 0 || len(wider.hidden) > 0 || len(wider.ignored) > 0) {
-		chosen = &wider
-		widened = true
+	if err == nil && widen && len(projects) > 0 && len(scoped.byCmd) == 0 && len(scoped.hidden) == 0 && len(scoped.ignored) == 0 {
+		wider := bucket{hidden: map[string]bool{}, ignored: map[string]bool{}, byCmd: map[string]*howEntry{}}
+		widerKeep := func(meta index.SessionMeta) bool {
+			if len(excluded) > 0 && excluded[strings.ToLower(strings.TrimSpace(meta.Harness))] {
+				return false
+			}
+			return !howProjectMatches(meta.Project, projects)
+		}
+		err = index.EachRecordOfRoleWhere(dir, "command", widerKeep, scanCommand(&wider))
+		if err == nil && (len(wider.byCmd) > 0 || len(wider.hidden) > 0 || len(wider.ignored) > 0) {
+			chosen = &wider
+			widened = true
+		}
+	}
+	if err != nil {
+		return nil, len(scoped.hidden), len(scoped.ignored), false, fmt.Errorf("read: %w", err)
 	}
 	out := make([]howEntry, 0, len(chosen.byCmd))
 	for _, e := range chosen.byCmd {

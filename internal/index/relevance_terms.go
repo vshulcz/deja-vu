@@ -294,16 +294,25 @@ func (a *relevanceAcc) addAssociativeTerms(dir string, terms []string) {
 	if len(a.credited) <= 1 || len(terms) == 0 {
 		return
 	}
-	neighbors := readCooccur(dir)
-	if len(neighbors) == 0 {
-		return
-	}
 	inQuery := map[string]bool{}
+	var lookup []string
+	seenLookup := map[string]bool{}
 	for _, t := range terms {
 		inQuery[t] = true
 		for _, tok := range tokens(t) {
 			inQuery[tok] = true
+			if len(tok) >= 4 && !query.IsStopWord(tok) && !seenLookup[tok] {
+				seenLookup[tok] = true
+				lookup = append(lookup, tok)
+			}
 		}
+	}
+	if len(lookup) == 0 {
+		return
+	}
+	neighbors, ok := lookupCooccurMany(dir, lookup)
+	if !ok || len(neighbors) == 0 {
+		return
 	}
 	expand := map[string]float64{}
 	for _, t := range terms {

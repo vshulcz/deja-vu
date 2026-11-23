@@ -474,23 +474,34 @@ func newBucketReader(dir string) *bucketReader {
 // overlays'. Tests land a pass there.
 var bucketBaseRead func(tok string)
 
-func (b *bucketReader) postings(tok string) ([]posting, error) {
-	if bucketBaseRead == nil {
-		if cached, ok := b.posts[tok]; ok {
-			return cached, nil
-		}
-	}
+func (b *bucketReader) bucketFiles(tok string) ([]string, bool) {
 	p, ok := bucketPath(b.dir, tok)
 	if !ok {
-		return nil, nil
+		return nil, false
 	}
 	layers, cached := b.layers[p]
 	if !cached {
 		layers = bucketLayers(p)
 		b.layers[p] = layers
 	}
+	if len(layers) == 0 {
+		return []string{p}, true
+	}
+	return append([]string{p}, layers...), true
+}
+
+func (b *bucketReader) postings(tok string) ([]posting, error) {
+	if bucketBaseRead == nil {
+		if cached, ok := b.posts[tok]; ok {
+			return cached, nil
+		}
+	}
+	files, ok := b.bucketFiles(tok)
+	if !ok {
+		return nil, nil
+	}
 	var out []posting
-	for i, f := range append([]string{p}, layers...) {
+	for i, f := range files {
 		posts, err := b.filePostings(f, tok)
 		if err != nil {
 			// A bucket that was never written means the token does not occur
@@ -519,9 +530,38 @@ func (b *bucketReader) postings(tok string) ([]posting, error) {
 	return res, nil
 }
 
-func (b *bucketReader) filePostings(p, tok string) ([]posting, error) {
+func (b *bucketReader) hasToken(tok string) (bool, error) {
+	if bucketBaseRead == nil {
+		if cached, ok := b.posts[tok]; ok {
+			return len(cached) > 0, nil
+		}
+	}
+	files, ok := b.bucketFiles(tok)
+	if !ok {
+		return false, nil
+	}
+	for _, f := range files {
+		d, fp, closeFile, err := b.fileDir(f)
+		if closeFile && fp != nil {
+			_ = fp.Close()
+		}
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return false, err
+		}
+		if _, hit := d.find(tok); hit {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (b *bucketReader) fileDir(p string) (*cachedBucketDir, *os.File, bool, error) {
 	d, seen := b.dirs[p]
 	var f *os.File
+	closeFile := false
 	switch {
 	case !seen:
 		var err error
@@ -529,25 +569,34 @@ func (b *bucketReader) filePostings(p, tok string) ([]posting, error) {
 			if os.IsNotExist(err) {
 				b.dirs[p] = nil
 			}
-			return nil, err
+			return nil, nil, false, err
 		}
 		if bucketBaseRead != nil || runtime.GOOS == "windows" {
-			defer func() { _ = f.Close() }()
+			closeFile = true
 		}
 		if d, err = bucketDirOf(p, f); err != nil {
-			if bucketBaseRead == nil && runtime.GOOS != "windows" {
-				_ = f.Close()
-			}
-			return nil, err
+			_ = f.Close()
+			return nil, nil, false, err
 		}
-		if bucketBaseRead == nil && runtime.GOOS != "windows" {
+		if !closeFile {
 			b.files[p] = f
 		}
 		b.dirs[p] = d
 	case d == nil:
-		return nil, os.ErrNotExist
+		return nil, nil, false, os.ErrNotExist
 	case bucketBaseRead == nil && runtime.GOOS != "windows":
 		f = b.files[p]
+	}
+	return d, f, closeFile, nil
+}
+
+func (b *bucketReader) filePostings(p, tok string) ([]posting, error) {
+	d, f, closeFile, err := b.fileDir(p)
+	if err != nil {
+		return nil, err
+	}
+	if closeFile && f != nil {
+		defer func() { _ = f.Close() }()
 	}
 	if _, ok := d.find(tok); !ok {
 		return nil, nil

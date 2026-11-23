@@ -238,7 +238,9 @@ func buildCooccur(tmp string, ss []model.Session) {
 	if dm := digest.LearnDiscourseMarkers(ss); len(dm) > 0 {
 		neighbors[cooccurDiscourseKey] = dm
 	}
-	_ = writeGob(cooccurPath(tmp), neighbors)
+	if err := writeGob(cooccurPath(tmp), neighbors); err == nil {
+		_ = writeCooccurBinBuild(tmp, neighbors)
+	}
 }
 
 // turnWindowBit maps a message index within a session of nMsgs messages to a
@@ -343,7 +345,11 @@ func writeCooccurWithout(dir string, m map[string][]string, drop func(word strin
 	}
 	// An empty map rather than no file, which a reader holding it open on
 	// Windows would refuse to let go; a read of either finds no neighbours.
-	return writeGobAtomic(cooccurPath(dir), m)
+	if err := writeGobAtomic(cooccurPath(dir), m); err != nil {
+		return err
+	}
+	_ = writeCooccurBinAtomic(dir, m)
+	return nil
 }
 
 // cooccurVocabulary is every word of m, as a word or a neighbour; nil unless
@@ -437,11 +443,7 @@ func CooccurNeighbors(dir, term string) []string {
 	if dir == "" || term == "" {
 		return nil
 	}
-	m := readCooccur(dir)
-	if len(m) == 0 {
-		return nil
-	}
-	return m[strings.ToLower(term)]
+	return lookupCooccurNeighbors(dir, strings.ToLower(term))
 }
 
 // cooccurSearch is the last lexical resort: every stem/fuzzy avenue came up
@@ -477,8 +479,8 @@ func cooccurNarrowedSearch(dir string, m Manifest, o query.Options) (SearchResul
 	if len(terms) < 2 {
 		return SearchResult{}, nil
 	}
-	neighbors := readCooccur(dir)
-	if neighbors == nil {
+	neighbors, ok := lookupCooccurMany(dir, terms)
+	if !ok {
 		return SearchResult{}, nil
 	}
 	// A sentence never matches an AND after one substitution: the map holds
@@ -669,13 +671,23 @@ func cooccurSearchOver(dir string, m Manifest, o query.Options, terms []string, 
 	var found []model.Session
 	seen := map[string]bool{}
 	gathered := map[string][]string{}
-	neighbors := readCooccur(dir)
-	if neighbors == nil {
+	neighbors, ok := lookupCooccurMany(dir, terms)
+	if !ok {
 		return SearchResult{}, nil
 	}
-	catalog, err := tokenCatalogCached(dir)
-	if err != nil {
-		return SearchResult{}, err
+	br := newBucketReader(dir)
+	defer br.close()
+	inCatalog := map[string]bool{}
+	hasCatalogToken := func(tok string) (bool, error) {
+		if has, cached := inCatalog[tok]; cached {
+			return has, nil
+		}
+		has, err := br.hasToken("t" + tok)
+		if err != nil {
+			return false, err
+		}
+		inCatalog[tok] = has
+		return has, nil
 	}
 	// Each attempt swaps one word and keeps the others, so the others' postings
 	// are the same on every attempt. Reading them again per neighbour read the
@@ -686,7 +698,11 @@ func cooccurSearchOver(dir string, m Manifest, o query.Options, terms []string, 
 	swappable := false
 	for _, term := range terms {
 		for _, n := range neighbors[term] {
-			if catalog[n] {
+			has, err := hasCatalogToken(n)
+			if err != nil {
+				return SearchResult{}, err
+			}
+			if has {
 				swappable = true
 				break
 			}
@@ -716,7 +732,11 @@ func cooccurSearchOver(dir string, m Manifest, o query.Options, terms []string, 
 			continue
 		}
 		for _, n := range neighbors[term] {
-			if !catalog[n] {
+			has, err := hasCatalogToken(n)
+			if err != nil {
+				return SearchResult{}, err
+			}
+			if !has {
 				continue
 			}
 			swapped := cooccurPostings(dir, m, n)

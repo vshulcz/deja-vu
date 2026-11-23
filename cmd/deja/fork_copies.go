@@ -171,7 +171,7 @@ func forkCopiesFromFull(dir string, ss []model.Session, identities []index.Ident
 			ids = append(ids, id)
 		}
 	}
-	full, err := index.FindManyByIdentity(dir, ids)
+	full, err := index.FindManyForCopyCheck(dir, ids)
 	if err != nil {
 		return
 	}

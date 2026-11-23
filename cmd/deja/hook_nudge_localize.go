@@ -1,8 +1,7 @@
 package main
 
 import (
-	"bytes"
-	"encoding/gob"
+	"encoding/binary"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -98,43 +97,13 @@ type repoSymbolMap struct {
 }
 
 const (
+	repoSymbolDiskMagic   = "DJSYMM01"
 	repoSymbolDiskTTL     = 60 * time.Second
-	repoSymbolDiskVersion = 1
+	repoSymbolDiskVersion = 2
+	repoSymbolDiskHdrLen  = 8 + 4 + 1 + 8
+	maxSymDiskStrings     = 4_000_000
+	maxSymDiskEntries     = 4_000_000
 )
-
-type repoSymbolDiskSnapshot struct {
-	Version    int
-	At         time.Time
-	Files      []repoFileDiskEntry
-	ByStem     map[string][]string
-	ByDir      map[string]int
-	StemDF     map[string]int
-	DeclDF     map[string]int
-	StructDF   map[string]int
-	BodyDF     map[string]int
-	FirstDecl  map[string]symbolDeclDiskLoc
-	DirMtimes  map[string]int64
-	FileMtimes map[string]int64
-	FileSizes  map[string]int64
-	NumFiles   int
-	Capped     bool
-}
-
-type repoFileDiskEntry struct {
-	Rel       string
-	Stem      string
-	Pkg       string
-	StemWords map[string]bool
-	DeclExact map[string]bool
-	DeclWords map[string]bool
-	BodyWords map[string]int
-}
-
-type symbolDeclDiskLoc struct {
-	Rel  string
-	Line int
-	Sig  string
-}
 
 var (
 	repoSymbolMapCache                   sync.Map
@@ -197,75 +166,466 @@ func repoSymbolDiskCacheAllowed() (string, bool) {
 	return dir, true
 }
 
-func snapshotFromRepoSymbolMap(idx repoSymbolMap) repoSymbolDiskSnapshot {
-	files := make([]repoFileDiskEntry, len(idx.files))
-	for i, f := range idx.files {
-		files[i] = repoFileDiskEntry{
-			Rel:       f.rel,
-			Stem:      f.stem,
-			Pkg:       f.pkg,
-			StemWords: f.stemWords,
-			DeclExact: f.declExact,
-			DeclWords: f.declWords,
-			BodyWords: f.bodyWords,
-		}
+type symStrWriter struct {
+	ids   map[string]uint32
+	strs  []string
+	bytes int
+}
+
+func (w *symStrWriter) id(s string) uint32 {
+	if id, ok := w.ids[s]; ok {
+		return id
 	}
-	decls := make(map[string]symbolDeclDiskLoc, len(idx.firstDecl))
-	for k, v := range idx.firstDecl {
-		decls[k] = symbolDeclDiskLoc{Rel: v.rel, Line: v.line, Sig: v.sig}
+	if w.ids == nil {
+		w.ids = make(map[string]uint32, 1024)
 	}
-	return repoSymbolDiskSnapshot{
-		Version:    repoSymbolDiskVersion,
-		At:         idx.at,
-		Files:      files,
-		ByStem:     idx.byStem,
-		ByDir:      idx.byDir,
-		StemDF:     idx.stemDF,
-		DeclDF:     idx.declDF,
-		StructDF:   idx.structDF,
-		BodyDF:     idx.bodyDF,
-		FirstDecl:  decls,
-		DirMtimes:  idx.dirMtimes,
-		FileMtimes: idx.fileMtimes,
-		FileSizes:  idx.fileSizes,
-		NumFiles:   idx.numFiles,
-		Capped:     idx.capped,
+	id := uint32(len(w.strs)) //nolint:gosec // bounded by maxSymDiskStrings check before write
+	w.ids[s] = id
+	w.strs = append(w.strs, s)
+	w.bytes += len(s)
+	return id
+}
+
+type symBinWriter struct {
+	b    []byte
+	strs symStrWriter
+}
+
+func (w *symBinWriter) uvarint(v uint64) {
+	w.b = binary.AppendUvarint(w.b, v)
+}
+
+func (w *symBinWriter) varint(v int64) {
+	w.b = binary.AppendVarint(w.b, v)
+}
+
+func (w *symBinWriter) str(s string) {
+	w.uvarint(uint64(w.strs.id(s)))
+}
+
+func (w *symBinWriter) nilableLen(n int, nonNil bool) bool {
+	if !nonNil {
+		w.uvarint(0)
+		return false
+	}
+	w.uvarint(uint64(n) + 1) //nolint:gosec // n is a non-negative Go slice/map length
+	return true
+}
+
+func (w *symBinWriter) strSlice(ss []string) {
+	if !w.nilableLen(len(ss), ss != nil) {
+		return
+	}
+	for _, s := range ss {
+		w.str(s)
 	}
 }
 
-func repoSymbolMapFromSnapshot(snap repoSymbolDiskSnapshot) repoSymbolMap {
-	files := make([]repoFileEntry, len(snap.Files))
-	for i, f := range snap.Files {
-		files[i] = repoFileEntry{
-			rel:       f.Rel,
-			stem:      f.Stem,
-			pkg:       f.Pkg,
-			stemWords: f.StemWords,
-			declExact: f.DeclExact,
-			declWords: f.DeclWords,
-			bodyWords: f.BodyWords,
+func (w *symBinWriter) strBoolMap(m map[string]bool) {
+	if !w.nilableLen(len(m), m != nil) {
+		return
+	}
+	for k := range m {
+		w.str(k)
+	}
+}
+
+func (w *symBinWriter) strIntMap(m map[string]int) {
+	if !w.nilableLen(len(m), m != nil) {
+		return
+	}
+	for k, v := range m {
+		w.str(k)
+		w.varint(int64(v))
+	}
+}
+
+func (w *symBinWriter) strInt64Map(m map[string]int64) {
+	if !w.nilableLen(len(m), m != nil) {
+		return
+	}
+	for k, v := range m {
+		w.str(k)
+		w.varint(v)
+	}
+}
+
+type symBinReader struct {
+	b    []byte
+	strs []string
+}
+
+func (r *symBinReader) uvarint() (uint64, bool) {
+	v, n := binary.Uvarint(r.b)
+	if n <= 0 {
+		return 0, false
+	}
+	r.b = r.b[n:]
+	return v, true
+}
+
+func (r *symBinReader) varint() (int64, bool) {
+	v, n := binary.Varint(r.b)
+	if n <= 0 {
+		return 0, false
+	}
+	r.b = r.b[n:]
+	return v, true
+}
+
+func (r *symBinReader) str() (string, bool) {
+	id, ok := r.uvarint()
+	if !ok || id >= uint64(len(r.strs)) {
+		return "", false
+	}
+	return r.strs[id], true
+}
+
+func (r *symBinReader) nilableLen() (int, bool, bool) {
+	v, ok := r.uvarint()
+	if !ok {
+		return 0, false, false
+	}
+	if v == 0 {
+		return 0, false, true
+	}
+	n := v - 1
+	if n > maxSymDiskEntries {
+		return 0, false, false
+	}
+	return int(n), true, true
+}
+
+func (r *symBinReader) strSlice() ([]string, bool) {
+	n, nonNil, ok := r.nilableLen()
+	if !ok || !nonNil {
+		return nil, ok
+	}
+	if n > len(r.b) {
+		return nil, false
+	}
+	out := make([]string, n)
+	for i := range n {
+		s, sok := r.str()
+		if !sok {
+			return nil, false
+		}
+		out[i] = s
+	}
+	return out, true
+}
+
+func (r *symBinReader) strBoolMap() (map[string]bool, bool) {
+	n, nonNil, ok := r.nilableLen()
+	if !ok || !nonNil {
+		return nil, ok
+	}
+	if n > len(r.b) {
+		return nil, false
+	}
+	out := make(map[string]bool, n)
+	for range n {
+		k, sok := r.str()
+		if !sok {
+			return nil, false
+		}
+		out[k] = true
+	}
+	return out, true
+}
+
+func (r *symBinReader) strIntMap() (map[string]int, bool) {
+	n, nonNil, ok := r.nilableLen()
+	if !ok || !nonNil {
+		return nil, ok
+	}
+	if n*2 > len(r.b) {
+		return nil, false
+	}
+	out := make(map[string]int, n)
+	for range n {
+		k, sok := r.str()
+		if !sok {
+			return nil, false
+		}
+		v, vok := r.varint()
+		if !vok {
+			return nil, false
+		}
+		out[k] = int(v)
+	}
+	return out, true
+}
+
+func (r *symBinReader) strInt64Map() (map[string]int64, bool) {
+	n, nonNil, ok := r.nilableLen()
+	if !ok || !nonNil {
+		return nil, ok
+	}
+	if n*2 > len(r.b) {
+		return nil, false
+	}
+	out := make(map[string]int64, n)
+	for range n {
+		k, sok := r.str()
+		if !sok {
+			return nil, false
+		}
+		v, vok := r.varint()
+		if !vok {
+			return nil, false
+		}
+		out[k] = v
+	}
+	return out, true
+}
+
+func encodeRepoSymbolMap(idx repoSymbolMap) ([]byte, bool) {
+	var hdr [repoSymbolDiskHdrLen]byte
+	copy(hdr[:8], repoSymbolDiskMagic)
+	binary.LittleEndian.PutUint32(hdr[8:12], repoSymbolDiskVersion)
+	if idx.capped {
+		hdr[12] = 1
+	}
+	var atNano int64
+	if !idx.at.IsZero() {
+		atNano = idx.at.UnixNano()
+	}
+	binary.LittleEndian.PutUint64(hdr[13:21], uint64(atNano))
+	if idx.capped {
+		return hdr[:], true
+	}
+
+	var w symBinWriter
+	if w.nilableLen(len(idx.files), idx.files != nil) {
+		for _, f := range idx.files {
+			w.str(f.rel)
+			w.str(f.stem)
+			w.str(f.pkg)
+			w.strBoolMap(f.stemWords)
+			w.strBoolMap(f.declExact)
+			w.strBoolMap(f.declWords)
+			w.strIntMap(f.bodyWords)
 		}
 	}
-	decls := make(map[string]symbolDeclLoc, len(snap.FirstDecl))
-	for k, v := range snap.FirstDecl {
-		decls[k] = symbolDeclLoc{rel: v.Rel, line: v.Line, sig: v.Sig}
+	if w.nilableLen(len(idx.byStem), idx.byStem != nil) {
+		for k, ss := range idx.byStem {
+			w.str(k)
+			w.strSlice(ss)
+		}
+	}
+	w.strIntMap(idx.byDir)
+	w.strIntMap(idx.stemDF)
+	w.strIntMap(idx.declDF)
+	w.strIntMap(idx.structDF)
+	w.strIntMap(idx.bodyDF)
+	if w.nilableLen(len(idx.firstDecl), idx.firstDecl != nil) {
+		for k, loc := range idx.firstDecl {
+			w.str(k)
+			w.str(loc.rel)
+			w.varint(int64(loc.line))
+			w.str(loc.sig)
+		}
+	}
+	w.strInt64Map(idx.dirMtimes)
+	w.strInt64Map(idx.fileMtimes)
+	w.strInt64Map(idx.fileSizes)
+	if len(w.strs.strs) > maxSymDiskStrings || w.strs.bytes > int(^uint32(0)>>1) {
+		return nil, false
+	}
+
+	out := make([]byte, repoSymbolDiskHdrLen, repoSymbolDiskHdrLen+24+len(w.strs.strs)*2+w.strs.bytes+len(w.b))
+	copy(out, hdr[:])
+	out = binary.AppendUvarint(out, uint64(max(0, idx.numFiles)))
+	out = binary.AppendUvarint(out, uint64(len(w.strs.strs)))
+	out = binary.AppendUvarint(out, uint64(w.strs.bytes)) //nolint:gosec // total string byte count >= 0
+	for _, s := range w.strs.strs {
+		out = binary.AppendUvarint(out, uint64(len(s)))
+	}
+	for _, s := range w.strs.strs {
+		out = append(out, s...)
+	}
+	out = append(out, w.b...)
+	return out, true
+}
+
+func parseRepoSymbolHeader(data []byte) (time.Time, bool) {
+	if len(data) < repoSymbolDiskHdrLen || string(data[:8]) != repoSymbolDiskMagic {
+		return time.Time{}, false
+	}
+	if binary.LittleEndian.Uint32(data[8:12]) != repoSymbolDiskVersion || data[12] != 0 {
+		return time.Time{}, false
+	}
+	atNano := int64(binary.LittleEndian.Uint64(data[13:21])) //nolint:gosec // signed UnixNano bit-preserved in fixed header
+	if atNano == 0 {
+		return time.Time{}, false
+	}
+	at := time.Unix(0, atNano)
+	if time.Since(at) >= repoSymbolDiskTTL {
+		return time.Time{}, false
+	}
+	return at, true
+}
+
+func (r *symBinReader) readSymStringPool() (int, bool) {
+	numFiles, ok := r.uvarint()
+	if !ok || numFiles > maxSymDiskEntries {
+		return 0, false
+	}
+	strCount, ok := r.uvarint()
+	if !ok || strCount > maxSymDiskStrings {
+		return 0, false
+	}
+	poolBytes, ok := r.uvarint()
+	if !ok || poolBytes > uint64(len(r.b)) || poolBytes > uint64(^uint32(0)>>1) {
+		return 0, false
+	}
+	if strCount > uint64(len(r.b))-poolBytes {
+		return 0, false
+	}
+	offsets := make([]uint32, strCount+1)
+	var cursor uint64
+	for i := range int(strCount) {
+		slen, lok := r.uvarint()
+		if !lok || slen > poolBytes-cursor {
+			return 0, false
+		}
+		cursor += slen
+		offsets[i+1] = uint32(cursor) //nolint:gosec // cursor <= poolBytes <= math.MaxInt32
+	}
+	if cursor != poolBytes || uint64(len(r.b)) < poolBytes {
+		return 0, false
+	}
+	pool := string(r.b[:poolBytes])
+	r.b = r.b[poolBytes:]
+	strs := make([]string, strCount)
+	for i := range int(strCount) {
+		strs[i] = pool[offsets[i]:offsets[i+1]]
+	}
+	r.strs = strs
+	return int(numFiles), true
+}
+
+func (r *symBinReader) readFileEntries() ([]repoFileEntry, bool) {
+	nFiles, filesNonNil, ok := r.nilableLen()
+	if !ok || nFiles > len(r.b) {
+		return nil, false
+	}
+	if !filesNonNil {
+		return nil, true
+	}
+	files := make([]repoFileEntry, nFiles)
+	for i := range nFiles {
+		rel, ok1 := r.str()
+		stem, ok2 := r.str()
+		pkg, ok3 := r.str()
+		sw, ok4 := r.strBoolMap()
+		de, ok5 := r.strBoolMap()
+		dw, ok6 := r.strBoolMap()
+		bw, ok7 := r.strIntMap()
+		if !ok1 || !ok2 || !ok3 || !ok4 || !ok5 || !ok6 || !ok7 {
+			return nil, false
+		}
+		files[i] = repoFileEntry{
+			rel:       rel,
+			stem:      stem,
+			pkg:       pkg,
+			stemWords: sw,
+			declExact: de,
+			declWords: dw,
+			bodyWords: bw,
+		}
+	}
+	return files, true
+}
+
+func (r *symBinReader) readStemSliceMap() (map[string][]string, bool) {
+	nStem, stemNonNil, ok := r.nilableLen()
+	if !ok || nStem > len(r.b) {
+		return nil, false
+	}
+	if !stemNonNil {
+		return nil, true
+	}
+	byStem := make(map[string][]string, nStem)
+	for range nStem {
+		k, okK := r.str()
+		ss, okS := r.strSlice()
+		if !okK || !okS {
+			return nil, false
+		}
+		byStem[k] = ss
+	}
+	return byStem, true
+}
+
+func (r *symBinReader) readFirstDeclMap() (map[string]symbolDeclLoc, bool) {
+	nDecls, declsNonNil, ok := r.nilableLen()
+	if !ok || nDecls*4 > len(r.b) {
+		return nil, false
+	}
+	if !declsNonNil {
+		return nil, true
+	}
+	firstDecl := make(map[string]symbolDeclLoc, nDecls)
+	for range nDecls {
+		k, okK := r.str()
+		rel, okR := r.str()
+		line, okL := r.varint()
+		sig, okS := r.str()
+		if !okK || !okR || !okL || !okS {
+			return nil, false
+		}
+		firstDecl[k] = symbolDeclLoc{rel: rel, line: int(line), sig: sig}
+	}
+	return firstDecl, true
+}
+
+func decodeRepoSymbolMap(data []byte, cwd string) (repoSymbolMap, bool) {
+	at, ok := parseRepoSymbolHeader(data)
+	if !ok {
+		return repoSymbolMap{}, false
+	}
+	r := symBinReader{b: data[repoSymbolDiskHdrLen:]}
+	numFiles, ok := r.readSymStringPool()
+	if !ok {
+		return repoSymbolMap{}, false
+	}
+	files, okFiles := r.readFileEntries()
+	byStem, okStem := r.readStemSliceMap()
+	byDir, ok1 := r.strIntMap()
+	stemDF, ok2 := r.strIntMap()
+	declDF, ok3 := r.strIntMap()
+	structDF, ok4 := r.strIntMap()
+	bodyDF, ok5 := r.strIntMap()
+	firstDecl, okDecls := r.readFirstDeclMap()
+	dirMtimes, ok6 := r.strInt64Map()
+	fileMtimes, ok7 := r.strInt64Map()
+	fileSizes, ok8 := r.strInt64Map()
+	if !okFiles || !okStem || !ok1 || !ok2 || !ok3 || !ok4 || !ok5 || !okDecls || !ok6 || !ok7 || !ok8 || len(r.b) != 0 {
+		return repoSymbolMap{}, false
+	}
+
+	var cleanCWD string
+	if cwd != "" {
+		cleanCWD = filepath.Clean(cwd)
 	}
 	return repoSymbolMap{
-		at:         snap.At,
+		at:         at,
+		cwd:        cleanCWD,
 		files:      files,
-		byStem:     snap.ByStem,
-		byDir:      snap.ByDir,
-		stemDF:     snap.StemDF,
-		declDF:     snap.DeclDF,
-		structDF:   snap.StructDF,
-		bodyDF:     snap.BodyDF,
-		firstDecl:  decls,
-		dirMtimes:  snap.DirMtimes,
-		fileMtimes: snap.FileMtimes,
-		fileSizes:  snap.FileSizes,
-		numFiles:   snap.NumFiles,
-		capped:     snap.Capped,
-	}
+		byStem:     byStem,
+		byDir:      byDir,
+		stemDF:     stemDF,
+		declDF:     declDF,
+		structDF:   structDF,
+		bodyDF:     bodyDF,
+		firstDecl:  firstDecl,
+		dirMtimes:  dirMtimes,
+		fileMtimes: fileMtimes,
+		fileSizes:  fileSizes,
+		numFiles:   numFiles,
+	}, true
 }
 
 func loadRepoSymbolMapFromDisk(dir, scanRoot, cwd string) (repoSymbolMap, bool) {
@@ -273,26 +633,19 @@ func loadRepoSymbolMapFromDisk(dir, scanRoot, cwd string) (repoSymbolMap, bool) 
 	if err != nil {
 		return repoSymbolMap{}, false
 	}
-	var snap repoSymbolDiskSnapshot
-	if err := gob.NewDecoder(bytes.NewReader(data)).Decode(&snap); err != nil {
-		return repoSymbolMap{}, false
-	}
-	if snap.Capped || snap.Version != repoSymbolDiskVersion || snap.At.IsZero() || time.Since(snap.At) >= repoSymbolDiskTTL {
-		return repoSymbolMap{}, false
-	}
-	idx := repoSymbolMapFromSnapshot(snap)
-	if !repoSymbolMapMtimesMatch(idx) {
+	idx, ok := decodeRepoSymbolMap(data, cwd)
+	if !ok || !repoSymbolMapMtimesMatch(idx) {
 		return repoSymbolMap{}, false
 	}
 	return idx, true
 }
 
 func saveRepoSymbolMapToDisk(dir, scanRoot, cwd string, idx repoSymbolMap) {
-	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(snapshotFromRepoSymbolMap(idx)); err != nil {
+	data, ok := encodeRepoSymbolMap(idx)
+	if !ok {
 		return
 	}
-	_ = atomicfile.Write(repoSymbolDiskPath(dir, scanRoot, cwd), buf.Bytes(), 0o600)
+	_ = atomicfile.Write(repoSymbolDiskPath(dir, scanRoot, cwd), data, 0o600)
 }
 
 func loadRepoSymbolMap(cwd string) repoSymbolMap {
@@ -2784,7 +3137,7 @@ func bm25SessionTouchedBoost(dir, cwd, asked string, skip map[string]bool) (map[
 	if len(projNames) == 0 {
 		return nil, nil
 	}
-	ranked, matched, strong, _, _, err := index.ProjectRelevantNamingCut(dir, projNames, terms, 18, skip, nil)
+	ranked, matched, strong, err := index.ProjectRelevantMetas(dir, projNames, terms, 18, skip)
 	if err != nil || len(ranked) == 0 {
 		return nil, nil
 	}
@@ -2800,6 +3153,7 @@ func bm25SessionTouchedBoost(dir, cwd, asked string, skip map[string]bool) (map[
 	qWords := extractTargetQueryWords(cwd, asked)
 	var symIdx repoSymbolMap
 	var byRel map[string]repoFileEntry
+	pathMemo := &touchedPathMemo{}
 	boost := map[string]float64{}
 	sessCount := map[string]int{}
 	for i, s := range ranked {
@@ -2819,11 +3173,11 @@ func bm25SessionTouchedBoost(dir, cwd, asked string, skip map[string]bool) (map[
 		if m < 2 && (sc < 1 || (len(terms) > 8 && i >= 2)) {
 			continue
 		}
-		meta, ok := sessionMetaForTouched(dir, s)
+		meta, ok := resolvePromotedNoteTouchedMeta(dir, s.PromotedNoteID(), s, true)
 		if !ok || len(meta.Touched) == 0 {
 			continue
 		}
-		targets, okT := filterAndRankTouchedTargetsWithDF(cwd, &symIdx, &byRel, qWords, fileSessionDF, meta.Touched, 28)
+		targets, okT := filterAndRankTouchedTargetsWithDFMemo(cwd, &symIdx, &byRel, qWords, fileSessionDF, meta.Touched, 28, pathMemo)
 		if !okT {
 			continue
 		}
@@ -2933,6 +3287,7 @@ func projectFileSessionDF(dir, cwd string, skip map[string]bool) map[string]int 
 	}
 	if rows == nil {
 		rows = make([]cachedSessionRelFiles, 0, len(metas))
+		orientMemo := make(map[string]string, 128)
 		for _, m := range metas {
 			if len(m.Touched) == 0 {
 				continue
@@ -2943,7 +3298,11 @@ func projectFileSessionDF(dir, cwd string, skip map[string]bool) map[string]int 
 			seenRel := make(map[string]bool, len(m.Touched))
 			var rels []string
 			for _, raw := range m.Touched {
-				rel := filepath.ToSlash(orientPath(raw, cwd))
+				rel, ok := orientMemo[raw]
+				if !ok {
+					rel = filepath.ToSlash(orientPath(raw, cwd))
+					orientMemo[raw] = rel
+				}
 				if rel != "" && !seenRel[rel] {
 					seenRel[rel] = true
 					rels = append(rels, rel)
@@ -3125,12 +3484,11 @@ func rankTouchedWithSymbolMapAndDF(idx *repoSymbolMap, byRel map[string]repoFile
 	return out, scored[0].score, matchedCount
 }
 
-func sessionMetaForTouched(dir string, s model.Session) (index.SessionMeta, bool) {
-	meta, ok := index.MetaForKey(dir, s.Key())
+func resolvePromotedNoteTouchedMeta(dir, noteID string, meta index.SessionMeta, ok bool) (index.SessionMeta, bool) {
 	if ok && len(meta.Touched) > 0 {
 		return meta, true
 	}
-	if noteID := s.PromotedNoteID(); noteID != "" {
+	if noteID != "" {
 		if srcKey, okSrc := model.PromotedNoteSourceKey(noteID); okSrc {
 			if srcMeta, okM := index.MetaForKey(dir, srcKey); okM && len(srcMeta.Touched) > 0 {
 				return srcMeta, true
@@ -3138,6 +3496,11 @@ func sessionMetaForTouched(dir string, s model.Session) (index.SessionMeta, bool
 		}
 	}
 	return meta, ok
+}
+
+func sessionMetaForTouched(dir string, s model.Session) (index.SessionMeta, bool) {
+	meta, ok := index.MetaForKey(dir, s.Key())
+	return resolvePromotedNoteTouchedMeta(dir, s.PromotedNoteID(), meta, ok)
 }
 
 func selectLowDFTouchedTargets(ranked []string, fileSessionDF map[string]int, limit int) []string {
@@ -3160,9 +3523,14 @@ func selectLowDFTouchedTargets(ranked []string, fileSessionDF map[string]int, li
 	return lowDF
 }
 
+type touchedPathMemo struct {
+	orient map[string]string
+	exists map[string]bool
+}
+
 const maxUnrankedTouchedTargets = 8
 
-func filterAndRankTouchedTargetsWithDF(
+func filterAndRankTouchedTargetsWithDFMemo(
 	cwd string,
 	symIdx *repoSymbolMap,
 	byRel *map[string]repoFileEntry,
@@ -3170,8 +3538,9 @@ func filterAndRankTouchedTargetsWithDF(
 	fileSessionDF map[string]int,
 	rawTouched []string,
 	maxRanked int,
+	memo *touchedPathMemo,
 ) ([]string, bool) {
-	resolved := resolveRepoTouchedTargets(cwd, rawTouched)
+	resolved := resolveRepoTouchedTargetsMemo(cwd, rawTouched, memo)
 	if len(resolved) == 0 || len(resolved) > maxRanked {
 		return nil, false
 	}
@@ -3329,6 +3698,7 @@ func historicalTitleTouchedBoost(dir, cwd, asked string, skip map[string]bool) (
 	qWords := extractTargetQueryWords(cwd, asked)
 	var symIdx repoSymbolMap
 	var byRel map[string]repoFileEntry
+	pathMemo := &touchedPathMemo{}
 	var qualifiedDocs []scoredHistDoc
 	for _, d := range projDocs {
 		rareHits := 0
@@ -3363,7 +3733,7 @@ func historicalTitleTouchedBoost(dir, cwd, asked string, skip map[string]bool) (
 		if docScore > 6.5 {
 			docScore = 6.5
 		}
-		targets, okT := filterAndRankTouchedTargetsWithDF(cwd, &symIdx, &byRel, qWords, fileSessionDF, d.touched, 28)
+		targets, okT := filterAndRankTouchedTargetsWithDFMemo(cwd, &symIdx, &byRel, qWords, fileSessionDF, d.touched, 28, pathMemo)
 		if !okT {
 			continue
 		}
@@ -3397,13 +3767,14 @@ func sessionActionMapLineForPrompt(dir, cwd, asked string, ss []model.Session, s
 	}
 	fileSessionDF := projectFileSessionDF(dir, cwd, skip)
 	hubFileCap := projectHubFileCap(dir, cwd, skip)
+	pathMemo := &touchedPathMemo{}
 	var targets []string
 	for _, s := range ss {
 		meta, ok := sessionMetaForTouched(dir, s)
 		if !ok || len(meta.Touched) == 0 {
 			continue
 		}
-		resolved, okT := filterAndRankTouchedTargetsWithDF(cwd, &idx, &byRel, qWords, fileSessionDF, meta.Touched, 36)
+		resolved, okT := filterAndRankTouchedTargetsWithDFMemo(cwd, &idx, &byRel, qWords, fileSessionDF, meta.Touched, 36, pathMemo)
 		if !okT {
 			continue
 		}
@@ -3456,6 +3827,7 @@ func rankedTouchedConsensusLineForPrompt(dir, cwd, asked string, ranked []model.
 		weight   float64
 	}
 	counts := map[string]*tally{}
+	pathMemo := &touchedPathMemo{}
 	contributingSessions := 0
 	for i := 0; i < len(ranked) && contributingSessions < 12; i++ {
 		s := ranked[i]
@@ -3482,7 +3854,7 @@ func rankedTouchedConsensusLineForPrompt(dir, cwd, asked string, ranked []model.
 		if !ok || len(meta.Touched) == 0 {
 			continue
 		}
-		touched, okT := filterAndRankTouchedTargetsWithDF(cwd, &symIdx, &byRel, qWords, fileSessionDF, meta.Touched, 36)
+		touched, okT := filterAndRankTouchedTargetsWithDFMemo(cwd, &symIdx, &byRel, qWords, fileSessionDF, meta.Touched, 36, pathMemo)
 		if !okT {
 			continue
 		}
@@ -3580,6 +3952,7 @@ func singleStrongSessionTouchedLineWithDF(dir, cwd, asked string, ranked []model
 	qWords := extractTargetQueryWords(cwd, asked)
 	var symIdx repoSymbolMap
 	var byRel map[string]repoFileEntry
+	pathMemo := &touchedPathMemo{}
 	checkedTouched := 0
 	for i := 0; i < len(ranked) && i < 20 && checkedTouched < 5; i++ {
 		s0 := ranked[i]
@@ -3608,7 +3981,7 @@ func singleStrongSessionTouchedLineWithDF(dir, cwd, asked string, ranked []model
 		if !ok0 || len(meta0.Touched) == 0 {
 			continue
 		}
-		touched0, okT := filterAndRankTouchedTargetsWithDF(cwd, &symIdx, &byRel, qWords, fileSessionDF, meta0.Touched, 36)
+		touched0, okT := filterAndRankTouchedTargetsWithDFMemo(cwd, &symIdx, &byRel, qWords, fileSessionDF, meta0.Touched, 36, pathMemo)
 		if !okT || (softBM25 && len(touched0) > 8) {
 			continue
 		}
@@ -3645,10 +4018,27 @@ func singleStrongSessionTouchedLineWithDF(dir, cwd, asked string, ranked []model
 }
 
 func resolveRepoTouchedTargets(cwd string, touched []string) []string {
+	return resolveRepoTouchedTargetsMemo(cwd, touched, nil)
+}
+
+func resolveRepoTouchedTargetsMemo(cwd string, touched []string, memo *touchedPathMemo) []string {
 	var primary, tests []string
 	seen := map[string]bool{}
 	for _, raw := range touched {
-		rel := orientPath(raw, cwd)
+		var rel string
+		if memo != nil {
+			if cached, ok := memo.orient[raw]; ok {
+				rel = cached
+			} else {
+				rel = orientPath(raw, cwd)
+				if memo.orient == nil {
+					memo.orient = make(map[string]string, 32)
+				}
+				memo.orient[raw] = rel
+			}
+		} else {
+			rel = orientPath(raw, cwd)
+		}
 		if rel == "" || filepath.IsAbs(rel) || strings.HasPrefix(rel, "..") {
 			continue
 		}
@@ -3661,7 +4051,21 @@ func resolveRepoTouchedTargets(cwd string, touched []string) []string {
 			continue
 		}
 		abs := filepath.Join(cwd, filepath.FromSlash(rel))
-		if !fileThere(abs) {
+		var exists bool
+		if memo != nil {
+			if cached, ok := memo.exists[abs]; ok {
+				exists = cached
+			} else {
+				exists = fileThere(abs)
+				if memo.exists == nil {
+					memo.exists = make(map[string]bool, 32)
+				}
+				memo.exists[abs] = exists
+			}
+		} else {
+			exists = fileThere(abs)
+		}
+		if !exists {
 			continue
 		}
 		seen[rel] = true

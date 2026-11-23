@@ -374,7 +374,7 @@ func fillGluedMatches(terms []string, matchesPer [][]string, catalog *tokenIndex
 	}
 }
 
-func stemMatches(term string, catalog map[string]bool) []string {
+func stemCandidateForms(term string) []string {
 	var forms []string
 	if len([]rune(term)) < 5 {
 		for _, form := range []string{term, term + "s", term + "es", strings.TrimSuffix(term, "s")} {
@@ -388,17 +388,35 @@ func stemMatches(term string, catalog map[string]bool) []string {
 	}
 	forms = append(forms, devSynonyms[term]...)
 	forms = append(forms, cyrSuffixForms(term)...)
+	return forms
+}
+
+func stemMatchesWith(term string, has func(string) (bool, error)) ([]string, error) {
 	matches := make([]string, 0, 8)
 	seen := map[string]bool{}
-	for _, form := range forms {
-		if !seen[form] && catalog[form] {
-			seen[form] = true
+	for _, form := range stemCandidateForms(term) {
+		if seen[form] {
+			continue
+		}
+		seen[form] = true
+		ok, err := has(form)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
 			matches = append(matches, form)
+			if len(matches) == 8 {
+				break
+			}
 		}
 	}
-	if len(matches) > 8 {
-		matches = matches[:8]
-	}
+	return matches, nil
+}
+
+func stemMatches(term string, catalog map[string]bool) []string {
+	matches, _ := stemMatchesWith(term, func(form string) (bool, error) {
+		return catalog[form], nil
+	})
 	return matches
 }
 
