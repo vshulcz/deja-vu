@@ -11,7 +11,7 @@
 <meta property="og:title" content="What compaction drops, and how to get it back">
 <meta property="og:description" content="What a compaction keeps and what it drops, measured over 43 real ones, and how to recover the commands, errors and edits the summary left out.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/after-compaction.html">
-<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og-after-compaction.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
 <link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
@@ -24,17 +24,34 @@
 <meta property="og:site_name" content="deja-vu">
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
-<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta property="og:image:alt" content="What compaction drops: 77% of prose decisions survive vs 0.2% of shell commands across 43 real compactions">
 <meta name="twitter:title" content="What compaction drops, and how to get it back">
 <meta name="twitter:description" content="What a compaction keeps and what it drops, measured over 43 real ones, and how to recover the commands, errors and edits the summary left out.">
-<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
-<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og-after-compaction.png">
+<meta name="twitter:image:alt" content="What compaction drops: 77% of prose decisions survive vs 0.2% of shell commands across 43 real compactions">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "What compaction drops, and how to get it back", "description": "What a context compaction keeps and what it silently drops — measured over 43 real compactions — and how to recover the commands, errors and edits the summary left out.", "url": "https://vshulcz.github.io/deja-vu/guide/after-compaction.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/after-compaction.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-24", "dateModified": "2026-10-07"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "What compaction drops, and how to get it back", "description": "What a context compaction keeps and what it silently drops — measured over 43 real compactions — and how to recover the commands, errors and edits the summary left out.", "url": "https://vshulcz.github.io/deja-vu/guide/after-compaction.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/after-compaction.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-24", "dateModified": "2026-11-23"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"After compaction","item":"https://vshulcz.github.io/deja-vu/guide/after-compaction.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What does context compaction actually keep?","acceptedAnswer":{"@type":"Answer","text":"Measured over 43 real compactions: 77% of the decisions survived the summary and 0.2% of the commands that had been run. Reasoning is summarised; the exact invocations, error text and edited spans are dropped."}},{"@type":"Question","name":"Can I recover what a compaction dropped?","acceptedAnswer":{"@type":"Answer","text":"Yes, if the full transcript is still on disk. Harnesses write the whole session to a log file; the compaction only shortens what is in the model context, not what was written."}},{"@type":"Question","name":"How do I stop losing work to compaction?","acceptedAnswer":{"@type":"Answer","text":"Index the transcripts and let the agent search them, so the summary stops being the only copy. Indexing before compaction runs keeps the session searchable even after the window collapses."}}]}</script>
+<style>
+.comp-fig{margin:20px 0 24px;padding:18px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.comp-fig svg{display:block;width:100%;height:auto}
+.comp-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.comp-card{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.comp-card.drop{border-color:rgba(255,135,0,.35)}
+.comp-k{font:600 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ph-hi);margin:0 0 8px}
+.comp-card.drop .comp-k{color:var(--amber)}
+.comp-card p{margin:0;font-size:13.5px;line-height:1.5;color:var(--body)}
+.comp-lines{margin:0;padding:0;list-style:none;font:12px/1.6 var(--mono);color:var(--body)}
+.comp-lines li{margin:2px 0;overflow-wrap:anywhere}
+.comp-lines .cmd{color:var(--ink)}
+.comp-lines .ok{color:var(--ph-hi)}
+.comp-lines .err{color:var(--amber)}
+.comp-cap{margin:12px 0 0;font:12px/1.5 var(--mono);color:var(--faint)}
+@media(max-width:680px){.comp-grid{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
 <div class="glow"></div>
@@ -202,17 +219,53 @@
 <li><b>77%</b> of the decisions survived — the conclusions, the "we went with X because Y".</li>
 <li><b>0.2%</b> of the commands that had actually been run survived.</li>
 </ul>
+<figure class="comp-fig">
+<svg viewBox="0 0 680 120" role="img" aria-label="Measured across 43 real compactions: 77% of prose decisions survived versus 0.2% of shell commands">
+  <text x="0" y="22" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="14" fill="#c4cdcf">Prose decisions survived</text>
+  <text x="680" y="22" text-anchor="end" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="18" font-weight="700" fill="#afafd7">77%</text>
+  <rect x="0" y="34" width="680" height="12" rx="4" fill="#161c1f"/>
+  <rect x="0" y="34" width="524" height="12" rx="4" fill="#8787af"/>
+  <text x="0" y="78" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="14" fill="#c4cdcf">Shell commands survived</text>
+  <text x="680" y="78" text-anchor="end" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="18" font-weight="700" fill="#ff8700">0.2%</text>
+  <rect x="0" y="90" width="680" height="12" rx="4" fill="#161c1f"/>
+  <rect x="0" y="90" width="4" height="12" rx="2" fill="#ff8700"/>
+</svg>
+<div class="comp-grid">
+  <div class="comp-card">
+    <div class="comp-k">Summary kept</div>
+    <p>"Switched connection pool from pgx 5.4.3 to pgbouncer transaction mode to stop checkout timeouts."</p>
+  </div>
+  <div class="comp-card drop">
+    <div class="comp-k">Raw transcript on disk &middot; dropped</div>
+    <ul class="comp-lines">
+      <li><span class="cmd">go test -race -tags integration ./internal/db -run TestPool</span> <span class="ok">[passed]</span></li>
+      <li class="err">pq: sorry, too many clients already (max_connections=100)</li>
+      <li>internal/db/pool.go:42  MaxConns: 24 -&gt; 12</li>
+    </ul>
+  </div>
+</div>
+<figcaption class="comp-cap">Synthetic example of the split measured across 43 compactions: intent survives in prose, while exact commands, errors and edited lines stay only in the raw log.</figcaption>
+</figure>
 <p>The method, the corpus and the script are in the repository under <a href="benchmarks.html">benchmarks</a>, and the ratio holds across harnesses because they all summarise prose the same way.</p>
 <p>That split is the whole problem. A summary is written in the language of intent, and the things that cost you an afternoon are not intent: the invocation with the four flags that finally worked, the error text you pasted, the exact span an edit replaced, the path of the file that turned out to matter. Ask after a compaction and you get a confident paraphrase of the plan with none of the parts you would have copied.</p>
 
 <h2>What compaction does not touch</h2>
 <p>The transcript. Compaction shortens what is in the model's context; it does not go back and rewrite the log the harness has been appending to since the session opened. Every command, every tool result, every edit is still on disk — see <a href="where-sessions-are-stored.html">where each agent keeps it</a>.</p>
 <p>So "lost to compaction" is a retrieval problem, not a data-loss problem. The work is there; nothing reads it back.</p>
+<p>You can inspect what is still in your own Claude Code logs without installing anything:</p>
+<pre>jq -r '.message.content? | arrays[] | select(.type == "tool_use" and .name == "Bash") | .input.command // empty' ~/.claude/projects/*/*.jsonl | tail -n 20</pre>
+<p>Codex keeps its logs under <code>~/.codex/sessions</code>, Cursor in <code>state.vscdb</code>, and the rest follow the paths in the <a href="../registry/README.html">format registry</a>.</p>
 
 <h2>Getting it back</h2>
 <p>Two moments matter, and they are different.</p>
 <h3>During the session</h3>
-<p><code>deja install --auto</code> wires the pre-compaction hook wherever the host has a compaction event: Claude Code, Codex, TRAE CLI, CodeBuddy, WorkBuddy, Muse Code, opencode, Kilo CLI, Cline CLI, Copilot CLI, VS Code Copilot Chat, Qwen Code, Kimi Code, Grok Build, Cursor CLI, pi, omp, Senpi, gajae-code, prime-agent, OpenClaw and DeepSeek Harness, Hermes through its memory provider, and Gemini CLI on the next prompt. The session is read by the same parser that indexes it, found by the id and the transcript the host names. When the host supplies them, deja reads it as the compaction starts and keeps what the summary is about to drop: the task, the conclusions, the files, the commands — each marked <code>[passed]</code> or <code>[failed]</code> from the harness's own exit status or the output recorded after it — and what a turn said was still open, recognised by the label a line opens with in either language. The next hook for that same session and workspace hands it back once, inside 4 KB. A last line says whether the repository moved: unchanged, with the branch, or changed since the commit it was captured at, which is the difference between a conclusion you can still act on and one that needs re-checking. The agent does not need to write a checkpoint.</p>
+<p><code>deja install --auto</code> wires a pre-compaction hook wherever the host exposes a compaction event (Claude Code, Codex, opencode, Cursor CLI, Copilot CLI, VS Code Copilot Chat, Qwen Code, Kimi Code, Cline CLI, Kilo CLI, TRAE CLI, pi, OpenClaw and the other hosts in the <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/compaction.md">compaction reference</a>; Hermes through its memory provider; Gemini CLI on the next prompt). When compaction starts, deja reads the active transcript with the same parser that indexes it and captures what the summary is about to drop — no manual checkpoint needed:</p>
+<ul>
+<li>The task in flight, conclusions, and open items carried from earlier turns.</li>
+<li>Commands that actually ran, marked <code>[passed]</code> or <code>[failed]</code> from the harness exit status or recorded output.</li>
+<li>Files touched in the session, bounded so the re-injected packet fits inside 4 KB on the next hook call.</li>
+<li>A final git status line noting the branch and whether HEAD or the working tree moved since capture, so stale conclusions get re-checked.</li>
+</ul>
 <p><code>deja stats</code> reports the raw tool calls before the first edit after compaction, with incomplete observations kept separate. See the <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/compaction.md">compaction reference</a> for capture limits and privacy controls.</p>
 <h3>Afterwards</h3>
 <p>Ask for the specific thing rather than the story:</p>
@@ -221,6 +274,20 @@ deja how "go test"          # the invocation this project actually uses, with it
 deja fix "pq: too many connections"   # what was run after this error, where it stayed fixed
 deja blame internal/index/ingest.go   # which sessions discussed this file, and what they decided</pre>
 <p>Those questions map onto exactly what a summary drops: the task in flight, commands, failures and file-level decisions. With recall wired in, the agent asks them itself — before it runs a command, after one fails, and when a prompt matches earlier work.</p>
+
+<h2>Try it on your logs</h2>
+<pre>brew install deja-vu
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+npx @vshulcz/deja-vu</pre>
+<p>On Windows, use <code>winget install vshulcz.deja-vu</code> or <code>scoop install deja-vu</code> (see <a href="getting-started.html">getting started</a> for the zip release). Running bare <code>deja</code> builds a local index of transcripts already on disk and opens search immediately; <code>deja install --auto</code> is optional and only needed to wire MCP recall and pre-compaction hooks into your agents.</p>
+
+<h2>Common questions</h2>
+<h3>Why index transcripts instead of running rg over JSONL?</h3>
+<p>Raw logs mix prompts, nested JSON tool payloads, file dumps and ANSI escapes across different schemas per agent. On the seeded multi-session corpus (<code>deja bench context</code>), deja matches naive grep's verbatim fact coverage in roughly <b>250× fewer tokens</b> (and about 70× fewer than replaying matched sessions in full), parses structured fields like command exit status and edited lines across <a href="harnesses.html">52 coding agents</a>, and captures the pre-compaction packet before the window resets. See <a href="benchmarks.html">benchmarks</a>.</p>
+<h3>Where does lexical search lose?</h3>
+<p>Pure BM25 misses keyword-free paraphrases. On LongMemEval-S (470 cleaned questions, no LLM or embeddings), deja scores <b>88.9% hit@1</b> overall (97.4% hit@5), while the preference slice drops to <b>43.3% hit@1</b> (100% hit@20) — exact runs and failure modes are on <a href="benchmarks.html">benchmarks</a> and <a href="day-zero.html">day zero</a>. If you run a local embedding endpoint such as Ollama or LM Studio, <code>deja embed</code> adds an optional vector sidecar for hybrid recall; without one, search stays strictly offline.</p>
+<h3>What about secrets in raw transcripts?</h3>
+<p>Indexing and search stay local with no network path unless you enable embeddings. API keys, bearer tokens, private-key blocks and credential URLs are redacted at index time before anything is written to the index or pre-compaction packet. You can scan raw on-disk transcripts without building an index with <code>deja audit --secrets</code>, or inspect and scrub findings via <code>deja secrets</code> — details in <a href="privacy.html">privacy</a> and <a href="credentials-in-transcripts.html">credentials in transcripts</a>.</p>
 
 <h2>What this does not fix</h2>
 <p>Compaction is not a defect to be switched off. The window is finite, summarising is the right response, and a memory layer does not change that — it stops the summary from being the only copy. If the harness never wrote the session to disk, none of this applies, and the answer really is gone.</p>

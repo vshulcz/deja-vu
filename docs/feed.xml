@@ -18,6 +18,13 @@
     <summary>Shared local memory, session history search, cross-agent handoff, and uncommitted code recovery across 52 coding agents (Claude Code, Codex, Cursor, OpenCode, Gemini CLI, OpenClaw and 46 more agents). One Go binary, zero LLM calls.</summary>
   </entry>
   <entry>
+    <title>What compaction drops, and how to get it back — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/after-compaction.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/after-compaction.html"></link>
+    <updated>2026-11-23T00:00:00Z</updated>
+    <summary>What a compaction keeps and what it drops, measured over 43 real ones, and how to recover the commands, errors and edits the summary left out.</summary>
+  </entry>
+  <entry>
     <title>Delete Cursor Chat History and Archived Chats — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html"></link>
@@ -32,6 +39,13 @@
     <summary>How to give dsh recall over the sessions every coding agent on the machine already wrote — the plugin, the tools, and how it behaves beside the CLI install.</summary>
   </entry>
   <entry>
+    <title>deja CLI reference: search, recall, blame, stats — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/commands.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/commands.html"></link>
+    <updated>2026-11-22T00:00:00Z</updated>
+    <summary>Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
+  </entry>
+  <entry>
     <title>AI Coding Memory Benchmarks: 97.2% LongMemEval — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/benchmarks.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html"></link>
@@ -44,13 +58,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html"></link>
     <updated>2026-11-21T00:00:00Z</updated>
     <summary>No API key or daemon: deja-vu (97.2% R@5 LongMemEval-S) indexes Claude Code, Codex, Cursor, opencode and 48 other agents via hooks and MCP.</summary>
-  </entry>
-  <entry>
-    <title>deja CLI reference: search, recall, blame, stats — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/commands.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/commands.html"></link>
-    <updated>2026-11-21T00:00:00Z</updated>
-    <summary>Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
   </entry>
   <entry>
     <title>Compare Claude Code, Codex and Cursor memory — deja-vu</title>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-aider.html"></link>
     <updated>2026-11-16T00:00:00Z</updated>
     <summary>aider appends every message to one markdown log and reads none of it back. deja keeps a read-only context file current and indexes every agent on the machine.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Amp: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-amp.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-amp.html"></link>
-    <updated>2026-11-16T00:00:00Z</updated>
-    <summary>Amp keeps every thread on the server and starts each one empty. A plugin under ~/.config/amp/plugins puts this machine&#39;s own history before the model.</summary>
   </entry>
 </feed>
