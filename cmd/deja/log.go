@@ -23,12 +23,15 @@ func runLog(dir string, args []string) error {
 func runLogTo(w io.Writer, dir string, args []string) error {
 	n := 20
 	jsonOut := false
+	jsonl := false
 	last := false
 	seenN := false
 	for _, a := range args {
 		switch a {
 		case "--json":
 			jsonOut = true
+		case "--jsonl":
+			jsonl = true
 		case "--last":
 			last = true
 		default:
@@ -72,9 +75,11 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 			return nil
 		}
 		s := snaps[0]
-		if jsonOut {
+		if jsonOut || jsonl {
 			enc := json.NewEncoder(w)
-			enc.SetIndent("", "  ")
+			if !jsonl {
+				enc.SetIndent("", "  ")
+			}
 			return enc.Encode(s)
 		}
 		fmt.Fprintf(w, "# %s · %s · %d session%s · %s%s\n\n", logKindLabel(s.Kind), s.Time.Local().Format("2006-01-02 15:04"), s.Sessions, pluralS(s.Sessions), humanBytes(int64(s.Bytes)), snapshotTail(s))
@@ -89,6 +94,15 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 		return nil
 	}
 	events, total := usage.EventsCounted(dir, n)
+	if jsonl {
+		enc := json.NewEncoder(w)
+		for _, e := range events {
+			if err := enc.Encode(e); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 	if jsonOut {
 		// A nil slice encodes as null, and null is not an empty list: len()
 		// raises, iteration raises, `jq '.[]'` errors. Every other

@@ -176,6 +176,7 @@ var flagsOfOtherCommands = map[string]string{
 	"--both":             "sync ssh",
 	"--from":             "last",
 	"--last":             "log",
+	"--jsonl":            "log",
 	"--seed":             "bench",
 	"--settle":           "friction",
 	"--unsettle":         "friction",
@@ -218,7 +219,7 @@ var (
 	}
 	doctorFlags   = []string{"--json", "--offline", "--deep", "--all"}
 	viewFlags     = []string{"--out", "--no-open"}
-	logFlags      = []string{"--json", "--last"}
+	logFlags      = []string{"--json", "--jsonl", "--last"}
 	rememberFlags = []string{"--project", "--tag", "--repo"}
 	restoreFlags  = []string{"--force", "--span", "--out", "--all"}
 	promoteFlags  = []string{"--state", "--note", "--to", "--tag", "--repo"}

@@ -139,13 +139,25 @@ func Enabled() bool {
 	return err == nil
 }
 
-// IsLocked reports whether encryption is enabled and the vault is locked or timed out.
+// IsLocked reports whether encryption is enabled and the store is locked. It
+// never reports a lock that was not sealed: when an idle timeout cannot seal
+// (no key to seal with), it reports false and the store stays unlocked, the
+// same refusal CheckUnlocked returns.
 func IsLocked(indexDir string) bool {
 	if !Enabled() {
 		return false
 	}
-	_, err := CheckUnlocked(indexDir)
-	return err != nil
+	cfg, err := LoadConfig()
+	if err != nil {
+		return true
+	}
+	if cfg.Locked {
+		return true
+	}
+	if idleExpired(indexDir, cfg) {
+		return autoLock(indexDir, cfg) == nil
+	}
+	return false
 }
 
 // LoadConfig reads and validates vault.json.
@@ -200,9 +212,18 @@ func CheckUnlocked(indexDir string) ([]byte, error) {
 		return nil, ErrLocked
 	}
 	if idleExpired(indexDir, cfg) {
-		autoLock(indexDir, cfg)
+		if lockErr := autoLock(indexDir, cfg); lockErr != nil {
+			return nil, lockErr
+		}
 		return nil, ErrLocked
 	}
+	return resolveDEK(cfg)
+}
+
+// resolveDEK returns the active 32-byte DEK from DEJA_VAULT_KEY, then
+// DEJA_VAULT_PASSPHRASE, then the OS keyring. It never returns a partial key:
+// a host with none of the three gets ErrKeyUnavailable.
+func resolveDEK(cfg Config) ([]byte, error) {
 	if rawHex := strings.TrimSpace(os.Getenv(EnvVaultKey)); rawHex != "" {
 		dek, decErr := hex.DecodeString(rawHex)
 		if decErr != nil || len(dek) != 32 || !keyIDMatches(dek, cfg.KeyID) {
@@ -217,8 +238,7 @@ func CheckUnlocked(indexDir string) ([]byte, error) {
 		}
 		return dek, nil
 	}
-	dek, err := activeKeyring.Get(cfg.KeyID)
-	if err == nil && len(dek) == 32 && keyIDMatches(dek, cfg.KeyID) {
+	if dek, err := activeKeyring.Get(cfg.KeyID); err == nil && len(dek) == 32 && keyIDMatches(dek, cfg.KeyID) {
 		return dek, nil
 	}
 	return nil, ErrKeyUnavailable
@@ -247,16 +267,28 @@ func idleExpired(indexDir string, cfg Config) bool {
 	return time.Since(last) > time.Duration(cfg.AutoLockSeconds)*time.Second
 }
 
-func autoLock(indexDir string, cfg Config) {
-	if indexDir != "" {
-		if dek, err := activeKeyring.Get(cfg.KeyID); err == nil && len(dek) == 32 && keyIDMatches(dek, cfg.KeyID) {
-			_ = SealTree(indexDir, dek)
-			clear(dek)
+// autoLock seals the plaintext store before marking the vault locked. It
+// reports success only after SealTree has run with a resolvable DEK, so a
+// keyringless host with no DEJA_VAULT_KEY/DEJA_VAULT_PASSPHRASE fails loudly
+// instead of reporting "locked" while leaving the plaintext index on disk.
+func autoLock(indexDir string, cfg Config) error {
+	if indexDir != "" && hasPlaintextStore(indexDir) {
+		dek, err := resolveDEK(cfg)
+		if err != nil {
+			return fmt.Errorf("auto-lock refused: cannot seal plaintext memory store — %w", err)
+		}
+		sealErr := SealTree(indexDir, dek)
+		clear(dek)
+		if sealErr != nil {
+			return fmt.Errorf("auto-lock refused: sealing memory store failed — %w", sealErr)
 		}
 	}
 	cfg.Locked = true
-	_ = saveConfig(cfg)
+	if err := saveConfig(cfg); err != nil {
+		return err
+	}
 	_ = activeKeyring.Delete(cfg.KeyID)
+	return nil
 }
 
 func keyIDFor(dek []byte) string {

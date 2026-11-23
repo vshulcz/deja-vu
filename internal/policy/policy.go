@@ -370,6 +370,9 @@ func (p Policy) expectedClientToken(client string) (string, bool) {
 }
 
 // AuthenticateClient checks enrollment and constant-time SHA-256 client token digest.
+// Every enrolled client name that has a token must present it; there is no
+// built-in exemption for the "cli" name, which MCP callers could otherwise
+// self-assert to skip token validation.
 func (p Policy) AuthenticateClient(client, presentedToken string) (bool, string) {
 	c := NormalizeClient(client)
 	_, enrolled := p.findClientRule(c)
@@ -377,7 +380,7 @@ func (p Policy) AuthenticateClient(client, presentedToken string) (bool, string)
 		return false, "client not enrolled"
 	}
 	wantHex, hasToken := p.expectedClientToken(c)
-	if hasToken || (p.RequireClients && len(p.ClientTokens) > 0 && c != "cli") {
+	if hasToken || (p.RequireClients && len(p.ClientTokens) > 0) {
 		if !hasToken || presentedToken == "" {
 			return false, "client token required"
 		}

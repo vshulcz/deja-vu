@@ -243,6 +243,67 @@ func TestVaultAutoLockAndEnvKeyPaths(t *testing.T) {
 	}
 }
 
+func TestVaultAutoLockRefusesToLockWithoutSealableKey(t *testing.T) {
+	indexDir, kr := withTestVaultEnv(t)
+	if err := os.MkdirAll(indexDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	canary := "AUTOLOCK_PLAINTEXT_CANARY_5511"
+	if err := os.WriteFile(filepath.Join(indexDir, "records.bin"), []byte(canary), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Init(indexDir, "auto-lock-passphrase", 1*time.Second); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Keyringless host: no keyring entry and no env DEK/passphrase.
+	delete(kr.keys, cfg.KeyID)
+	t.Setenv(EnvVaultKey, "")
+	t.Setenv(EnvVaultPassphrase, "")
+	cfg.UnlockedAt = time.Now().UTC().Add(-10 * time.Second).Format(time.RFC3339Nano)
+	if err := saveConfig(cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	// The idle timeout cannot seal, so it must fail loudly instead of reporting
+	// a locked vault with plaintext still on disk.
+	_, lockErr := CheckUnlocked(indexDir)
+	if lockErr == nil || errors.Is(lockErr, ErrLocked) {
+		t.Fatalf("auto-lock without key = %v, want a sealing error, not ErrLocked", lockErr)
+	}
+	if !errors.Is(lockErr, ErrKeyUnavailable) {
+		t.Fatalf("auto-lock without key = %v, want ErrKeyUnavailable", lockErr)
+	}
+	if IsLocked(indexDir) {
+		t.Fatal("IsLocked reported locked although no seal happened")
+	}
+	after, err := LoadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Locked {
+		t.Fatal("config Locked set although SealTree never ran")
+	}
+	if b, err := os.ReadFile(filepath.Join(indexDir, "records.bin")); err != nil || string(b) != canary {
+		t.Fatalf("plaintext index changed on refused auto-lock: %q (%v)", b, err)
+	}
+
+	// With a resolvable key the same idle timeout seals and reports ErrLocked.
+	t.Setenv(EnvVaultPassphrase, "auto-lock-passphrase")
+	if _, err := CheckUnlocked(indexDir); !errors.Is(err, ErrLocked) {
+		t.Fatalf("auto-lock with passphrase = %v, want ErrLocked", err)
+	}
+	if _, statErr := os.Stat(indexDir); !os.IsNotExist(statErr) {
+		t.Fatalf("plaintext indexDir still exists after sealed auto-lock")
+	}
+	if _, statErr := os.Stat(ArchivePath(indexDir)); statErr != nil {
+		t.Fatalf("sealed archive missing after auto-lock: %v", statErr)
+	}
+}
+
 func TestVaultFailClosedAndArchiveTamper(t *testing.T) {
 	indexDir, _ := withTestVaultEnv(t)
 	if err := os.MkdirAll(filepath.Dir(ConfigPath()), 0o700); err != nil {
