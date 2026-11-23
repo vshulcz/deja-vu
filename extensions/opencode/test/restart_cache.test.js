@@ -1,11 +1,12 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 import { DejaPlugin } from "../index.js"
+import { createSessionStore, promptCachePath } from "../lib.js"
 import entry from "../server.js"
 
 function stand() {
@@ -196,6 +197,73 @@ test("compacting one session leaves other concurrent sessions intact and blocks 
       const mAAfter = { info: { id: "mA1", role: "user", sessionID: "ses_A" }, parts: [{ type: "text", text: "topic alpha" }] }
       await p3["experimental.chat.messages.transform"]({ sessionID: "ses_A" }, { messages: [mAAfter] })
       assert.equal(mAAfter.parts[0].text, "topic alpha\n\n<deja-recall>\nPROMPT-5\n</deja-recall>")
+    })
+  } finally {
+    s.cleanup()
+  }
+})
+
+test("4.x prompt cache enforces 0o700 dir and 0o600 file permissions and tightens loose modes", { skip: process.platform === "win32" }, async () => {
+  const s = stand()
+  const prevUmask = process.umask(0o022)
+  try {
+    await withEnv(s.dir, async () => {
+      const p1 = await DejaPlugin({ client: {}, directory: s.dir }, { bin: s.bin })
+      await p1["experimental.chat.system.transform"]({ sessionID: "ses_perm" }, { system: ["base"] })
+      const freshFile = promptCachePath("opencode-deja", s.bin)
+      const freshDir = dirname(freshFile)
+      assert.equal(freshDir, join(dirname(s.bin), ".deja-cache"))
+      assert.equal(statSync(freshDir).mode & 0o777, 0o700)
+      assert.equal(statSync(freshFile).mode & 0o777, 0o600)
+
+      const looseCacheRoot = join(s.dir, ".loose-cache")
+      process.env.XDG_CACHE_HOME = looseCacheRoot
+      assert.equal(promptCachePath("opencode-deja", s.bin), freshFile)
+
+      const installedBin = "/usr/local/bin/deja"
+      const looseFile = promptCachePath("opencode-deja", installedBin)
+      const looseDir = dirname(looseFile)
+      assert.equal(looseDir, join(looseCacheRoot, "deja-vu"))
+      mkdirSync(looseDir, { recursive: true, mode: 0o755 })
+      chmodSync(looseDir, 0o755)
+      writeFileSync(looseFile, JSON.stringify({ version: 1, sessions: {} }), { encoding: "utf8", mode: 0o644 })
+      chmodSync(looseFile, 0o644)
+
+      createSessionStore("opencode-deja", { dejaBin: installedBin }).write("ses_loose", 0, (cur) => {
+        cur.digest = "DIGEST-LOOSE"
+      })
+      assert.equal(statSync(looseDir).mode & 0o777, 0o700)
+      assert.equal(statSync(looseFile).mode & 0o777, 0o600)
+    })
+  } finally {
+    process.umask(prevUmask)
+    s.cleanup()
+  }
+})
+
+test("5.x prompt cache safely handles Object.prototype key names", async () => {
+  const s = stand()
+  try {
+    await withEnv(s.dir, async () => {
+      const store = createSessionStore("opencode-proto", { dejaBin: s.bin })
+      for (const scope of ["constructor", "toString", "valueOf", "hasOwnProperty", "__proto__"]) {
+        const empty = store.read(scope)
+        assert.equal(empty.epoch, 0)
+        assert.equal(empty.session.recalled.toString, undefined)
+        const res = store.write(scope, 0, (cur) => {
+          cur.digest = "DIGEST-" + scope
+          cur.recalled[scope] = "VAL-" + scope
+          cur.recalled.marker = "OK"
+        })
+        assert.equal(res.stale, false)
+      }
+      for (const scope of ["constructor", "toString", "valueOf", "hasOwnProperty", "__proto__"]) {
+        const loaded = store.read(scope)
+        assert.equal(loaded.session.digest, "DIGEST-" + scope)
+        assert.equal(loaded.session.recalled[scope], "VAL-" + scope)
+        assert.equal(loaded.session.recalled.marker, "OK")
+        if (scope !== "constructor") assert.equal(loaded.session.recalled.constructor, undefined)
+      }
     })
   } finally {
     s.cleanup()

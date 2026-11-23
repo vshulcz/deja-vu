@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { accessSync, constants, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { accessSync, chmodSync, constants, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { homedir, tmpdir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
@@ -40,26 +40,33 @@ function isTempDejaBin(dejaBin) {
 export function promptCachePath(name = "magpie-cache", dejaBin = "") {
   const override = process.env.DEJA_PROMPT_CACHE_FILE;
   if (override) return override;
-  const xdg = process.env.XDG_CACHE_HOME;
-  if (xdg && isAbsolute(xdg)) return join(xdg, "deja-vu", `${name}.json`);
   if (isTempDejaBin(dejaBin)) {
     return join(dirname(dejaBin), ".deja-cache", `${name}.json`);
   }
+  const xdg = process.env.XDG_CACHE_HOME;
+  if (xdg && isAbsolute(xdg)) return join(xdg, "deja-vu", `${name}.json`);
   const base = process.platform === "win32"
     ? (process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"))
     : join(homedir(), ".cache");
   return join(base, "deja-vu", `${name}.json`);
 }
 
+function nullMap(src) {
+  const out = Object.create(null);
+  if (!src || typeof src !== "object" || Array.isArray(src)) return out;
+  for (const [k, v] of Object.entries(src)) out[k] = v;
+  return out;
+}
+
 function readPromptCache(file = promptCachePath()) {
   try {
-    if (!existsSync(file)) return { version: 1, sessions: {} };
+    if (!existsSync(file)) return { version: 1, sessions: Object.create(null) };
     const parsed = JSON.parse(readFileSync(file, "utf8"));
-    if (parsed && parsed.version === 1 && parsed.sessions && typeof parsed.sessions === "object") {
-      return parsed;
+    if (parsed && parsed.version === 1 && parsed.sessions && typeof parsed.sessions === "object" && !Array.isArray(parsed.sessions)) {
+      return { version: 1, sessions: nullMap(parsed.sessions) };
     }
   } catch {}
-  return { version: 1, sessions: {} };
+  return { version: 1, sessions: Object.create(null) };
 }
 
 function writePromptCache(data, keepConv, file = promptCachePath()) {
@@ -67,18 +74,32 @@ function writePromptCache(data, keepConv, file = promptCachePath()) {
     const entries = Object.entries(data.sessions);
     if (entries.length > maxSessions) {
       entries.sort((a, b) => (b[1]?.updatedAt || 0) - (a[1]?.updatedAt || 0));
-      const trimmed = {};
-      if (keepConv && data.sessions[keepConv]) trimmed[keepConv] = data.sessions[keepConv];
+      const trimmed = Object.create(null);
+      if (keepConv && Object.hasOwn(data.sessions, keepConv) && data.sessions[keepConv]) {
+        trimmed[keepConv] = data.sessions[keepConv];
+      }
       for (const [k, v] of entries) {
         if (Object.keys(trimmed).length >= maxSessions) break;
         trimmed[k] = v;
       }
       data.sessions = trimmed;
     }
-    mkdirSync(dirname(file), { recursive: true });
+    const dir = dirname(file);
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    if (
+      process.platform !== "win32" &&
+      dir !== "/" &&
+      dir !== "/tmp" &&
+      dir !== "/private/tmp" &&
+      dir !== tmpdir().replace(/\/+$/, "") &&
+      dir !== homedir().replace(/\/+$/, "")
+    ) {
+      try { chmodSync(dir, 0o700); } catch {}
+    }
     const tmp = `${file}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
     try {
-      writeFileSync(tmp, JSON.stringify(data), "utf8");
+      writeFileSync(tmp, JSON.stringify(data), { encoding: "utf8", mode: 0o600 });
+      if (process.platform !== "win32") chmodSync(tmp, 0o600);
       renameSync(tmp, file);
       touchedFiles.add(file);
     } catch (err) {
@@ -90,9 +111,10 @@ function writePromptCache(data, keepConv, file = promptCachePath()) {
 
 export function loadConversation(convKey, dejaBin = "") {
   const map = new Map();
-  const entry = readPromptCache(promptCachePath("magpie-cache", dejaBin)).sessions?.[convKey];
+  const sessions = readPromptCache(promptCachePath("magpie-cache", dejaBin)).sessions;
+  const entry = Object.hasOwn(sessions, convKey) ? sessions[convKey] : undefined;
   const turns = entry?.turns;
-  if (!turns || typeof turns !== "object") return map;
+  if (!turns || typeof turns !== "object" || Array.isArray(turns)) return map;
   for (const [k, v] of Object.entries(turns)) {
     if (v && typeof v === "object" && typeof v.text === "string") {
       map.set(k, { text: v.text, bytes: typeof v.bytes === "number" ? v.bytes : 0 });
@@ -104,8 +126,8 @@ export function loadConversation(convKey, dejaBin = "") {
 export function saveTurn(convKey, tKey, formatted, dejaBin = "") {
   const file = promptCachePath("magpie-cache", dejaBin);
   const data = readPromptCache(file);
-  const existing = data.sessions[convKey];
-  const turns = existing?.turns && typeof existing.turns === "object" ? { ...existing.turns } : {};
+  const existing = Object.hasOwn(data.sessions, convKey) ? data.sessions[convKey] : undefined;
+  const turns = nullMap(existing?.turns);
   if (Object.hasOwn(turns, tKey)) delete turns[tKey];
   turns[tKey] = { text: formatted.text, bytes: formatted.bytes };
   const keys = Object.keys(turns);

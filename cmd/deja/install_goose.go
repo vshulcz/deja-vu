@@ -887,7 +887,7 @@ func refreshGooseHintsFor(cwd, session string) error {
 	var self []string
 	if session != "" {
 		markSessionLive(dir, session)
-		for id := range askerLineage(dir, session, "") {
+		for id := range askerLineageForHarness(dir, session, "", "goose") {
 			self = append(self, id)
 		}
 		sort.Strings(self)

@@ -31,7 +31,7 @@ func emitAskedHandoff(dir string, input promptHookInput, asked, cwd string, plai
 	if !ok || isSpawnedReader(input.SessionID) || !firstPromptOf(dir, input.SessionID) {
 		return false
 	}
-	self := askerLineage(dir, input.SessionID, input.TranscriptPath, input.ParentSessionID)
+	self := askerLineageForHarness(dir, input.SessionID, input.TranscriptPath, input.Harness, input.ParentSessionID)
 	src, found := askedHandoffSource(dir, ask, cwd, self)
 	if !found {
 		return false

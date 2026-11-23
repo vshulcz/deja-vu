@@ -268,21 +268,14 @@ func readCompactionParts(path string, size int64) (header, tail []byte, tailOffs
 		return nil, all, 0, false, nil
 	}
 
-	headerBuf := make([]byte, compactionHeaderBytes)
-	n, err := f.ReadAt(headerBuf, 0)
-	if err != nil && !errors.Is(err, io.EOF) {
+	header, err = readBoundedTranscriptHeader(f, size)
+	if err != nil {
 		return nil, nil, 0, false, err
 	}
-	headerBuf = headerBuf[:n]
-	i := bytes.LastIndexByte(headerBuf, '\n')
-	if i < 0 {
-		return nil, nil, 0, false, ErrTranscriptLineTooLarge
-	}
-	header = append([]byte(nil), headerBuf[:i+1]...)
 
 	tailOffset = size - CompactionTailBytes
 	tail = make([]byte, CompactionTailBytes)
-	n, err = f.ReadAt(tail, tailOffset)
+	n, err := f.ReadAt(tail, tailOffset)
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, nil, 0, false, err
 	}
@@ -311,6 +304,36 @@ func readCompactionParts(path string, size int64) (header, tail []byte, tailOffs
 	}
 	tail = trimCompactionTornTail(tail)
 	return header, tail, tailOffset, true, nil
+}
+
+func readBoundedTranscriptHeader(f *os.File, size int64) ([]byte, error) {
+	maxHeader := min(size, transcriptHeadMaxBytes)
+	if maxHeader <= 0 {
+		return nil, ErrTranscriptLineTooLarge
+	}
+	for readLen := min(size, compactionHeaderBytes); ; readLen = min(maxHeader, readLen*2) {
+		headerBuf := make([]byte, readLen)
+		n, err := f.ReadAt(headerBuf, 0)
+		if err != nil && !errors.Is(err, io.EOF) {
+			return nil, err
+		}
+		headerBuf = headerBuf[:n]
+		// Keep up to compactionHeaderBytes of multi-line preambles, but once an
+		// oversized line forces doubling, stop right after that first line so
+		// early session turns are not pulled into tail captures.
+		var idx int
+		if readLen <= compactionHeaderBytes {
+			idx = bytes.LastIndexByte(headerBuf, '\n')
+		} else {
+			idx = bytes.IndexByte(headerBuf, '\n')
+		}
+		if idx >= 0 {
+			return append([]byte(nil), headerBuf[:idx+1]...), nil
+		}
+		if readLen >= maxHeader || int64(n) < readLen {
+			return nil, ErrTranscriptLineTooLarge
+		}
+	}
 }
 
 func trimCompactionTornTail(b []byte) []byte {

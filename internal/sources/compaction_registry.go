@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -22,7 +24,53 @@ const (
 	compactionScanFiles       = 64
 	compactionProbeWindow     = 64 << 10
 	compactionProbeTotalBytes = 8 << 20
+	compactionMaxDirEntries   = 512
+	compactionMaxStatCalls    = 128
 )
+
+type compactionLookupStats struct {
+	DirEntries int
+	StatCalls  int
+	ProbeBytes int64
+}
+
+type compactionShallowSpec struct {
+	dir         string
+	rels        []string
+	subDirs     []string
+	skipSubdirs map[string]bool
+}
+
+type compactionDatedSpec struct {
+	dir               string
+	maxDepth          int
+	wantPrefix        string
+	skipDirs          map[string]bool
+	onlyIfMissingDirs []string
+}
+
+type compactionSearchPlan struct {
+	direct    []string
+	shallow   []compactionShallowSpec
+	datedDirs []compactionDatedSpec
+	walks     []compactionDatedSpec
+	histories []string
+	dbs       []string
+	custom    func(id string, stats *compactionLookupStats) []string
+}
+
+func hasCompactionSearchPlan(harness string) bool {
+	return compactionPlanBuilders[harness] != nil
+}
+
+func canReadCompactionTailByHarness(harness string) bool {
+	switch harness {
+	case "claude", "codex", "codebuddy", "qoder", "cherrystudio", "antigravity", "gemini":
+		return true
+	default:
+		return false
+	}
+}
 
 // ReadCompactionSession captures a session through the reader that indexes it,
 // for a host whose transcript has no bounded tail reader of its own. The host
@@ -49,6 +97,27 @@ func ReadCompactionSession(harness, nativeSessionID, transcriptPath, hint string
 		return CompactionTranscript{}, ErrUnsupportedCompactionTranscript
 	}
 	for _, c := range candidates {
+		if transcriptPath == "" && canReadCompactionTailByHarness(c.harness) {
+			tr, err := ReadCompactionTranscript(c.path, nativeSessionID)
+			if err == nil && len(tr.Session.Messages) > 0 {
+				if tr.Harness == "" {
+					tr.Harness = c.harness
+				}
+				if tr.Workspace == "" {
+					tr.Workspace = compactionSessionWorkspace(c.harness, c.path, tr.Session)
+				}
+				if tr.Workspace == "" && hint != "" && tr.Session.Project != "" && tr.Session.Project == projectName(hint) {
+					tr.Workspace = hint
+				}
+				if tr.Session.Path == "" {
+					tr.Session.Path = c.path
+				}
+				return tr, nil
+			}
+			if errors.Is(err, ErrTranscriptIdentity) {
+				continue
+			}
+		}
 		info, err := os.Stat(c.path)
 		if err != nil || !info.Mode().IsRegular() {
 			continue
@@ -199,68 +268,1027 @@ func compactionCandidatesForPath(harness, path string) []compactionCandidate {
 }
 
 // compactionCandidatesByID finds the files of harness that can hold the
-// session: first those whose path names the id, which is how most stores file
-// a session, then the most recently written few that hold the id at all.
+// session without enumerating entire multi-year stores: first direct and
+// shallow per-project lookups, then bounded newest-first directory walks that
+// skip filenames carrying another session id, then bounded history/DB checks.
 func compactionCandidatesByID(harness, id string) []compactionCandidate {
+	out, _ := compactionCandidatesByIDObserved(harness, id)
+	return out
+}
+
+func compactionCandidatesByIDObserved(harness, id string) ([]compactionCandidate, compactionLookupStats) {
+	var stats compactionLookupStats
+	h, ok := compactionHarnessEntry(harness)
+	if !ok {
+		return nil, stats
+	}
+	builder := compactionPlanBuilders[h.Name]
+	if builder == nil {
+		return nil, stats
+	}
+	plan := builder(id, compactionSafeRelID(id))
+	kindOf := func(p string) (FileKind, bool) {
+		for _, k := range h.Kinds {
+			if k.Match != nil && k.Match(p) {
+				return k, true
+			}
+		}
+		return FileKind{}, false
+	}
+	r := &compactionSearchRunner{
+		harness:  h.Name,
+		id:       id,
+		kindOf:   kindOf,
+		stats:    &stats,
+		seenPath: map[string]bool{},
+	}
+	if plan.custom != nil {
+		for _, p := range plan.custom(id, r.stats) {
+			if k, ok := kindOf(p); ok {
+				return []compactionCandidate{{h.Name, p, k}}, stats
+			}
+		}
+	}
+	if named := r.findDirect(plan.direct); len(named) > 0 {
+		return named, stats
+	}
+	if named := r.findShallow(plan.shallow); len(named) > 0 {
+		return named, stats
+	}
+	if named := r.findWalks(plan.datedDirs, true); len(named) > 0 {
+		return named, stats
+	}
+	if named := r.findWalks(plan.walks, true); len(named) > 0 {
+		return named, stats
+	}
+	r.collectOpaquePaths(plan.histories, false)
+	r.collectOpaquePaths(plan.dbs, h.Name == "hermes")
+	return r.probeRecent(), stats
+}
+
+func compactionHarnessEntry(harness string) (Harness, bool) {
 	for _, h := range StoresToRead() {
-		if h.Name != harness || h.Files == nil {
+		if h.Name == harness {
+			return h, true
+		}
+	}
+	return Harness{}, false
+}
+
+func compactionSafeRelID(id string) bool {
+	if id == "" || id == "." || id == ".." {
+		return false
+	}
+	return !strings.ContainsAny(id, `/\`) && !strings.Contains(id, "..")
+}
+
+type compactionDatedPath struct {
+	path string
+	mod  int64
+	kind FileKind
+}
+
+type compactionSearchRunner struct {
+	harness  string
+	id       string
+	kindOf   func(string) (FileKind, bool)
+	stats    *compactionLookupStats
+	seenPath map[string]bool
+	recent   []compactionDatedPath
+}
+
+func (r *compactionSearchRunner) statRegular(p string) (os.FileInfo, bool) {
+	if p == "" || r.seenPath[p] || r.stats.StatCalls >= compactionMaxStatCalls {
+		return nil, false
+	}
+	r.seenPath[p] = true
+	r.stats.StatCalls++
+	info, err := os.Stat(p)
+	if err != nil || !info.Mode().IsRegular() {
+		return nil, false
+	}
+	return info, true
+}
+
+func (r *compactionSearchRunner) findDirect(paths []string) []compactionCandidate {
+	var out []compactionCandidate
+	for _, p := range paths {
+		if _, ok := r.statRegular(p); !ok {
 			continue
 		}
-		files := h.Files()
-		kindOf := func(p string) (FileKind, bool) {
-			for _, k := range h.Kinds {
-				if k.Match != nil && k.Match(p) {
-					return k, true
+		if k, ok := r.kindOf(p); ok {
+			out = append(out, compactionCandidate{r.harness, p, k})
+		}
+	}
+	return out
+}
+
+func (r *compactionSearchRunner) findShallow(specs []compactionShallowSpec) []compactionCandidate {
+	for _, sh := range specs {
+		if sh.dir == "" || r.stats.DirEntries >= compactionMaxDirEntries || r.stats.StatCalls >= compactionMaxStatCalls {
+			continue
+		}
+		entries, err := os.ReadDir(sh.dir)
+		if err != nil {
+			continue
+		}
+		for _, e := range entries {
+			if r.stats.DirEntries >= compactionMaxDirEntries || r.stats.StatCalls >= compactionMaxStatCalls {
+				break
+			}
+			r.stats.DirEntries++
+			if !e.IsDir() || sh.skipSubdirs[e.Name()] {
+				continue
+			}
+			subBase := filepath.Join(sh.dir, e.Name())
+			for _, rel := range sh.rels {
+				cand := filepath.Join(subBase, rel)
+				if _, ok := r.statRegular(cand); !ok {
+					continue
+				}
+				if k, ok := r.kindOf(cand); ok {
+					return []compactionCandidate{{r.harness, cand, k}}
 				}
 			}
-			return FileKind{}, false
+			for _, sd := range sh.subDirs {
+				if r.stats.StatCalls >= compactionMaxStatCalls {
+					break
+				}
+				r.stats.StatCalls++
+				subEntries, subErr := os.ReadDir(filepath.Join(subBase, sd))
+				if subErr != nil {
+					continue
+				}
+				for _, se := range subEntries {
+					if r.stats.DirEntries >= compactionMaxDirEntries {
+						break
+					}
+					r.stats.DirEntries++
+					if se.IsDir() {
+						continue
+					}
+					cand := filepath.Join(subBase, sd, se.Name())
+					if k, ok := r.kindOf(cand); ok {
+						return []compactionCandidate{{r.harness, cand, k}}
+					}
+				}
+			}
 		}
-		var named []compactionCandidate
-		for _, p := range files {
-			if !strings.Contains(p, id) {
-				continue
-			}
-			if k, ok := kindOf(p); ok {
-				named = append(named, compactionCandidate{h.Name, p, k})
-			}
-		}
-		if len(named) > 0 {
-			return named
-		}
-		type dated struct {
-			path string
-			mod  int64
-		}
-		var recent []dated
-		for _, p := range files {
-			if info, err := os.Stat(p); err == nil && info.Mode().IsRegular() {
-				recent = append(recent, dated{p, info.ModTime().UnixNano()})
-			}
-		}
-		sort.Slice(recent, func(i, j int) bool { return recent[i].mod > recent[j].mod })
-		var out []compactionCandidate
-		needle := []byte(id)
-		var totalRead int64
-		for i, f := range recent {
-			if i >= compactionScanFiles {
-				break
-			}
-			k, ok := kindOf(f.path)
-			if !ok {
-				continue
-			}
-			keep, stop := compactionCandidateProbeMatch(h.Name, f.path, id, needle, &totalRead)
-			if stop {
-				break
-			}
-			if !keep {
-				continue
-			}
-			out = append(out, compactionCandidate{h.Name, f.path, k})
-		}
-		return out
 	}
 	return nil
+}
+
+func (r *compactionSearchRunner) findWalks(specs []compactionDatedSpec, descending bool) []compactionCandidate {
+	for _, spec := range specs {
+		if spec.dir == "" || r.stats.DirEntries >= compactionMaxDirEntries || r.stats.StatCalls >= compactionMaxStatCalls {
+			continue
+		}
+		if anyDirExists(spec.onlyIfMissingDirs) {
+			continue
+		}
+		if found := r.walkDirBounded(spec, spec.dir, 1, descending); len(found) > 0 {
+			return found
+		}
+	}
+	return nil
+}
+
+func anyDirExists(dirs []string) bool {
+	for _, d := range dirs {
+		if info, err := os.Stat(d); err == nil && info.IsDir() {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *compactionSearchRunner) walkDirBounded(spec compactionDatedSpec, dir string, depth int, descending bool) []compactionCandidate {
+	if r.stats.DirEntries >= compactionMaxDirEntries || r.stats.StatCalls >= compactionMaxStatCalls {
+		return nil
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	if descending {
+		sort.Slice(entries, func(i, j int) bool { return entries[i].Name() > entries[j].Name() })
+	}
+	for _, e := range entries {
+		if r.stats.DirEntries >= compactionMaxDirEntries || r.stats.StatCalls >= compactionMaxStatCalls {
+			return nil
+		}
+		r.stats.DirEntries++
+		name := e.Name()
+		p := filepath.Join(dir, name)
+		if e.IsDir() {
+			if spec.skipDirs[name] || depth >= spec.maxDepth {
+				continue
+			}
+			if found := r.walkDirBounded(spec, p, depth+1, descending); len(found) > 0 {
+				return found
+			}
+			continue
+		}
+		if spec.wantPrefix != "" && !strings.Contains(name, spec.wantPrefix) {
+			continue
+		}
+		k, ok := r.kindOf(p)
+		if !ok {
+			continue
+		}
+		if pathMatchesCompactionID(p, r.id) {
+			if _, ok := r.statRegular(p); ok {
+				return []compactionCandidate{{r.harness, p, k}}
+			}
+			continue
+		}
+		if filenameCarriesDifferentSessionID(name, r.id) {
+			continue
+		}
+		if info, ok := r.statRegular(p); ok {
+			r.recent = append(r.recent, compactionDatedPath{p, info.ModTime().UnixNano(), k})
+		}
+	}
+	return nil
+}
+
+func (r *compactionSearchRunner) collectOpaquePaths(paths []string, allowNonRegularPG bool) {
+	for _, p := range paths {
+		if p == "" {
+			continue
+		}
+		if allowNonRegularPG && IsHermesPGStore(p) {
+			if !r.seenPath[p] {
+				r.seenPath[p] = true
+				if k, ok := r.kindOf(p); ok {
+					r.recent = append(r.recent, compactionDatedPath{p, 0, k})
+				}
+			}
+			continue
+		}
+		if info, ok := r.statRegular(p); ok {
+			if k, ok := r.kindOf(p); ok {
+				r.recent = append(r.recent, compactionDatedPath{p, info.ModTime().UnixNano(), k})
+			}
+		}
+	}
+}
+
+func (r *compactionSearchRunner) probeRecent() []compactionCandidate {
+	if len(r.recent) == 0 {
+		return nil
+	}
+	sort.Slice(r.recent, func(i, j int) bool { return r.recent[i].mod > r.recent[j].mod })
+	var out []compactionCandidate
+	needle := []byte(r.id)
+	var totalRead int64
+	for i, f := range r.recent {
+		if i >= compactionScanFiles {
+			break
+		}
+		keep, stop := compactionCandidateProbeMatch(r.harness, f.path, r.id, needle, &totalRead)
+		r.stats.ProbeBytes = totalRead
+		if stop {
+			break
+		}
+		if !keep {
+			continue
+		}
+		out = append(out, compactionCandidate{r.harness, f.path, f.kind})
+	}
+	return out
+}
+
+var (
+	compactionUUIDRE        = regexp.MustCompile(`(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+	compactionGeminiShortRE = regexp.MustCompile(`(?i)^session-\d{4}-\d{2}-\d{2}t\d{2}-\d{2}-([0-9a-f]{8})\.json$`)
+)
+
+func pathMatchesCompactionID(p, id string) bool {
+	if id == "" {
+		return false
+	}
+	base := filepath.Base(p)
+	stem := trimCompactionSuffixes(base)
+	if idStemMatches(stem, id) {
+		return true
+	}
+	dir := filepath.Dir(p)
+	for range 3 {
+		name := filepath.Base(dir)
+		if name == "." || name == string(filepath.Separator) || name == "" {
+			break
+		}
+		if name == id || name == "session_"+id || name == "session-"+id || name == "sess_"+id {
+			return true
+		}
+		dir = filepath.Dir(dir)
+	}
+	return false
+}
+
+func trimCompactionSuffixes(base string) string {
+	for _, suf := range []string{".messages.json", ".jsonl.zst", ".jsonl.gz", ".jsonl", ".json", ".pb"} {
+		if trimmed, ok := strings.CutSuffix(base, suf); ok {
+			return trimmed
+		}
+	}
+	return base
+}
+
+func idStemMatches(stem, id string) bool {
+	return stem == id ||
+		strings.HasSuffix(stem, "-"+id) ||
+		strings.HasSuffix(stem, "_"+id) ||
+		strings.HasPrefix(stem, id+"-") ||
+		strings.HasPrefix(stem, id+"_")
+}
+
+func filenameCarriesDifferentSessionID(base, wantID string) bool {
+	lowerBase := strings.ToLower(base)
+	lowerWant := strings.ToLower(wantID)
+	if lowerWant != "" && strings.Contains(lowerBase, lowerWant) {
+		return false
+	}
+	if strings.HasPrefix(lowerBase, "rollout-") && (strings.HasSuffix(lowerBase, ".jsonl") || strings.HasSuffix(lowerBase, ".jsonl.zst")) {
+		return true
+	}
+	if uuid := compactionUUIDRE.FindString(lowerBase); uuid != "" {
+		if len(lowerWant) == 8 && strings.HasPrefix(uuid, lowerWant) {
+			return false
+		}
+		return true
+	}
+	if m := compactionGeminiShortRE.FindStringSubmatch(lowerBase); len(m) == 2 {
+		if len(lowerWant) >= 8 && !strings.HasPrefix(lowerWant, m[1]) {
+			return true
+		}
+	}
+	return false
+}
+
+var compactionPlanBuilders = map[string]func(id string, safeID bool) compactionSearchPlan{
+	"claude":       compactionPlanClaude,
+	"codearts":     compactionPlanCodeArts,
+	"doubao":       compactionPlanDoubao,
+	"codex":        compactionPlanCodex,
+	"trae":         compactionPlanTrae,
+	"opencode":     compactionPlanOpencode,
+	"mcode":        compactionPlanMcode,
+	"aider":        compactionPlanAider,
+	"amp":          compactionPlanAmp,
+	"gemini":       compactionPlanGemini,
+	"cursor":       compactionPlanCursor,
+	"antigravity":  compactionPlanAntigravity,
+	"grok":         compactionPlanGrok,
+	"hermes":       compactionPlanHermes,
+	"goose":        compactionPlanGoose,
+	"qwen":         compactionPlanQwen,
+	"qoder":        compactionPlanQoder,
+	"kimi":         compactionPlanKimi,
+	"cline":        compactionPlanCline,
+	"cherrystudio": compactionPlanCherryStudio,
+	"senpi":        compactionPlanSenpi,
+	"gjc":          compactionPlanGjc,
+	"kimchi":       compactionPlanKimchi,
+	"clawcode":     compactionPlanClawCode,
+	"commandcode":  compactionPlanCommandCode,
+	"zcode":        compactionPlanZCode,
+	"kiro":         compactionPlanKiro,
+	"kilocode":     compactionPlanKilocode,
+	"roo":          compactionPlanRoo,
+	"crush":        compactionPlanCrush,
+	"continue":     compactionPlanContinue,
+	"pi":           compactionPlanPi,
+	"prime":        compactionPlanPrime,
+	"omp":          compactionPlanOmp,
+	"openclaw":     compactionPlanOpenClaw,
+	"copilot":      compactionPlanCopilot,
+	"copilot-chat": compactionPlanCopilotChat,
+	"codewhale":    compactionPlanCodeWhale,
+	"codebuddy":    compactionPlanCodeBuddy,
+	"reasonix":     compactionPlanReasonix,
+	"muse":         compactionPlanMuse,
+	"deepseek":     compactionPlanDeepSeek,
+	"zed":          compactionPlanZed,
+	"devin":        compactionPlanDevin,
+	"junie":        compactionPlanJunie,
+	"jetbrains":    compactionPlanJetBrains,
+	"windsurf":     compactionPlanWindsurf,
+	"mimo":         compactionPlanMimo,
+	"teleagent":    compactionPlanTeleAgent,
+	"omnigent":     compactionPlanOmnigent,
+	"orca":         compactionPlanOrca,
+	"ante":         compactionPlanAnte,
+	"deja":         compactionPlanDeja,
+}
+
+func compactionPlanClaude(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	projDir := claudeProjectsDirName()
+	for _, r := range ClaudeRoots() {
+		if !safeID {
+			continue
+		}
+		p.direct = append(p.direct, filepath.Join(r, id+".jsonl"))
+		if filepath.Base(r) == projDir {
+			p.shallow = append(p.shallow, compactionShallowSpec{dir: r, rels: []string{id + ".jsonl"}})
+		} else {
+			p.shallow = append(p.shallow,
+				compactionShallowSpec{dir: filepath.Join(r, projDir), rels: []string{id + ".jsonl"}},
+				compactionShallowSpec{dir: r, rels: []string{id + ".jsonl"}, skipSubdirs: map[string]bool{projDir: true}},
+			)
+		}
+	}
+	if hist := ClaudeHistoryFile(); hist != "" {
+		p.histories = append(p.histories, hist)
+	}
+	if db := ClaudeMemDBPath(); db != "" {
+		p.dbs = append(p.dbs, db)
+	}
+	return p
+}
+
+func compactionPlanCodeArts(id string, safeID bool) compactionSearchPlan {
+	root := CodeArtsRoot()
+	if !safeID || root == "" {
+		return compactionSearchPlan{}
+	}
+	return compactionSearchPlan{
+		direct:  []string{filepath.Join(root, id, "history.jsonl")},
+		shallow: []compactionShallowSpec{{dir: root, rels: []string{filepath.Join(id, "history.jsonl")}}},
+	}
+}
+
+func compactionPlanDoubao(_ string, _ bool) compactionSearchPlan {
+	return compactionSearchPlan{
+		walks: []compactionDatedSpec{{dir: DoubaoRoot(), maxDepth: doubaoMaxDepthWalk}},
+	}
+}
+
+func compactionPlanCodex(_ string, _ bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	for _, r := range CodexRoots() {
+		for _, dir := range codexSessionDirs(r) {
+			p.datedDirs = append(p.datedDirs, compactionDatedSpec{dir: dir, maxDepth: 4, wantPrefix: "rollout-"})
+		}
+	}
+	p.histories = []string{filepath.Join(CodexRoot(), "history.jsonl")}
+	return p
+}
+
+func compactionPlanTrae(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	for _, dir := range TraeSessionDirs() {
+		if safeID {
+			p.direct = append(p.direct, filepath.Join(dir, id+".json"), filepath.Join(dir, id+".jsonl"))
+		}
+		p.datedDirs = append(p.datedDirs, compactionDatedSpec{dir: dir, maxDepth: 4, wantPrefix: "rollout-"})
+	}
+	p.histories = []string{filepath.Join(TraeRoot(), "history.jsonl")}
+	return p
+}
+
+func compactionPlanOpencode(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	if safeID {
+		p.direct = []string{filepath.Join(OpencodeDiffDir(), id+".json")}
+	}
+	p.dbs = []string{OpencodeDB()}
+	return p
+}
+
+func compactionPlanMcode(_ string, _ bool) compactionSearchPlan {
+	return compactionSearchPlan{
+		custom: func(id string, stats *compactionLookupStats) []string {
+			if p := mcodeSessionPathBounded(id, stats); p != "" {
+				return []string{p}
+			}
+			return nil
+		},
+	}
+}
+
+func compactionPlanAider(_ string, _ bool) compactionSearchPlan {
+	var histories []string
+	if env := os.Getenv("AIDER_CHAT_HISTORY_FILE"); env != "" {
+		histories = append(histories, env)
+	}
+	histories = append(histories, filepath.Join(Home(), aiderHistoryName))
+	for _, dir := range aiderProjects() {
+		histories = append(histories, filepath.Join(dir, aiderHistoryName))
+	}
+	roots := AiderRoots()
+	walks := make([]compactionDatedSpec, 0, len(roots))
+	for _, r := range roots {
+		histories = append(histories, filepath.Join(r, aiderHistoryName))
+		walks = append(walks, compactionDatedSpec{dir: r, maxDepth: 3})
+	}
+	return compactionSearchPlan{histories: histories, walks: walks}
+}
+
+func compactionPlanAmp(id string, safeID bool) compactionSearchPlan {
+	root := AmpRoot()
+	if !safeID || root == "" {
+		return compactionSearchPlan{}
+	}
+	return compactionSearchPlan{
+		direct:  []string{filepath.Join(root, id+".json")},
+		shallow: []compactionShallowSpec{{dir: root, rels: []string{id + ".json"}}},
+	}
+}
+
+func compactionPlanGemini(_ string, _ bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	skip := map[string]bool{"checkpoints": true, "tasks": true}
+	for _, r := range GeminiRoots() {
+		tmpDir := filepath.Join(r, "tmp")
+		p.datedDirs = append(p.datedDirs,
+			compactionDatedSpec{dir: tmpDir, maxDepth: 4, skipDirs: skip},
+			compactionDatedSpec{dir: r, maxDepth: 3, skipDirs: skip, onlyIfMissingDirs: []string{tmpDir}},
+		)
+	}
+	return p
+}
+
+func compactionPlanCursor(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	if safeID {
+		p.shallow = []compactionShallowSpec{{
+			dir:  filepath.Join(CursorCLIRoot(), "projects"),
+			rels: []string{filepath.Join("agent-transcripts", id+".jsonl"), filepath.Join("agent-transcripts", id, id+".jsonl")},
+		}}
+	}
+	p.dbs = CursorDBs()
+	return p
+}
+
+func compactionPlanAntigravity(id string, safeID bool) compactionSearchPlan {
+	if !safeID {
+		return compactionSearchPlan{}
+	}
+	var p compactionSearchPlan
+	for _, r := range AntigravityRoots() {
+		p.direct = append(p.direct,
+			filepath.Join(r, "brain", id, ".system_generated", "logs", "transcript.jsonl"),
+			filepath.Join(r, "brain", id, ".system_generated", "logs", "transcript_full.jsonl"),
+		)
+	}
+	return p
+}
+
+func compactionPlanGrok(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	sessRoot := filepath.Join(GrokRoot(), "sessions")
+	if safeID {
+		p.direct = []string{filepath.Join(sessRoot, id, "updates.jsonl")}
+		p.shallow = []compactionShallowSpec{{dir: sessRoot, rels: []string{filepath.Join(id, "updates.jsonl")}}}
+	}
+	p.dbs = []string{GrokDB()}
+	return p
+}
+
+func compactionPlanHermes(_ string, _ bool) compactionSearchPlan {
+	dbs := slices.Clone(HermesDBs())
+	if dsn := HermesPGDSN(); dsn != "" {
+		if pg := HermesPGStorePath(dsn); pg != "" {
+			dbs = append(dbs, pg)
+		}
+	}
+	return compactionSearchPlan{dbs: dbs}
+}
+
+func compactionPlanGoose(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	for _, dir := range GooseSessionsDirs() {
+		if safeID {
+			p.direct = append(p.direct, filepath.Join(dir, id+".jsonl"))
+		}
+		p.walks = append(p.walks, compactionDatedSpec{dir: dir, maxDepth: 2})
+	}
+	p.dbs = GooseDBs()
+	return p
+}
+
+func compactionPlanQwen(id string, safeID bool) compactionSearchPlan {
+	if !safeID {
+		return compactionSearchPlan{}
+	}
+	root := QwenRoot()
+	return compactionSearchPlan{
+		direct:  []string{filepath.Join(root, id+".jsonl")},
+		shallow: []compactionShallowSpec{{dir: filepath.Join(root, "projects"), rels: []string{filepath.Join("chats", id+".jsonl")}}},
+	}
+}
+
+func compactionPlanQoder(id string, safeID bool) compactionSearchPlan {
+	if !safeID {
+		return compactionSearchPlan{}
+	}
+	root := QoderRoot()
+	return compactionSearchPlan{
+		direct:  []string{filepath.Join(root, id+".jsonl")},
+		shallow: []compactionShallowSpec{{dir: filepath.Join(root, "projects"), rels: []string{id + ".jsonl"}}},
+	}
+}
+
+func compactionPlanKimi(id string, safeID bool) compactionSearchPlan {
+	if !safeID {
+		return compactionSearchPlan{}
+	}
+	sessRoot := filepath.Join(KimiRoot(), "sessions")
+	return compactionSearchPlan{
+		direct:  []string{filepath.Join(sessRoot, id, "agents", "main", "wire.jsonl")},
+		shallow: []compactionShallowSpec{{dir: sessRoot, rels: []string{filepath.Join(id, "agents", "main", "wire.jsonl")}}},
+	}
+}
+
+func compactionPlanCline(id string, safeID bool) compactionSearchPlan {
+	if !safeID {
+		return compactionSearchPlan{}
+	}
+	p := compactionSearchPlan{
+		direct: []string{filepath.Join(ClineSessionsDir(), id, id+".messages.json")},
+	}
+	for _, r := range ClineLegacyRoots() {
+		p.direct = append(p.direct, filepath.Join(r, "tasks", id, "api_conversation_history.json"))
+	}
+	return p
+}
+
+func compactionPlanCherryStudio(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	seen := map[string]bool{}
+	for _, r := range CherryStudioRoots() {
+		seen[r] = true
+		if safeID {
+			p.direct = append(p.direct, filepath.Join(r, id+".jsonl"))
+			p.shallow = append(p.shallow, compactionShallowSpec{dir: r, rels: []string{id + ".jsonl"}})
+		}
+	}
+	for _, r := range CherryStudioAllRoots() {
+		if seen[r] {
+			continue
+		}
+		p.walks = append(p.walks, compactionDatedSpec{dir: r, maxDepth: 3})
+	}
+	return p
+}
+
+func compactionPlanSenpi(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	root := SenpiRoot()
+	if safeID {
+		p.direct = []string{filepath.Join(root, id+".jsonl")}
+	}
+	p.walks = []compactionDatedSpec{{dir: root, maxDepth: 3}}
+	return p
+}
+
+func compactionPlanGjc(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	root := GjcRoot()
+	if safeID {
+		p.direct = []string{filepath.Join(root, id+".jsonl")}
+		p.shallow = []compactionShallowSpec{{dir: root, rels: []string{id + ".jsonl"}}}
+	}
+	p.walks = []compactionDatedSpec{{dir: root, maxDepth: 3}}
+	return p
+}
+
+func compactionPlanKimchi(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	root := KimchiRoot()
+	if safeID {
+		p.direct = []string{filepath.Join(root, id+".jsonl")}
+	}
+	p.walks = []compactionDatedSpec{{dir: root, maxDepth: 3}}
+	return p
+}
+
+func compactionPlanClawCode(id string, safeID bool) compactionSearchPlan {
+	if !safeID {
+		return compactionSearchPlan{}
+	}
+	var p compactionSearchPlan
+	for _, r := range ClawCodeRoots() {
+		p.direct = append(p.direct, filepath.Join(r, id+".jsonl"), filepath.Join(r, id+".json"))
+		p.shallow = append(p.shallow, compactionShallowSpec{dir: r, rels: []string{id + ".jsonl", id + ".json"}})
+	}
+	return p
+}
+
+func compactionPlanCommandCode(id string, safeID bool) compactionSearchPlan {
+	if !safeID {
+		return compactionSearchPlan{}
+	}
+	root := CommandCodeRoot()
+	return compactionSearchPlan{
+		direct: []string{filepath.Join(root, id+".jsonl")},
+		shallow: []compactionShallowSpec{
+			{dir: root, rels: []string{id + ".jsonl"}},
+			{dir: filepath.Join(root, "projects"), rels: []string{id + ".jsonl"}},
+		},
+	}
+}
+
+func compactionPlanZCode(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	if safeID {
+		root := ZCodeRoot()
+		legacy := ZCodeLegacyRoot()
+		p.direct = []string{filepath.Join(root, id+".jsonl"), filepath.Join(legacy, id+".json")}
+		p.shallow = []compactionShallowSpec{
+			{dir: root, rels: []string{id + ".jsonl"}},
+			{dir: legacy, rels: []string{id + ".json"}},
+		}
+	}
+	p.dbs = []string{ZCodeDB()}
+	return p
+}
+
+func compactionPlanKiro(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	root := KiroRoot()
+	if safeID {
+		p.direct = []string{
+			filepath.Join(root, "cli", id+".jsonl"),
+			filepath.Join(root, "sess_"+id, "messages.jsonl"),
+			filepath.Join(root, id, "messages.jsonl"),
+		}
+		p.shallow = []compactionShallowSpec{{
+			dir:  root,
+			rels: []string{filepath.Join("sess_"+id, "messages.jsonl"), filepath.Join(id, "messages.jsonl")},
+		}}
+	}
+	p.dbs = []string{KiroDB()}
+	return p
+}
+
+func compactionPlanKilocode(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	if safeID {
+		for _, r := range KiloRoots() {
+			p.direct = append(p.direct, filepath.Join(r, "tasks", id, "api_conversation_history.json"))
+		}
+	}
+	p.dbs = []string{KiloDB()}
+	return p
+}
+
+func compactionPlanRoo(id string, safeID bool) compactionSearchPlan {
+	if !safeID {
+		return compactionSearchPlan{}
+	}
+	var p compactionSearchPlan
+	for _, r := range append(RooRoots(), RooCLIRoot()) {
+		p.direct = append(p.direct, filepath.Join(r, "tasks", id, "api_conversation_history.json"))
+	}
+	return p
+}
+
+func compactionPlanCrush(_ string, _ bool) compactionSearchPlan {
+	return compactionSearchPlan{dbs: CrushDBs()}
+}
+
+func compactionPlanContinue(id string, safeID bool) compactionSearchPlan {
+	if !safeID {
+		return compactionSearchPlan{}
+	}
+	root := ContinueRoot()
+	return compactionSearchPlan{
+		direct: []string{filepath.Join(root, "sessions", id+".json"), filepath.Join(root, id+".json")},
+	}
+}
+
+func compactionPlanPi(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	root := PiRoot()
+	if safeID {
+		p.direct = []string{filepath.Join(root, id+".jsonl")}
+	}
+	p.walks = []compactionDatedSpec{{dir: root, maxDepth: 3}}
+	return p
+}
+
+func compactionPlanPrime(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	if safeID {
+		p.direct = []string{filepath.Join(PrimeRoot(), id+".jsonl")}
+	}
+	for _, r := range PrimeRoots() {
+		p.walks = append(p.walks, compactionDatedSpec{dir: r, maxDepth: 3})
+	}
+	return p
+}
+
+func compactionPlanOmp(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	for _, r := range OmpSessionRoots() {
+		if safeID {
+			p.direct = append(p.direct, filepath.Join(r, id+".jsonl"))
+		}
+		p.walks = append(p.walks, compactionDatedSpec{dir: r, maxDepth: 3})
+	}
+	return p
+}
+
+func compactionPlanOpenClaw(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	root := OpenClawRoot()
+	if safeID {
+		p.shallow = []compactionShallowSpec{{dir: root, rels: []string{filepath.Join("sessions", id+".jsonl")}}}
+	}
+	p.walks = []compactionDatedSpec{{dir: root, maxDepth: 3}}
+	p.dbs = OpenClawAgentDBs()
+	return p
+}
+
+func compactionPlanCopilot(id string, safeID bool) compactionSearchPlan {
+	if !safeID {
+		return compactionSearchPlan{}
+	}
+	return compactionSearchPlan{direct: []string{filepath.Join(CopilotRoot(), id, "events.jsonl")}}
+}
+
+func compactionPlanCopilotChat(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	for _, r := range CopilotChatRoots() {
+		if safeID {
+			p.direct = append(p.direct,
+				filepath.Join(r, "globalStorage", "emptyWindowChatSessions", id+".jsonl"),
+				filepath.Join(r, "globalStorage", "emptyWindowChatSessions", id+".json"),
+				filepath.Join(r, id+".jsonl"),
+				filepath.Join(r, id+".json"),
+			)
+			p.shallow = append(p.shallow, compactionShallowSpec{
+				dir: filepath.Join(r, "workspaceStorage"),
+				rels: []string{
+					filepath.Join("chatSessions", id+".jsonl"),
+					filepath.Join("chatSessions", id+".json"),
+					filepath.Join(copilotAgentParentDir, copilotAgentDirName, id+".jsonl"),
+				},
+			})
+		}
+		p.walks = append(p.walks, compactionDatedSpec{
+			dir:               r,
+			maxDepth:          4,
+			onlyIfMissingDirs: []string{filepath.Join(r, "globalStorage"), filepath.Join(r, "workspaceStorage")},
+		})
+	}
+	return p
+}
+
+func compactionPlanCodeWhale(id string, safeID bool) compactionSearchPlan {
+	if !safeID {
+		return compactionSearchPlan{}
+	}
+	var p compactionSearchPlan
+	for _, r := range CodeWhaleRoots() {
+		p.direct = append(p.direct, filepath.Join(r, id+".json"))
+		p.shallow = append(p.shallow, compactionShallowSpec{dir: r, rels: []string{id + ".json"}})
+	}
+	return p
+}
+
+func compactionPlanCodeBuddy(id string, safeID bool) compactionSearchPlan {
+	if !safeID {
+		return compactionSearchPlan{}
+	}
+	var p compactionSearchPlan
+	for _, r := range CodeBuddyRoots() {
+		p.direct = append(p.direct, filepath.Join(r, id+".jsonl"))
+		if filepath.Base(r) == "projects" {
+			p.shallow = append(p.shallow, compactionShallowSpec{dir: r, rels: []string{id + ".jsonl"}})
+		} else {
+			p.shallow = append(p.shallow,
+				compactionShallowSpec{dir: filepath.Join(r, "projects"), rels: []string{id + ".jsonl"}},
+				compactionShallowSpec{dir: r, rels: []string{id + ".jsonl"}, skipSubdirs: map[string]bool{"projects": true}},
+			)
+		}
+	}
+	return p
+}
+
+func compactionPlanReasonix(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	for _, r := range ReasonixRoots() {
+		if safeID {
+			p.direct = append(p.direct,
+				filepath.Join(r, "desktop-sessions-v5", "by-id", id, "events.frames"),
+				filepath.Join(r, "sessions-v4", id, "events.frames"),
+				filepath.Join(r, "sessions", id+".jsonl"),
+				filepath.Join(r, id, "events.frames"),
+				filepath.Join(r, id+".jsonl"),
+			)
+			p.shallow = append(p.shallow, compactionShallowSpec{
+				dir: filepath.Join(r, "projects"),
+				rels: []string{
+					filepath.Join("sessions-v4", id, "events.frames"),
+					filepath.Join("sessions", id+".jsonl"),
+					filepath.Join(id, "events.frames"),
+					id + ".jsonl",
+				},
+			})
+		}
+		p.walks = append(p.walks, compactionDatedSpec{dir: r, maxDepth: 4})
+	}
+	return p
+}
+
+func compactionPlanMuse(_ string, _ bool) compactionSearchPlan {
+	return compactionSearchPlan{
+		custom: func(id string, stats *compactionLookupStats) []string {
+			if p := museSessionPathBounded(id, stats); p != "" {
+				return []string{p}
+			}
+			return nil
+		},
+	}
+}
+
+func compactionPlanDeepSeek(id string, safeID bool) compactionSearchPlan {
+	if !safeID {
+		return compactionSearchPlan{}
+	}
+	root := DeepSeekRoot()
+	names := []string{"session.v4.jsonl.zstd", "session.v4.jsonl", "session.v3.jsonl.zstd", "session.v3.jsonl", "session.jsonl.zstd", "session.jsonl"}
+	var direct []string
+	for _, n := range names {
+		direct = append(direct, filepath.Join(root, "session-"+id, n), filepath.Join(root, id, n))
+	}
+	return compactionSearchPlan{
+		direct:  direct,
+		shallow: []compactionShallowSpec{{dir: root, subDirs: []string{"session-" + id, id}}},
+	}
+}
+
+func compactionPlanZed(_ string, _ bool) compactionSearchPlan {
+	return compactionSearchPlan{dbs: []string{ZedDB()}}
+}
+
+func compactionPlanDevin(_ string, _ bool) compactionSearchPlan {
+	return compactionSearchPlan{dbs: []string{DevinSessionsDB(), DevinLegacySessionsDB()}}
+}
+
+func compactionPlanJunie(id string, safeID bool) compactionSearchPlan {
+	if !safeID {
+		return compactionSearchPlan{}
+	}
+	root := JunieRoot()
+	return compactionSearchPlan{
+		direct:  []string{filepath.Join(root, id, "events.jsonl")},
+		shallow: []compactionShallowSpec{{dir: root, rels: []string{filepath.Join(id, "events.jsonl")}}},
+	}
+}
+
+func compactionPlanJetBrains(_ string, _ bool) compactionSearchPlan {
+	return compactionSearchPlan{
+		walks: []compactionDatedSpec{{dir: JetBrainsRoot(), maxDepth: 3}},
+	}
+}
+
+func compactionPlanWindsurf(id string, safeID bool) compactionSearchPlan {
+	if !safeID {
+		return compactionSearchPlan{}
+	}
+	root := WindsurfRoot()
+	return compactionSearchPlan{
+		direct: []string{filepath.Join(root, "cascade", id+".pb"), filepath.Join(root, id+".pb")},
+	}
+}
+
+func compactionPlanMimo(_ string, _ bool) compactionSearchPlan {
+	return compactionSearchPlan{dbs: []string{MimoDB()}}
+}
+
+func compactionPlanTeleAgent(_ string, _ bool) compactionSearchPlan {
+	return compactionSearchPlan{dbs: TeleAgentDBs()}
+}
+
+func compactionPlanOmnigent(_ string, _ bool) compactionSearchPlan {
+	return compactionSearchPlan{dbs: []string{OmnigentDB()}}
+}
+
+func compactionPlanOrca(_ string, _ bool) compactionSearchPlan {
+	return compactionSearchPlan{dbs: []string{OrcaDB()}}
+}
+
+func compactionPlanAnte(id string, safeID bool) compactionSearchPlan {
+	var p compactionSearchPlan
+	for _, r := range AnteRoots() {
+		if safeID {
+			p.direct = append(p.direct, filepath.Join(r, id, "events.jsonl"), filepath.Join(r, id, "dialog.json"))
+		}
+		if !SubagentsOff() {
+			p.walks = append(p.walks, compactionDatedSpec{dir: r, maxDepth: 3})
+		}
+	}
+	return p
+}
+
+func compactionPlanDeja(_ string, _ bool) compactionSearchPlan {
+	return compactionSearchPlan{histories: append(NotesFiles(), RepoMemoryFiles()...)}
 }
 
 func compactionCandidateProbeMatch(harness, path, id string, needle []byte, totalRead *int64) (keep, stop bool) {

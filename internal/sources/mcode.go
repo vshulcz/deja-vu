@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"unicode/utf16"
@@ -737,19 +738,71 @@ func mcodeToolCalls(v any) []any {
 // base64url cut at 180 characters (JDe); the id itself is checked against
 // the manifest, so a cut name never stands in for another session.
 func McodeSessionPath(id string) string {
+	return mcodeSessionPathBounded(id, nil)
+}
+
+func mcodeSessionPathBounded(id string, stats *compactionLookupStats) string {
 	if id == "" {
+		return ""
+	}
+	root := McodeRoot()
+	if root == "" {
 		return ""
 	}
 	enc := base64.RawURLEncoding.EncodeToString([]byte(id))
 	if len(enc) > 180 {
 		enc = enc[:180]
 	}
-	for _, p := range McodeSessionFiles() {
-		if strings.HasSuffix(filepath.Base(filepath.Dir(p)), "session_"+enc) && mcodeSessionID(p) == id {
-			return p
+	wantSuffix := "session_" + enc
+	dirBudget, statBudget := 0, 0
+	var match string
+	var walk func(dir string, depth int)
+	walk = func(dir string, depth int) {
+		if match != "" || dirBudget >= compactionMaxDirEntries || statBudget >= compactionMaxStatCalls {
+			return
+		}
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return
+		}
+		sort.Slice(entries, func(i, j int) bool { return entries[i].Name() > entries[j].Name() })
+		for _, e := range entries {
+			if match != "" || dirBudget >= compactionMaxDirEntries || statBudget >= compactionMaxStatCalls {
+				return
+			}
+			dirBudget++
+			if stats != nil {
+				stats.DirEntries++
+			}
+			if !e.IsDir() {
+				continue
+			}
+			name := e.Name()
+			if strings.HasPrefix(name, ".history-mutation-") || name == "snapshots" || name == "reports" {
+				continue
+			}
+			sub := filepath.Join(dir, name)
+			if strings.HasSuffix(name, wantSuffix) {
+				p := filepath.Join(sub, mcodeTranscriptName)
+				if mcodeSessionID(p) == id {
+					statBudget++
+					if stats != nil {
+						stats.StatCalls++
+					}
+					if info, err := os.Stat(p); err == nil && info.Mode().IsRegular() {
+						match = p
+						return
+					}
+				}
+				continue
+			}
+			if depth < 4 {
+				walk(sub, depth+1)
+			}
 		}
 	}
-	return ""
+	walk(root, 1)
+	return match
 }
 
 // readMcodeCompaction captures a MiniMax Code session for a PreCompact hook.

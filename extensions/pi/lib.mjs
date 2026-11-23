@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { dirname, isAbsolute, join } from "node:path"
 
@@ -134,11 +134,11 @@ function isTempDejaBin(dejaBin) {
 export function promptCachePath(name = "pi-pkg-cache", dejaBin = "") {
   const override = process.env.DEJA_PROMPT_CACHE_FILE
   if (override) return override
-  const xdg = process.env.XDG_CACHE_HOME
-  if (xdg && isAbsolute(xdg)) return join(xdg, "deja-vu", name + ".json")
   if (isTempDejaBin(dejaBin)) {
     return join(dirname(dejaBin), ".deja-cache", name + ".json")
   }
+  const xdg = process.env.XDG_CACHE_HOME
+  if (xdg && isAbsolute(xdg)) return join(xdg, "deja-vu", name + ".json")
   const base = process.platform === "win32"
     ? (process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"))
     : join(homedir(), ".cache")
@@ -149,31 +149,38 @@ function isPlainObject(v) {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v)
 }
 
+function nullMap(src) {
+  const out = Object.create(null)
+  if (!isPlainObject(src)) return out
+  for (const [k, v] of Object.entries(src)) out[k] = v
+  return out
+}
+
 function clonePromptSession(raw) {
   if (!isPlainObject(raw)) {
-    return { epoch: 0, updatedAt: 0, recalled: {}, repairs: {}, told: false, empties: 0 }
+    return { epoch: 0, updatedAt: 0, recalled: Object.create(null), repairs: Object.create(null), told: false, empties: 0 }
   }
   const out = {
     epoch: Number.isInteger(raw.epoch) ? raw.epoch : 0,
     updatedAt: typeof raw.updatedAt === "number" ? raw.updatedAt : 0,
-    recalled: isPlainObject(raw.recalled) ? { ...raw.recalled } : {},
-    repairs: isPlainObject(raw.repairs) ? { ...raw.repairs } : {},
+    recalled: nullMap(raw.recalled),
+    repairs: nullMap(raw.repairs),
     told: Boolean(raw.told),
     empties: Number.isInteger(raw.empties) ? raw.empties : 0,
   }
-  if (typeof raw.digest === "string") out.digest = raw.digest
+  if (Object.hasOwn(raw, "digest") && typeof raw.digest === "string") out.digest = raw.digest
   return out
 }
 
 function readPromptCacheFile(file) {
   try {
-    if (!existsSync(file)) return { version: 1, sessions: {} }
+    if (!existsSync(file)) return { version: 1, sessions: Object.create(null) }
     const parsed = JSON.parse(readFileSync(file, "utf8"))
     if (isPlainObject(parsed) && parsed.version === 1 && isPlainObject(parsed.sessions)) {
-      return parsed
+      return { version: 1, sessions: nullMap(parsed.sessions) }
     }
   } catch {}
-  return { version: 1, sessions: {} }
+  return { version: 1, sessions: Object.create(null) }
 }
 
 function writePromptCacheFile(file, data, keepKey, maxSessions) {
@@ -181,18 +188,32 @@ function writePromptCacheFile(file, data, keepKey, maxSessions) {
     const entries = Object.entries(data.sessions)
     if (entries.length > maxSessions) {
       entries.sort((a, b) => ((b[1] && b[1].updatedAt) || 0) - ((a[1] && a[1].updatedAt) || 0))
-      const trimmed = {}
-      if (keepKey && data.sessions[keepKey]) trimmed[keepKey] = data.sessions[keepKey]
+      const trimmed = Object.create(null)
+      if (keepKey && Object.hasOwn(data.sessions, keepKey) && data.sessions[keepKey]) {
+        trimmed[keepKey] = data.sessions[keepKey]
+      }
       for (const [k, v] of entries) {
         if (Object.keys(trimmed).length >= maxSessions) break
         trimmed[k] = v
       }
       data.sessions = trimmed
     }
-    mkdirSync(dirname(file), { recursive: true })
+    const dir = dirname(file)
+    mkdirSync(dir, { recursive: true, mode: 0o700 })
+    if (
+      process.platform !== "win32" &&
+      dir !== "/" &&
+      dir !== "/tmp" &&
+      dir !== "/private/tmp" &&
+      dir !== tmpdir().replace(/\/+$/, "") &&
+      dir !== homedir().replace(/\/+$/, "")
+    ) {
+      try { chmodSync(dir, 0o700) } catch {}
+    }
     const tmp = file + "." + process.pid + "." + Math.random().toString(36).slice(2) + ".tmp"
     try {
-      writeFileSync(tmp, JSON.stringify(data), "utf8")
+      writeFileSync(tmp, JSON.stringify(data), { encoding: "utf8", mode: 0o600 })
+      if (process.platform !== "win32") chmodSync(tmp, 0o600)
       renameSync(tmp, file)
     } catch (err) {
       try { rmSync(tmp, { force: true }) } catch {}
@@ -215,14 +236,16 @@ export function createSessionStore(name = "pi-pkg-cache", { maxSessions = 128, d
   const file = () => promptCachePath(name, dejaBin)
   const read = (sessionKey) => {
     const data = readPromptCacheFile(file())
-    const session = clonePromptSession(data.sessions[sessionKey])
+    const raw = Object.hasOwn(data.sessions, sessionKey) ? data.sessions[sessionKey] : undefined
+    const session = clonePromptSession(raw)
     return { epoch: session.epoch, session }
   }
   const write = (sessionKey, expectedEpoch, mutate) => {
     if (!sessionKey) return false
     const f = file()
     const data = readPromptCacheFile(f)
-    const current = clonePromptSession(data.sessions[sessionKey])
+    const raw = Object.hasOwn(data.sessions, sessionKey) ? data.sessions[sessionKey] : undefined
+    const current = clonePromptSession(raw)
     if (current.epoch !== expectedEpoch) return false
     mutate(current)
     current.updatedAt = Date.now()
@@ -234,12 +257,13 @@ export function createSessionStore(name = "pi-pkg-cache", { maxSessions = 128, d
     if (!sessionKey) return
     const f = file()
     const data = readPromptCacheFile(f)
-    const prev = clonePromptSession(data.sessions[sessionKey])
+    const raw = Object.hasOwn(data.sessions, sessionKey) ? data.sessions[sessionKey] : undefined
+    const prev = clonePromptSession(raw)
     const next = {
       epoch: prev.epoch + 1,
       updatedAt: Date.now(),
-      recalled: {},
-      repairs: {},
+      recalled: Object.create(null),
+      repairs: Object.create(null),
       told: prev.told,
       empties: 0,
     }
