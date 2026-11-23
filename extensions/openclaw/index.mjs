@@ -12,6 +12,8 @@ import {
   argv,
   configPath,
   contributions,
+  createSeenStore,
+  createSessionStore,
   directTurn,
   installerPluginPath,
   mcpWired,
@@ -211,7 +213,10 @@ export default {
     // the last, so a gateway with only the package had no digest and lost what
     // a compacted session had been shown.
     if (adds.recall) {
-      const seen = new Map()
+      const promptCache = createSessionStore("openclaw-pkg-cache", { dejaBin: bin })
+      const seen = createSeenStore(promptCache)
+      const scopeOf = (at) => (at.cwd || "") + "\0" + (at.id || "default")
+      const hasBootstrapRecall = (files) => files.some((f) => f && (f.name === "DEJA-RECALL.md" || f.path === "deja://recall"))
       // deja's per-prompt receipt rides under the final reply in a
       // 1:1 chat with the owner on a channel (Telegram, Slack, Discord ...).
       // Not in a group, where other people read the reply, and not on the TUI or
@@ -264,7 +269,20 @@ export default {
             async (event) => {
               const context = event && event.context
               if (!context || !Array.isArray(context.bootstrapFiles)) return
-              const text = await digest(event, context)
+              if (hasBootstrapRecall(context.bootstrapFiles)) return
+              const at = where(seen, event, context, process.cwd())
+              const scope = scopeOf(at)
+              const snap = promptCache.read(scope)
+              let text
+              if (Object.hasOwn(snap.session, "digest")) {
+                text = snap.session.digest
+              } else {
+                if (context.trigger === "heartbeat" || (event && event.trigger === "heartbeat")) return
+                text = await digest(event, context)
+                promptCache.write(scope, snap.epoch, (s) => {
+                  s.digest = text
+                })
+              }
               if (!text) return
               context.bootstrapFiles.push({ name: "DEJA-RECALL.md", path: "deja://recall", content: text, missing: false })
             },
@@ -277,7 +295,15 @@ export default {
         api.on(
           "agent_turn_prepare",
           async (event, ctx) => {
+            if (ctx && ctx.trigger === "heartbeat") return
+            const at = where(seen, event, ctx, process.cwd())
+            const scope = scopeOf(at)
+            const snap = promptCache.read(scope)
+            if (Object.hasOwn(snap.session.recalled, "__turn_prepare__")) return
             const text = await digest(event, ctx)
+            promptCache.write(scope, snap.epoch, (s) => {
+              s.recalled["__turn_prepare__"] = text ? "1" : ""
+            })
             if (!text) return
             return { prependContext: text }
           },
@@ -353,6 +379,7 @@ export default {
             }),
             10000,
           )
+          promptCache.compact(scopeOf(at), false)
         },
         { timeoutMs: 15000 },
       )

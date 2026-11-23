@@ -1,4 +1,6 @@
-import { join } from "node:path"
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
+import { homedir, tmpdir } from "node:os"
+import { dirname, isAbsolute, join } from "node:path"
 
 // The pure half of the plugin: everything that reads deja's output or
 // opencode's message shape, with no process and no host. Kept apart from
@@ -320,4 +322,129 @@ export function v1ToolName(name) {
   if (name === "subagent") return "task"
   if (name === "shell") return "bash"
   return name
+}
+
+// promptCachePath resolves the on-disk state file so plugin reloads and process
+// restarts re-emit the exact prompt-prefix blocks instead of busting cache.
+function isTempDejaBin(dejaBin) {
+  if (!dejaBin) return false
+  const fold = (s) => {
+    const clean = s.replace(/\\/g, "/").replace(/\/+$/, "")
+    return process.platform === "win32" ? clean.toLowerCase() : clean
+  }
+  const bin = fold(dejaBin)
+  return [tmpdir(), "/tmp", "/private/tmp", "/var/folders"]
+    .filter(Boolean)
+    .some((base) => {
+      const root = fold(base)
+      return root && bin.startsWith(root + "/")
+    })
+}
+
+export function promptCachePath(name, dejaBin = "") {
+  const override = process.env.DEJA_PROMPT_CACHE_FILE
+  if (override) return override
+  const xdg = process.env.XDG_CACHE_HOME
+  if (xdg && isAbsolute(xdg)) return join(xdg, "deja-vu", `${name}.json`)
+  if (isTempDejaBin(dejaBin)) {
+    return join(dirname(dejaBin), ".deja-cache", `${name}.json`)
+  }
+  const base = process.platform === "win32"
+    ? (process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"))
+    : join(homedir(), ".cache")
+  return join(base, "deja-vu", `${name}.json`)
+}
+
+function readCacheFile(file) {
+  try {
+    if (!existsSync(file)) return { version: 1, sessions: {} }
+    const parsed = JSON.parse(readFileSync(file, "utf8"))
+    if (parsed && parsed.version === 1 && parsed.sessions && typeof parsed.sessions === "object") {
+      return parsed
+    }
+  } catch {}
+  return { version: 1, sessions: {} }
+}
+
+function writeCacheFile(file, data, keepScope, maxSessions) {
+  try {
+    const entries = Object.entries(data.sessions)
+    if (entries.length > maxSessions) {
+      entries.sort((a, b) => (b[1]?.updatedAt || 0) - (a[1]?.updatedAt || 0))
+      const trimmed = {}
+      if (keepScope && data.sessions[keepScope]) trimmed[keepScope] = data.sessions[keepScope]
+      for (const [k, v] of entries) {
+        if (Object.keys(trimmed).length >= maxSessions) break
+        trimmed[k] = v
+      }
+      data.sessions = trimmed
+    }
+    mkdirSync(dirname(file), { recursive: true })
+    const tmp = `${file}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`
+    try {
+      writeFileSync(tmp, JSON.stringify(data), "utf8")
+      renameSync(tmp, file)
+    } catch (err) {
+      try { rmSync(tmp, { force: true }) } catch {}
+      throw err
+    }
+  } catch {}
+}
+
+function cloneSession(raw) {
+  if (!raw || typeof raw !== "object") return { epoch: 0, updatedAt: 0, recalled: {} }
+  const out = {
+    epoch: Number.isInteger(raw.epoch) ? raw.epoch : 0,
+    updatedAt: typeof raw.updatedAt === "number" ? raw.updatedAt : 0,
+    recalled: raw.recalled && typeof raw.recalled === "object" ? { ...raw.recalled } : {},
+  }
+  if (Object.hasOwn(raw, "digest")) out.digest = String(raw.digest ?? "")
+  if (raw.told) out.told = true
+  if (typeof raw.empties === "number") out.empties = raw.empties
+  return out
+}
+
+export function rememberEntry(mapObj, key, val, maxEntries = 1000) {
+  if (Object.hasOwn(mapObj, key)) delete mapObj[key]
+  mapObj[key] = val
+  const keys = Object.keys(mapObj)
+  while (keys.length > maxEntries) {
+    delete mapObj[keys.shift()]
+  }
+}
+
+// createSessionStore persists per-session digest and recall maps with a
+// monotonic compaction epoch so a slower worker on an old epoch cannot
+// overwrite post-compaction state.
+export function createSessionStore(name, { maxSessions = 256, dejaBin = "" } = {}) {
+  const path = () => promptCachePath(name, dejaBin)
+  const read = (scope) => {
+    const data = readCacheFile(path())
+    const session = cloneSession(data.sessions[scope])
+    return { epoch: session.epoch, session }
+  }
+  const write = (scope, expectedEpoch, mutator) => {
+    const file = path()
+    const data = readCacheFile(file)
+    const cur = cloneSession(data.sessions[scope])
+    if (cur.epoch > expectedEpoch) return { stale: true, epoch: cur.epoch, session: cur }
+    mutator(cur)
+    cur.epoch = cur.epoch > expectedEpoch ? cur.epoch : expectedEpoch
+    cur.updatedAt = Date.now()
+    data.sessions[scope] = cur
+    writeCacheFile(file, data, scope, maxSessions)
+    return { stale: false, epoch: cur.epoch, session: cur }
+  }
+  const compact = (scope, { clearDigest = false } = {}) => {
+    const file = path()
+    const data = readCacheFile(file)
+    const cur = cloneSession(data.sessions[scope])
+    const next = { epoch: cur.epoch + 1, updatedAt: Date.now(), recalled: {} }
+    if (!clearDigest && Object.hasOwn(cur, "digest")) next.digest = cur.digest
+    if (cur.told) next.told = true
+    data.sessions[scope] = next
+    writeCacheFile(file, data, scope, maxSessions)
+    return next
+  }
+  return { read, write, compact }
 }

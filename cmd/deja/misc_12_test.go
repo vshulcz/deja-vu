@@ -2484,6 +2484,9 @@ func runNodeDriver(t *testing.T, name, src, driver string) string {
 	}
 	cmd := exec.CommandContext(t.Context(), node, append(args, drive)...)
 	cmd.Dir = dir
+	if os.Getenv("DEJA_PROMPT_CACHE_FILE") == "" {
+		cmd.Env = append(os.Environ(), "XDG_CACHE_HOME="+filepath.Join(dir, ".xdg-cache"))
+	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("node: %v\n%s", err, out)

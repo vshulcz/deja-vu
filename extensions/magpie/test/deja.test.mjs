@@ -1,4 +1,4 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -13,12 +13,17 @@ import {
 
 function makeStubDeja(scriptBody) {
   const dir = mkdtempSync(join(tmpdir(), "magpie-deja-test-"));
+  const prevCache = process.env.DEJA_PROMPT_CACHE_FILE;
+  process.env.DEJA_PROMPT_CACHE_FILE = join(dir, "magpie-cache.json");
   const bin = join(dir, "deja");
   writeFileSync(bin, `#!/usr/bin/env node\n${scriptBody}\n`, "utf8");
   chmodSync(bin, 0o755);
   return {
     bin,
+    dir,
     cleanup() {
+      if (prevCache === undefined) delete process.env.DEJA_PROMPT_CACHE_FILE;
+      else process.env.DEJA_PROMPT_CACHE_FILE = prevCache;
       rmSync(dir, { recursive: true, force: true });
     },
   };
@@ -39,7 +44,7 @@ describe("@vshulcz/magpie-deja", () => {
         protocol: "chat",
         origin: "local",
         session: "s1",
-        options: { bin: stub.bin },
+        options: { bin: stub.bin, requestTimeoutMs: 5000 },
         report: (state) => reports.push(state),
       });
       assert.equal(out, undefined);
@@ -63,7 +68,7 @@ describe("@vshulcz/magpie-deja", () => {
         origin: "remote",
         cwd: "/workspace/project-a",
         session: "s1",
-        options: { bin: stub.bin },
+        options: { bin: stub.bin, requestTimeoutMs: 5000 },
       });
       assert.equal(out, undefined);
 
@@ -72,7 +77,7 @@ describe("@vshulcz/magpie-deja", () => {
         origin: "remote",
         cwd: "/workspace/project-a",
         session: "s1",
-        options: { bin: stub.bin, recallRemote: true },
+        options: { bin: stub.bin, recallRemote: true, requestTimeoutMs: 5000 },
       });
       assert.ok(allowed);
       assert.ok(allowed.messages[0].content.includes("<deja-memory"));
@@ -101,7 +106,7 @@ describe("@vshulcz/magpie-deja", () => {
           protocol: "chat",
           origin: "local",
           cwd: "/workspace/project-a",
-          options: { bin: stub.bin },
+          options: { bin: stub.bin, requestTimeoutMs: 5000 },
         }),
         undefined,
       );
@@ -115,7 +120,7 @@ describe("@vshulcz/magpie-deja", () => {
           protocol: "anthropic",
           origin: "local",
           cwd: "/workspace/project-a",
-          options: { bin: stub.bin },
+          options: { bin: stub.bin, requestTimeoutMs: 5000 },
         }),
         undefined,
       );
@@ -165,7 +170,7 @@ describe("@vshulcz/magpie-deja", () => {
         origin: "local",
         cwd: "/workspace/service-x",
         session: "sess-42",
-        options: { bin: stub.bin },
+        options: { bin: stub.bin, requestTimeoutMs: 5000 },
       });
       assert.ok(res1);
       assert.equal(
@@ -202,7 +207,7 @@ describe("@vshulcz/magpie-deja", () => {
         origin: "local",
         cwd: "/workspace/service-x",
         session: "sess-42",
-        options: { bin: stub.bin },
+        options: { bin: stub.bin, requestTimeoutMs: 5000 },
       });
       assert.ok(res2);
       assert.equal(res2.messages[0].content, res1.messages[0].content);
@@ -230,7 +235,7 @@ describe("@vshulcz/magpie-deja", () => {
         origin: "local",
         cwd: "/workspace/api",
         session: "s-resp",
-        options: { bin: stub.bin },
+        options: { bin: stub.bin, requestTimeoutMs: 5000 },
       });
       assert.equal(responsesReq.input[0].content.length, 1);
       assert.equal(outResponses.input[0].content.length, 2);
@@ -249,7 +254,7 @@ describe("@vshulcz/magpie-deja", () => {
         origin: "local",
         cwd: "/workspace/api",
         session: "s-anth",
-        options: { bin: stub.bin },
+        options: { bin: stub.bin, requestTimeoutMs: 5000 },
       });
       assert.equal(anthropicReq.messages[0].content.length, 1);
       assert.equal(outAnthropic.messages[0].content.length, 2);
@@ -268,7 +273,7 @@ describe("@vshulcz/magpie-deja", () => {
         origin: "local",
         cwd: "/workspace/api",
         session: "s-gem",
-        options: { bin: stub.bin },
+        options: { bin: stub.bin, requestTimeoutMs: 5000 },
       });
       assert.equal(geminiReq.contents[0].parts.length, 1);
       assert.equal(outGemini.contents[0].parts.length, 2);
@@ -292,5 +297,154 @@ describe("@vshulcz/magpie-deja", () => {
     assert.doesNotThrow(() => resolveDeja(undefined));
     assert.doesNotThrow(() => resolveDeja(null));
     assert.doesNotThrow(() => resolveDeja(123));
+  });
+
+  it("persists per-turn sticky recall across process restarts and clears cache in reset()", async () => {
+    const { readFileSync } = await import("node:fs");
+    reset();
+    let countFile = "";
+    const stub = makeStubDeja(`
+      const fs = require("node:fs");
+      const path = require("node:path");
+      const countPath = path.join(__dirname, "count");
+      let n = 0;
+      try { n = Number(fs.readFileSync(countPath, "utf8")) || 0; } catch {}
+      n++;
+      fs.writeFileSync(countPath, String(n));
+      process.stdout.write("[deja — 2026-10-30] PROMPT-" + n);
+    `);
+    countFile = join(stub.dir, "count");
+    try {
+      const turn1 = { messages: [{ role: "user", content: "where is backoff configured?" }] };
+      const res1 = await onRequest(turn1, {
+        protocol: "chat",
+        origin: "local",
+        cwd: "/workspace/service-x",
+        session: "sess-restart",
+        options: { bin: stub.bin, requestTimeoutMs: 5000 },
+      });
+      assert.ok(res1);
+      assert.ok(res1.messages[0].content.includes("PROMPT-1"));
+
+      // Simulate gateway restart: clear in-memory Map without resetting disk cache.
+      const { sticky } = await import("../deja.lib.mjs");
+      sticky.clear();
+
+      const turn2 = {
+        messages: [
+          { role: "user", content: "where is backoff configured?" },
+          { role: "assistant", content: "in retry.go" },
+          { role: "user", content: "what about jitter?" },
+        ],
+      };
+      const res2 = await onRequest(turn2, {
+        protocol: "chat",
+        origin: "local",
+        cwd: "/workspace/service-x",
+        session: "sess-restart",
+        options: { bin: stub.bin, requestTimeoutMs: 5000 },
+      });
+      assert.ok(res2);
+      assert.equal(res2.messages[0].content, res1.messages[0].content);
+      assert.ok(res2.messages[2].content.includes("PROMPT-2"));
+      assert.equal(readFileSync(countFile, "utf8"), "2");
+
+      reset();
+      const resAfterReset = await onRequest(turn1, {
+        protocol: "chat",
+        origin: "local",
+        cwd: "/workspace/service-x",
+        session: "sess-restart",
+        options: { bin: stub.bin, requestTimeoutMs: 5000 },
+      });
+      assert.ok(resAfterReset.messages[0].content.includes("PROMPT-3"));
+    } finally {
+      stub.cleanup();
+    }
+  });
+
+  it("isolates prompt cache next to temp stub binary when DEJA_PROMPT_CACHE_FILE is unset", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "magpie-tempbin-"));
+    const stubDir = join(dir, "bin");
+    const fakeHome = join(dir, "home");
+    mkdirSync(stubDir, { recursive: true });
+    mkdirSync(fakeHome, { recursive: true });
+    const stubBin = join(stubDir, "deja");
+    writeFileSync(
+      stubBin,
+      `#!/usr/bin/env node
+const fs = require("node:fs");
+const path = require("node:path");
+const countPath = path.join(${JSON.stringify(stubDir)}, "count");
+let n = 0;
+try { n = Number(fs.readFileSync(countPath, "utf8")) || 0; } catch {}
+n++;
+fs.writeFileSync(countPath, String(n));
+process.stdout.write("[deja — 2026-10-30] PROMPT-" + n);
+`,
+      "utf8",
+    );
+    chmodSync(stubBin, 0o755);
+
+    const saved = {
+      DEJA_PROMPT_CACHE_FILE: process.env.DEJA_PROMPT_CACHE_FILE,
+      XDG_CACHE_HOME: process.env.XDG_CACHE_HOME,
+      HOME: process.env.HOME,
+      USERPROFILE: process.env.USERPROFILE,
+    };
+    delete process.env.DEJA_PROMPT_CACHE_FILE;
+    delete process.env.XDG_CACHE_HOME;
+    process.env.HOME = fakeHome;
+    process.env.USERPROFILE = fakeHome;
+
+    try {
+      const { sticky } = await import("../deja.lib.mjs");
+      reset();
+      const turn1 = { messages: [{ role: "user", content: "where is backoff configured?" }] };
+      const res1 = await onRequest(turn1, {
+        protocol: "chat",
+        origin: "local",
+        cwd: "/workspace/svc",
+        session: "s-iso",
+        options: { bin: stubBin, requestTimeoutMs: 5000 },
+      });
+      assert.ok(res1);
+      assert.ok(res1.messages[0].content.includes("PROMPT-1"));
+
+      const isolatedCache = join(stubDir, ".deja-cache", "magpie-cache.json");
+      const homeCache = join(fakeHome, ".cache", "deja-vu", "magpie-cache.json");
+      assert.equal(existsSync(isolatedCache), true);
+      assert.equal(existsSync(homeCache), false);
+
+      sticky.clear();
+      const turn2 = {
+        messages: [
+          { role: "user", content: "where is backoff configured?" },
+          { role: "assistant", content: "in retry.go" },
+          { role: "user", content: "what about jitter?" },
+        ],
+      };
+      const res2 = await onRequest(turn2, {
+        protocol: "chat",
+        origin: "local",
+        cwd: "/workspace/svc",
+        session: "s-iso",
+        options: { bin: stubBin, requestTimeoutMs: 5000 },
+      });
+      assert.ok(res2);
+      assert.equal(res2.messages[0].content, res1.messages[0].content);
+      assert.ok(res2.messages[2].content.includes("PROMPT-2"));
+      assert.equal(readFileSync(join(stubDir, "count"), "utf8"), "2");
+
+      reset();
+      assert.equal(existsSync(isolatedCache), false);
+    } finally {
+      reset();
+      for (const [k, v] of Object.entries(saved)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

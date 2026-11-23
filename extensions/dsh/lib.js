@@ -2,6 +2,10 @@
 // anything a plugin module exports as part of the plugin — opencode does
 // exactly that with its own — and this is a helper, not a second plugin.
 
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { dirname, isAbsolute, join } from "node:path";
+
 // argv builds the call for a query somebody typed, rather than handing the text
 // to deja as it stands.
 //
@@ -226,3 +230,138 @@ export function noteBoard({ perSession = 8, sessions = 64, ttlMs = 10 * 60 * 100
     },
   };
 }
+
+function isTempDejaBin(dejaBin) {
+  if (!dejaBin) return false;
+  const fold = (s) => {
+    const clean = String(s).replace(/\\/g, "/").replace(/\/+$/, "");
+    return process.platform === "win32" ? clean.toLowerCase() : clean;
+  };
+  const bin = fold(dejaBin);
+  return [tmpdir(), "/tmp", "/private/tmp", "/var/folders"]
+    .filter(Boolean)
+    .some((base) => {
+      const root = fold(base);
+      return root && bin.startsWith(root + "/");
+    });
+}
+
+export function promptCachePath(name, dejaBin = "") {
+  const override = process.env.DEJA_PROMPT_CACHE_FILE;
+  if (override) return override;
+  const xdg = process.env.XDG_CACHE_HOME;
+  if (xdg && isAbsolute(xdg)) return join(xdg, "deja-vu", name + ".json");
+  if (isTempDejaBin(dejaBin)) {
+    return join(dirname(dejaBin), ".deja-cache", name + ".json");
+  }
+  const base = process.platform === "win32"
+    ? (process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"))
+    : join(homedir(), ".cache");
+  return join(base, "deja-vu", name + ".json");
+}
+
+function isPlainObject(v) {
+  return Boolean(v) && typeof v === "object" && !Array.isArray(v);
+}
+
+function clonePromptSession(raw) {
+  if (!isPlainObject(raw)) {
+    return { epoch: 0, updatedAt: 0, recalled: {}, repairs: {}, told: false, empties: 0 };
+  }
+  const out = {
+    epoch: Number.isInteger(raw.epoch) ? raw.epoch : 0,
+    updatedAt: typeof raw.updatedAt === "number" ? raw.updatedAt : 0,
+    recalled: isPlainObject(raw.recalled) ? { ...raw.recalled } : {},
+    repairs: isPlainObject(raw.repairs) ? { ...raw.repairs } : {},
+    told: Boolean(raw.told),
+    empties: Number.isInteger(raw.empties) ? raw.empties : 0,
+  };
+  if (typeof raw.digest === "string") out.digest = raw.digest;
+  return out;
+}
+
+function readPromptCacheFile(file) {
+  try {
+    if (!existsSync(file)) return { version: 1, sessions: {} };
+    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    if (isPlainObject(parsed) && parsed.version === 1 && isPlainObject(parsed.sessions)) {
+      return parsed;
+    }
+  } catch {}
+  return { version: 1, sessions: {} };
+}
+
+function writePromptCacheFile(file, data, keepKey, maxSessions) {
+  try {
+    const entries = Object.entries(data.sessions);
+    if (entries.length > maxSessions) {
+      entries.sort((a, b) => ((b[1] && b[1].updatedAt) || 0) - ((a[1] && a[1].updatedAt) || 0));
+      const trimmed = {};
+      if (keepKey && data.sessions[keepKey]) trimmed[keepKey] = data.sessions[keepKey];
+      for (const [k, v] of entries) {
+        if (Object.keys(trimmed).length >= maxSessions) break;
+        trimmed[k] = v;
+      }
+      data.sessions = trimmed;
+    }
+    mkdirSync(dirname(file), { recursive: true });
+    const tmp = file + "." + process.pid + "." + Math.random().toString(36).slice(2) + ".tmp";
+    try {
+      writeFileSync(tmp, JSON.stringify(data), "utf8");
+      renameSync(tmp, file);
+    } catch (err) {
+      try { rmSync(tmp, { force: true }); } catch {}
+      throw err;
+    }
+  } catch {}
+}
+
+export function rememberEntry(map, key, value, limit = 256) {
+  if (!key) return;
+  if (Object.hasOwn(map, key)) delete map[key];
+  map[key] = value;
+  const keys = Object.keys(map);
+  while (keys.length > limit) {
+    delete map[keys.shift()];
+  }
+}
+
+export function createSessionStore(name, { maxSessions = 128, dejaBin = "" } = {}) {
+  const file = () => promptCachePath(name, dejaBin);
+  const read = (sessionKey) => {
+    const data = readPromptCacheFile(file());
+    const session = clonePromptSession(data.sessions[sessionKey]);
+    return { epoch: session.epoch, session };
+  };
+  const write = (sessionKey, expectedEpoch, mutate) => {
+    if (!sessionKey) return false;
+    const f = file();
+    const data = readPromptCacheFile(f);
+    const current = clonePromptSession(data.sessions[sessionKey]);
+    if (current.epoch !== expectedEpoch) return false;
+    mutate(current);
+    current.updatedAt = Date.now();
+    data.sessions[sessionKey] = current;
+    writePromptCacheFile(f, data, sessionKey, maxSessions);
+    return true;
+  };
+  const compact = (sessionKey, keepDigest) => {
+    if (!sessionKey) return;
+    const f = file();
+    const data = readPromptCacheFile(f);
+    const prev = clonePromptSession(data.sessions[sessionKey]);
+    const next = {
+      epoch: prev.epoch + 1,
+      updatedAt: Date.now(),
+      recalled: {},
+      repairs: {},
+      told: prev.told,
+      empties: 0,
+    };
+    if (keepDigest && typeof prev.digest === "string") next.digest = prev.digest;
+    data.sessions[sessionKey] = next;
+    writePromptCacheFile(f, data, sessionKey, maxSessions);
+  };
+  return { read, write, compact };
+}
+

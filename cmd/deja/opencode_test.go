@@ -1103,7 +1103,11 @@ console.log("dispose:" + JSON.stringify(ran.filter((c) => c.includes("hook-sessi
 	if err = os.WriteFile(run, []byte(driver), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	out, err := exec.CommandContext(t.Context(), node, run).CombinedOutput()
+	cmd := exec.CommandContext(t.Context(), node, run)
+	if os.Getenv("DEJA_PROMPT_CACHE_FILE") == "" {
+		cmd.Env = append(os.Environ(), "XDG_CACHE_HOME="+filepath.Join(dir, ".xdg-cache"))
+	}
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("driving the plugin: %v\n%s", err, out)
 	}
@@ -1303,7 +1307,11 @@ func runNode(t *testing.T, dir, driver string) string {
 	if err = os.WriteFile(run, []byte(driver), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	out, err := exec.CommandContext(t.Context(), node, run).CombinedOutput()
+	cmd := exec.CommandContext(t.Context(), node, run)
+	if os.Getenv("DEJA_PROMPT_CACHE_FILE") == "" {
+		cmd.Env = append(os.Environ(), "XDG_CACHE_HOME="+filepath.Join(dir, ".xdg-cache"))
+	}
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("driving the plugin: %v\n%s", err, out)
 	}

@@ -35,13 +35,17 @@ function stand() {
 }
 
 async function withConfigHome(dir, run) {
-  const previous = process.env.XDG_CONFIG_HOME
+  const prevConfig = process.env.XDG_CONFIG_HOME
+  const prevCache = process.env.XDG_CACHE_HOME
   process.env.XDG_CONFIG_HOME = dir
+  process.env.XDG_CACHE_HOME = join(dir, ".cache")
   try {
     await run()
   } finally {
-    if (previous === undefined) delete process.env.XDG_CONFIG_HOME
-    else process.env.XDG_CONFIG_HOME = previous
+    if (prevConfig === undefined) delete process.env.XDG_CONFIG_HOME
+    else process.env.XDG_CONFIG_HOME = prevConfig
+    if (prevCache === undefined) delete process.env.XDG_CACHE_HOME
+    else process.env.XDG_CACHE_HOME = prevCache
     rmSync(dir, { recursive: true, force: true })
   }
 }

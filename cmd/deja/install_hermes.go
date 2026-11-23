@@ -258,7 +258,7 @@ def recall(session_id=None, user_message=None, is_first_turn=False, **kwargs):
         # The session id, so hook-context stamps this session live: a first
         # turn returns before hook-prompt runs, and the deja tool answered it
         # with the session asking (#4246).
-        start = json.dumps({"session_id": session_id or "", "cwd": cwd})
+        start = json.dumps({"session_id": session_id or "", "cwd": cwd, "deja_once": True})
         digest = _deja(["hook-context", "--plain"], start)
         if digest:
             return {"context": digest}
