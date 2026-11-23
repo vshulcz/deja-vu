@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- On Windows, `deja index` and the background refreshes no longer flash console windows. When `deja` ran without a console (started by a GUI host, a scheduled task or a detached refresh), each `sqlite3`, `git`, `zstd` or `psql` child opened a window of its own for as long as it ran. These children, and the detached `deja` refresh, version and warmup processes, now start with a console that has no window (#6156).
+
 ## [0.25.0] - 2026-11-21
 
 Three new agent readers (`ante`, `doubao`, and `teleagent`, bringing `deja` to

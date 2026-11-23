@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -34,6 +35,7 @@ const hermesPGWhere = `role in ('user','assistant') and content is not null and 
 // default shells out exactly like the SQLite path shells out to sqlite3.
 var HermesPGRunner = func(dsn, sql string) ([]byte, error) {
 	cmd := exec.Command("psql", dsn, "-tAXq", "-v", "ON_ERROR_STOP=1", "-c", sql)
+	hideconsole.Apply(cmd)
 	out, err := cmd.Output()
 	if err != nil {
 		var ee *exec.ExitError
