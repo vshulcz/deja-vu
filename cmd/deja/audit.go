@@ -212,8 +212,6 @@ func collectAuditWithOptions(dir string, now time.Time, scanSecrets bool) auditR
 				}
 				if sp.name == "claude" || scanSecrets {
 					res.files = files
-				}
-				if sp.name == "claude" {
 					res.infos = infos
 				}
 				results[i] = res
@@ -235,10 +233,10 @@ func collectAuditWithOptions(dir string, now time.Time, scanSecrets bool) auditR
 	var (
 		claudeFiles []string
 		claudeInfos []os.FileInfo
-		storeFiles  map[string][]string
+		storeFiles  map[string][]auditStoreFile
 	)
 	if scanSecrets {
-		storeFiles = make(map[string][]string, len(results))
+		storeFiles = make(map[string][]auditStoreFile, len(results))
 	}
 	for i, res := range results {
 		if !res.ok {
@@ -248,7 +246,15 @@ func collectAuditWithOptions(dir string, now time.Time, scanSecrets bool) auditR
 		rep.TotalFiles += res.row.Files
 		rep.TotalBytes += res.row.Bytes
 		if scanSecrets {
-			storeFiles[specs[i].name] = res.files
+			files := make([]auditStoreFile, len(res.files))
+			for j, p := range res.files {
+				var sz int64
+				if j < len(res.infos) && res.infos[j] != nil {
+					sz = res.infos[j].Size()
+				}
+				files[j] = auditStoreFile{path: p, size: sz}
+			}
+			storeFiles[specs[i].name] = files
 		}
 		if specs[i].name == "claude" {
 			claudeFiles = res.files
@@ -434,6 +440,12 @@ func printAuditReport(w io.Writer, rep auditReport) {
 				strings.Join(storeParts, ", "),
 				formatAuditClassSummary(rep.CredentialClasses))
 		}
+	} else if rep.TotalFiles > 0 {
+		cmd := "npx @vshulcz/deja-vu audit --secrets"
+		if len(rep.WiredTargets) > 0 {
+			cmd = "deja audit --secrets"
+		}
+		fmt.Fprintf(w, "secrets:  not scanned (run `%s` to check raw logs for exposed keys)\n", cmd)
 	}
 
 	if rep.IndexedSessions > 0 {

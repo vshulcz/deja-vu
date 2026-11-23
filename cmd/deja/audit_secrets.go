@@ -19,6 +19,7 @@ import (
 )
 
 const (
+	auditReadBufBytes      = 512 * 1024
 	auditMaxLineChunkBytes = 4 * 1024 * 1024
 	auditMaxPEMBlockBytes  = 32 * 1024
 )
@@ -52,9 +53,15 @@ var auditNamedSecretAllow = map[string]bool{
 	"password":           true,
 }
 
+type auditStoreFile struct {
+	path string
+	size int64
+}
+
 type auditFileScanTask struct {
 	storeName string
 	path      string
+	size      int64
 }
 
 type auditStoreSecretCounts struct {
@@ -83,6 +90,12 @@ func auditShouldSkipPath(p string) bool {
 }
 
 func auditScanFile(path string) map[string]int {
+	br := bufio.NewReaderSize(nil, auditReadBufBytes)
+	var lineBuf []byte
+	return auditScanFileWithReader(path, br, &lineBuf)
+}
+
+func auditScanFileWithReader(path string, br *bufio.Reader, lineBuf *[]byte) map[string]int {
 	if auditShouldSkipPath(path) {
 		return nil
 	}
@@ -92,16 +105,15 @@ func auditScanFile(path string) map[string]int {
 	}
 	defer f.Close()
 
-	var header [4096]byte
-	n, readErr := io.ReadFull(f, header[:])
-	if readErr != nil && !errors.Is(readErr, io.EOF) && !errors.Is(readErr, io.ErrUnexpectedEOF) {
+	br.Reset(f)
+	peek, peekErr := br.Peek(4096)
+	if peekErr != nil && !errors.Is(peekErr, io.EOF) {
 		return nil
 	}
-	if n == 0 || bytes.IndexByte(header[:n], 0) >= 0 {
+	if len(peek) == 0 || bytes.IndexByte(peek, 0) >= 0 {
 		return nil
 	}
 
-	reader := io.MultiReader(bytes.NewReader(header[:n]), f)
 	counts := map[string]int{}
 	inPEM := false
 	var pemBuf strings.Builder
@@ -109,6 +121,9 @@ func auditScanFile(path string) map[string]int {
 
 	record := func(text string) map[string]int {
 		raw := redact.ScanKinds(text, auditNamedSecretAllow)
+		if len(raw) == 0 {
+			return nil
+		}
 		out := map[string]int{}
 		for kind, c := range raw {
 			if c > 0 && index.SecretKindNamed(kind) {
@@ -119,7 +134,7 @@ func auditScanFile(path string) map[string]int {
 		return out
 	}
 
-	streamErr := auditStreamChunks(reader, func(line string) {
+	streamErr := auditStreamChunksReader(br, lineBuf, func(line string) {
 		trimmed := strings.TrimSpace(line)
 		if !inPEM && strings.Contains(line, "-----BEGIN ") &&
 			strings.Contains(line, "PRIVATE KEY-----") &&
@@ -170,18 +185,37 @@ func auditScanFile(path string) map[string]int {
 }
 
 func auditStreamChunks(r io.Reader, fn func(line string)) error {
-	br := bufio.NewReaderSize(r, 64*1024)
-	var buf []byte
+	br := bufio.NewReaderSize(r, auditReadBufBytes)
+	var lineBuf []byte
+	return auditStreamChunksReader(br, &lineBuf, fn)
+}
+
+func auditStreamChunksReader(br *bufio.Reader, lineBuf *[]byte, fn func(line string)) error {
+	buf := (*lineBuf)[:0]
+	defer func() {
+		if cap(buf) > auditReadBufBytes {
+			*lineBuf = nil
+		} else {
+			*lineBuf = buf[:0]
+		}
+	}()
 	for {
 		frag, err := br.ReadSlice('\n')
-		buf = append(buf, frag...)
 		if !errors.Is(err, bufio.ErrBufferFull) {
-			if len(buf) > 0 {
-				line := strings.TrimRight(string(buf), "\r\n")
-				if line != "" {
-					fn(line)
+			if len(buf) == 0 {
+				trimmed := bytes.TrimRight(frag, "\r\n")
+				if len(trimmed) > 0 {
+					fn(string(trimmed))
 				}
-				buf = buf[:0]
+			} else {
+				buf = append(buf, frag...)
+				if len(buf) > 0 {
+					line := strings.TrimRight(string(buf), "\r\n")
+					if line != "" {
+						fn(line)
+					}
+					buf = buf[:0]
+				}
 			}
 			if errors.Is(err, io.EOF) {
 				return nil
@@ -191,6 +225,7 @@ func auditStreamChunks(r io.Reader, fn func(line string)) error {
 			}
 			continue
 		}
+		buf = append(buf, frag...)
 		if len(buf) >= auditMaxLineChunkBytes {
 			cut := auditChunkSplitIndex(buf)
 			fn(string(buf[:cut]))
@@ -212,14 +247,34 @@ func auditChunkSplitIndex(buf []byte) int {
 	return len(buf)
 }
 
-func applyAuditSecretScan(rep *auditReport, storeFiles map[string][]string) {
-	rep.SecretsScanned = true
+// buildAuditSecretTasks orders transcript files largest-first so worker goroutines
+// start big files early and avoid trailing on a single multi-megabyte log.
+func buildAuditSecretTasks(stores []auditStoreRow, storeFiles map[string][]auditStoreFile) []auditFileScanTask {
 	var tasks []auditFileScanTask
-	for _, row := range rep.Stores {
-		for _, p := range storeFiles[row.Name] {
-			tasks = append(tasks, auditFileScanTask{storeName: row.Name, path: p})
+	for _, row := range stores {
+		for _, f := range storeFiles[row.Name] {
+			tasks = append(tasks, auditFileScanTask{
+				storeName: row.Name,
+				path:      f.path,
+				size:      f.size,
+			})
 		}
 	}
+	sort.Slice(tasks, func(i, j int) bool {
+		if tasks[i].size != tasks[j].size {
+			return tasks[i].size > tasks[j].size
+		}
+		if tasks[i].storeName != tasks[j].storeName {
+			return tasks[i].storeName < tasks[j].storeName
+		}
+		return tasks[i].path < tasks[j].path
+	})
+	return tasks
+}
+
+func applyAuditSecretScan(rep *auditReport, storeFiles map[string][]auditStoreFile) {
+	rep.SecretsScanned = true
+	tasks := buildAuditSecretTasks(rep.Stores, storeFiles)
 	if len(tasks) == 0 {
 		return
 	}
@@ -243,8 +298,10 @@ func applyAuditSecretScan(rep *auditReport, storeFiles map[string][]string) {
 	workers := min(len(tasks), max(runtime.GOMAXPROCS(0), 4))
 	for range workers {
 		wg.Go(func() {
+			br := bufio.NewReaderSize(nil, auditReadBufBytes)
+			var lineBuf []byte
 			for task := range jobs {
-				counts := auditScanFile(task.path)
+				counts := auditScanFileWithReader(task.path, br, &lineBuf)
 				if len(counts) == 0 {
 					continue
 				}

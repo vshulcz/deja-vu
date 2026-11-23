@@ -268,7 +268,7 @@ func isEntropyByte(c byte) bool {
 	return false
 }
 
-func redactEntropy(s string, p kindPass) string {
+func redactEntropy(s string, p *kindPass) string {
 	if !p.on("entropy") || len(s) < entropyMinAssign {
 		return s
 	}

@@ -1426,6 +1426,108 @@ func TestAuditIndexlessRunCreatesZeroFiles(t *testing.T) {
 	}
 }
 
+func TestAuditBuildSecretTasksLargestFirst(t *testing.T) {
+	stores := []auditStoreRow{{Name: "codex"}, {Name: "claude"}}
+	storeFiles := map[string][]auditStoreFile{
+		"codex": {
+			{path: "z.jsonl", size: 500},
+			{path: "tiny.jsonl", size: 10},
+			{path: "a.jsonl", size: 500},
+		},
+		"claude": {
+			{path: "tie.jsonl", size: 500},
+			{path: "huge.jsonl", size: 9000},
+		},
+	}
+
+	got := buildAuditSecretTasks(stores, storeFiles)
+	want := []auditFileScanTask{
+		{storeName: "claude", path: "huge.jsonl", size: 9000},
+		{storeName: "claude", path: "tie.jsonl", size: 500},
+		{storeName: "codex", path: "a.jsonl", size: 500},
+		{storeName: "codex", path: "z.jsonl", size: 500},
+		{storeName: "codex", path: "tiny.jsonl", size: 10},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("len(tasks) = %d, want %d: %+v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("task[%d] = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestAuditPrintSecretsHint(t *testing.T) {
+	t.Run("unwired_hint", func(t *testing.T) {
+		var buf bytes.Buffer
+		printAuditReport(&buf, auditReport{TotalFiles: 3, TotalBytes: 1200})
+		want := "secrets:  not scanned (run `npx @vshulcz/deja-vu audit --secrets` to check raw logs for exposed keys)"
+		if !strings.Contains(buf.String(), want) {
+			t.Fatalf("missing unwired secrets hint %q in:\n%s", want, buf.String())
+		}
+	})
+
+	t.Run("wired_hint", func(t *testing.T) {
+		var buf bytes.Buffer
+		printAuditReport(&buf, auditReport{
+			TotalFiles:   3,
+			TotalBytes:   1200,
+			WiredTargets: []string{"claude"},
+		})
+		want := "secrets:  not scanned (run `deja audit --secrets` to check raw logs for exposed keys)"
+		if !strings.Contains(buf.String(), want) {
+			t.Fatalf("missing wired secrets hint %q in:\n%s", want, buf.String())
+		}
+	})
+
+	t.Run("empty_no_hint", func(t *testing.T) {
+		var buf bytes.Buffer
+		printAuditReport(&buf, auditReport{TotalFiles: 0})
+		if strings.Contains(buf.String(), "secrets:") {
+			t.Fatalf("unexpected secrets line when TotalFiles == 0:\n%s", buf.String())
+		}
+	})
+
+	t.Run("scanned_unchanged", func(t *testing.T) {
+		var buf bytes.Buffer
+		printAuditReport(&buf, auditReport{TotalFiles: 2, SecretsScanned: true})
+		want := "secrets:  0 unredacted credentials found in raw transcripts"
+		if !strings.Contains(buf.String(), want) {
+			t.Fatalf("missing clean scanned line %q in:\n%s", want, buf.String())
+		}
+		if strings.Contains(buf.String(), "not scanned") {
+			t.Fatalf("unexpected hint when SecretsScanned is true:\n%s", buf.String())
+		}
+	})
+
+	t.Run("bare_json_keeps_secrets_scanned_false", func(t *testing.T) {
+		_, home, _, idxDir := isolateAuditEnv(t, "claude")
+		projDir := filepath.Join(home, ".claude", "projects", "-Users-alex-app")
+		if err := os.MkdirAll(projDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(projDir, "s1.jsonl"), []byte(`{"type":"user","message":{"role":"user","content":"hi"}}`+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		var jsonOut bytes.Buffer
+		if err := runAudit(idxDir, []string{"--json"}, &jsonOut); err != nil {
+			t.Fatalf("runAudit --json: %v", err)
+		}
+		var rep auditReport
+		if err := json.Unmarshal(jsonOut.Bytes(), &rep); err != nil {
+			t.Fatalf("unmarshal audit json: %v\n%s", err, jsonOut.String())
+		}
+		if rep.SecretsScanned {
+			t.Fatalf("expected bare runAudit --json to keep secrets_scanned=false, got true")
+		}
+		if rep.TotalFiles != 1 {
+			t.Fatalf("total_files = %d, want 1", rep.TotalFiles)
+		}
+	})
+}
+
 func TestAuditStreamChunksAndSplitIndex(t *testing.T) {
 	withDelim := make([]byte, 20000)
 	for i := range withDelim {
