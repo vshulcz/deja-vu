@@ -6,7 +6,7 @@
   <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
   <link rel="self" type="application/atom+xml" href="https://vshulcz.github.io/deja-vu/feed.xml"></link>
   <link rel="hub" href="https://pubsubhubbub.appspot.com/"></link>
-  <updated>2026-11-21T00:00:00Z</updated>
+  <updated>2026-11-23T00:00:00Z</updated>
   <author>
     <name>vshulcz</name>
   </author>
@@ -14,8 +14,22 @@
     <title>deja-vu: local memory, session search &amp; handoff across 52 coding agents</title>
     <id>https://vshulcz.github.io/deja-vu/</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
-    <updated>2026-11-21T00:00:00Z</updated>
+    <updated>2026-11-23T00:00:00Z</updated>
     <summary>Shared local memory, session history search, cross-agent handoff, and uncommitted code recovery across 52 coding agents (Claude Code, Codex, Cursor, OpenCode, Gemini CLI, OpenClaw and 46 more agents). One Go binary, zero LLM calls.</summary>
+  </entry>
+  <entry>
+    <title>Delete Cursor Chat History and Archived Chats — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html"></link>
+    <updated>2026-11-23T00:00:00Z</updated>
+    <summary>Permanently delete Cursor archived chats and chat history: Archive vs Delete in the UI, Developer: Delete Old Chats, state.vscdb rows, and CLI transcripts.</summary>
+  </entry>
+  <entry>
+    <title>Add memory to DeepSeek Harness: all agents — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html"></link>
+    <updated>2026-11-23T00:00:00Z</updated>
+    <summary>How to give dsh recall over the sessions every coding agent on the machine already wrote — the plugin, the tools, and how it behaves beside the CLI install.</summary>
   </entry>
   <entry>
     <title>AI Coding Memory Benchmarks: 97.2% LongMemEval — deja-vu</title>
@@ -79,13 +93,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/harnesses.html"></link>
     <updated>2026-11-21T00:00:00Z</updated>
     <summary>The fifty-two coding agents deja indexes today, where each stores its history, and how to add a new one.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to DeepSeek Harness: all agents — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html"></link>
-    <updated>2026-11-21T00:00:00Z</updated>
-    <summary>How to give dsh recall over the sessions every coding agent on the machine already wrote — the plugin, the tools, and how it behaves beside the CLI install.</summary>
   </entry>
   <entry>
     <title>TeleAgent 星辰超级智能体 history — deja-vu</title>
@@ -205,13 +212,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html"></link>
     <updated>2026-11-18T00:00:00Z</updated>
     <summary>How to delete or purge Codex CLI sessions: codex delete &lt;id&gt;, codex archive, wiping ~/.codex/sessions and archived_sessions, and keeping history.jsonl.</summary>
-  </entry>
-  <entry>
-    <title>Delete Cursor chat history from state.vscdb — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html"></link>
-    <updated>2026-11-18T00:00:00Z</updated>
-    <summary>How to delete Cursor chat history — where the chats live in state.vscdb, why deleting the file resets more than chats, and what the CLI writes separately.</summary>
   </entry>
   <entry>
     <title>Delete old Claude Code CLI sessions by age — deja-vu</title>
