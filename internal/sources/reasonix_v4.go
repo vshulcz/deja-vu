@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -154,6 +155,7 @@ func reasonixV4FramesOneByOne(frames [][]byte, sizes []int) ([][]byte, error) {
 
 func reasonixZstd(in []byte) ([]byte, error) {
 	cmd := exec.CommandContext(context.Background(), "zstd", "-d", "-c", "-q")
+	hideconsole.Apply(cmd)
 	cmd.Stdin = bytes.NewReader(in)
 	var out, errBuf bytes.Buffer
 	cmd.Stdout = &out
