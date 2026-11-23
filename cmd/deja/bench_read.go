@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/bench"
+	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -188,6 +189,7 @@ begin;
 	}
 	defer func() { _ = f.Close() }()
 	cmd := exec.CommandContext(context.Background(), "sqlite3", db)
+	hideconsole.Apply(cmd)
 	cmd.Stdin = f
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("sqlite3 setup: %w: %s", err, out)

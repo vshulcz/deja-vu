@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -423,6 +424,7 @@ func zstdDecode(frame []byte) ([]byte, error) {
 		return nil, errors.New("zed: empty thread body")
 	}
 	cmd := exec.CommandContext(context.Background(), "zstd", "-d", "-c", "-q")
+	hideconsole.Apply(cmd)
 	cmd.Stdin = bytes.NewReader(frame)
 	var out, errBuf bytes.Buffer
 	cmd.Stdout = &out

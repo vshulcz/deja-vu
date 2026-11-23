@@ -8,6 +8,8 @@ import (
 	"context"
 	"os"
 	"os/exec"
+
+	"github.com/vshulcz/deja-vu/internal/hideconsole"
 )
 
 // Env is what every read-only git call adds to the environment.
@@ -27,5 +29,6 @@ var Env = []string{"GIT_OPTIONAL_LOCKS=0", "GIT_NO_LAZY_FETCH=1"}
 func Command(ctx context.Context, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Env = append(os.Environ(), Env...)
+	hideconsole.Apply(cmd)
 	return cmd
 }

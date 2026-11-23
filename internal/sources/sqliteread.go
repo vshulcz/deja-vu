@@ -13,6 +13,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/hideconsole"
 )
 
 // A read against a SQLite store is given up when it stops moving, not when a
@@ -71,6 +73,7 @@ func sqliteReadCmd(db string, tail ...string) (*sqliteRead, func()) {
 	if in != nil {
 		r.Stdin = in
 	}
+	hideconsole.Apply(r.Cmd)
 	return r, r.release
 }
 
