@@ -2,7 +2,7 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
-import { argv, branchHoldsRecall, contextText, installerExtensionPath, installerExtensionPaths, sessionKey } from "../lib.mjs"
+import { argv, branchCompactionKey, branchHoldsRecall, contextText, installerExtensionPath, installerExtensionPaths, sessionKey } from "../lib.mjs"
 
 test("the installer's extension is looked for where the installer writes it", () => {
   assert.equal(installerExtensionPath("/home/u"), "/home/u/.pi/agent/extensions/deja.ts")
@@ -83,4 +83,25 @@ test("only the marked digest counts once a branch has one", () => {
   assert.equal(branchHoldsRecall([digest, { type: "message", id: "a2" }, recall]), true)
   // A branch written before the mark: any block of ours counts, as before.
   assert.equal(branchHoldsRecall([{ type: "message", id: "a2" }, recall, { type: "compaction", firstKeptEntryId: "a3" }]), true)
+})
+
+test("branchCompactionKey distinguishes empty branches and each compaction generation", () => {
+  assert.equal(branchCompactionKey([]), "0")
+  assert.equal(branchCompactionKey([{ type: "message", id: "m1" }]), "0")
+  assert.equal(
+    branchCompactionKey([
+      { type: "message", id: "m1" },
+      { type: "compaction", id: "c1", firstKeptEntryId: "m1" },
+    ]),
+    "c:1:c1:m1",
+  )
+  assert.notEqual(
+    branchCompactionKey([
+      { type: "message", id: "m1" },
+      { type: "compaction", id: "c1", firstKeptEntryId: "m1" },
+      { type: "message", id: "m2" },
+      { type: "compaction", id: "c2", firstKeptEntryId: "m2" },
+    ]),
+    "c:1:c1:m1",
+  )
 })

@@ -13,11 +13,13 @@ import { execFile } from "node:child_process";
 
 import {
   EXE,
+  loadConversation,
   lru,
   maskSecrets,
   maxSessions,
   maxTurns,
   resolveDeja,
+  saveTurn,
   sha256,
   sticky,
 } from "./deja.lib.mjs";
@@ -100,7 +102,9 @@ export async function onRequest(body, ctx = {}) {
     ctx.session ?? "",
     cwd,
   );
-  const conversation = lru(sticky, convKey, () => new Map(), maxSessions);
+  let resolvedBin;
+  const getBin = () => (resolvedBin ??= resolveDeja(opts.bin));
+  const conversation = lru(sticky, convKey, () => loadConversation(convKey, getBin()), maxSessions);
   const turnKey = (t) => sha256(String(t.index), t.text);
 
   // Re-attach blocks that earlier user turns in this conversation were sent
@@ -131,7 +135,7 @@ export async function onRequest(body, ctx = {}) {
     return changed ? cloned : undefined;
   }
 
-  const bin = resolveDeja(opts.bin);
+  const bin = getBin();
   const payload = JSON.stringify({
     prompt: query,
     session_id: String(ctx.session || ""),
@@ -145,7 +149,9 @@ export async function onRequest(body, ctx = {}) {
   }
 
   const formatted = formatBlock(raw, opts.maxBytes);
-  lru(conversation, turnKey(turn), () => formatted, maxTurns);
+  const tKey = turnKey(turn);
+  lru(conversation, tKey, () => formatted, maxTurns);
+  saveTurn(convKey, tKey, formatted, bin);
   ctx.report?.(formatted.bytes ? "ready" : "empty", formatted.bytes);
 
   if (!formatted.text) {

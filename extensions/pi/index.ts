@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 
-import { argv, branchHoldsRecall, contextText, installerExtensionPaths, sessionKey } from "./lib.mjs";
+import { argv, branchCompactionKey, branchHoldsRecall, contextText, createSessionStore, installerExtensionPaths, rememberEntry, sessionKey } from "./lib.mjs";
 
 const require = createRequire(import.meta.url);
 
@@ -80,12 +80,14 @@ export default function (pi: any) {
   // process and switch the session, and a flag set on the first one left every
   // later session with no digest.
   const injected = new Set<string>();
+  const promptCache = createSessionStore("pi-pkg-cache", { dejaBin: DEJA });
   let toldBuilding = false;
   // The tool and compaction events carry no session id of their own, and
   // recall dedupes per session: without one it repeats itself and forgets
   // nothing. The prompt handler passes through first and pi keeps the id on
   // the session manager, so it is read there and held.
   let session = "";
+  const scopeOf = () => process.cwd() + "\0" + (session || "default");
 
   // pi keeps a footer status line: while the first index builds, that is
   // where the user can see it happening instead of wondering why recall is
@@ -164,22 +166,36 @@ export default function (pi: any) {
       // its source's. Asking for another put a second copy in front of the
       // model, and in a fork one that led with the source itself.
       const parent = parentID(ctx);
+      let branch: any[] = [];
       try {
-        if (!injected.has(session) && branchHoldsRecall(ctx.sessionManager.getBranch())) {
-          injected.add(session);
-          const stats = run(["statusline"], JSON.stringify({ session_id: session, cwd: process.cwd() })).split(" · ").slice(0, 3).map((p: string, i: number) => i === 2 ? p.replace(/^(\d+\s+earlier)\b.*/, "$1") : p).join(" · ");
-          if (stats) ctx.ui.setStatus("deja", stats);
-        }
+        branch = ctx.sessionManager.getBranch() || [];
       } catch {}
-      if (!injected.has(session)) {
+      const scope = scopeOf();
+      const snap = promptCache.read(scope);
+      const digestKey = "__digest__:" + branchCompactionKey(branch);
+      const settledKey = scope + "\0" + digestKey;
+      let settled = injected.has(settledKey) || Object.hasOwn(snap.session.recalled, digestKey);
+      if (!settled && branchHoldsRecall(branch)) {
+        settled = true;
+        injected.add(settledKey);
+        promptCache.write(scope, snap.epoch, (s: any) => {
+          rememberEntry(s.recalled, digestKey, "__branch__", 64);
+        });
+        const stats = run(["statusline"], JSON.stringify({ session_id: session, cwd: process.cwd() })).split(" · ").slice(0, 3).map((p: string, i: number) => i === 2 ? p.replace(/^(\d+\s+earlier)\b.*/, "$1") : p).join(" · ");
+        if (stats) ctx.ui.setStatus("deja", stats);
+      }
+      if (!settled) {
         // The session goes with it: hook-context marks the one starting as
         // live, which keeps it out of its own MCP recall on this first turn
         // (#4394, as #4246 and #4273 did for Hermes and opencode).
         const { context: digest, receipt } = contextText(
           run(["hook-context"], JSON.stringify({ session_id: session, parent_session_id: parent, cwd: process.cwd() })),
         );
+        injected.add(settledKey);
         if (digest) {
-          injected.add(session);
+          promptCache.write(scope, snap.epoch, (s: any) => {
+            rememberEntry(s.recalled, digestKey, digest, 64);
+          });
           ctx.ui.setStatus("deja", "");
           // The receipt is what tells the user memory arrived; without it the
           // recall is invisible and reads as the model guessing.
@@ -194,11 +210,15 @@ export default function (pi: any) {
         }
         // Nothing to recall: either there is no history yet, or the first
         // index is still building. Only the second is worth saying, once.
-        if (!toldBuilding && showBuild(ctx)) {
+        const notifyWarmup = !toldBuilding && !snap.session.told && showBuild(ctx);
+        promptCache.write(scope, snap.epoch, (s: any) => {
+          rememberEntry(s.recalled, digestKey, "", 64);
+          if (notifyWarmup) s.told = true;
+        });
+        if (notifyWarmup) {
           toldBuilding = true;
           ctx.ui.notify(run(["warmup-status"], ""), "info");
         }
-        return;
       }
       const raw = run(["hook-prompt"], JSON.stringify({ prompt: event.prompt || "", session_id: session, parent_session_id: parent, cwd: process.cwd() }));
       if (!raw) return;
@@ -225,6 +245,8 @@ export default function (pi: any) {
       if (!event) return;
       const key = sessionKey(event, ctx);
       if (key) session = key;
+      const scope = scopeOf();
+      const snap = promptCache.read(scope);
       // A file the agent just opened is the step before it changes that file,
       // and pi has no handler that runs earlier whose return the model reads.
       // So the file's own history goes out here: what was decided about it,
@@ -237,12 +259,20 @@ export default function (pi: any) {
         const parts = Array.isArray(event.content) ? event.content : [];
         const id = "file:" + String(event.toolCallId || "");
         if (!(id in repaired)) {
-          repaired[id] = run(["hook-tool", "--plain"], JSON.stringify({
-            tool_name: event.toolName,
-            tool_input: { ...(event.input || {}), file_path: path },
-            session_id: session,
-            cwd: process.cwd(),
-          }));
+          if (Object.hasOwn(snap.session.repairs, id)) {
+            repaired[id] = snap.session.repairs[id];
+          } else {
+            const val = run(["hook-tool", "--plain"], JSON.stringify({
+              tool_name: event.toolName,
+              tool_input: { ...(event.input || {}), file_path: path },
+              session_id: session,
+              cwd: process.cwd(),
+            }));
+            repaired[id] = val;
+            promptCache.write(scope, snap.epoch, (s: any) => {
+              rememberEntry(s.repairs, id, val, 256);
+            });
+          }
         }
         const note = repaired[id];
         if (!note) return;
@@ -259,12 +289,20 @@ export default function (pi: any) {
       if (!output.trim()) return;
       const id = String(event.toolCallId || "");
       if (!(id in repaired)) {
-        repaired[id] = run(["hook-tool-after", "--plain"], JSON.stringify({
-          tool_name: event.toolName,
-          tool_response: output,
-          session_id: session,
-          cwd: process.cwd(),
-        }));
+        if (Object.hasOwn(snap.session.repairs, id)) {
+          repaired[id] = snap.session.repairs[id];
+        } else {
+          const val = run(["hook-tool-after", "--plain"], JSON.stringify({
+            tool_name: event.toolName,
+            tool_response: output,
+            session_id: session,
+            cwd: process.cwd(),
+          }));
+          repaired[id] = val;
+          promptCache.write(scope, snap.epoch, (s: any) => {
+            rememberEntry(s.repairs, id, val, 256);
+          });
+        }
       }
       const line = repaired[id];
       if (!line) return;
@@ -287,6 +325,7 @@ export default function (pi: any) {
       const m = ctx && ctx.sessionManager;
       const file = m && m.getSessionFile ? String(m.getSessionFile() || "") : "";
       run(["hook-precompact"], JSON.stringify({ session_id: session, transcript_path: file, cwd: process.cwd() }));
+      promptCache.compact(scopeOf(), false);
     } catch {}
   });
 

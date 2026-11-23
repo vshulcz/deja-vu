@@ -22,9 +22,11 @@ import {
   configPaths,
   contextText,
   contributions,
+  createSessionStore,
   mcpWired,
   recallArgv,
   recallSilence,
+  rememberEntry,
   settleRecall,
   TOOL_SPECS,
   trailingRecall,
@@ -166,8 +168,8 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
   const toast = (message) => (toasts ? client.tui.showToast({ body: { message, variant: "info", duration: 6000 } }) : undefined)
   const hook = (name) => (toasts ? [name] : [name, "--strict"])
 
-  const digests = new Map()
-  const told = new Set()
+  const promptCache = createSessionStore("opencode-deja", { dejaBin: bin })
+  const scopeOf = (id) => cwd + "\0" + (id || "default")
   // How many times this session has been answered with nothing. An empty
   // answer is cached so the plugin does not shell out every turn, but the
   // reasons for it are not alike: no history is permanent, while a locked
@@ -176,19 +178,27 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
   // of its memory — every later turn read the emptiness rather than asking
   // again. Counted, so a store that really is empty is still only asked a few
   // times.
-  const empties = new Map()
+  const emptyRetries = 3
+  const digests = {
+    delete: (k) => {
+      const s = scopeOf(k)
+      const cur = promptCache.read(s)
+      promptCache.write(s, cur.epoch, (d) => { delete d.digest })
+    },
+  }
+  const empties = {
+    set: (k, asks) => {
+      const s = scopeOf(k)
+      const cur = promptCache.read(s)
+      promptCache.write(s, cur.epoch, (d) => { d.empties = asks })
+    },
+  }
   // Sessions between their compacting hook and the summary request.
   const compacting = new Set()
   // Every session the per-prompt hook stamped live. opencode never says a
   // session ended, so without ending them here the stamp sat out its whole
   // window and the next session's MCP recall left a finished one out (#4546).
   const live = new Set()
-  // The per-prompt recall each user message was given, by message.
-  const recalled = new Map()
-  const remember = (key, extra) => {
-    recalled.set(key, extra)
-    if (recalled.size > 1000) recalled.delete(recalled.keys().next().value)
-  }
   const endSession = (id) => ask(["hook-session-end"], JSON.stringify({ session_id: id, cwd }), 5000)
   // The session that spawned each one, asked of opencode once. A task
   // sub-agent's digest and recall led with its parent, which is live and
@@ -314,22 +324,29 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
       // recovery packet meant for the turn after.
       if (input?.sessionID && compacting.delete(input.sessionID)) return
       const key = input?.sessionID || "default"
-      if (!digests.has(key)) {
+      const scope = scopeOf(key)
+      let snap = promptCache.read(scope)
+      if (!Object.hasOwn(snap.session, "digest")) {
         // The session id, as the plugin `deja install opencode-auto` writes
         // sends it: without it deja hands the session its own work back and
         // never reads the digest cached for it (#4273). The parent rides
         // along so the digest leaves it out too.
         const payload = { session_id: input?.sessionID || "", parent_session_id: await parentOf(input?.sessionID), cwd }
         const { context, receipt } = contextText(await ask(hook("hook-context"), JSON.stringify(payload), 30000))
-        digests.set(key, context)
-        // The receipt is the only sign the user gets that memory arrived. Once
-        // per session: repeating it every turn is wallpaper.
-        if (receipt && !told.has(key)) {
-          told.add(key)
-          await toast(receipt)
-        }
+        let showReceipt = false
+        snap = promptCache.write(scope, snap.epoch, (s) => {
+          if (Object.hasOwn(s, "digest")) return
+          s.digest = context
+          // The receipt is the only sign the user gets that memory arrived. Once
+          // per session: repeating it every turn is wallpaper.
+          if (receipt && !s.told) {
+            s.told = true
+            showReceipt = true
+          }
+        })
+        if (showReceipt && receipt) await toast(receipt)
       }
-      const context = digests.get(key)
+      const context = snap.session.digest || ""
       if (context) {
         // Fold into the first system entry, as the generated plugin does.
         // opencode sends each entry as its own system message, and a backend
@@ -345,14 +362,17 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
       // still building, or the call did not get through. The build is the only
       // one worth saying out loud, and saying it drops the empty answer so the
       // next turn asks again.
-      const asks = (empties.get(key) || 0) + 1
+      const asks = (snap.session.empties || 0) + 1
       empties.set(key, asks)
       if (asks < emptyRetries) digests.delete(key)
-      if (told.has(key)) return
+      if (snap.session.told) return
       const status = await ask(["warmup-status"], undefined, 5000)
       if (!status) return
-      told.add(key)
-      digests.delete(key)
+      const post = promptCache.read(scope)
+      promptCache.write(scope, post.epoch, (s) => {
+        s.told = true
+        delete s.digest
+      })
       await toast(status)
     } catch {
       // memory is optional: never break the session over it
@@ -372,6 +392,8 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
       const users = userTurns(output?.messages)
       const last = users[users.length - 1]
       if (!last) return
+      const scope = scopeOf(input?.sessionID || last.sessionID || owner)
+      let snap = promptCache.read(scope)
       // Asked once per message. opencode builds every model call afresh from
       // its store, so text added to a message here lasts one call: once the
       // agent ran a tool the recall was gone, and deja, having shown it, would
@@ -381,8 +403,10 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
       // message between calls. It is the answer: asked again, deja picks the
       // next pointer down and the message carried both (#5682).
       const present = trailingRecall(last.parts[last.parts.length - 1]?.text).blocks[0]
-      if (!recalled.has(last.key) && present) remember(last.key, present)
-      if (!recalled.has(last.key)) {
+      if (!Object.hasOwn(snap.session.recalled, last.key) && present) {
+        snap = promptCache.write(scope, snap.epoch, (s) => rememberEntry(s.recalled, last.key, present, 1000))
+      }
+      if (!Object.hasOwn(snap.session.recalled, last.key)) {
         // A turn with no text, an image alone, still goes to hook-prompt: that
         // call is what stamps the session live again after session.idle ended
         // it, and without it the turn's MCP recall could return the session
@@ -401,17 +425,23 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         const prompt = parent ? "" : last.prompt
         const raw = await ask(hook("hook-prompt"), JSON.stringify({ prompt, session_id: key, parent_session_id: parent, cwd }))
         const reply = prompt && raw ? JSON.parse(raw) : {}
-        remember(last.key, reply?.hookSpecificOutput?.additionalContext || "")
+        const extra = reply?.hookSpecificOutput?.additionalContext || ""
+        let wrote = false
+        snap = promptCache.write(scope, snap.epoch, (s) => {
+          if (Object.hasOwn(s.recalled, last.key)) return
+          rememberEntry(s.recalled, last.key, extra, 1000)
+          wrote = true
+        })
         // The "deja-vu — from Codex CLI, …" line is the person's, and what goes
         // into the message is the model's: without the toast it reached no one,
         // while deja counted it shown and held the next one back twenty minutes.
-        if (reply?.systemMessage) await toast(reply.systemMessage)
+        if (wrote && reply?.systemMessage) await toast(reply.systemMessage)
       }
       // Every message gets back what it was given, in every call, the way
       // Claude Code keeps a prompt hook's text in its transcript. Once: the
       // block is put in place of any already there, never after it.
       for (const u of users) {
-        const extra = recalled.get(u.key)
+        const extra = snap.session.recalled[u.key]
         if (extra) settleRecall(u.parts[u.parts.length - 1], extra)
       }
     } catch {
@@ -427,7 +457,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
     try {
       const sessionID = input?.sessionID || ""
       if (sessionID) compacting.add(sessionID)
-      recalled.clear()
+      promptCache.compact(scopeOf(sessionID))
       await ask(["hook-precompact"], JSON.stringify({ session_id: sessionID, cwd, harness: "opencode" }), 60000)
     } catch {
       // memory is optional: never break a compaction over it

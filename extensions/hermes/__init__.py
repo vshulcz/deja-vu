@@ -310,7 +310,7 @@ class DejaMemoryProvider(MemoryProvider):
             # The session goes with it: hook-context stamps the session live,
             # which keeps it out of its own MCP recall on this first turn, and
             # keys the digest's once-per-session ledger (#4246 for the hook).
-            start = json.dumps({"session_id": session_id or "", "cwd": cwd})
+            start = json.dumps({"session_id": session_id or "", "cwd": cwd, "deja_once": True})
             digest, note = self._hook("hook-context", start, timeout=8, cwd=cwd)
             if digest:
                 parts.append(digest)

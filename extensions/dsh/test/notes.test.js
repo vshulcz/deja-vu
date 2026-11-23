@@ -115,9 +115,12 @@ if (args[0] === "version") { console.log("deja 0.0.0-test"); process.exit(0); }
 fs.appendFileSync(${JSON.stringify(CALLS)}, args.join(" ") + "\\n");
 if (args[0] === "search") { console.log("HIT"); process.exit(0); }
 if (args.includes("--notes")) process.exit(0);
+let rawIn = "";
+try { rawIn = fs.readFileSync(0, "utf8"); } catch {}
+const miss = rawIn.includes("__miss__");
 const plain = args.includes("--plain");
-const ctx = args[0] === "hook-prompt" ? ${JSON.stringify(RECALL)} : ${JSON.stringify(DIGEST)};
-const note = args[0] === "hook-prompt" ? ${JSON.stringify(RECEIPT)} : ${JSON.stringify(BUILT)};
+const ctx = miss ? "" : (args[0] === "hook-prompt" ? ${JSON.stringify(RECALL)} : ${JSON.stringify(DIGEST)});
+const note = miss ? "" : (args[0] === "hook-prompt" ? ${JSON.stringify(RECEIPT)} : ${JSON.stringify(BUILT)});
 if (plain) { console.log(ctx); process.exit(0); }
 console.log(JSON.stringify({ systemMessage: note, hookSpecificOutput: { hookEventName: "X", additionalContext: ctx } }));
 `,
@@ -255,4 +258,43 @@ if (args[0] === "search") {
     process.env.DEJA_BIN = prev;
   }
 });
+
+test("dsh autoRecall and autoDigest persist across interleaved sessions, misses, and reloads", { skip }, async () => {
+  const assemblyWithPrompt = (sid, prompt) => {
+    const log = [
+      { type: "agent/inbox/spliced", data: { inserted: [{ role: "user", source: { kind: "user" }, content: [{ type: "text", text: prompt }] }] } },
+      { type: "turn/start", data: { turn: 1 } },
+      { type: "agent/inbox/spliced", data: { removedCount: 1, inserted: [] } },
+    ];
+    return { agent: { sessionId: sid, session: { header: { cwd: STAND }, get seq() { return log.length; }, eventAt: (i) => log[i] } } };
+  };
+
+  const { default: apply1 } = await import("../index.js?reload1");
+  const tui1 = host(["connection"]);
+  apply1(tui1.ctx, {});
+
+  const before = calls().length;
+  assert.equal(tui1.contexts.get("deja:project")(assemblyWithPrompt("session-interleave-a", "__miss__ q1")), DIGEST);
+  assert.equal(tui1.contexts.get("deja:recall")(assemblyWithPrompt("session-interleave-a", "__miss__ q1")), "");
+  // Empty miss settles without re-spawning hook-prompt.
+  assert.equal(tui1.contexts.get("deja:recall")(assemblyWithPrompt("session-interleave-a", "__miss__ q1")), "");
+  assert.equal(calls().slice(before).filter((l) => l.startsWith("hook-prompt")).length, 1);
+
+  assert.equal(tui1.contexts.get("deja:recall")(assemblyWithPrompt("session-interleave-a", "staging queue")), RECALL);
+  assert.equal(tui1.contexts.get("deja:recall")(assemblyWithPrompt("session-interleave-b", "unrelated prompt")), RECALL);
+  // Returning to session A after session B must reuse session A's cached recall.
+  const beforeSwitchBack = calls().length;
+  assert.equal(tui1.contexts.get("deja:recall")(assemblyWithPrompt("session-interleave-a", "staging queue")), RECALL);
+  assert.equal(calls().slice(beforeSwitchBack).length, 0);
+
+  // Module reload simulates process restart; persisted digest and recall survive without re-spawning hooks.
+  const { default: apply2 } = await import("../index.js?reload2");
+  const tui2 = host(["connection"]);
+  apply2(tui2.ctx, {});
+  const beforeReload = calls().length;
+  assert.equal(tui2.contexts.get("deja:project")(assemblyWithPrompt("session-interleave-a", "staging queue")), DIGEST);
+  assert.equal(tui2.contexts.get("deja:recall")(assemblyWithPrompt("session-interleave-a", "staging queue")), RECALL);
+  assert.deepEqual(calls().slice(beforeReload), []);
+});
+
 

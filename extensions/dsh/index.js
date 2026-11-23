@@ -13,7 +13,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { argv, contributions, recallArgv, recallSilence, exitStatus, guarded, inert, newestEvents, noteBoard, resultText, splitHookReply } from "./lib.js";
+import { argv, contributions, createSessionStore, recallArgv, recallSilence, exitStatus, guarded, inert, newestEvents, noteBoard, resultText, splitHookReply } from "./lib.js";
 
 const require = createRequire(import.meta.url);
 
@@ -59,6 +59,11 @@ function resolveDeja() {
 }
 
 const DEJA = resolveDeja();
+const promptCache = createSessionStore("dsh-pkg-cache", { dejaBin: DEJA });
+
+function dshScope(cwd, sid) {
+  return (cwd || "") + "\0" + (sid || "default");
+}
 
 const HOOK_TIMEOUT_MS = 3000;
 const TOOL_TIMEOUT_MS = 20000;
@@ -312,8 +317,6 @@ function userText(message) {
 // re-resolutions during the first step (#5904) and clears it once the session
 // moves past its opening step.
 function autoDigest(ctx, board) {
-  const digests = new Map();
-
   guarded(() =>
     ctx.systemPrompt.context({
       name: "deja:project",
@@ -323,11 +326,22 @@ function autoDigest(ctx, board) {
         const agent = assembly && assembly.agent;
         if (!agent) return "";
         const sid = sessionId(agent);
+        const scope = sid ? dshScope(sessionCwd(agent), sid) : "";
         if (pastOpeningStep(agent.session)) {
-          if (sid) digests.set(sid, "");
+          if (scope) {
+            const snap = promptCache.read(scope);
+            if (!Object.hasOwn(snap.session, "digest") || snap.session.digest !== "") {
+              promptCache.write(scope, snap.epoch, (s) => {
+                s.digest = "";
+              });
+            }
+          }
           return "";
         }
-        if (sid && digests.has(sid)) return digests.get(sid);
+        if (scope) {
+          const snap = promptCache.read(scope);
+          if (Object.hasOwn(snap.session, "digest")) return snap.session.digest;
+        }
         const text = inert(askHook(
           ["hook-context", "--plain"],
           ["hook-context"],
@@ -335,9 +349,11 @@ function autoDigest(ctx, board) {
           sid,
           board,
         ));
-        if (sid) {
-          digests.set(sid, text);
-          while (digests.size > 64) digests.delete(digests.keys().next().value);
+        if (scope) {
+          const snap = promptCache.read(scope);
+          promptCache.write(scope, snap.epoch, (s) => {
+            s.digest = text;
+          });
         }
         return text;
       },
@@ -397,10 +413,6 @@ function askHook(plain, json, payload, sid, board) {
 }
 
 function autoRecall(ctx, board) {
-  let asked = "";
-  let askedIn = "";
-  let askedBy = "";
-  let recalled = "";
   const compacted = new Set();
   watchCompaction(ctx, compacted);
 
@@ -416,7 +428,14 @@ function autoRecall(ctx, board) {
         if (!prompt) return "";
         const cwd = sessionCwd(agent);
         const sid = sessionId(agent);
-        const afterCompaction = compacted.delete(sid);
+        const scope = dshScope(cwd, sid);
+        const snap = promptCache.read(scope);
+        const rec = snap.session.recalled;
+        let asked = typeof rec.__asked__ === "string" ? rec.__asked__ : "";
+        let askedIn = typeof rec.__cwd__ === "string" ? rec.__cwd__ : "";
+        let askedBy = typeof rec.__sid__ === "string" ? rec.__sid__ : "";
+        let recalled = typeof rec.__recalled__ === "string" ? rec.__recalled__ : "";
+        const afterCompaction = compacted.delete(sid) || Boolean(rec.__compacted__);
         // The same question asked in another workspace is a different question,
         // and so is one asked again after its session compacted: deja then
         // answers with the recovery packet, which only a prompt naming the
@@ -432,6 +451,13 @@ function autoRecall(ctx, board) {
             sid,
             board,
           ));
+          promptCache.write(scope, snap.epoch, (s) => {
+            s.recalled.__asked__ = asked;
+            s.recalled.__cwd__ = askedIn;
+            s.recalled.__sid__ = askedBy;
+            s.recalled.__recalled__ = recalled;
+            delete s.recalled.__compacted__;
+          });
         }
         // Silence is the common case: this speaks only when the history answers.
         return recalled;
@@ -529,6 +555,10 @@ function watchCompaction(ctx, compacted) {
         } catch {}
         await runAsync(["hook-precompact"], JSON.stringify({ session_id: sid, cwd, harness: "deepseek" }));
         compacted.add(sid);
+        const snap = promptCache.read(dshScope(cwd, sid));
+        promptCache.write(dshScope(cwd, sid), snap.epoch, (s) => {
+          s.recalled.__compacted__ = "1";
+        });
       });
       capturing.set(sid, capture);
       capture.then(() => {

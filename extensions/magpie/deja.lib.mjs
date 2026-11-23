@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { accessSync, constants } from "node:fs";
+import { accessSync, constants, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { dirname, isAbsolute, join } from "node:path";
 
 const require = createRequire(import.meta.url);
 
@@ -18,11 +18,113 @@ export const secretPattern =
   /(?:(?:^|[^A-Za-z0-9])(?:[A-Za-z0-9]+[_-])*(?:api[_-]?key|access[_-]?key|access[_-]?token|token|authorization|[A-Za-z0-9]*(?:password|passwd|pwd)|secret|private[_-]?key|client[_-]?secret)["']?\s*[:=]\s*["']?[^\s"'<>]+|\b[a-z][a-z0-9+.-]*:\/\/[^\s/?#@]+:[^\s/?#@]+@|\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{8,}|\bAIza[0-9A-Za-z_-]{35}(?![0-9A-Za-z_-])|\bbearer\s+[A-Za-z0-9._~+/=-]{8,}|\bsk-[A-Za-z0-9_-]{8,}|\bgh[pousr]_[A-Za-z0-9]{20,}|\bgithub_pat_[A-Za-z0-9_]{20,}|\bxox[abprs]-[A-Za-z0-9-]{10,}|\bAKIA[0-9A-Z]{16}\b|-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----)/giu;
 
 export const sticky = new Map();
+const touchedFiles = new Set();
 export const maxSessions = 256;
 export const maxTurns = 128;
 
-export function reset() {
+function isTempDejaBin(dejaBin) {
+  if (!dejaBin) return false;
+  const fold = (s) => {
+    const clean = s.replace(/\\/g, "/").replace(/\/+$/, "");
+    return process.platform === "win32" ? clean.toLowerCase() : clean;
+  };
+  const bin = fold(dejaBin);
+  return [tmpdir(), "/tmp", "/private/tmp", "/var/folders"]
+    .filter(Boolean)
+    .some((base) => {
+      const root = fold(base);
+      return root && bin.startsWith(root + "/");
+    });
+}
+
+export function promptCachePath(name = "magpie-cache", dejaBin = "") {
+  const override = process.env.DEJA_PROMPT_CACHE_FILE;
+  if (override) return override;
+  const xdg = process.env.XDG_CACHE_HOME;
+  if (xdg && isAbsolute(xdg)) return join(xdg, "deja-vu", `${name}.json`);
+  if (isTempDejaBin(dejaBin)) {
+    return join(dirname(dejaBin), ".deja-cache", `${name}.json`);
+  }
+  const base = process.platform === "win32"
+    ? (process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"))
+    : join(homedir(), ".cache");
+  return join(base, "deja-vu", `${name}.json`);
+}
+
+function readPromptCache(file = promptCachePath()) {
+  try {
+    if (!existsSync(file)) return { version: 1, sessions: {} };
+    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    if (parsed && parsed.version === 1 && parsed.sessions && typeof parsed.sessions === "object") {
+      return parsed;
+    }
+  } catch {}
+  return { version: 1, sessions: {} };
+}
+
+function writePromptCache(data, keepConv, file = promptCachePath()) {
+  try {
+    const entries = Object.entries(data.sessions);
+    if (entries.length > maxSessions) {
+      entries.sort((a, b) => (b[1]?.updatedAt || 0) - (a[1]?.updatedAt || 0));
+      const trimmed = {};
+      if (keepConv && data.sessions[keepConv]) trimmed[keepConv] = data.sessions[keepConv];
+      for (const [k, v] of entries) {
+        if (Object.keys(trimmed).length >= maxSessions) break;
+        trimmed[k] = v;
+      }
+      data.sessions = trimmed;
+    }
+    mkdirSync(dirname(file), { recursive: true });
+    const tmp = `${file}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
+    try {
+      writeFileSync(tmp, JSON.stringify(data), "utf8");
+      renameSync(tmp, file);
+      touchedFiles.add(file);
+    } catch (err) {
+      try { rmSync(tmp, { force: true }); } catch {}
+      throw err;
+    }
+  } catch {}
+}
+
+export function loadConversation(convKey, dejaBin = "") {
+  const map = new Map();
+  const entry = readPromptCache(promptCachePath("magpie-cache", dejaBin)).sessions?.[convKey];
+  const turns = entry?.turns;
+  if (!turns || typeof turns !== "object") return map;
+  for (const [k, v] of Object.entries(turns)) {
+    if (v && typeof v === "object" && typeof v.text === "string") {
+      map.set(k, { text: v.text, bytes: typeof v.bytes === "number" ? v.bytes : 0 });
+    }
+  }
+  return map;
+}
+
+export function saveTurn(convKey, tKey, formatted, dejaBin = "") {
+  const file = promptCachePath("magpie-cache", dejaBin);
+  const data = readPromptCache(file);
+  const existing = data.sessions[convKey];
+  const turns = existing?.turns && typeof existing.turns === "object" ? { ...existing.turns } : {};
+  if (Object.hasOwn(turns, tKey)) delete turns[tKey];
+  turns[tKey] = { text: formatted.text, bytes: formatted.bytes };
+  const keys = Object.keys(turns);
+  while (keys.length > maxTurns) {
+    delete turns[keys.shift()];
+  }
+  data.sessions[convKey] = { updatedAt: Date.now(), turns };
+  writePromptCache(data, convKey, file);
+}
+
+export function reset(dejaBin = "") {
   sticky.clear();
+  const targets = new Set([promptCachePath("magpie-cache", dejaBin), ...touchedFiles]);
+  for (const f of targets) {
+    try {
+      rmSync(f, { force: true });
+    } catch {}
+  }
+  touchedFiles.clear();
 }
 
 export function wellKnown() {
