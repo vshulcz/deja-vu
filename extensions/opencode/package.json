@@ -1,6 +1,6 @@
 {
   "name": "opencode-deja",
-  "version": "0.25.0",
+  "version": "0.25.1",
   "description": "deja-vu MCP memory and session history search for OpenCode across fifty-one other coding agents (Claude Code, Codex, Cursor, Gemini CLI, OpenClaw) — local index, no LLM.",
   "type": "module",
   "main": "index.js",
@@ -57,7 +57,7 @@
   },
   "dependencies": {
     "@opencode-ai/plugin": ">=1.0.0",
-    "@vshulcz/deja-vu": "^0.25.0"
+    "@vshulcz/deja-vu": "^0.25.1"
   },
   "scripts": {
     "test": "node --test test/*.test.js"
