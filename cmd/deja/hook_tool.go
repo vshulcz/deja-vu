@@ -6,10 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -18,6 +16,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/evidence"
 	"github.com/vshulcz/deja-vu/internal/gitread"
+	"github.com/vshulcz/deja-vu/internal/hookengine"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -69,69 +68,8 @@ type toolHookInput struct {
 	ToolName      string `json:"tool_name"`
 	// TRAE IDE sends the tool's name here as well as under tool_name; read
 	// when tool_name is missing (#4731).
-	LLMToolName string `json:"llm_tool_name"`
-	ToolInput   struct {
-		Command          string   `json:"command"`
-		CommandLine      string   `json:"CommandLine"`
-		CommandLineSnake string   `json:"command_line"`
-		Cmd              string   `json:"cmd"`
-		Script           string   `json:"script"`
-		FilePath         string   `json:"file_path"`
-		AbsolutePath     string   `json:"AbsolutePath"`
-		AbsolutePathSnk  string   `json:"absolute_path"`
-		Paths            []string `json:"paths"`
-		PathsUpper       []string `json:"Paths"`
-		// Claude's NotebookEdit names its file here and not under file_path
-		// (#4489).
-		NotebookPath string `json:"notebook_path"`
-		// Muse's edit_file and write_file name it here (#4709).
-		Path string `json:"path"`
-		// Grok's read_file.
-		TargetFile string `json:"target_file"`
-		// Command Code's shell_command runs command with these after it
-		// (#4540).
-		Args any `json:"args"`
-		// VS Code Copilot Chat's replace_string_in_file and create_file.
-		FilePathCamel string `json:"filePath"`
-		// OpenCode and OpenAI-style apply_patch pass the patch text under
-		// patchText or patch when not under command.
-		PatchText         string          `json:"patchText"`
-		Patch             string          `json:"patch"`
-		NestedToolArgs    json.RawMessage `json:"toolArgs"`
-		NestedToolArgsSnk json.RawMessage `json:"tool_args"`
-		OldString         string          `json:"old_string"`
-		NewString         string          `json:"new_string"`
-		OldStr            string          `json:"oldStr"`
-		NewStr            string          `json:"newStr"`
-
-		// Multi-harness edit field dialects
-		OldText            string `json:"oldText"`
-		NewText            string `json:"newText"`
-		OldTextSnake       string `json:"old_text"`
-		NewTextSnake       string `json:"new_text"`
-		OldStringCamel     string `json:"oldString"`
-		NewStringCamel     string `json:"newString"`
-		Target             string `json:"Target"`
-		Replacement        string `json:"Replacement"`
-		TargetLower        string `json:"target"`
-		ReplacementLower   string `json:"replacement"`
-		TargetContent      string `json:"TargetContent"`
-		ReplacementContent string `json:"ReplacementContent"`
-		Content            string `json:"content"`
-		ContentUpper       string `json:"Content"`
-		FileText           string `json:"file_text"`
-		NewSource          string `json:"new_source"`
-		Edits              []struct {
-			OldString   string `json:"old_string"`
-			NewString   string `json:"new_string"`
-			OldStr      string `json:"old_str"`
-			NewStr      string `json:"new_str"`
-			OldText     string `json:"oldText"`
-			NewText     string `json:"newText"`
-			Target      string `json:"Target"`
-			Replacement string `json:"Replacement"`
-		} `json:"edits"`
-	} `json:"tool_input"`
+	LLMToolName string               `json:"llm_tool_name"`
+	ToolInput   hookengine.ToolInput `json:"tool_input"`
 	// Copilot CLI sends the tool's arguments as toolArgs: {command} for bash,
 	// {path} for edit and create (1.0.92).
 	ToolArgs       json.RawMessage `json:"toolArgs"`
@@ -150,258 +88,59 @@ type toolHookInput struct {
 
 // firstNonEmpty returns the first non-empty string among the provided arguments.
 func firstNonEmpty(items ...string) string {
-	for _, it := range items {
-		if strings.TrimSpace(it) != "" {
-			return it
-		}
-	}
-	return ""
+	return hookengine.FirstNonEmpty(items...)
 }
 
 // mapString retrieves the first non-empty string value for any of the given keys.
 func mapString(m map[string]any, keys ...string) string {
-	if m == nil {
-		return ""
-	}
-	for _, k := range keys {
-		if v, ok := m[k].(string); ok && strings.TrimSpace(v) != "" {
-			return v
-		}
-	}
-	return ""
-}
-
-// normalizeEditStrings unifies all 44 harness edit string dialects into
-// canonical OldString and NewString fields.
-func (i *toolHookInput) normalizeEditStrings() {
-	var editOlds, editNews []string
-	for _, ed := range i.ToolInput.Edits {
-		if o := firstNonEmpty(ed.OldString, ed.OldStr, ed.OldText, ed.Target); o != "" {
-			editOlds = append(editOlds, o)
-		}
-		if n := firstNonEmpty(ed.NewString, ed.NewStr, ed.NewText, ed.Replacement); n != "" {
-			editNews = append(editNews, n)
-		}
-	}
-	joinedOldEdits := strings.Join(editOlds, "\n")
-	joinedNewEdits := strings.Join(editNews, "\n")
-
-	var toolArgsOld, toolArgsNew string
-	if args := copilotToolArgs(i.ToolArgs); args != nil {
-		toolArgsOld = mapString(args, "old_string", "oldStr", "oldString", "oldText", "old_text", "Target", "target", "TargetContent")
-		toolArgsNew = mapString(args, "new_string", "newStr", "newString", "newText", "new_text", "Replacement", "replacement", "ReplacementContent", "content", "Content", "file_text", "new_source")
-		if rawEdits, ok := args["edits"].([]any); ok {
-			var aOlds, aNews []string
-			for _, rawEd := range rawEdits {
-				if edMap, ok := rawEd.(map[string]any); ok {
-					if o := mapString(edMap, "old_string", "oldStr", "oldString", "oldText", "old_text", "Target", "target"); o != "" {
-						aOlds = append(aOlds, o)
-					}
-					if n := mapString(edMap, "new_string", "newStr", "newString", "newText", "new_text", "Replacement", "replacement"); n != "" {
-						aNews = append(aNews, n)
-					}
-				}
-			}
-			if toolArgsOld == "" && len(aOlds) > 0 {
-				toolArgsOld = strings.Join(aOlds, "\n")
-			}
-			if toolArgsNew == "" && len(aNews) > 0 {
-				toolArgsNew = strings.Join(aNews, "\n")
-			}
-		}
-	}
-
-	i.ToolInput.OldString = firstNonEmpty(
-		i.ToolInput.OldString,
-		i.ToolInput.OldStr,
-		i.ToolInput.OldStringCamel,
-		i.ToolInput.OldText,
-		i.ToolInput.OldTextSnake,
-		i.ToolInput.Target,
-		i.ToolInput.TargetLower,
-		i.ToolInput.TargetContent,
-		joinedOldEdits,
-		toolArgsOld,
-	)
-	i.ToolInput.NewString = firstNonEmpty(
-		i.ToolInput.NewString,
-		i.ToolInput.NewStr,
-		i.ToolInput.NewStringCamel,
-		i.ToolInput.NewText,
-		i.ToolInput.NewTextSnake,
-		i.ToolInput.Replacement,
-		i.ToolInput.ReplacementLower,
-		i.ToolInput.ReplacementContent,
-		joinedNewEdits,
-		toolArgsNew,
-		i.ToolInput.Content,
-		i.ToolInput.ContentUpper,
-		i.ToolInput.FileText,
-		i.ToolInput.NewSource,
-	)
-}
-
-var ompReadSelectorRe = regexp.MustCompile(`(?i):(?:raw|-?[0-9]+(?:[-+][0-9]*)?(?:,[0-9]+(?:[-+][0-9]*)?)*)$`)
-
-// stripReadPathSelectors peels omp-style line/raw selectors off a read tool
-// path unless the literal path exists on disk, so already-installed extensions
-// and direct hook-tool callers resolve the bare file (#6106).
-func stripReadPathSelectors(cwd, p string) string {
-	if p == "" || !strings.Contains(p, ":") {
-		return p
-	}
-	check := p
-	if !filepath.IsAbs(check) && cwd != "" {
-		check = filepath.Join(cwd, check)
-	}
-	if _, err := os.Stat(check); err == nil {
-		return p
-	}
-	for ompReadSelectorRe.MatchString(p) {
-		next := ompReadSelectorRe.ReplaceAllString(p, "")
-		if next == "" || next == p {
-			break
-		}
-		p = next
-	}
-	return p
+	return hookengine.MapString(m, keys...)
 }
 
 // cleanHookFilePath strips surrounding quotes and file:// prefixes.
 func cleanHookFilePath(p string) string {
-	p = strings.TrimSpace(p)
-	if len(p) >= 2 && ((p[0] == '"' && p[len(p)-1] == '"') || (p[0] == '\'' && p[len(p)-1] == '\'')) {
-		p = strings.TrimSpace(p[1 : len(p)-1])
-	}
-	if after, ok := strings.CutPrefix(p, "file://"); ok {
-		p = after
-		if dec, err := url.PathUnescape(p); err == nil {
-			p = dec
-		}
-	}
-	return strings.TrimSpace(p)
-}
-
-func firstNonScratchPath(paths ...string) string {
-	for _, raw := range paths {
-		p := cleanHookFilePath(raw)
-		if p == "" {
-			continue
-		}
-		if sources.IsAgentScratchPath(filepath.ToSlash(p)) {
-			continue
-		}
-		return p
-	}
-	return ""
-}
-
-func firstNonScratchSliceFromAny(v any) string {
-	switch s := v.(type) {
-	case []string:
-		return firstNonScratchPath(s...)
-	case []any:
-		cands := make([]string, 0, len(s))
-		for _, item := range s {
-			if str, ok := item.(string); ok {
-				cands = append(cands, str)
-			}
-		}
-		return firstNonScratchPath(cands...)
-	case string:
-		if trimmed := strings.TrimSpace(s); strings.HasPrefix(trimmed, "[") {
-			var cands []string
-			if json.Unmarshal([]byte(trimmed), &cands) == nil {
-				return firstNonScratchPath(cands...)
-			}
-		}
-	}
-	return ""
+	return hookengine.CleanFilePath(p)
 }
 
 func isExternalMCPEditTool(name string) bool {
-	return isExternalMCPToolWithSuffix(name, "_write", "_edit", "_create_file", "_write_file", "_edit_file")
+	return hookengine.IsExternalMCPEditTool(name)
 }
 
 func isExternalMCPReadTool(name string) bool {
-	return isExternalMCPToolWithSuffix(name, "_read", "_read_file", "_view_file")
+	return hookengine.IsExternalMCPReadTool(name)
 }
 
 // adopt fills in what grok spells differently. Without the tool name and its
 // command this hook cannot tell a spawn from an edit, and has nothing to look
 // the action up by.
 func (i *toolHookInput) adopt() {
-	i.SessionID, i.TranscriptPath, i.WorkspaceRoots = i.adoptCommon(i.SessionID, i.ConversationID, i.TranscriptPath, i.WorkspaceRoots)
-	i.ToolName = adoptGrok(adoptGrok(i.ToolName, i.grokEnvelope.ToolName), i.LLMToolName)
-	i.ToolInput.Command = adoptGrok(i.ToolInput.Command, i.grokEnvelope.ToolInput.Command)
-	i.ToolInput.Command = firstNonEmpty(
-		i.ToolInput.Command,
-		i.ToolInput.CommandLine,
-		i.ToolInput.CommandLineSnake,
-		i.ToolInput.Cmd,
-		i.ToolInput.Script,
-	)
-	i.ToolInput.FilePath = adoptGrok(i.ToolInput.FilePath, i.grokEnvelope.ToolInput.FilePath)
-	i.ToolInput.FilePath = firstNonEmpty(
-		i.ToolInput.FilePath,
-		i.ToolInput.NotebookPath,
-		i.ToolInput.Path,
-		i.ToolInput.FilePathCamel,
-		i.ToolInput.TargetFile,
-		i.ToolInput.AbsolutePath,
-		i.ToolInput.AbsolutePathSnk,
-	)
-	if i.ToolInput.FilePath == "" {
-		i.ToolInput.FilePath = firstNonScratchPath(i.ToolInput.Paths...)
+	ev := hookengine.ToolEvent{
+		HookEventName:  i.HookEventName,
+		ToolName:       i.ToolName,
+		LLMToolName:    i.LLMToolName,
+		ToolInput:      i.ToolInput,
+		ToolArgs:       i.ToolArgs,
+		ToolArgsSnake:  i.ToolArgsSnake,
+		SessionID:      i.SessionID,
+		ConversationID: i.ConversationID,
+		TranscriptPath: i.TranscriptPath,
+		Harness:        i.Harness,
+		ToolUseID:      i.ToolUseID,
+		CWD:            i.CWD,
+		WorkspaceRoots: i.WorkspaceRoots,
+		GrokEnvelope:   i.GrokEnvelope,
 	}
-	if i.ToolInput.FilePath == "" {
-		i.ToolInput.FilePath = firstNonScratchPath(i.ToolInput.PathsUpper...)
-	}
-	for _, rawArgs := range []json.RawMessage{
-		i.ToolArgs, i.ToolArgsSnake, i.ToolInput.NestedToolArgs, i.ToolInput.NestedToolArgsSnk,
-	} {
-		args := copilotToolArgs(rawArgs)
-		if args == nil {
-			continue
-		}
-		if i.ToolInput.Command == "" {
-			i.ToolInput.Command = mapString(args, "command", "CommandLine", "command_line", "cmd", "script")
-		}
-		if i.ToolInput.FilePath == "" {
-			i.ToolInput.FilePath = mapString(args, "path", "file_path", "filePath", "target_file", "AbsolutePath", "absolute_path")
-		}
-		if i.ToolInput.FilePath == "" {
-			i.ToolInput.FilePath = firstNonScratchSliceFromAny(args["paths"])
-		}
-		if i.ToolInput.FilePath == "" {
-			i.ToolInput.FilePath = firstNonScratchSliceFromAny(args["Paths"])
-		}
-	}
-	i.ToolInput.FilePath = cleanHookFilePath(i.ToolInput.FilePath)
-	if isCommandTool(i.ToolName) && strings.TrimSpace(i.ToolInput.Command) != "" {
-		i.ToolInput.Command += sources.CommandArgs(i.ToolInput.Args)
-	}
-	if isReadOnlyFileTool(i.ToolName) && i.ToolInput.FilePath != "" {
-		i.ToolInput.FilePath = stripReadPathSelectors(hookProjectPath(i.CWD, i.WorkspaceRoots), i.ToolInput.FilePath)
-	}
-	i.normalizeEditStrings()
+	ev.Normalize()
+	i.SessionID = ev.SessionID
+	i.TranscriptPath = ev.TranscriptPath
+	i.WorkspaceRoots = ev.WorkspaceRoots
+	i.ToolName = ev.ToolName
+	i.ToolInput = ev.ToolInput
 }
 
 // copilotToolArgs reads toolArgs as an object, or as the JSON string older
 // Copilot CLI builds sent in its place.
 func copilotToolArgs(raw json.RawMessage) map[string]any {
-	if len(bytes.TrimSpace(raw)) == 0 {
-		return nil
-	}
-	var s string
-	if json.Unmarshal(raw, &s) == nil {
-		raw = json.RawMessage(s)
-	}
-	var m map[string]any
-	if json.Unmarshal(raw, &m) != nil {
-		return nil
-	}
-	return m
+	return hookengine.CopilotToolArgs(raw)
 }
 
 // hookToolShape is how the answer is framed on the way out. Claude Code's hook
@@ -894,11 +633,7 @@ func fileLineFor(dir, cwd string, input toolHookInput) string {
 
 // isReadOnlyFileTool reports whether toolName is a file-read PostToolUse channel.
 func isReadOnlyFileTool(toolName string) bool {
-	switch strings.TrimSpace(toolName) {
-	case "read", "read_file", "Read", "view_file", "read_many_files":
-		return true
-	}
-	return isExternalMCPReadTool(toolName)
+	return hookengine.IsReadOnlyFileTool(toolName)
 }
 
 // isSearchReplaceEditTool reports whether toolName is a search-and-replace edit tool.

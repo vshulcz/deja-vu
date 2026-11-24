@@ -19,6 +19,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/digest"
+	"github.com/vshulcz/deja-vu/internal/hookengine"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -86,7 +87,7 @@ func (i *precompactHookInput) adopt() {
 }
 
 // hookStdinWait bounds how long any hook waits for its payload.
-const hookStdinWait = 300 * time.Millisecond
+const hookStdinWait = hookengine.DefaultStdinWait
 
 // readHookStdin reads the hook payload without trusting the host to close
 // stdin. Codex keeps the pipe open and silent, and a hook that blocks on
@@ -97,69 +98,14 @@ func readHookStdin() []byte {
 }
 
 // readHookPayload reads at most 1MB from r and gives up after wait, keeping
-// whatever arrived by then. Waiting for EOF is waiting for the host: a payload
-// can be complete on the wire while the pipe stays open behind it (#846).
-//
-// It returns as soon as the bytes so far hold a whole JSON value. Waiting out
-// the deadline on a payload that already arrived would put those milliseconds
-// on every user message, which is the cost the decoder this replaced did not
-// have (#846).
+// whatever arrived by then.
 func readHookPayload(r io.Reader, wait time.Duration) []byte {
-	return readBounded(r, wait, true)
+	return hookengine.ReadPayload(r, wait)
 }
 
-// readBounded is readHookPayload with a say in when to stop. stopAtValue=false
-// keeps reading to EOF or the deadline: the status line drains what the host
-// wrote rather than leaving the rest of it in the pipe, and only the waiting
-// needed a bound (#1074).
+// readBounded is readHookPayload with a say in when to stop.
 func readBounded(r io.Reader, wait time.Duration, stopAtValue bool) []byte {
-	var mu sync.Mutex
-	var buf []byte
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		lr := io.LimitReader(r, 1<<20)
-		chunk := make([]byte, 32<<10)
-		for {
-			n, err := lr.Read(chunk)
-			if n > 0 {
-				mu.Lock()
-				buf = append(buf, chunk[:n]...)
-				// A host on Windows can write its payload with a UTF-8 byte
-				// order mark, which no JSON decoder takes, and the hook went
-				// quiet on it.
-				if len(buf) >= len(utf8BOM) {
-					buf = bytes.TrimPrefix(buf, utf8BOM)
-				}
-				whole := stopAtValue && endsAValue(buf) && json.Valid(buf)
-				mu.Unlock()
-				if whole {
-					return
-				}
-			}
-			if err != nil {
-				return
-			}
-		}
-	}()
-	select {
-	case <-done:
-	case <-time.After(wait):
-	}
-	mu.Lock()
-	defer mu.Unlock()
-	return append([]byte(nil), buf...)
-}
-
-// endsAValue keeps the scan above off the hot path: json.Valid on every chunk
-// of a large payload is a full pass each time, and a hook payload is an object
-// or an array.
-func endsAValue(b []byte) bool {
-	b = bytes.TrimRight(b, " \t\r\n")
-	if len(b) == 0 {
-		return false
-	}
-	return b[len(b)-1] == '}' || b[len(b)-1] == ']'
+	return hookengine.ReadBounded(r, wait, stopAtValue)
 }
 
 func cmdHookPrecompact(dir string, rest []string) error {

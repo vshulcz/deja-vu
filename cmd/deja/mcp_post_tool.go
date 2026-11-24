@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
+	"github.com/vshulcz/deja-vu/internal/hookengine"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -27,12 +28,9 @@ type mcpStagedEntry struct {
 func mcpStagedPath(dir string) string { return dir + mcpStagedFile }
 
 // isDejaMCPToolCall reports whether a PostToolUse or AfterTool hook payload
-// names one of deja's own MCP tools (mcp__deja__deja in Qwen Code,
-// mcp_deja_deja or deja__deja in Gemini CLI).
+// names one of deja's own MCP tools.
 func isDejaMCPToolCall(name string) bool {
-	return strings.HasPrefix(name, "mcp__deja__") ||
-		strings.HasPrefix(name, "mcp_deja_") ||
-		strings.HasPrefix(name, "deja__")
+	return hookengine.IsDejaMCPToolCall(name)
 }
 
 // stageMCPToolResult holds a <deja-...> MCP answer for the PostToolUse /

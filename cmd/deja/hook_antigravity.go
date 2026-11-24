@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/hookengine"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -20,14 +21,7 @@ import (
 // answer with an empty object (checked on antigravity-cli 1.1.13). So this one
 // event carries both channels — the digest on the first invocation, and the
 // question's own answer on the ones after it.
-type antigravityHookInput struct {
-	InvocationNum  int      `json:"invocationNum"`
-	WorkspacePaths []string `json:"workspacePaths"`
-	// The transcript is where the question lives: antigravity has no
-	// per-prompt event, so the newest user turn is read from here.
-	TranscriptPath string `json:"transcriptPath"`
-	ConversationID string `json:"conversationId"`
-}
+type antigravityHookInput = hookengine.AntigravityEvent
 
 type antigravityInjectStep struct {
 	EphemeralMessage string `json:"ephemeralMessage,omitempty"`
@@ -38,11 +32,10 @@ type antigravityHookResponse struct {
 }
 
 func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
-	var input antigravityHookInput
 	// Bounded, like the other hooks: an unbounded decode waited for the host to
 	// close the pipe, which cost 20 s per turn on a host that holds it (#846).
 	payload := readHookPayload(stdin, hookStdinWait)
-	decoded := json.Unmarshal(payload, &input) == nil && len(payload) > 0
+	input, decoded := hookengine.NormalizeAntigravityEvent(payload)
 	// A payload deja could not read leaves invocationNum at 0, which reads as
 	// the first call — so bounding the read without this would turn "once per
 	// turn" into "before every model call" (#846).
@@ -66,7 +59,7 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	if len(input.WorkspacePaths) == 0 {
 		convFallback = workspaceFromConversation(input.TranscriptPath, input.ConversationID)
 	}
-	workspace, projectWorkspace := selectAntigravityWorkspaces(input.WorkspacePaths, convFallback, tailSteps)
+	workspace, projectWorkspace := selectAntigravityWorkspaces(input.WorkspacePaths, input.EffectiveWorkspace(convFallback), tailSteps)
 	if !isSubagentTranscriptPath(input.TranscriptPath) {
 		syncAntigravitySessionRules(dir, projectWorkspace, input.ConversationID, tailSteps)
 	}
@@ -109,7 +102,7 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 		block := antigravityFixPair(dir, failedOut,
 			input.ConversationID, projectWorkspace)
 		if block == "" {
-			block = antigravityPromptBlockFrom(dir, latestUserRequestFromSteps(tailSteps),
+			block = antigravityPromptBlockFrom(dir, input.PreferredPrompt(latestUserRequestFromSteps(tailSteps)),
 				input.ConversationID, projectWorkspace, input.TranscriptPath, nil)
 		}
 		// The line the pre-tool hook gives before an edit, for the file the
@@ -192,7 +185,7 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	}
 	block := antigravityFixPair(dir, failedOut, input.ConversationID, projectWorkspace)
 	if block == "" {
-		block = antigravityPromptBlockFrom(dir, latestUserRequestFromSteps(tailSteps),
+		block = antigravityPromptBlockFrom(dir, input.PreferredPrompt(latestUserRequestFromSteps(tailSteps)),
 			input.ConversationID, projectWorkspace, input.TranscriptPath, ids)
 	}
 	if planLine := antigravityPlanBlock(dir, tailSteps, input.ConversationID, projectWorkspace); planLine != "" {
@@ -216,41 +209,11 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 }
 
 func isSingleRecallFrame(msg string) bool {
-	trimmed := strings.TrimSpace(msg)
-	_, body, ok := cutFrameHeader(trimmed)
-	if !ok {
-		return false
-	}
-	_, after, ok := strings.Cut(body, recallFrameFooter)
-	return ok && strings.TrimSpace(after) == ""
+	return hookengine.IsSingleRecallFrame(msg)
 }
 
 func appendUnwrappedRecallParts(dst []string, msg string, seen map[string]bool) []string {
-	rest := strings.TrimSpace(msg)
-	for rest != "" {
-		_, body, ok := cutFrameHeader(rest)
-		if !ok {
-			if !seen[rest] {
-				seen[rest] = true
-				dst = append(dst, rest)
-			}
-			break
-		}
-		if before, after, ok := strings.Cut(body, recallFrameFooter); ok {
-			if part := strings.TrimSpace(before); part != "" && !seen[part] {
-				seen[part] = true
-				dst = append(dst, part)
-			}
-			rest = strings.TrimSpace(after)
-			continue
-		}
-		if part := strings.TrimSpace(body); part != "" && !seen[part] {
-			seen[part] = true
-			dst = append(dst, part)
-		}
-		break
-	}
-	return dst
+	return hookengine.AppendUnwrappedRecallParts(dst, msg, seen)
 }
 
 // coalesceAntigravitySteps merges multiple hook messages (recovery packet,
