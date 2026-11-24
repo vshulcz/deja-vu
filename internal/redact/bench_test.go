@@ -88,3 +88,51 @@ func BenchmarkTextChattyRegex(b *testing.B) {
 		text(chatty, false)
 	}
 }
+
+var namedBenchAllow = map[string]bool{
+	"aws-access-key":     true,
+	"aws-secret":         true,
+	"aws-key":            true,
+	"openai-key":         true,
+	"anthropic-key":      true,
+	"google-api-key":     true,
+	"github-token":       true,
+	"gitlab-token":       true,
+	"groq-key":           true,
+	"xai-key":            true,
+	"npm-token":          true,
+	"slack-token":        true,
+	"huggingface-token":  true,
+	"stripe-key":         true,
+	"telegram-bot-token": true,
+	"provider-token":     true,
+	"private-key":        true,
+	"jwt":                true,
+	"bearer-token":       true,
+	"cookie":             true,
+	"url-credentials":    true,
+	"webhook-url":        true,
+	"command-password":   true,
+	"password":           true,
+}
+
+func BenchmarkScanKindsNamedAllow(b *testing.B) {
+	for _, tc := range []struct {
+		name string
+		text string
+	}{
+		{"chatty", chatty},
+		{"mixed", mixed},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			b.SetBytes(int64(len(tc.text)))
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				if c := ScanKinds(tc.text, namedBenchAllow); c.Total() < 0 {
+					b.Fatal("impossible")
+				}
+			}
+		})
+	}
+}

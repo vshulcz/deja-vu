@@ -11,6 +11,12 @@ func ScanKinds(s string, allow map[string]bool) Counts {
 		return counts
 	}
 	_, more := scanPass(StripEscapes(out), allow, true)
+	if len(more) == 0 {
+		return counts
+	}
+	if counts == nil {
+		counts = Counts{}
+	}
 	for k, n := range more {
 		counts.Add(k, n)
 	}

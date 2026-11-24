@@ -501,6 +501,199 @@ func containsAnyFold(s string, hints []string) bool {
 	return false
 }
 
+func isRegexpWordByte(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_'
+}
+
+// asciiLower lowercases ASCII bytes without walking UTF-8 runes when only ASCII
+// delimiters matter, falling back to strings.ToLower if U+0130 or U+212A appear.
+func asciiLower(s string) string {
+	var b strings.Builder
+	grown := false
+	last := 0
+	for i := range len(s) {
+		c := s[i]
+		if c >= 'A' && c <= 'Z' {
+			if !grown {
+				b.Grow(len(s))
+				grown = true
+			}
+			b.WriteString(s[last:i])
+			b.WriteByte(c + ('a' - 'A'))
+			last = i + 1
+			continue
+		}
+		if c == 0xc4 && i+1 < len(s) && s[i+1] == 0xb0 {
+			return strings.ToLower(s)
+		}
+		if c == 0xe2 && i+2 < len(s) && s[i+1] == 0x84 && s[i+2] == 0xaa {
+			return strings.ToLower(s)
+		}
+	}
+	if !grown {
+		return s
+	}
+	b.WriteString(s[last:])
+	return b.String()
+}
+
+// containsAnchored searches s for sub by scanning for sub[anchor], which lets
+// callers anchor on a rarer byte than sub[0].
+func containsAnchored(s, sub string, anchor int) bool {
+	if len(sub) == 0 {
+		return true
+	}
+	if len(s) < len(sub) {
+		return false
+	}
+	tail := len(sub) - anchor
+	target := sub[anchor]
+	for i := anchor; i+tail <= len(s); {
+		j := strings.IndexByte(s[i:len(s)-tail+1], target)
+		if j < 0 {
+			return false
+		}
+		pos := i + j
+		start := pos - anchor
+		if s[start:start+len(sub)] == sub {
+			return true
+		}
+		i = pos + 1
+	}
+	return false
+}
+
+func hasAWSLabelHint(lower string) bool {
+	for i := 1; i+1 < len(lower); {
+		j := strings.IndexByte(lower[i:len(lower)-1], 'w')
+		if j < 0 {
+			return false
+		}
+		k := i + j
+		if lower[k-1] == 'a' && (k == 1 || !isRegexpWordByte(lower[k-2])) && lower[k+1] == 's' {
+			rest := lower[k+2:]
+			if strings.HasPrefix(rest, "_secret") || strings.HasPrefix(rest, "-secret") || strings.HasPrefix(rest, "secret") {
+				return true
+			}
+		}
+		i = k + 1
+	}
+	return false
+}
+
+func hasBearerOrBasic(lower string) bool {
+	for i := 0; i < len(lower); {
+		j := strings.IndexByte(lower[i:], 'b')
+		if j < 0 {
+			return false
+		}
+		k := i + j
+		if k == 0 || !isRegexpWordByte(lower[k-1]) {
+			rest := lower[k:]
+			if (len(rest) >= 7 && rest[1:6] == "earer" && isSpaceByte(rest[6])) ||
+				(len(rest) >= 6 && rest[1:5] == "asic" && isSpaceByte(rest[5])) {
+				return true
+			}
+		}
+		i = k + 1
+	}
+	return false
+}
+
+// hasProviderHint reports whether s contains any provider token prefix from
+// providerRE at a word boundary, scanning once per delimiter byte rather than once per prefix.
+func hasProviderHint(s string) bool {
+	return hasUnderscoreProviderHint(s) || hasHyphenProviderHint(s) || hasAIzaProviderHint(s)
+}
+
+func hasUnderscoreProviderHint(s string) bool {
+	for i := 0; i < len(s); {
+		j := strings.IndexByte(s[i:], '_')
+		if j < 0 {
+			return false
+		}
+		k := i + j
+		if k >= 2 && hasUnderscorePrefixAt(s, k) {
+			return true
+		}
+		i = k + 1
+	}
+	return false
+}
+
+func hasUnderscorePrefixAt(s string, k int) bool {
+	p2 := s[k-2 : k]
+	if (p2 == "sk" || p2 == "rk") && (k == 2 || !isRegexpWordByte(s[k-3])) &&
+		(strings.HasPrefix(s[k+1:], "live_") || strings.HasPrefix(s[k+1:], "test_")) {
+		return true
+	}
+	if p2 == "hf" && (k == 2 || !isRegexpWordByte(s[k-3])) {
+		return true
+	}
+	if k < 3 {
+		return false
+	}
+	if s[k-3] == 'g' && s[k-2] == 's' && s[k-1] == 'k' && (k == 3 || !isRegexpWordByte(s[k-4])) {
+		return true
+	}
+	if s[k-3] == 'n' && s[k-2] == 'p' && s[k-1] == 'm' && (k == 3 || !isRegexpWordByte(s[k-4])) {
+		return true
+	}
+	if s[k-3] == 'g' && s[k-2] == 'h' && (k == 3 || !isRegexpWordByte(s[k-4])) {
+		switch s[k-1] {
+		case 'p', 'o', 's', 'u', 'r':
+			return true
+		}
+	}
+	return k >= 10 && s[k-10:k] == "github_pat" && (k == 10 || !isRegexpWordByte(s[k-11]))
+}
+
+func hasHyphenProviderHint(s string) bool {
+	for i := 0; i < len(s); {
+		j := strings.IndexByte(s[i:], '-')
+		if j < 0 {
+			return false
+		}
+		k := i + j
+		if k >= 2 && hasHyphenPrefixAt(s, k) {
+			return true
+		}
+		i = k + 1
+	}
+	return false
+}
+
+func hasHyphenPrefixAt(s string, k int) bool {
+	if s[k-2] == 's' && s[k-1] == 'k' && (k == 2 || !isRegexpWordByte(s[k-3])) {
+		return true
+	}
+	if k >= 3 && s[k-3] == 'x' && s[k-2] == 'a' && s[k-1] == 'i' && (k == 3 || !isRegexpWordByte(s[k-4])) {
+		return true
+	}
+	if k >= 4 && s[k-4] == 'x' && s[k-3] == 'o' && s[k-2] == 'x' && (k == 4 || !isRegexpWordByte(s[k-5])) {
+		switch s[k-1] {
+		case 'b', 'p', 'c', 's':
+			return true
+		}
+	}
+	return k >= 5 && s[k-5:k] == "glpat" && (k == 5 || !isRegexpWordByte(s[k-6]))
+}
+
+func hasAIzaProviderHint(s string) bool {
+	for i := 2; i+1 < len(s); {
+		j := strings.IndexByte(s[i:len(s)-1], 'z')
+		if j < 0 {
+			return false
+		}
+		k := i + j
+		if s[k-2] == 'A' && s[k-1] == 'I' && s[k+1] == 'a' && (k == 2 || !isRegexpWordByte(s[k-3])) {
+			return true
+		}
+		i = k + 1
+	}
+	return false
+}
+
 // Text applies every rule.
 //
 // Colored output splits a secret with terminal escapes
@@ -521,6 +714,9 @@ func text(s string, fast bool) (string, Counts) {
 	plain, more := textPass(StripEscapes(out), nil, fast)
 	if len(more) == 0 {
 		return out, counts
+	}
+	if counts == nil {
+		counts = Counts{}
 	}
 	for k, n := range more {
 		counts.Add(k, n)
@@ -549,50 +745,57 @@ func textPass(s string, allow map[string]bool, fast bool) (string, Counts) {
 	if Disabled() || s == "" {
 		return s, Counts{}
 	}
-	return scanPass(s, allow, fast)
+	out, counts := scanPass(s, allow, fast)
+	if counts == nil {
+		return out, Counts{}
+	}
+	return out, counts
 }
 
 func scanPass(s string, allow map[string]bool, fast bool) (string, Counts) {
-	counts := Counts{}
 	if s == "" {
-		return s, counts
+		return s, nil
 	}
-	p := kindPass{counts: counts, allow: allow}
-	if fast {
-		p.v = &view{}
+	p := kindPass{allow: allow, fast: fast}
+	var lower string
+	if p.on("credential") {
+		lower = strings.ToLower(s)
+	} else {
+		lower = asciiLower(s)
 	}
-	lower := strings.ToLower(s)
-	s = redactKeyShapes(s, lower, p)
-	s = redactAssignments(s, lower, p)
-	s = redactCommandPasswords(s, lower, p)
-	s = redactEntropy(s, p)
-	return s, counts
+	s = redactKeyShapes(s, lower, &p)
+	s = redactAssignments(s, lower, &p)
+	s = redactCLIFlags(s, lower, &p)
+	s = redactEntropy(s, &p)
+	return s, p.counts
 }
 
 // redactKeyShapes masks the values that say what they are: key blocks, URL
 // credentials, provider keys, tokens and JWTs. lower is s lowered before any rule ran.
-func redactKeyShapes(s, lower string, p kindPass) string {
-	if strings.Contains(s, "-----BEGIN") {
-		s = replaceWhole(s, pemPrivateRE, "private-key", p)
-		s = replaceWhole(s, pemPrivateOpenRE, "private-key", p)
+func redactKeyShapes(s, lower string, p *kindPass) string {
+	if p.on("private-key") && strings.Contains(s, "-----BEGIN") {
+		s = replaceWhole(s, pemPrivateRE, "[redacted:private-key]", p)
+		s = replaceWhole(s, pemPrivateOpenRE, "[redacted:private-key]", p)
 	}
-	if strings.Contains(s, "://") {
-		s = replaceGroup(s, connURLRE, 3, "url-credentials", p, nil)
+	if (p.on("url-credentials") || p.on("webhook-url")) && strings.Contains(s, "://") {
+		if p.on("url-credentials") && strings.IndexByte(s, '@') >= 0 {
+			s = replaceGroup(s, connURLRE, 3, "[redacted:url-credentials]", p, nil)
+		}
 		// Under the URL gate: a webhook travels as https://…, and another
 		// scan of every message cost more than the rule.
-		if strings.Contains(lower, "hooks.slack.com") || strings.Contains(lower, "discord") {
-			s = replaceSubmatch(s, webhookPathRE, "webhook-url", p, func(m []string) string {
+		if p.on("webhook-url") && (strings.Contains(lower, "hooks.slack.com") || strings.Contains(lower, "discord")) {
+			s = replaceSubmatch(s, webhookPathRE, "[redacted:webhook-url]", p, func(m []string) string {
 				return m[1] + "[redacted:webhook-url]"
 			})
 		}
 	}
-	if strings.Contains(lower, "aws") {
-		s = replaceSubmatch(s, awsSecretRE, "aws-secret", p, func(m []string) string {
+	if p.on("aws-secret") && hasAWSLabelHint(lower) {
+		s = replaceSubmatch(s, awsSecretRE, "[redacted:aws-secret]", p, func(m []string) string {
 			return m[1] + m[2] + m[3] + "[redacted:aws-secret]" + closingQuote(m[3], m[5])
 		})
 	}
-	if strings.Contains(s, "AKIA") || strings.Contains(s, "ASIA") {
-		s = replaceWhole(s, awsAccessKeyRE, "aws-access-key", p)
+	if p.on("aws-access-key") && (containsAnchored(s, "AKIA", 1) || containsAnchored(s, "ASIA", 2)) {
+		s = replaceWhole(s, awsAccessKeyRE, "[redacted:aws-access-key]", p)
 	}
 	// Before the assignment rules, not after them. A provider prefix says what
 	// a value is; sitting next to `token=` only says that something was
@@ -604,11 +807,11 @@ func redactKeyShapes(s, lower string, p kindPass) string {
 	// anthropic-key 16→36 and stripe-key 22→34. The same values are masked
 	// either way; this is about being able to tell someone which key leaked
 	// (#536).
-	if containsAnyFold(s, providerHints) {
+	if hasProviderHint(s) {
 		s = replaceProvider(s, p)
 	}
-	if strings.Contains(s, ":A") {
-		s = replaceGroup(s, telegramBotTokenRE, 1, "telegram-bot-token", p, func(m []string) bool {
+	if p.on("telegram-bot-token") && strings.Contains(s, ":A") {
+		s = replaceGroup(s, telegramBotTokenRE, 1, "[redacted:telegram-bot-token]", p, func(m []string) bool {
 			_, tail, _ := strings.Cut(m[1], ":")
 			return len(tail) != 35
 		})
@@ -621,40 +824,43 @@ func redactKeyShapes(s, lower string, p kindPass) string {
 	// ContainsAny is the cheap half: the pattern needs a quote character, so a
 	// text without one cannot match it, and this drops the rule from 1023 runs
 	// to 769 on a 4851-message sample (#3491).
-	if strings.ContainsAny(s, "\"'`") &&
+	if p.on("quoted-secret") && strings.ContainsAny(s, "\"'`") &&
 		(strings.Contains(lower, "password") || strings.Contains(lower, "passwd") ||
 			strings.Contains(lower, "pwd") || strings.Contains(lower, "secret") ||
 			strings.Contains(lower, "token") || strings.Contains(lower, "api key") ||
 			strings.Contains(lower, "api-key") || strings.Contains(lower, "api_key") ||
 			strings.Contains(lower, "apikey")) {
-		s = replaceGroup(s, quotedSecretRE, 4, "quoted-secret", p, nil)
+		s = replaceGroup(s, quotedSecretRE, 4, "[redacted:quoted-secret]", p, nil)
 	}
 	// The header, not the word: "the Authorization header" is ordinary prose.
 	// "uthoriz", not "authoriz": the scan stops on every first byte, and an
 	// 'a' is in every other hex digest.
-	if strings.Contains(lower, "uthoriz") && strings.Contains(lower, "token") && kvAssignmentNearbyHints(lower, authHints) {
-		s = replaceSubmatch(s, authTokenRE, "bearer-token", p, func(m []string) string {
+	if p.on("bearer-token") && containsAnchored(lower, "uthoriz", 6) && strings.Contains(lower, "token") && kvAssignmentNearbyHints(lower, authHints) {
+		s = replaceSubmatch(s, authTokenRE, "[redacted:bearer-token]", p, func(m []string) string {
 			return m[1] + m[2] + "[redacted:bearer-token]"
 		})
 	}
-	if strings.Contains(lower, "bearer") || strings.Contains(lower, "basic ") {
-		s = replaceSubmatch(s, bearerRE, "bearer-token", p, func(m []string) string {
+	if p.on("bearer-token") && hasBearerOrBasic(lower) {
+		s = replaceSubmatch(s, bearerRE, "[redacted:bearer-token]", p, func(m []string) string {
 			return m[1] + m[2] + "[redacted:bearer-token]"
 		})
 	}
-	if strings.Contains(s, "eyJ") {
-		s = replaceWhole(s, jwtRE, "jwt", p)
+	if p.on("jwt") && containsAnchored(s, "eyJ", 2) {
+		s = replaceWhole(s, jwtRE, "[redacted:jwt]", p)
 	}
 	return s
 }
 
 // redactAssignments masks values assigned to a key word, quoted, flagged or in prose.
-func redactAssignments(s, lower string, p kindPass) string {
-	if kvAssignmentNearby(lower) {
-		s = replaceSubmatch(s, genericKVRE, "credential", p, func(m []string) string {
+func redactAssignments(s, lower string, p *kindPass) string {
+	if !p.on("credential") && !p.on("quoted-secret") {
+		return s
+	}
+	if p.on("credential") && kvAssignmentNearby(lower) {
+		s = replaceSubmatch(s, genericKVRE, "[redacted:credential]", p, func(m []string) string {
 			return m[1] + m[2] + m[3] + "[redacted:credential]" + closingQuote(m[3], m[5])
 		})
-		s = replaceSubmatch(s, envKeyRE, "credential", p, func(m []string) string {
+		s = replaceSubmatch(s, envKeyRE, "[redacted:credential]", p, func(m []string) string {
 			return m[1] + m[2] + m[3] + "[redacted:credential]" + closingQuote(m[3], m[5])
 		})
 	}
@@ -662,21 +868,24 @@ func redactAssignments(s, lower string, p kindPass) string {
 	// marker they wrote, and what is left is the short quoted value nothing
 	// reached (#3614). A value that is already a redaction marker is passed
 	// over rather than masked again under a different name.
-	if strings.ContainsAny(s, "\"'`") && kvAssignmentNearby(lower) {
-		s = replaceGroup(s, quotedAssignedSecretRE, 4, "quoted-secret", p, func(m []string) bool {
+	if p.on("quoted-secret") && strings.ContainsAny(s, "\"'`") && kvAssignmentNearby(lower) {
+		s = replaceGroup(s, quotedAssignedSecretRE, 4, "[redacted:quoted-secret]", p, func(m []string) bool {
 			return strings.HasPrefix(m[4], "[redacted:")
 		})
 	}
+	if !p.on("credential") {
+		return s
+	}
 	if kvAssignmentNearbyHints(lower, kvIntlHints) {
 		intlPatternRuns.Add(1)
-		s = replaceSubmatch(s, genericKVIntlRE, "credential", p, func(m []string) string {
+		s = replaceSubmatch(s, genericKVIntlRE, "[redacted:credential]", p, func(m []string) string {
 			return m[1] + m[2] + m[3] + m[4] + "[redacted:credential]" + closingQuote(m[4], m[6])
 		})
 	}
 	// Its own gate: the adjacency one cannot see a delimiter that is a few
 	// words away, which is the whole point of this pattern.
 	if strings.ContainsAny(s, ":=") && containsAnyFold(s, kvIntlHints) {
-		s = replaceSubmatch(s, genericKVIntlFillerRE, "credential", p, func(m []string) string {
+		s = replaceSubmatch(s, genericKVIntlFillerRE, "[redacted:credential]", p, func(m []string) string {
 			return m[1] + m[2] + m[3] + m[4] + "[redacted:credential]" + closingQuote(m[4], m[6])
 		})
 	}
@@ -689,7 +898,7 @@ func redactAssignments(s, lower string, p kindPass) string {
 	// cost kvAssignmentNearby was written to avoid; the pattern cannot match
 	// without a dash before the name, so "-token" is both necessary and rare.
 	if flagHintNearby(lower) {
-		s = replaceGroup(s, passwordFlagRE, 4, "credential", p, func(m []string) bool {
+		s = replaceGroup(s, passwordFlagRE, 4, "[redacted:credential]", p, func(m []string) bool {
 			return notASecretValue(m[4]) || proseWordAfterFlag(m[3], m[4])
 		})
 	}
@@ -697,19 +906,19 @@ func redactAssignments(s, lower string, p kindPass) string {
 	// has no dash anywhere, so the flag gate above would have silently switched
 	// this pattern off.
 	if strings.Contains(lower, "passw") || strings.Contains(lower, "pwd") {
-		s = replaceGroup(s, passwordAssignRE, 4, "credential", p, func(m []string) bool {
+		s = replaceGroup(s, passwordAssignRE, 4, "[redacted:credential]", p, func(m []string) bool {
 			return notASecretValue(m[4])
 		})
 	}
 	if strings.Contains(lower, "pass") {
-		s = replaceGroup(s, passSuffixAssignRE, 4, "credential", p, func(m []string) bool {
+		s = replaceGroup(s, passSuffixAssignRE, 4, "[redacted:credential]", p, func(m []string) bool {
 			return notASecretValue(m[4])
 		})
 	}
 	// Its own gate: the prose form has no delimiter for the others to find.
 	if strings.Contains(lower, "password") || strings.Contains(lower, "passphrase") ||
 		strings.Contains(lower, "парол") {
-		s = replaceGroup(s, prosePasswordRE, 4, "credential", p, func(m []string) bool {
+		s = replaceGroup(s, prosePasswordRE, 4, "[redacted:credential]", p, func(m []string) bool {
 			return notASecretValue(m[4]) || !chosenSecret(m[4])
 		})
 	}
@@ -717,42 +926,121 @@ func redactAssignments(s, lower string, p kindPass) string {
 	// Every other pattern here can only match an ASCII value, so this runs
 	// exactly where they cannot.
 	if hasNonASCII(s) && (strings.ContainsAny(s, ":=")) {
-		s = replaceGroup(s, intlValueRE, 4, "credential", p, func(m []string) bool {
+		s = replaceGroup(s, intlValueRE, 4, "[redacted:credential]", p, func(m []string) bool {
 			return !worthRedactingIntl(m[4])
 		})
 	}
 	return s
 }
 
-// redactCommandPasswords masks passwords passed on a command line, in a netrc
-// and in a cookie header.
-func redactCommandPasswords(s, lower string, p kindPass) string {
-	if strings.Contains(lower, "sshpass") {
-		s = replaceGroup(s, sshpassRE, 1, "command-password", p, nil)
+type cliFlagSpans struct {
+	sshpass, userPair, mysql, login bool
+}
+
+func isLoginSep(c byte) bool {
+	return c == ' ' || c == '=' || c == '<'
+}
+
+func hasLoginCommand(w string) bool {
+	return strings.Contains(w, "login") || strings.Contains(w, "redis-cli") ||
+		strings.Contains(w, "ftp") || strings.Contains(w, "smbclient")
+}
+
+// scanCLIFlagSpans detects candidate CLI flag spans in a single pass over '-'
+// delimiters in lower.
+func scanCLIFlagSpans(lower string) cliFlagSpans {
+	var flags cliFlagSpans
+	for i := 0; i+1 < len(lower); {
+		j := strings.IndexByte(lower[i:], '-')
+		if j < 0 {
+			break
+		}
+		k := i + j
+		i = k + 1
+		if k+1 >= len(lower) {
+			break
+		}
+		next := lower[k+1]
+		atStartOrSpace := k == 0 || isSpaceByte(lower[k-1])
+		hasSpaceBefore := k > 0 && isSpaceByte(lower[k-1])
+
+		switch next {
+		case 'p':
+			if !flags.sshpass && strings.Contains(lower[max(0, k-264):k], "sshpass") {
+				flags.sshpass = true
+			}
+			if hasSpaceBefore {
+				w := lower[max(0, k-496):k]
+				if !flags.mysql && (strings.Contains(w, "mysql") || strings.Contains(w, "mariadb")) {
+					flags.mysql = true
+				}
+				if !flags.login && k+2 < len(lower) && isLoginSep(lower[k+2]) && hasLoginCommand(w) {
+					flags.login = true
+				}
+			}
+		case 'a':
+			if hasSpaceBefore && !flags.login && k+2 < len(lower) && isLoginSep(lower[k+2]) &&
+				hasLoginCommand(lower[max(0, k-496):k]) {
+				flags.login = true
+			}
+		case 'u':
+			if atStartOrSpace && !flags.userPair && k+2 < len(lower) && (lower[k+2] == ' ' || lower[k+2] == '=') &&
+				strings.IndexByte(lower[k:min(len(lower), k+300)], ':') >= 0 {
+				flags.userPair = true
+			}
+		case '-':
+			if !atStartOrSpace {
+				continue
+			}
+			if !flags.userPair && k+6 < len(lower) && lower[k+1:k+6] == "-user" && (lower[k+6] == ' ' || lower[k+6] == '=') &&
+				strings.IndexByte(lower[k:min(len(lower), k+300)], ':') >= 0 {
+				flags.userPair = true
+			}
+			if hasSpaceBefore && !flags.login &&
+				((k+10 < len(lower) && lower[k+1:k+10] == "-password" && isLoginSep(lower[k+10])) ||
+					(k+12 < len(lower) && lower[k+1:k+12] == "-with-token" && isLoginSep(lower[k+12]))) &&
+				hasLoginCommand(lower[max(0, k-496):k]) {
+				flags.login = true
+			}
+		}
 	}
-	if strings.Contains(lower, "-u ") || strings.Contains(lower, "-u=") || strings.Contains(lower, "--user") {
-		s = replaceGroup(s, userPairRE, 2, "command-password", p, func(m []string) bool {
-			// A uid:gid pair, not a login.
-			return allDigits(m[1]) && allDigits(m[2])
-		})
+	return flags
+}
+
+// redactCLIFlags masks values passed on a CLI flag, in a netrc entry, and in a
+// cookie header.
+func redactCLIFlags(s, lower string, p *kindPass) string {
+	if !p.on("command-password") && !p.on("password") && !p.on("cookie") {
+		return s
 	}
-	if strings.Contains(lower, "mysql") || strings.Contains(lower, "mariadb") {
-		s = replaceGroup(s, mysqlPassRE, 1, "command-password", p, nil)
+	if p.on("command-password") && strings.IndexByte(lower, '-') >= 0 {
+		flags := scanCLIFlagSpans(lower)
+		if flags.sshpass {
+			s = replaceGroup(s, sshpassRE, 1, "[redacted:command-password]", p, nil)
+		}
+		if flags.userPair {
+			s = replaceGroup(s, userPairRE, 2, "[redacted:command-password]", p, func(m []string) bool {
+				// A uid:gid pair, not a login.
+				return allDigits(m[1]) && allDigits(m[2])
+			})
+		}
+		if flags.mysql {
+			s = replaceGroup(s, mysqlPassRE, 1, "[redacted:command-password]", p, nil)
+		}
+		if flags.login {
+			s = replaceGroup(s, loginPassRE, 1, "[redacted:command-password]", p, func(m []string) bool {
+				// A port, or a host:port — `-p` means that far more often than it
+				// means a password.
+				return allDigits(strings.TrimLeft(m[1], "0123456789:"))
+			})
+		}
 	}
-	if strings.Contains(lower, "login") || strings.Contains(lower, "redis-cli") ||
-		strings.Contains(lower, "ftp") || strings.Contains(lower, "smbclient") {
-		s = replaceGroup(s, loginPassRE, 1, "command-password", p, func(m []string) bool {
-			// A port, or a host:port — `-p` means that far more often than it
-			// means a password.
-			return allDigits(strings.TrimLeft(m[1], "0123456789:"))
-		})
-	}
-	if (strings.Contains(lower, "password") || strings.Contains(lower, "passwd")) &&
+	if p.on("password") && containsAnchored(lower, "passw", 4) &&
 		(strings.Contains(lower, "machine ") || strings.Contains(lower, "login ")) {
-		s = replaceGroup(s, netrcRE, 1, "password", p, nil)
+		s = replaceGroup(s, netrcRE, 1, "[redacted:password]", p, nil)
 	}
-	if strings.Contains(lower, "cookie:") {
-		s = replaceGroup(s, cookieRE, 1, "cookie", p, nil)
+	if p.on("cookie") && containsAnchored(lower, "cookie:", 3) {
+		s = replaceGroup(s, cookieRE, 1, "[redacted:cookie]", p, nil)
 	}
 	return s
 }
@@ -763,43 +1051,64 @@ func redactCommandPasswords(s, lower string, p kindPass) string {
 type kindPass struct {
 	counts Counts
 	allow  map[string]bool
+	fast   bool
 	v      *view
 }
 
 // finderFor is the finder that answers for a rule, or nil when the plain
 // regex is still the one that runs.
-func (p kindPass) finderFor(re *regexp.Regexp, s string) *finder {
-	f := finders[re]
-	if f == nil || p.v == nil {
+func (p *kindPass) finderFor(re *regexp.Regexp, s string) *finder {
+	if !p.fast {
 		return nil
+	}
+	f := finders[re]
+	if f == nil {
+		return nil
+	}
+	if p.v == nil {
+		p.v = &view{}
 	}
 	p.v.reset(s)
 	return f
 }
 
-func (p kindPass) on(kind string) bool { return p.allow == nil || p.allow[kind] }
+func (p *kindPass) on(kind string) bool { return p.allow == nil || p.allow[kind] }
 
-func (p kindPass) add(kind string, n int) { p.counts.Add(kind, n) }
+func (p *kindPass) add(kind string, n int) {
+	if n <= 0 {
+		return
+	}
+	if p.counts == nil {
+		p.counts = Counts{}
+	}
+	p.counts.Add(kind, n)
+}
 
-func replaceWhole(s string, re *regexp.Regexp, kind string, p kindPass) string {
+func markerKind(marker string) string {
+	return marker[len(Marker) : len(marker)-1]
+}
+
+func replaceWhole(s string, re *regexp.Regexp, marker string, p *kindPass) string {
+	kind := markerKind(marker)
 	if !p.on(kind) {
 		return s
 	}
 	if f := p.finderFor(re, s); f != nil {
 		matches := f.all(p.v)
 		p.add(kind, len(matches))
-		return spliceMatches(s, matches, func(string) string { return "[redacted:" + kind + "]" })
+		return spliceMatches(s, matches, func(string) string { return marker })
 	}
 	n := 0
 	out := re.ReplaceAllStringFunc(s, func(_ string) string {
 		n++
-		return "[redacted:" + kind + "]"
+		return marker
 	})
 	p.add(kind, n)
 	return out
 }
 
-func replaceSubmatch(s string, re *regexp.Regexp, kind string, p kindPass, repl func([]string) string) string {
+func replaceSubmatch(s string, re *regexp.Regexp, marker string, p *kindPass, repl func([]string) string) string {
+	kind := markerKind(marker)
 	if !p.on(kind) {
 		return s
 	}
@@ -844,7 +1153,8 @@ func spliceMatches(s string, matches [][]int, repl func(string) string) string {
 //
 // A value that is a shell reference (`-p "$DEPLOY_PASS"`) is not a secret and
 // is left as written.
-func replaceGroup(s string, re *regexp.Regexp, group int, kind string, p kindPass, skip func([]string) bool) string {
+func replaceGroup(s string, re *regexp.Regexp, group int, marker string, p *kindPass, skip func([]string) bool) string {
+	kind := markerKind(marker)
 	if !p.on(kind) {
 		return s
 	}
@@ -875,7 +1185,7 @@ func replaceGroup(s string, re *regexp.Regexp, group int, kind string, p kindPas
 			continue
 		}
 		b.WriteString(s[at:lo])
-		b.WriteString("[redacted:" + kind + "]")
+		b.WriteString(marker)
 		at = hi
 		n++
 	}
@@ -901,14 +1211,14 @@ func allDigits(s string) bool {
 	return true
 }
 
-func replaceProvider(s string, p kindPass) string {
+func replaceProvider(s string, p *kindPass) string {
 	if f := p.finderFor(providerRE, s); f != nil {
 		return spliceMatches(s, f.all(p.v), func(v string) string { return providerMask(v, p) })
 	}
 	return providerRE.ReplaceAllStringFunc(s, func(v string) string { return providerMask(v, p) })
 }
 
-func providerMask(v string, p kindPass) string {
+func providerMask(v string, p *kindPass) string {
 	kind := "provider-token"
 	switch {
 	case strings.HasPrefix(v, "ghp_"), strings.HasPrefix(v, "gho_"), strings.HasPrefix(v, "ghs_"),
