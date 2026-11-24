@@ -163,6 +163,18 @@ func TestVaultSecurityEndToEnd(t *testing.T) {
 		t.Fatalf("init --encrypted --passphrase-stdin: %v", initErr)
 	}
 
+	// init --encrypted must seal the derived index, not leave it plaintext
+	// until a later `deja lock`.
+	if !vault.IsLocked(dir) {
+		t.Fatal("init --encrypted left the store unsealed (IsLocked false)")
+	}
+	if _, statErr := os.Stat(dir); !os.IsNotExist(statErr) {
+		t.Fatalf("init --encrypted left plaintext indexDir %s on disk", dir)
+	}
+	if _, statErr := os.Stat(vault.ArchivePath(dir)); statErr != nil {
+		t.Fatalf("init --encrypted did not write a sealed archive: %v", statErr)
+	}
+
 	notesBytes, err := os.ReadFile(vault.NotesPath())
 	if err != nil {
 		t.Fatal(err)

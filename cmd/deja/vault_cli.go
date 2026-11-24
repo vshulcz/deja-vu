@@ -57,7 +57,14 @@ func cmdInit(dir string, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(os.Stdout, "deja: initialized encrypted memory (backend: %s, config: %s)\n", backend, vault.ConfigPath())
+	// Seal the derived index now. Init only encrypts notes and snapshot
+	// digests in place; without this the session index (past prompts) sits in
+	// plaintext until someone remembers to run `deja lock`.
+	if err := vault.Lock(dir, pass); err != nil {
+		return fmt.Errorf("init: sealed store setup failed: %w", err)
+	}
+	fmt.Fprintf(os.Stdout, "deja: initialized encrypted memory (backend: %s, sealed: yes, config: %s)\n", backend, vault.ConfigPath())
+	fmt.Fprintln(os.Stdout, "deja: memory store is locked — run `deja unlock` before use")
 	return nil
 }
 

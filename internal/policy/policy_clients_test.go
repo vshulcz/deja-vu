@@ -64,7 +64,8 @@ func TestPolicyClientAuthScopesAndWrite(t *testing.T) {
 		t.Fatal("unrestricted client project denied")
 	}
 
-	// Write checks: RequireClients requires token for non-cli when ClientTokens is non-empty.
+	// Write checks: RequireClients requires a token for every client name when
+	// ClientTokens is non-empty — "cli" gets no exemption.
 	if ok, reason := p.AllowsClientWrite("mcp", "readonly", "", "billing"); ok || reason != "client token required" {
 		t.Fatalf("readonly without token write = (%v, %q)", ok, reason)
 	}
@@ -97,6 +98,24 @@ func TestPolicyClientAuthScopesAndWrite(t *testing.T) {
 	// Auth failure before write gate
 	if ok, _ := p.AllowsClientWrite("mcp", "unknown", "", "billing"); ok {
 		t.Fatal("unauthenticated client allowed write")
+	}
+	// The former `cli` exemption let an MCP caller self-assert "cli" and skip
+	// token validation whenever tokens were enrolled. An enrolled "cli" client
+	// must now present a token like any other name.
+	pCLI := Policy{
+		Write:          map[string]bool{"cli": true},
+		RequireClients: true,
+		Clients:        map[string]ClientRule{"cli": {Read: boolPtr(true), Write: boolPtr(true)}},
+		ClientTokens:   map[string]string{"other": tokenDigest("other-tok")},
+	}
+	if ok, reason := pCLI.AllowsClientRead("mcp", "cli", "", "billing"); ok || reason != "client token required" {
+		t.Fatalf("enrolled cli without token read = (%v, %q)", ok, reason)
+	}
+	if ok, reason := pCLI.AllowsClientRead("mcp", "cli", "other-tok", "billing"); ok || reason != "client token required" {
+		t.Fatalf("enrolled cli with another client's token = (%v, %q)", ok, reason)
+	}
+	if ok, reason := pCLI.AllowsClientWrite("mcp", "cli", "", "billing"); ok || reason != "client token required" {
+		t.Fatalf("enrolled cli without token write = (%v, %q)", ok, reason)
 	}
 }
 
