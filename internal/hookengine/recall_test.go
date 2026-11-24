@@ -95,6 +95,80 @@ func TestFitSealedRespectsLimitRunesAndFrameClosure(t *testing.T) {
 	if tiny != "" {
 		t.Fatalf("tiny budget should omit framed block, got %q", tiny)
 	}
+
+	// Plain blocks and tight separator exhaustion paths.
+	if plainFit := FitSealed([]string{"hello world", "second"}, "\n", 5); plainFit != "hello" {
+		t.Fatalf("plain FitSealed(5) = %q, want %q", plainFit, "hello")
+	}
+	if multi := FitSealed([]string{p2, SealRecall("third block")}, "\n", len(p2)+1); multi != p2 {
+		t.Fatalf("exact room exhaustion = %q, want %q", multi, p2)
+	}
+}
+
+func TestIsSingleRecallFrameAndAppendUnwrapped(t *testing.T) {
+	singlePlain := SealRecall("use atomic rename")
+	singleRule := SealRecall(evidence.LabelUserRule + " run go vet ./...")
+	doubleFrame := singlePlain + "\n\n" + singleRule
+
+	for _, tc := range []struct {
+		name string
+		in   string
+		want bool
+	}{
+		{name: "empty", in: "", want: false},
+		{name: "plain_unframed", in: "just text", want: false},
+		{name: "unclosed_frame", in: FrameHeader + "no footer", want: false},
+		{name: "single_plain", in: "  \n" + singlePlain + "\n ", want: true},
+		{name: "single_rule", in: singleRule, want: true},
+		{name: "adjacent_double", in: doubleFrame, want: false},
+		{name: "trailing_text", in: singlePlain + "\nextra outside", want: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsSingleRecallFrame(tc.in); got != tc.want {
+				t.Errorf("IsSingleRecallFrame() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+
+	seen := map[string]bool{}
+	var got []string
+	got = AppendUnwrappedRecallParts(got, "   \n\t ", seen)
+	got = AppendUnwrappedRecallParts(got, doubleFrame+"\n\n"+FrameHeader+"dangling tail", seen)
+	got = AppendUnwrappedRecallParts(got, singlePlain, seen) // duplicate dropped via seen
+	got = AppendUnwrappedRecallParts(got, "plain tail note", seen)
+
+	want := []string{
+		"use atomic rename",
+		evidence.LabelUserRule + " run go vet ./...",
+		"dangling tail",
+		"plain tail note",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("AppendUnwrappedRecallParts = %#v, want %#v", got, want)
+	}
+}
+
+func TestTruncateUTF8Edges(t *testing.T) {
+	if got := TruncateUTF8("abc", 0); got != "" {
+		t.Fatalf("limit 0 = %q, want empty", got)
+	}
+	if got := TruncateUTF8("abc", -5); got != "" {
+		t.Fatalf("negative limit = %q, want empty", got)
+	}
+	if got := TruncateUTF8("abc", 10); got != "abc" {
+		t.Fatalf("under limit = %q, want abc", got)
+	}
+	// 2-byte 'é' + 3-byte '€' + 4-byte '🚀'
+	multi := "é€🚀"
+	if got := TruncateUTF8(multi, 3); got != "é" {
+		t.Fatalf("split inside 3-byte rune = %q, want %q", got, "é")
+	}
+	if got := TruncateUTF8(multi, 6); got != "é€" {
+		t.Fatalf("split inside 4-byte rune = %q, want %q", got, "é€")
+	}
+	if got := TruncateUTF8("\x80\x80\x80", 2); got != "" {
+		t.Fatalf("leading continuation bytes = %q, want empty", got)
+	}
 }
 
 func TestStripInjectedContext(t *testing.T) {

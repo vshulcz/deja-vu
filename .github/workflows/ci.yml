@@ -513,11 +513,11 @@ jobs:
         run: |
           declare -A floor=(
             [cmd/deja]=88 [internal/atomicfile]=85 [internal/bench]=100
-            [internal/cjkfold]=100 [internal/digest]=90 [internal/docsdate]=84 [internal/embed]=93
+            [internal/cjkfold]=100 [internal/cliarg]=95 [internal/digest]=90 [internal/docsdate]=84 [internal/embed]=93
             [internal/evidence]=85 [internal/gitread]=100
-            [internal/harnesscolor]=100 [internal/hideconsole]=100 [internal/index]=90 [internal/mark]=98 [internal/model]=100
+            [internal/harnesscolor]=100 [internal/hideconsole]=100 [internal/hookengine]=90 [internal/index]=90 [internal/mark]=98 [internal/model]=100
             [internal/nfcfold]=100 [internal/peers]=80 [internal/policy]=100
-            [internal/prompt]=95 [internal/query]=100 [internal/redact]=98
+            [internal/proc]=90 [internal/prompt]=95 [internal/query]=100 [internal/redact]=98
             [internal/search]=93 [internal/sources]=87 [internal/stats]=94
             [internal/termwidth]=100 [internal/testenv]=88 [internal/tui]=90 [internal/usage]=95
             [internal/vault]=85
