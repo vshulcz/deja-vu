@@ -176,6 +176,7 @@ var flagsOfOtherCommands = map[string]string{
 	"--both":             "sync ssh",
 	"--from":             "last",
 	"--last":             "log",
+	"--jsonl":            "log",
 	"--seed":             "bench",
 	"--delivery":         "bench live",
 	"--settle":           "friction",
@@ -199,6 +200,9 @@ var flagsOfOtherCommands = map[string]string{
 	"--http":             "mcp",
 	"--secrets":          "audit",
 	"--fail-on-secrets":  "audit",
+	"--encrypted":        "init",
+	"--passphrase-stdin": "unlock",
+	"--auto-lock":        "init",
 }
 
 // searchFlags is every flag the bare search form accepts, for the typo check.
@@ -218,7 +222,7 @@ var (
 	}
 	doctorFlags   = []string{"--json", "--offline", "--deep", "--all"}
 	viewFlags     = []string{"--out", "--no-open"}
-	logFlags      = []string{"--json", "--last"}
+	logFlags      = []string{"--json", "--jsonl", "--last"}
 	rememberFlags = []string{"--project", "--tag", "--repo"}
 	restoreFlags  = []string{"--force", "--span", "--out", "--all"}
 	promoteFlags  = []string{"--state", "--note", "--to", "--tag", "--repo"}

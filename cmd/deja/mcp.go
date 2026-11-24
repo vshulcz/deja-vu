@@ -685,29 +685,48 @@ func callMCPRecall(dir string, raw json.RawMessage, served *int) (string, error)
 	return text, err
 }
 
+func callMCPDejaDispatch(dir string, raw json.RawMessage, served *int) (string, error) {
+	var a struct {
+		Mode string `json:"mode"`
+	}
+	if err := decodeToolArgs("deja", raw, &a); err != nil {
+		return "", err
+	}
+	mode := strings.ToLower(strings.TrimSpace(a.Mode))
+	if mode == "" || mode == "auto" {
+		mode = inferAutoMCPMode(raw)
+	}
+	target, ok := dispatcherModes[mode]
+	if !ok {
+		// Named, not guessed at: a model that invents a mode gets the list
+		// rather than an empty answer it will read as "no history".
+		// Named from what the tool declares rather than spelled out here:
+		// the seventh mode landed and this sentence still listed six.
+		return "", argErrorf("mode %q is not one of %s", a.Mode, strings.Join(declaredModes(), ", "))
+	}
+	return callMCPToolServed(dir, target, spreadQ(mode, raw), served)
+}
+
+func checkMCPReadToolAccess(dir, name string, raw json.RawMessage) error {
+	switch name {
+	case "recall", "recall_context", "blame", "fix", "how", "orient", "handoff":
+		var scope struct {
+			Project string `json:"project"`
+		}
+		_ = json.Unmarshal(raw, &scope)
+		return checkMCPAccess(dir, "read", scope.Project)
+	}
+	return nil
+}
+
 func callMCPToolRaw(dir, name string, raw json.RawMessage, served *int) (string, error) {
 	if name == "deja" {
-		var a struct {
-			Mode string `json:"mode"`
-		}
-		if err := decodeToolArgs(name, raw, &a); err != nil {
-			return "", err
-		}
-		mode := strings.ToLower(strings.TrimSpace(a.Mode))
-		if mode == "" || mode == "auto" {
-			mode = inferAutoMCPMode(raw)
-		}
-		target, ok := dispatcherModes[mode]
-		if !ok {
-			// Named, not guessed at: a model that invents a mode gets the list
-			// rather than an empty answer it will read as "no history".
-			// Named from what the tool declares rather than spelled out here:
-			// the seventh mode landed and this sentence still listed six.
-			return "", argErrorf("mode %q is not one of %s", a.Mode, strings.Join(declaredModes(), ", "))
-		}
-		return callMCPToolServed(dir, target, spreadQ(mode, raw), served)
+		return callMCPDejaDispatch(dir, raw, served)
 	}
 	raw = spreadQ(name, raw)
+	if err := checkMCPReadToolAccess(dir, name, raw); err != nil {
+		return "", err
+	}
 	switch name {
 	case "recall":
 		return callMCPRecall(dir, raw, served)
@@ -812,6 +831,18 @@ func callMCPToolRaw(dir, name string, raw json.RawMessage, served *int) (string,
 			Tags    []string `json:"tags"`
 		}
 		if err := decodeToolArgs(name, raw, &a); err != nil {
+			return "", err
+		}
+		targetProject := strings.TrimSpace(a.Project)
+		if _, repo, _ := repoRememberKind(targetProject); repo || targetProject == "" {
+			targetProject = "notes"
+			if cwd, err := os.Getwd(); err == nil {
+				if p := sources.ClaudeProjectName(cwd); p != "" {
+					targetProject = p
+				}
+			}
+		}
+		if err := checkMCPAccess(dir, "write", targetProject); err != nil {
 			return "", err
 		}
 		if strings.TrimSpace(a.Text) == "" {

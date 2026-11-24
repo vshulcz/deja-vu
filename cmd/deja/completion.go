@@ -297,7 +297,7 @@ _deja_completion() {
             COMPREPLY=( $(compgen -W "--json" -- "$cur") )
             ;;
         log)
-            COMPREPLY=( $(compgen -W "--last --json" -- "$cur") )
+            COMPREPLY=( $(compgen -W "--last --json --jsonl" -- "$cur") )
             ;;
         view)
             if [[ "$prev" == "--out" ]]; then
@@ -355,6 +355,16 @@ _deja_completion() {
             else
                 COMPREPLY=( $(compgen -W "--limit --json" -- "$cur") )
             fi
+            ;;
+        init)
+            if [[ "$prev" == "--auto-lock" ]]; then
+                COMPREPLY=()
+            else
+                COMPREPLY=( $(compgen -W "--encrypted --passphrase-stdin --auto-lock" -- "$cur") )
+            fi
+            ;;
+        lock|unlock)
+            COMPREPLY=( $(compgen -W "--passphrase-stdin" -- "$cur") )
             ;;
         mcp)
             if [[ "$prev" == "--http" ]]; then
@@ -418,8 +428,10 @@ _deja() {
     'handoff:continue a session in another agent'
     'help:print the command reference'
     'index:build or refresh the index'
+    'init:encrypt the memory store and personal notes at rest'
     'install:wire deja into an agent'
     'last:list recent sessions'
+    'lock:seal the index archive and evict the encryption key'
     'brief:recent sessions and what deja served, as text'
     'log:show what deja served to agents'
     'mcp:serve the MCP protocol'
@@ -437,6 +449,7 @@ _deja() {
     'statusline:print status bar data'
     'sync:move memory between machines'
     'uninstall:remove deja agent wiring'
+    'unlock:decrypt the index archive and load the key'
     'update:update a standalone install'
     'version:print the version'
     'warmup:build or refresh the index'
@@ -572,7 +585,7 @@ _deja() {
       _arguments '--json[print JSON]'
       ;;
     log)
-      _arguments '--last[print the most recent injected digest]' '--json[print JSON]' '1:count:'
+      _arguments '--last[print the most recent injected digest]' '--json[print JSON]' '--jsonl[print newline-delimited JSON]' '1:count:'
       ;;
     view)
       _arguments '--out=[write the page to a file]:file:_files' '--no-open[do not open the browser]'
@@ -598,6 +611,15 @@ _deja() {
       ;;
     fix|tests)
       _arguments '--limit=[max results]:count:' '--json[print JSON]'
+      ;;
+    init)
+      _arguments '--encrypted[encrypt memory store and personal notes at rest]' '--passphrase-stdin[read vault passphrase from stdin]' '--auto-lock=[idle auto-lock duration (for example 30m)]:duration:'
+      ;;
+    lock)
+      _arguments '--passphrase-stdin[read vault passphrase from stdin]'
+      ;;
+    unlock)
+      _arguments '--passphrase-stdin[read vault passphrase from stdin]'
       ;;
     mcp)
       _arguments '--context-search[serve only context_search]' '--http=[listen on Streamable HTTP address]:address:'
@@ -768,6 +790,7 @@ complete -c deja -n '__fish_seen_subcommand_from update' -l force -d 'Write over
 complete -c deja -n '__fish_seen_subcommand_from wip' -l json
 complete -c deja -n '__fish_seen_subcommand_from log' -l last -d 'Print the most recent injected digest'
 complete -c deja -n '__fish_seen_subcommand_from log' -l json
+complete -c deja -n '__fish_seen_subcommand_from log' -l jsonl -d 'Print newline-delimited JSON'
 complete -c deja -n '__fish_seen_subcommand_from view' -l out -r -F -d 'Write the page to a file'
 complete -c deja -n '__fish_seen_subcommand_from view' -l no-open -d 'Do not open the browser'
 complete -c deja -n '__fish_seen_subcommand_from fix tests' -l limit -x -d 'Max results'
@@ -804,6 +827,11 @@ complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcomman
 complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from ssh' -l pull
 complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from ssh' -l full
 complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from ssh' -l both
+complete -c deja -n '__fish_seen_subcommand_from init' -l encrypted -d 'Encrypt memory store and personal notes at rest'
+complete -c deja -n '__fish_seen_subcommand_from init' -l passphrase-stdin -d 'Read vault passphrase from stdin'
+complete -c deja -n '__fish_seen_subcommand_from init' -l auto-lock -x -d 'Idle auto-lock duration'
+complete -c deja -n '__fish_seen_subcommand_from lock' -l passphrase-stdin -d 'Read vault passphrase from stdin'
+complete -c deja -n '__fish_seen_subcommand_from unlock' -l passphrase-stdin -d 'Read vault passphrase from stdin'
 `
 
 const powershellCompletion = `# PowerShell completion for deja
@@ -942,7 +970,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
             }
             'update' { @('--force') }
             'wip' { @('--json') }
-            'log' { @('--last', '--json') }
+            'log' { @('--last', '--json', '--jsonl') }
             'view' {
                 if ($previous -eq '--out') { @() }
                 else { @('--out', '--no-open') }
@@ -972,6 +1000,13 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
             { $_ -in @('fix', 'tests') } {
                 if ($previous -eq '--limit') { @() }
                 else { @('--limit', '--json') }
+            }
+            'init' {
+                if ($previous -eq '--auto-lock') { @() }
+                else { @('--encrypted', '--passphrase-stdin', '--auto-lock') }
+            }
+            { $_ -in @('lock', 'unlock') } {
+                @('--passphrase-stdin')
             }
             'mcp' {
                 if ($previous -eq '--http') { @() }
@@ -1008,9 +1043,9 @@ func completionCommands() []string {
 	return []string{
 		"audit", "bench", "blame", "brief", "check", "completion", "ctx", "delete", "doctor", "embed",
 		"files", "fix", "forget", "friction", "handoff", "help", "how", "index",
-		"install", "last", "log", "mcp", "origin", "promote", "recall", "recap", "remember", "repo", "restore",
+		"init", "install", "last", "lock", "log", "mcp", "origin", "promote", "recall", "recap", "remember", "repo", "restore",
 		"resume", "review", "rules", "search", "secrets", "share", "shell", "show", "sources", "stats",
-		"status", "statusline", "sync", "tests", "trail", "uninstall", "update", "version", "view",
+		"status", "statusline", "sync", "tests", "trail", "uninstall", "unlock", "update", "version", "view",
 		"warmup", "wip",
 	}
 }

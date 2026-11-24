@@ -46,10 +46,14 @@ func AppendPromotedSourced(project, title, text, session, state string, tags []s
 		return errors.New("project and text required")
 	}
 	path := NotesFile()
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	dek, err := personalNotesDEK(path)
+	if err != nil {
 		return err
 	}
-	if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
+	if mkErr := os.MkdirAll(filepath.Dir(path), 0o700); mkErr != nil {
+		return mkErr
+	}
+	if info, lstatErr := os.Lstat(path); lstatErr == nil && info.Mode()&os.ModeSymlink != 0 {
 		return errors.New("notes file is a symlink")
 	}
 	// An identical re-promote is not a correction. `promote` writes a record
@@ -71,7 +75,7 @@ func AppendPromotedSourced(project, title, text, session, state string, tags []s
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	if err := f.Chmod(0o600); err != nil && runtime.GOOS != "windows" {
+	if err = f.Chmod(0o600); err != nil && runtime.GOOS != "windows" {
 		return err
 	}
 	if now.IsZero() {
@@ -81,14 +85,23 @@ func AppendPromotedSourced(project, title, text, session, state string, tags []s
 	if !srcTS.IsZero() {
 		stamp = srcTS.UTC().Format(time.RFC3339Nano)
 	}
-	if err := padTrailingNewline(f); err != nil {
-		return err
+	if padErr := padTrailingNewline(f); padErr != nil {
+		return padErr
 	}
-	return json.NewEncoder(f).Encode(note{
+	raw, err := json.Marshal(note{
 		TS: now.UTC().Format(time.RFC3339Nano), Project: project, Text: text,
 		Kind: "promoted", Session: session, State: state, Title: title,
 		Tags: NormalizeTags(tags), SrcTS: stamp,
 	})
+	if err != nil {
+		return err
+	}
+	line, err := sealPersonalNoteLine(dek, raw)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(line)
+	return err
 }
 
 // AppendRepoPromotedSourced appends a sanitized promoted note to
@@ -569,6 +582,10 @@ func RestorePromotedTitles(titleFor func(session string) string) (int, error) {
 // fails so a full disk does not leave one behind (#808).
 func rewriteNotes(edit func(map[string]any) (map[string]any, bool)) (int, error) {
 	path := NotesFile()
+	dek, err := personalNotesDEK(path)
+	if err != nil {
+		return 0, err
+	}
 	b, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -582,8 +599,13 @@ func rewriteNotes(edit func(map[string]any) (map[string]any, bool)) (int, error)
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
+		plain, ok := openPersonalNoteLine(dek, []byte(line))
+		if !ok {
+			lines = append(lines, line)
+			continue
+		}
 		var m map[string]any
-		if json.Unmarshal([]byte(line), &m) != nil {
+		if json.Unmarshal(plain, &m) != nil {
 			lines = append(lines, line)
 			continue
 		}
@@ -602,7 +624,13 @@ func rewriteNotes(edit func(map[string]any) (map[string]any, bool)) (int, error)
 			changed--
 			continue
 		}
-		lines = append(lines, string(out))
+		sealed, serr := sealPersonalNoteLine(dek, out)
+		if serr != nil {
+			lines = append(lines, line)
+			changed--
+			continue
+		}
+		lines = append(lines, strings.TrimRight(string(sealed), "\n"))
 	}
 	if changed == 0 {
 		return 0, nil

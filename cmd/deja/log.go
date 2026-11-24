@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -23,12 +24,15 @@ func runLog(dir string, args []string) error {
 func runLogTo(w io.Writer, dir string, args []string) error {
 	n := 20
 	jsonOut := false
+	jsonl := false
 	last := false
 	seenN := false
 	for _, a := range args {
 		switch a {
 		case "--json":
 			jsonOut = true
+		case "--jsonl":
+			jsonl = true
 		case "--last":
 			last = true
 		default:
@@ -54,9 +58,18 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 			n, seenN = x, true
 		}
 	}
+	if jsonOut && jsonl {
+		return errors.New("log: choose either --json or --jsonl, not both")
+	}
 	if last {
+		if err := checkCLIAccess(dir, "read", ""); err != nil {
+			return err
+		}
 		snaps := usage.Snapshots(dir, 1)
 		if len(snaps) == 0 {
+			if jsonl {
+				return nil
+			}
 			// `--json` answers in JSON, including when the answer is that
 			// there is nothing: this shape is one object, and null is how a
 			// missing object is spelled. The sentence went out under the flag
@@ -69,9 +82,11 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 			return nil
 		}
 		s := snaps[0]
-		if jsonOut {
+		if jsonOut || jsonl {
 			enc := json.NewEncoder(w)
-			enc.SetIndent("", "  ")
+			if !jsonl {
+				enc.SetIndent("", "  ")
+			}
 			return enc.Encode(s)
 		}
 		fmt.Fprintf(w, "# %s · %s · %d session%s · %s%s\n\n", logKindLabel(s.Kind), s.Time.Local().Format("2006-01-02 15:04"), s.Sessions, pluralS(s.Sessions), humanBytes(int64(s.Bytes)), snapshotTail(s))
@@ -85,7 +100,19 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 		}
 		return nil
 	}
+	if err := enforceClientPolicy(dir, "cli", cliClientName(), "read", ""); err != nil {
+		return err
+	}
 	events, total := usage.EventsCounted(dir, n)
+	if jsonl {
+		enc := json.NewEncoder(w)
+		for _, e := range events {
+			if err := enc.Encode(e); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 	if jsonOut {
 		// A nil slice encodes as null, and null is not an empty list: len()
 		// raises, iteration raises, `jq '.[]'` errors. Every other
@@ -126,7 +153,7 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 			// a host that sent nothing at all (#2161).
 			into = " · into: unknown (the host sent a payload deja could not read)"
 		}
-		fmt.Fprintf(w, "%s  %-14s %s%s%s%s%s\n", e.Time.Local().Format("2006-01-02 15:04"), logKindLabel(e.Kind), humanBytes(int64(e.Bytes)), sess, into, compactionFailureNote(e), mark)
+		fmt.Fprintf(w, "%s  %-14s %s%s%s%s%s%s\n", e.Time.Local().Format("2006-01-02 15:04"), logKindLabel(e.Kind), humanBytes(int64(e.Bytes)), sess, into, accessTail(e), compactionFailureNote(e), mark)
 	}
 	if total > len(events) {
 		// Nobody typed the 20 — it is the default above — and this is the
@@ -309,6 +336,38 @@ func logKindLabel(kind string) string {
 		return "compaction"
 	case usage.KindCompactionRecovery:
 		return "recovered"
+	case usage.KindAccess:
+		return "access"
 	}
 	return kind
+}
+
+func accessTail(e usage.Event) string {
+	if e.Kind != usage.KindAccess {
+		return ""
+	}
+	client := e.Client
+	if client == "" {
+		client = "-"
+	}
+	surface := e.Surface
+	if surface == "" {
+		surface = "-"
+	}
+	action := e.Action
+	if action == "" {
+		action = "-"
+	}
+	decision := e.Decision
+	if decision == "" {
+		decision = "-"
+	}
+	out := fmt.Sprintf(" · %s · %s · %s · %s", surface, client, action, decision)
+	if e.ProjectScope != "" {
+		out += " · project: " + e.ProjectScope
+	}
+	if e.DenyReason != "" {
+		out += " (" + e.DenyReason + ")"
+	}
+	return out
 }

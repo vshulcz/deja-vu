@@ -103,6 +103,9 @@ func runRemember(dir string, args []string) error {
 		project = sources.ClaudeProjectName(cwd)
 	}
 	now := time.Now()
+	if err := checkCLIAccess(dir, "write", project); err != nil {
+		return err
+	}
 	if toRepo {
 		cwd, err := os.Getwd()
 		if err != nil {

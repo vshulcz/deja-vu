@@ -82,6 +82,9 @@ func ReadRecordsAt(dir string, offsets []int64) ([]OffsetRecord, error) {
 }
 
 func openRecordLog(dir string) (*os.File, *recordTables, error) {
+	if err := ensureVaultUnlocked(dir); err != nil {
+		return nil, nil, err
+	}
 	t, err := loadRecordTables(dir)
 	if err != nil {
 		return nil, nil, err

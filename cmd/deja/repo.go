@@ -64,8 +64,14 @@ func runRepo(dir string, args []string) error {
 		case "candidates":
 			return runRepoCandidates(dir, os.Stdout, args[1:])
 		case "add":
+			if err := checkCLIAccess(dir, "write", ""); err != nil {
+				return err
+			}
 			return runRepoAdd(dir, os.Stdout, args[1:])
 		case "gotcha", "rejected", "decision":
+			if err := checkCLIAccess(dir, "write", ""); err != nil {
+				return err
+			}
 			return runRepoAdd(dir, os.Stdout, append([]string{"--kind", args[0]}, args[1:]...))
 		case "init", "sync":
 			return runRepoSync(dir, os.Stdout, args[0], args[1:])

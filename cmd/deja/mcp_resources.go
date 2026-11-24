@@ -21,6 +21,9 @@ const mcpResourceNameMax = 80
 // mcpResourcesList exposes recent sessions as browsable MCP resources, so an
 // agent can look around without guessing search terms first.
 func mcpResourcesList(dir string) (any, int, string) {
+	if err := checkMCPAccess(dir, "read", ""); err != nil {
+		return nil, -32603, err.Error()
+	}
 	// A browse is not worth a rebuild inside the handler: on a stale store
 	// index.Ensure ran the whole build here, and on a cold one the answer was
 	// a raw errno carrying an internal manifest path (#1306).
@@ -38,9 +41,10 @@ func mcpResourcesList(dir string) (any, int, string) {
 		return nil, -32603, err.Error()
 	}
 	pol := policy.Load()
+	client := mcpActiveClientName()
 	resources := make([]map[string]any, 0, mcpResourceLimit)
 	for _, s := range ss {
-		if !pol.Allows(policy.ActivationMCP, s.Project) {
+		if !pol.Allows(policy.ActivationMCP, s.Project) || !pol.AllowsClientProject(client, s.Project) {
 			continue
 		}
 		// A title is the first thing someone typed into some session, which may
@@ -94,6 +98,9 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 	if strings.TrimSpace(id) == "" {
 		return nil, -32602, "resource uri carries no session id"
 	}
+	if err := checkMCPAccess(dir, "read", ""); err != nil {
+		return nil, -32602, err.Error()
+	}
 	s, found, err := index.FindByPrefixIn(dir, id, harness)
 	if err != nil {
 		return nil, -32603, err.Error()
@@ -105,7 +112,11 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 		return nil, -32602, fmt.Sprintf("no session matches %q", neutralizeFrameMarkers(safeForStatusline(id, mcpResourceNameMax)))
 	}
 	pol := policy.Load()
-	if !pol.Allows(policy.ActivationMCP, s.Project) || pol.Ignored(s.Path, s.Project) {
+	client := mcpActiveClientName()
+	if !pol.Allows(policy.ActivationMCP, s.Project) || !pol.AllowsClientProject(client, s.Project) || pol.Ignored(s.Path, s.Project) {
+		if !pol.AllowsClientProject(client, s.Project) {
+			usage.RecordAccess(dir, "mcp", client, "read", s.Project, "deny", "project outside client scope")
+		}
 		return nil, -32602, "blocked by trust policy"
 	}
 	// Every door a person types says when a prefix reached more than one
@@ -115,7 +126,7 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 	// frame, so it reads as deja's own words and not as recalled text.
 	note := ""
 	if n := index.PrefixMatchesIn(dir, id, harness, func(project string) bool {
-		return pol.Allows(policy.ActivationMCP, project)
+		return pol.Allows(policy.ActivationMCP, project) && pol.AllowsClientProject(client, project)
 	}); n > 1 {
 		note = fmt.Sprintf("deja: %d sessions match %q — this is the most recent; ask for a longer prefix to read another.\n\n",
 			n, neutralizeFrameMarkers(safeForStatusline(id, mcpResourceNameMax)))
