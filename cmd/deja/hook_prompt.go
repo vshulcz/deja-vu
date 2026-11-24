@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
+	"github.com/vshulcz/deja-vu/internal/hookengine"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/redact"
@@ -81,29 +82,7 @@ func (i *promptHookInput) adopt() {
 type hookPromptText string
 
 func (h *hookPromptText) UnmarshalJSON(b []byte) error { //nolint:unparam // json.Unmarshaler fixes the signature
-	var s string
-	if err := json.Unmarshal(b, &s); err == nil {
-		*h = hookPromptText(withoutInjectedContext(s))
-		return nil
-	}
-	var parts []struct {
-		Type string `json:"type"`
-		Text string `json:"text"`
-	}
-	if err := json.Unmarshal(b, &parts); err != nil {
-		return nil //nolint:nilerr // an unknown shape means no prompt, not a broken hook
-	}
-	var sb strings.Builder
-	for _, p := range parts {
-		if p.Text == "" {
-			continue
-		}
-		if sb.Len() > 0 {
-			sb.WriteByte('\n')
-		}
-		sb.WriteString(p.Text)
-	}
-	*h = hookPromptText(withoutInjectedContext(sb.String()))
+	*h = hookPromptText(hookengine.DecodePromptText(b))
 	return nil
 }
 
@@ -114,28 +93,7 @@ func (h *hookPromptText) UnmarshalJSON(b []byte) error { //nolint:unparam // jso
 // user, so every prompt recalls whatever the last one did. Gemini escapes the
 // angle brackets of anything inside, so both spellings are removed.
 func withoutInjectedContext(s string) string {
-	for _, tag := range []struct{ open, close string }{
-		{"<hook_context>", "</hook_context>"},
-		{"&lt;hook_context&gt;", "&lt;/hook_context&gt;"},
-		{"<deja-recall>", "</deja-recall>"},
-		{"&lt;deja-recall&gt;", "&lt;/deja-recall&gt;"},
-	} {
-		for {
-			start := strings.Index(s, tag.open)
-			if start < 0 {
-				break
-			}
-			end := strings.Index(s[start:], tag.close)
-			if end < 0 {
-				// An unclosed block is still not the user's words, and what
-				// follows it cannot be told apart from more of the same.
-				s = s[:start]
-				break
-			}
-			s = s[:start] + s[start+end+len(tag.close):]
-		}
-	}
-	return strings.TrimSpace(s)
+	return hookengine.StripInjectedContext(s)
 }
 
 // plain=true prints the bare digest for hosts that inject a hook's stdout

@@ -1,0 +1,94 @@
+{
+  "trailingCases": [
+    {
+      "name": "empty",
+      "text": "",
+      "extra": "",
+      "allowWhole": false,
+      "wantBody": "",
+      "wantBlocks": []
+    },
+    {
+      "name": "plain_preserves_trailing_spaces",
+      "text": "check retry backoff  ",
+      "extra": "",
+      "allowWhole": false,
+      "wantBody": "check retry backoff  ",
+      "wantBlocks": []
+    },
+    {
+      "name": "framed_at_start_not_peeled_when_allow_whole_false",
+      "text": "<deja-recall>\nonly block\n</deja-recall>",
+      "extra": "",
+      "allowWhole": false,
+      "wantBody": "<deja-recall>\nonly block\n</deja-recall>",
+      "wantBlocks": []
+    },
+    {
+      "name": "framed_at_start_peeled_when_allow_whole_true",
+      "text": "<deja-recall>\nonly block\n</deja-recall>",
+      "extra": "",
+      "allowWhole": true,
+      "wantBody": "",
+      "wantBlocks": ["<deja-recall>\nonly block\n</deja-recall>"]
+    },
+    {
+      "name": "user_prompt_with_one_framed_block",
+      "text": "fix the retry loop\n\n<deja-recall>\nprior decision\n</deja-recall>\n",
+      "extra": "",
+      "allowWhole": false,
+      "wantBody": "fix the retry loop",
+      "wantBlocks": ["<deja-recall>\nprior decision\n</deja-recall>"]
+    },
+    {
+      "name": "user_prompt_with_stacked_framed_blocks",
+      "text": "fix the retry loop\n\n<deja-recall>\nfirst\n</deja-recall>\n\n<deja-recall>\nsecond\n</deja-recall>",
+      "extra": "",
+      "allowWhole": false,
+      "wantBody": "fix the retry loop",
+      "wantBlocks": ["<deja-recall>\nfirst\n</deja-recall>", "<deja-recall>\nsecond\n</deja-recall>"]
+    },
+    {
+      "name": "unframed_extra_block_peeled_after_newline",
+      "text": "check cache invalidation\n\nplain recall line",
+      "extra": "plain recall line",
+      "allowWhole": false,
+      "wantBody": "check cache invalidation",
+      "wantBlocks": ["plain recall line"]
+    },
+    {
+      "name": "inline_tag_without_leading_newline_ignored",
+      "text": "quote <deja-recall>inline</deja-recall>",
+      "extra": "",
+      "allowWhole": false,
+      "wantBody": "quote <deja-recall>inline</deja-recall>",
+      "wantBlocks": []
+    }
+  ],
+  "settleCases": [
+    {
+      "name": "append_fresh_recall",
+      "text": "check retry backoff  ",
+      "extra": "<deja-recall>\nprior\n</deja-recall>",
+      "wantText": "check retry backoff\n\n<deja-recall>\nprior\n</deja-recall>"
+    },
+    {
+      "name": "keep_existing_first_block_over_new_extra",
+      "text": "check retry backoff\n\n<deja-recall>\nfirst\n</deja-recall>\n\n<deja-recall>\nsecond\n</deja-recall>",
+      "extra": "<deja-recall>\nthird\n</deja-recall>",
+      "wantText": "check retry backoff\n\n<deja-recall>\nfirst\n</deja-recall>"
+    },
+    {
+      "name": "untouched_when_extra_empty_and_no_blocks",
+      "text": "check retry backoff  ",
+      "extra": "",
+      "wantText": "check retry backoff  "
+    },
+    {
+      "name": "bare_user_text_with_empty_extra_stays_verbatim",
+      "text": "plain text\n",
+      "extra": "",
+      "wantText": "plain text\n"
+    }
+  ]
+}
