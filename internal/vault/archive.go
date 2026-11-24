@@ -539,13 +539,8 @@ func restorePromptCache(stage, base string) error {
 		wipeTree(cacheDir)
 		srcDir := filepath.Join(stage, "prompt-cache")
 		if info, err := os.Stat(srcDir); err == nil && info.IsDir() {
-			if err := os.MkdirAll(filepath.Dir(cacheDir), 0o700); err != nil {
+			if err := copyTreeSecure(srcDir, cacheDir); err != nil {
 				return err
-			}
-			if err := os.Rename(srcDir, cacheDir); err != nil {
-				if copyErr := copyTreeSecure(srcDir, cacheDir); copyErr != nil {
-					return copyErr
-				}
 			}
 		}
 	}

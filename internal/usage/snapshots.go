@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"os"
 	"path/filepath"
 	"slices"
@@ -124,8 +125,12 @@ func digestHash(indexDir, digest string) string {
 		sum := mac.Sum(nil)
 		return hex.EncodeToString(sum[:8])
 	}
-	sum := sha256.Sum256([]byte(digest))
-	return hex.EncodeToString(sum[:8])
+	// FNV-1a, not a cryptographic hash: on an unencrypted store the full
+	// digest already sits in .injections.jsonl, and Event.Hash only tells
+	// equal-size injections in the same second apart.
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(digest))
+	return fmt.Sprintf("%016x", h.Sum64())
 }
 
 // RecordDigestFrom is RecordDigestInto plus the projects the digest was built
