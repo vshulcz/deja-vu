@@ -1,6 +1,8 @@
 package index
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -762,13 +764,36 @@ type bucketDir struct {
 }
 
 // tokenCatalogDirs is tokenCatalog that also keeps each bucket's directory.
+//
+// An append commits its manifest and then retires the overlays it folded in.
+// A reader that listed the directory before the retirement then opens an
+// overlay that is gone. The manifest did not change, so the generation retry
+// above never sees it, and recall failed with ENOENT until the next query
+// (#6168). The whole read is tried once more from a fresh listing: an entry of
+// the old listing is not skipped, because a file still missing on the second
+// listing is a lost overlay, and that error is returned.
 func tokenCatalogDirs(dir string) (map[string]bool, []bucketDir, error) {
+	catalog, dirs, err := readTokenCatalogDirs(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return readTokenCatalogDirs(dir)
+	}
+	return catalog, dirs, err
+}
+
+// catalogListed, when set by a test, runs between the listing of the buckets
+// directory and the open of its entries: where an append's cleanup lands.
+var catalogListed func()
+
+func readTokenCatalogDirs(dir string) (map[string]bool, []bucketDir, error) {
 	entries, err := os.ReadDir(filepath.Join(dir, "buckets"))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return map[string]bool{}, nil, nil
 		}
 		return nil, nil, err
+	}
+	if catalogListed != nil {
+		catalogListed()
 	}
 	var dirs []bucketDir
 	tokens := 0
