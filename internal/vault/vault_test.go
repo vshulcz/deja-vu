@@ -53,6 +53,7 @@ func withTestVaultEnv(t *testing.T) (dir string, kr *memKeyring) {
 	t.Setenv("XDG_DATA_HOME", filepath.Join(tmp, "data"))
 	t.Setenv("XDG_CACHE_HOME", filepath.Join(tmp, "cache"))
 	t.Setenv("DEJA_INDEX_DIR", "")
+	t.Setenv("DEJA_PROMPT_CACHE_FILE", "")
 	t.Setenv(EnvVaultFile, filepath.Join(tmp, "config", "deja", "vault.json"))
 	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "data", "deja", "notes.jsonl"))
 	t.Setenv(EnvVaultKey, "")
@@ -1449,4 +1450,162 @@ func (w *failAfterWriter) Write(p []byte) (int, error) {
 	}
 	w.left--
 	return len(p), nil
+}
+
+func TestLockSealsAndWipesPromptCacheAndUnlockRestores(t *testing.T) {
+	indexDir, _ := withTestVaultEnv(t)
+	if err := os.MkdirAll(indexDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(indexDir, "records.bin"), []byte("idx"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	const pass = "correct-horse-passphrase"
+	if _, err := Init(indexDir, pass, 0); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+
+	pcDir := filepath.Join(os.Getenv("XDG_CACHE_HOME"), "deja-vu")
+	if err := os.MkdirAll(filepath.Join(pcDir, "nested"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	opencodeFile := filepath.Join(pcDir, "opencode.json")
+	nestedFile := filepath.Join(pcDir, "nested", "pi.json")
+	const wantOpencode = `{"sessions":{"s1":{"digest":"SECRET_PROMPT_CANARY"}}}`
+	const wantNested = `{"sessions":{"s2":{"digest":"NESTED_PROMPT_CANARY"}}}`
+	if err := os.WriteFile(opencodeFile, []byte(wantOpencode), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(nestedFile, []byte(wantNested), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	skipLink := filepath.Join(pcDir, "skip-link.json")
+	_ = os.Symlink(opencodeFile, skipLink)
+
+	// An out-of-cache SealTree must not wipe or touch XDG_CACHE_HOME/deja-vu.
+	outsideRoot := t.TempDir()
+	outsideIdx := filepath.Join(outsideRoot, "isolated", "index.db")
+	if err := os.MkdirAll(outsideIdx, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outsideIdx, "records.bin"), []byte("out"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dek, err := CheckUnlocked(indexDir)
+	if err != nil {
+		t.Fatalf("CheckUnlocked: %v", err)
+	}
+	if err := SealTree(outsideIdx, dek); err != nil {
+		t.Fatalf("SealTree(outside): %v", err)
+	}
+	if got, readErr := os.ReadFile(opencodeFile); readErr != nil || string(got) != wantOpencode {
+		t.Fatalf("out-of-cache SealTree disturbed %s: got=%q err=%v", opencodeFile, got, readErr)
+	}
+
+	// Locking the active vault seals and wipes XDG_CACHE_HOME/deja-vu.
+	if err := Lock(indexDir, ""); err != nil {
+		t.Fatalf("Lock: %v", err)
+	}
+	if _, err := os.Stat(pcDir); !os.IsNotExist(err) {
+		t.Fatalf("prompt cache dir %s still exists while locked (err=%v)", pcDir, err)
+	}
+
+	// Simulate an agent running while locked and writing poisoned empty digests.
+	if err := os.MkdirAll(pcDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	poisonFile := filepath.Join(pcDir, "poison.json")
+	if err := os.WriteFile(poisonFile, []byte(`{"sessions":{"locked":{"digest":""}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(opencodeFile, []byte(`{"sessions":{"s1":{"digest":""}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Unlock(indexDir, pass); err != nil {
+		t.Fatalf("Unlock: %v", err)
+	}
+	if _, err := os.Stat(poisonFile); !os.IsNotExist(err) {
+		t.Fatalf("locked-era %s survived Unlock (err=%v)", poisonFile, err)
+	}
+	if got, err := os.ReadFile(opencodeFile); err != nil || string(got) != wantOpencode {
+		t.Fatalf("restored %s = %q (%v), want %q", opencodeFile, got, err, wantOpencode)
+	}
+	if got, err := os.ReadFile(nestedFile); err != nil || string(got) != wantNested {
+		t.Fatalf("restored %s = %q (%v), want %q", nestedFile, got, err, wantNested)
+	}
+	if _, err := os.Lstat(skipLink); !os.IsNotExist(err) {
+		t.Fatalf("symlink %s was restored across Lock/Unlock (err=%v)", skipLink, err)
+	}
+
+	// DEJA_PROMPT_CACHE_FILE override outside cache root also round-trips through Lock/Unlock.
+	overrideFile := filepath.Join(t.TempDir(), "custom-prompt-cache.json")
+	t.Setenv("DEJA_PROMPT_CACHE_FILE", overrideFile)
+	const wantOverride = `{"sessions":{"custom":{"digest":"OVERRIDE_CANARY"}}}`
+	if err := os.WriteFile(overrideFile, []byte(wantOverride), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Lock(indexDir, ""); err != nil {
+		t.Fatalf("Lock with override: %v", err)
+	}
+	if _, err := os.Stat(overrideFile); !os.IsNotExist(err) {
+		t.Fatalf("override prompt cache %s still exists while locked (err=%v)", overrideFile, err)
+	}
+	if err := os.WriteFile(overrideFile, []byte(`{"sessions":{"locked":{"digest":""}}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Unlock(indexDir, pass); err != nil {
+		t.Fatalf("Unlock with override: %v", err)
+	}
+	if got, err := os.ReadFile(overrideFile); err != nil || string(got) != wantOverride {
+		t.Fatalf("restored override %s = %q (%v), want %q", overrideFile, got, err, wantOverride)
+	}
+}
+
+func TestPromptCacheHelpersAndPlaintextDetection(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", "")
+	t.Setenv("LOCALAPPDATA", "")
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	wantRoot := filepath.Join(home, ".cache")
+	if runtime.GOOS == "windows" {
+		wantRoot = filepath.Join(home, "AppData", "Local")
+	}
+	if got := promptCacheRoot(); got != wantRoot {
+		t.Fatalf("promptCacheRoot() = %q, want %q", got, wantRoot)
+	}
+
+	cacheHome := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", cacheHome)
+	t.Setenv("DEJA_PROMPT_CACHE_FILE", "")
+	missingIdx := filepath.Join(cacheHome, "deja-vu-idx", "index.db")
+	if hasPlaintextStore(missingIdx) {
+		t.Fatalf("hasPlaintextStore(%q) = true with empty dirs, want false", missingIdx)
+	}
+
+	pcDir := filepath.Join(cacheHome, "deja-vu")
+	if err := os.MkdirAll(pcDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pcDir, "opencode.json"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if !hasPlaintextStore(missingIdx) {
+		t.Fatalf("hasPlaintextStore(%q) = false with prompt-cache file present, want true", missingIdx)
+	}
+
+	if err := os.RemoveAll(pcDir); err != nil {
+		t.Fatal(err)
+	}
+	override := filepath.Join(t.TempDir(), "single-cache.json")
+	t.Setenv("DEJA_PROMPT_CACHE_FILE", override)
+	if err := os.WriteFile(override, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	absentIdx := filepath.Join(t.TempDir(), "absent", "index.db")
+	if !hasPlaintextStore(absentIdx) {
+		t.Fatalf("hasPlaintextStore(%q) = false with DEJA_PROMPT_CACHE_FILE present, want true", absentIdx)
+	}
 }

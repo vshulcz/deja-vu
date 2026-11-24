@@ -335,6 +335,8 @@ func autoWiringState(a autoWiring) (state string, binaryMissing bool) {
 		state = "stale"
 	case a.name == "openclaw" && openclawPluginMissing():
 		state = "stale"
+	case a.name == "openclaw" && openclawPluginOutdated():
+		state = "stale"
 	case a.name == "openclaw" && openclawIncludedWiringMissing() != "":
 		state = "stale"
 	// Written, and the CLI's default V2 engine does not start it: that runs
@@ -374,6 +376,16 @@ func openclawPluginDir() string {
 func openclawPluginMissing() bool {
 	_, err := os.Stat(filepath.Join(openclawPluginDir(), "index.mjs"))
 	return err != nil
+}
+
+// openclawPluginOutdated reports whether the plugin half of openclaw-auto is
+// present on disk but predates prompt-cache session persistence (#6160).
+func openclawPluginOutdated() bool {
+	b, err := os.ReadFile(filepath.Join(openclawPluginDir(), "index.mjs"))
+	if err != nil {
+		return false
+	}
+	return pluginScriptOutdated("openclaw", string(b))
 }
 
 // aiderWiring is the aider row's state when the context file and the read:
@@ -481,6 +493,8 @@ func doctorAutoRecall(w io.Writer) {
 			fmt.Fprintf(w, "  %-12s %-11s %s  (deja's hook is not under hooks.events with hooks.enabled on — `deja install zcode-auto`)\n", a.name, "stale", reportPath(path))
 		case a.name == "openclaw" && openclawPluginMissing():
 			fmt.Fprintf(w, "  %-12s %-11s %s  (deja's plugin is not in %s — `openclaw agent --local` gets no recall; `deja install openclaw-auto`)\n", a.name, "stale", reportPath(path), reportPath(openclawPluginDir()))
+		case a.name == "openclaw" && openclawPluginOutdated():
+			fmt.Fprintf(w, "  %-12s %-11s %s  (outdated plugin script — run `deja install openclaw-auto` to update)\n", a.name, "stale", reportPath(path))
 		case a.name == "openclaw" && openclawIncludedWiringMissing() != "":
 			fmt.Fprintf(w, "  %-12s %-11s %s  (openclaw.json keeps a section deja writes in an $include, and %s is not in it or the file it includes yet — `deja install openclaw-auto` says what to add where)\n", a.name, "stale", reportPath(path), openclawIncludedWiringMissing())
 		case a.name == "kiro" && !kiroV2RunsDeja():
@@ -715,15 +729,17 @@ func pluginScriptOutdated(name, text string) bool {
 	}
 	switch name {
 	case "opencode", "kilocode", "mimo":
-		return !strings.Contains(text, "hook-tool-after") || !strings.Contains(text, "hook-session-end") || !strings.Contains(text, `.includes("patch")`)
+		return !strings.Contains(text, "hook-tool-after") || !strings.Contains(text, "hook-session-end") || !strings.Contains(text, `.includes("patch")`) || !strings.Contains(text, "createSessionStore")
 	case "deepseek":
-		return !strings.Contains(text, "hook-tool-after")
+		return !strings.Contains(text, "hook-tool-after") || !strings.Contains(text, "createSessionStore")
+	case "openclaw":
+		return !strings.Contains(text, "createSessionStore")
 	case "hermes":
 		return !strings.Contains(text, "hook-prompt")
 	case "pi", "senpi", "gjc", "kimchi":
-		return !strings.Contains(text, "hook-prompt") || !strings.Contains(text, "hook-tool-after")
+		return !strings.Contains(text, "hook-prompt") || !strings.Contains(text, "hook-tool-after") || !strings.Contains(text, "createSessionStore")
 	case "cline", "omp", "amp", "prime":
-		return !strings.Contains(text, "hook-prompt") || !strings.Contains(text, "hook-tool-after")
+		return !strings.Contains(text, "hook-prompt") || !strings.Contains(text, "hook-tool-after") || !strings.Contains(text, "createSessionStore")
 	}
 	return false
 }

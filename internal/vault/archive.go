@@ -15,6 +15,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -183,6 +184,17 @@ func hasPlaintextStore(indexDir string) bool {
 			return true
 		}
 	}
+	cacheDir, singleFile := promptCacheTargets(base)
+	if cacheDir != "" {
+		if entries, err := os.ReadDir(cacheDir); err == nil && len(entries) > 0 {
+			return true
+		}
+	}
+	if singleFile != "" {
+		if _, err := os.Stat(singleFile); err == nil {
+			return true
+		}
+	}
 	return false
 }
 
@@ -342,6 +354,9 @@ func OpenTree(indexDir string, dek []byte) error {
 			}
 		}
 	}
+	if err := restorePromptCache(stage, base); err != nil {
+		return err
+	}
 	_ = f.Close()
 	return os.Remove(archPath)
 }
@@ -391,7 +406,7 @@ func writeTreeToTar(tw *tar.Writer, base string) error {
 			return err
 		}
 	}
-	return nil
+	return addPromptCacheToTar(tw, base)
 }
 
 func addFileToTar(tw *tar.Writer, srcPath, tarName string, info fs.FileInfo) error {
@@ -427,6 +442,169 @@ func wipePlaintextStore(base string) {
 	for _, suf := range contentSidecars {
 		shredFile(base + suf)
 	}
+	cacheDir, singleFile := promptCacheTargets(base)
+	if cacheDir != "" {
+		wipeTree(cacheDir)
+	}
+	if singleFile != "" {
+		shredFile(singleFile)
+	}
+}
+
+func promptCacheRoot() string {
+	if base := os.Getenv("XDG_CACHE_HOME"); filepath.IsAbs(base) {
+		return filepath.Clean(base)
+	}
+	if runtime.GOOS == "windows" {
+		if base := os.Getenv("LOCALAPPDATA"); filepath.IsAbs(base) {
+			return filepath.Clean(base)
+		}
+		if h := homeDir(); filepath.IsAbs(h) {
+			return filepath.Join(h, "AppData", "Local")
+		}
+		return ""
+	}
+	if h := homeDir(); filepath.IsAbs(h) {
+		return filepath.Join(h, ".cache")
+	}
+	return ""
+}
+
+func promptCacheTargets(indexDir string) (cacheDir, singleFile string) {
+	base := strings.TrimSuffix(effectiveIndexDir(indexDir), string(filepath.Separator))
+	cleanIndex := ""
+	if base != "" {
+		cleanIndex = filepath.Clean(base)
+	}
+	root := promptCacheRoot()
+	inCacheRoot := false
+	if root != "" && cleanIndex != "" {
+		if rel, err := filepath.Rel(root, cleanIndex); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			inCacheRoot = true
+		}
+	}
+	def := DefaultIndexDir()
+	isDefault := os.Getenv("DEJA_INDEX_DIR") == "" && def != "" && cleanIndex == filepath.Clean(def)
+	singleFile = strings.TrimSpace(os.Getenv("DEJA_PROMPT_CACHE_FILE"))
+	if !inCacheRoot && !isDefault && singleFile == "" {
+		return "", ""
+	}
+	if (inCacheRoot || isDefault) && root != "" {
+		cacheDir = filepath.Join(root, "deja-vu")
+	}
+	return cacheDir, singleFile
+}
+
+func addPromptCacheToTar(tw *tar.Writer, base string) error {
+	cacheDir, singleFile := promptCacheTargets(base)
+	if cacheDir != "" {
+		if info, err := os.Lstat(cacheDir); err == nil && info.Mode()&os.ModeSymlink == 0 && info.IsDir() {
+			if err := filepath.WalkDir(cacheDir, func(p string, d fs.DirEntry, werr error) error {
+				if werr != nil {
+					return werr
+				}
+				if d.Type()&os.ModeSymlink != 0 || d.IsDir() {
+					return nil
+				}
+				entryInfo, entryErr := d.Info()
+				if entryErr != nil {
+					return entryErr
+				}
+				if entryInfo.Mode()&os.ModeSymlink != 0 {
+					return nil
+				}
+				rel, relErr := filepath.Rel(cacheDir, p)
+				if relErr != nil {
+					return relErr
+				}
+				return addFileToTar(tw, p, filepath.ToSlash(filepath.Join("prompt-cache", rel)), entryInfo)
+			}); err != nil {
+				return err
+			}
+		}
+	}
+	if singleFile != "" {
+		if info, err := os.Lstat(singleFile); err == nil && info.Mode()&os.ModeSymlink == 0 && !info.IsDir() {
+			if err := addFileToTar(tw, singleFile, "prompt-cache-file", info); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func restorePromptCache(stage, base string) error {
+	cacheDir, singleFile := promptCacheTargets(base)
+	if cacheDir != "" {
+		wipeTree(cacheDir)
+		srcDir := filepath.Join(stage, "prompt-cache")
+		if info, err := os.Stat(srcDir); err == nil && info.IsDir() {
+			if err := copyTreeSecure(srcDir, cacheDir); err != nil {
+				return err
+			}
+		}
+	}
+	if singleFile != "" {
+		shredFile(singleFile)
+		srcFile := filepath.Join(stage, "prompt-cache-file")
+		if info, err := os.Stat(srcFile); err == nil && !info.IsDir() {
+			stageRoot, err := os.OpenRoot(stage)
+			if err != nil {
+				return err
+			}
+			b, readErr := stageRoot.ReadFile("prompt-cache-file")
+			_ = stageRoot.Close()
+			if readErr != nil {
+				return readErr
+			}
+			if err := atomicfile.Write(singleFile, b, 0o600); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func copyTreeSecure(srcDir, dstDir string) error {
+	if err := os.MkdirAll(dstDir, 0o700); err != nil {
+		return err
+	}
+	srcRoot, err := os.OpenRoot(srcDir)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = srcRoot.Close() }()
+	dstRoot, err := os.OpenRoot(dstDir)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = dstRoot.Close() }()
+	return filepath.WalkDir(srcDir, func(p string, d fs.DirEntry, werr error) error {
+		if werr != nil {
+			return werr
+		}
+		rel, err := filepath.Rel(srcDir, p)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return nil
+		}
+		if d.IsDir() {
+			if mkErr := dstRoot.Mkdir(rel, 0o700); mkErr != nil && !os.IsExist(mkErr) {
+				return mkErr
+			}
+			return nil
+		}
+		if d.Type()&os.ModeSymlink != 0 {
+			return nil
+		}
+		data, err := srcRoot.ReadFile(rel)
+		if err != nil {
+			return err
+		}
+		return dstRoot.WriteFile(rel, data, 0o600)
+	})
 }
 
 func wipeTree(root string) {

@@ -3,8 +3,12 @@ package usage
 import (
 	"bufio"
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,6 +18,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 // A Snapshot is the full text of one served digest, kept so `deja log` can
@@ -105,11 +110,34 @@ func RecordDigest(indexDir, kind, digest string, sessions int, raw int64) {
 	RecordDigestPolicy(indexDir, kind, digest, sessions, raw, "")
 }
 
+func digestHash(indexDir, digest string) string {
+	if digest == "" {
+		return ""
+	}
+	if vault.Enabled() {
+		dek, err := vault.CheckUnlocked(indexDir)
+		if err != nil || len(dek) == 0 {
+			return ""
+		}
+		mac := hmac.New(sha256.New, dek)
+		mac.Write([]byte("deja-usage-hash:"))
+		mac.Write([]byte(digest))
+		sum := mac.Sum(nil)
+		return hex.EncodeToString(sum[:8])
+	}
+	// FNV-1a, not a cryptographic hash: on an unencrypted store the full
+	// digest already sits in .injections.jsonl, and Event.Hash only tells
+	// equal-size injections in the same second apart.
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(digest))
+	return fmt.Sprintf("%016x", h.Sum64())
+}
+
 // RecordDigestFrom is RecordDigestInto plus the projects the digest was built
 // from, for the reason RecordServedFrom exists.
 func RecordDigestFrom(indexDir, kind, digest, into string, sessions int, raw int64, terms, projects, ids []string) {
 	at := time.Now().UTC()
-	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, at)
+	recordFullAtHash(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, digestHash(indexDir, digest), at, false)
 	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, "", terms, projects, at)
 }
 
@@ -117,7 +145,7 @@ func RecordDigestFrom(indexDir, kind, digest, into string, sessions int, raw int
 // projects behind the digest, for the reason RecordServedFrom exists.
 func RecordDigestPolicyFrom(indexDir, kind, digest, into string, sessions int, raw int64, projects []string, policyName string) {
 	at := time.Now().UTC()
-	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, nil, into, at)
+	recordFullAtHash(indexDir, kind, len(digest), sessions, sessions == 0, raw, nil, into, digestHash(indexDir, digest), at, false)
 	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, nil, projects, at)
 }
 
@@ -128,7 +156,7 @@ func RecordDigestInto(indexDir, kind, digest, into string, sessions int, raw int
 	// injection, and separate time.Now() calls left them microseconds apart
 	// with nothing else to join them on (#2294).
 	at := time.Now().UTC()
-	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, at)
+	recordFullAtHash(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, digestHash(indexDir, digest), at, false)
 	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, "", terms, nil, at)
 }
 
@@ -162,7 +190,7 @@ func RecordServedFrom(indexDir, kind, digest string, sessions int, raw int64, id
 // next — the half of the evidence that says whether a recall was any use.
 func RecordServedFromInto(indexDir, kind, digest, into string, sessions int, raw int64, ids, projects []string, policyName string) {
 	at := time.Now().UTC()
-	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, at)
+	recordFullAtHash(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, digestHash(indexDir, digest), at, false)
 	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, nil, projects, at)
 }
 
@@ -188,7 +216,7 @@ func RecordDigestPolicySessionsFrom(indexDir, kind, digest, into string, session
 	// left `deja log` and `deja log --last` disagreeing about when an
 	// injection happened (#2294).
 	at := time.Now().UTC()
-	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, at)
+	recordFullAtHash(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, digestHash(indexDir, digest), at, false)
 	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, nil, projects, at)
 }
 
@@ -199,7 +227,7 @@ func RecordDigestPolicySessionsFrom(indexDir, kind, digest, into string, session
 // session-start hook).
 func RecordDigestFromUnread(indexDir, kind, digest, into string, sessions int, raw int64, terms, projects, ids []string) {
 	at := time.Now().UTC()
-	recordFullAtUnread(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, at, true)
+	recordFullAtHash(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, digestHash(indexDir, digest), at, true)
 	snapshotWriteAt(indexDir, kind, digest, into, sessions, "", terms, projects, at, true)
 }
 
@@ -214,7 +242,7 @@ func RecordDigestFromUnread(indexDir, kind, digest, into string, sessions int, r
 // receiver worth recording.
 func RecordDigestPolicySessionsUnread(indexDir, kind, digest, into string, sessions int, raw int64, policyName string, ids, projects []string) {
 	at := time.Now().UTC()
-	recordFullAtUnread(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, at, true)
+	recordFullAtHash(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, digestHash(indexDir, digest), at, true)
 	snapshotWriteAt(indexDir, kind, digest, into, sessions, policyName, nil, projects, at, true)
 }
 

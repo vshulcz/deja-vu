@@ -91,13 +91,13 @@ function run(args, input, timeout = 10000) {
 
 function cleanUserParts(content, known) {
   if (!Array.isArray(content)) return [];
-  if (content.length > 1 && content[0] && content[0].type === "text" && typeof content[0].text === "string") {
-    const t = content[0].text;
-    if (known.has(t) || /^\s*<deja-(?:recall|memory)\b[\s\S]*<\/deja-(?:recall|memory)>\s*$/.test(t)) {
-      return content.slice(1);
-    }
+  let i = 0;
+  while (content.length - i > 1 && content[i] && content[i].type === "text" && typeof content[i].text === "string") {
+    const t = content[i].text;
+    if (!known.has(t) && !/^\s*<deja-(?:recall|memory)\b[\s\S]*<\/deja-(?:recall|memory)>\s*$/.test(t)) break;
+    i++;
   }
-  return content;
+  return i ? content.slice(i) : content;
 }
 
 function userText(message, parts) {
@@ -251,7 +251,14 @@ export default function extension(pi) {
     let out = null;
     for (const u of users) {
       const extra = snap.session.recalled[u.key];
-      if (!extra) continue;
+      const raw = messages[u.at].content;
+      if (!extra) {
+        if (Array.isArray(raw) && raw.length !== u.clean.length) {
+          if (!out) out = messages.slice();
+          out[u.at] = { ...messages[u.at], content: u.clean };
+        }
+        continue;
+      }
       if (!out) out = messages.slice();
       out[u.at] = {
         ...messages[u.at],
