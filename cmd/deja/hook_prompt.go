@@ -86,16 +86,6 @@ func (h *hookPromptText) UnmarshalJSON(b []byte) error { //nolint:unparam // jso
 	return nil
 }
 
-// withoutInjectedContext drops context an earlier hook already put in front of
-// the question. Gemini hands BeforeAgent the whole request, which by then
-// carries the <hook_context> block SessionStart returned — deja's own recall.
-// Left in, the six search terms all come from that block and none from the
-// user, so every prompt recalls whatever the last one did. Gemini escapes the
-// angle brackets of anything inside, so both spellings are removed.
-func withoutInjectedContext(s string) string {
-	return hookengine.StripInjectedContext(s)
-}
-
 // plain=true prints the bare digest for hosts that inject a hook's stdout
 // verbatim — Kimi does that and reads no JSON field for context.
 func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool) error {

@@ -137,7 +137,7 @@ func AppendUnwrappedRecallParts(dst []string, msg string, seen map[string]bool) 
 	return dst
 }
 
-// TruncateUTF8 caps s at at most limit bytes on a valid UTF-8 rune boundary.
+// TruncateUTF8 caps s to at most limit bytes on a valid UTF-8 rune boundary.
 func TruncateUTF8(s string, limit int) string {
 	if limit <= 0 {
 		return ""

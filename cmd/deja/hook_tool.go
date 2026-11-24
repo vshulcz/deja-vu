@@ -127,7 +127,7 @@ func (i *toolHookInput) adopt() {
 		ToolUseID:      i.ToolUseID,
 		CWD:            i.CWD,
 		WorkspaceRoots: i.WorkspaceRoots,
-		GrokEnvelope:   i.grokEnvelope.GrokEnvelope,
+		GrokEnvelope:   i.GrokEnvelope,
 	}
 	ev.Normalize()
 	i.SessionID = ev.SessionID

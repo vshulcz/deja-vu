@@ -71,7 +71,7 @@ func TestReadPayloadAndReadBounded(t *testing.T) {
 		if elapsed >= time.Second {
 			t.Fatalf("ReadPayload waited for deadline (%v) despite valid JSON", elapsed)
 		}
-		if string(got) != string(raw) {
+		if !bytes.Equal(got, raw) {
 			t.Fatalf("got %q, want %q", got, raw)
 		}
 	})

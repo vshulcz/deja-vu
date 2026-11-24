@@ -34,17 +34,6 @@ const (
 // before the block is known.
 var recallFrameOverhead = hookengine.FrameOverhead
 
-// frameHeaderFor is the header text gets: the one naming the user-rule
-// exception when text carries a line it applies to.
-func frameHeaderFor(text string) string {
-	return hookengine.HeaderFor(text)
-}
-
-// cutFrameHeader is p without whichever header frames it.
-func cutFrameHeader(p string) (header, body string, ok bool) {
-	return hookengine.CutFrameHeader(p)
-}
-
 func frameRecall(text string) string {
 	return hookengine.SealRecall(text)
 }

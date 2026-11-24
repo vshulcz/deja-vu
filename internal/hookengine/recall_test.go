@@ -156,7 +156,7 @@ func TestTrailingAndSettleRecallParityWithOpenCodeJS(t *testing.T) {
 		t.Fatal(err)
 	}
 	var vecs recallVectorsFile
-	if err := json.Unmarshal(raw, &vecs); err != nil {
+	if err = json.Unmarshal(raw, &vecs); err != nil {
 		t.Fatal(err)
 	}
 

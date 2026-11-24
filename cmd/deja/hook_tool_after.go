@@ -297,10 +297,6 @@ func isExternalMCPToolWithSuffix(name string, suffixes ...string) bool {
 	return hookengine.IsExternalMCPToolWithSuffix(name, suffixes...)
 }
 
-func isExternalMCPCommandTool(name string) bool {
-	return hookengine.IsExternalMCPCommandTool(name)
-}
-
 // isCommandTool reports whether this tool runs a command.
 func isCommandTool(name string) bool {
 	return hookengine.IsCommandTool(name)
