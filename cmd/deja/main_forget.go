@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -62,7 +63,7 @@ func parseForgetArgs(args []string) (forgetArgs, error) {
 			case "--session":
 				sel, err := cliarg.ParseSelector(args[i])
 				if err != nil {
-					return forgetArgs{}, fmt.Errorf("forget: --session needs a value")
+					return forgetArgs{}, errors.New("forget: --session needs a value")
 				}
 				o.Session = sel.Clean
 			case "--project":

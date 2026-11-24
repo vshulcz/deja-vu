@@ -18,7 +18,7 @@ func LookPath(file string) (string, error) {
 // Command returns an exec.Cmd configured for non-interactive execution with
 // console-window suppression applied on Windows.
 func Command(name string, args ...string) *exec.Cmd {
-	cmd := exec.Command(name, args...)
+	cmd := exec.Command(name, args...) //nolint:noctx // Command builds a Cmd for detached or caller-managed lifecycles without a context.
 	hideconsole.Apply(cmd)
 	return cmd
 }

@@ -1,9 +1,7 @@
 package proc
 
 import (
-	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -90,7 +88,7 @@ func TestRunAndCombinedOutput(t *testing.T) {
 func TestStartDetachedPIDWritesFile(t *testing.T) {
 	target := filepath.Join(t.TempDir(), "detached.txt")
 	exe := testExe(t)
-	cmd := CommandContext(context.Background(), exe, "write-file", target, "done")
+	cmd := CommandContext(t.Context(), exe, "write-file", target, "done")
 	cmd.Env = append(os.Environ(), helperEnv+"=1")
 
 	pid, err := StartDetachedPID(cmd)
@@ -116,7 +114,7 @@ func TestStartDetachedErrorOnNil(t *testing.T) {
 	if _, err := StartDetachedPID(nil); err == nil {
 		t.Fatal("expected error for nil *exec.Cmd")
 	}
-	var bad *exec.Cmd = Command("definitely-nonexistent-deja-test-binary-xyz")
+	bad := Command("definitely-nonexistent-deja-test-binary-xyz")
 	if err := StartDetached(bad); err == nil {
 		t.Fatal("expected error when starting nonexistent binary")
 	}

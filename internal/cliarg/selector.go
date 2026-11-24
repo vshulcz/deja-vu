@@ -1,3 +1,4 @@
+// Package cliarg parses and normalizes <harness>:<id> CLI session selectors.
 package cliarg
 
 import (
