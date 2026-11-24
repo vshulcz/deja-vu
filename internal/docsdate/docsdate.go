@@ -23,6 +23,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/hideconsole"
 )
 
 // ErrNoHistory is a tracked file with no commit behind it in this clone.
@@ -41,6 +43,7 @@ type Dater struct {
 // New starts the reader for the repository at root.
 func New(root string) (*Dater, error) {
 	cmd := exec.CommandContext(context.Background(), "git", "-C", root, "cat-file", "--batch")
+	hideconsole.Apply(cmd)
 	in, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
@@ -72,13 +75,17 @@ func (d *Dater) Day(file string) (string, error) {
 	if err != nil {
 		return "", nil //nolint:nilerr // a file that is not there has no date
 	}
-	log, err := exec.CommandContext(context.Background(), "git", "-C", d.root, "log", "--format=%H %at", "--", file).Output()
+	logCmd := exec.CommandContext(context.Background(), "git", "-C", d.root, "log", "--format=%H %at", "--", file)
+	hideconsole.Apply(logCmd)
+	log, err := logCmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("git log %s: %w", file, err)
 	}
 	lines := strings.Fields(strings.TrimSpace(string(log)))
 	if len(lines) == 0 {
-		tracked, _ := exec.CommandContext(context.Background(), "git", "-C", d.root, "ls-files", "--", file).Output()
+		lsCmd := exec.CommandContext(context.Background(), "git", "-C", d.root, "ls-files", "--", file)
+		hideconsole.Apply(lsCmd)
+		tracked, _ := lsCmd.Output()
 		if len(bytes.TrimSpace(tracked)) == 0 {
 			return today(), nil // never committed
 		}

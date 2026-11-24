@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/hideconsole"
 )
 
 // The checks beside this one ask whether the binary a wiring runs is there,
@@ -185,7 +187,9 @@ func probeDejaBinaryRunErr(p string) string {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	if err := exec.CommandContext(ctx, p, "--version").Run(); err != nil {
+	cmd := exec.CommandContext(ctx, p, "--version")
+	hideconsole.Apply(cmd)
+	if err := cmd.Run(); err != nil {
 		return err.Error()
 	}
 	return ""
@@ -230,7 +234,9 @@ func readDejaBinaryVersion(p string) string {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, p, "version").Output()
+	cmd := exec.CommandContext(ctx, p, "version")
+	hideconsole.Apply(cmd)
+	out, err := cmd.Output()
 	if err != nil {
 		return ""
 	}

@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/hideconsole"
 )
 
 // claudeHookRunNote asks the shell Claude Code runs hooks in whether it can
@@ -31,7 +33,9 @@ func claudeHookRunNote(hooks map[string]any) string {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := exec.CommandContext(ctx, sh, "-c", "command -v "+exe).Run(); err == nil || ctx.Err() != nil {
+	cmd := exec.CommandContext(ctx, sh, "-c", "command -v "+exe)
+	hideconsole.Apply(cmd)
+	if err := cmd.Run(); err == nil || ctx.Err() != nil {
 		// A shell too slow to answer is not evidence the hook is broken.
 		return ""
 	} else if !errors.As(err, new(*exec.ExitError)) {

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
+	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -348,6 +349,7 @@ var cliStores = map[string]cliStore{"opencode": {"opencode"}, "mimo": {"mimo"}}
 
 func (c cliStore) run(args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(context.Background(), c.bin, args...)
+	hideconsole.Apply(cmd)
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()

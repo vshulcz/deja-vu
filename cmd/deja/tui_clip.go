@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
+	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -44,6 +45,7 @@ func clipboardCommand() []string {
 func tuiCopy(osc func(string), text string) error {
 	if c := clipboardCommand(); c != nil {
 		cmd := exec.CommandContext(context.Background(), c[0], c[1:]...)
+		hideconsole.Apply(cmd)
 		cmd.Stdin = strings.NewReader(text)
 		if err := cmd.Run(); err == nil {
 			return nil

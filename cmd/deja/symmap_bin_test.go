@@ -138,6 +138,91 @@ func TestRepoSymbolMapDiskBinaryRoundTripAndCorruptFallback(t *testing.T) {
 	}
 }
 
+func TestRepoSymbolMapDiskCachesDeterministicCapAndSkipsTimeout(t *testing.T) {
+	tmp := hermeticEnv(t)
+	dir := filepath.Join(tmp, "index.db")
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	prevDir := getActiveDejaDir()
+	setActiveDejaDir(dir)
+	t.Cleanup(func() { setActiveDejaDir(prevDir) })
+
+	detRepo := filepath.Join(tmp, "det-capped-repo")
+	if err := os.MkdirAll(filepath.Join(detRepo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { repoSymbolMapCache.Delete(detRepo) })
+	if p1, p2 := repoSymbolDiskPath(dir+"/", detRepo, detRepo), repoSymbolDiskPath(dir, detRepo, detRepo); p1 != p2 {
+		t.Fatalf("repoSymbolDiskPath trailing slash mismatch: %q vs %q", p1, p2)
+	}
+
+	// Build 66 Go files of ~254 KiB each (<= maxRepoSymbolFileBytes = 256 KiB)
+	// so default repoSymbolScanMaxBytes (16 MiB) triggers around file 65 while
+	// staying well below repoSymbolScanMinFilesBeforeDeadline (128), keeping
+	// all default globals intact and avoiding slow-VM wall-clock timeouts.
+	pkgDir := filepath.Join(detRepo, "pkg")
+	if err := os.MkdirAll(pkgDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	pad := "//" + strings.Repeat("a", 254*1024) + "\n"
+	for i := range 66 {
+		name := filepath.Join(pkgDir, "f"+strconv.Itoa(i)+".go")
+		body := "package pkg\nfunc Sym" + strconv.Itoa(i) + "() {}\n" + pad
+		if err := os.WriteFile(name, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	idx := loadRepoSymbolMap(detRepo)
+	if !idx.capped || idx.timedOut || len(idx.files) == 0 || len(idx.files) >= repoSymbolScanMinFilesBeforeDeadline {
+		t.Fatalf("expected deterministic byte cap before file-deadline threshold: capped=%v timedOut=%v files=%d",
+			idx.capped, idx.timedOut, len(idx.files))
+	}
+	if !repoSymbolMapFresh(idx) {
+		t.Fatal("expected freshly scanned deterministic capped symmap to pass repoSymbolMapFresh")
+	}
+	diskIdx, ok := loadRepoSymbolMapFromDisk(dir, detRepo, detRepo)
+	if !ok || !diskIdx.capped || len(diskIdx.files) != len(idx.files) {
+		t.Fatalf("expected deterministic capped snapshot to persist and reload with capped=true, got ok=%v capped=%v files=%d wantFiles=%d",
+			ok, diskIdx.capped, len(diskIdx.files), len(idx.files))
+	}
+
+	// Wall-clock deadline truncation must remain incomplete and must not encode for disk caching.
+	slowRepo := filepath.Join(tmp, "slow-repo")
+	if err := os.MkdirAll(filepath.Join(slowRepo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { repoSymbolMapCache.Delete(slowRepo) })
+	for i := range 3 {
+		if err := os.WriteFile(filepath.Join(slowRepo, "s"+strconv.Itoa(i)+".go"), []byte("package slow\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	prevBudget := repoSymbolScanBudget
+	prevMin := repoSymbolScanMinFilesBeforeDeadline
+	prevHook := repoSymbolScanHook
+	repoSymbolScanBudget = time.Nanosecond
+	repoSymbolScanMinFilesBeforeDeadline = 1
+	repoSymbolScanHook = func(string) {
+		t0 := time.Now()
+		for time.Since(t0) < time.Millisecond {
+			time.Sleep(time.Millisecond)
+		}
+	}
+	t.Cleanup(func() {
+		repoSymbolScanBudget = prevBudget
+		repoSymbolScanMinFilesBeforeDeadline = prevMin
+		repoSymbolScanHook = prevHook
+	})
+	slowIdx := loadRepoSymbolMap(slowRepo)
+	if !slowIdx.capped || !slowIdx.timedOut {
+		t.Fatalf("expected wall-clock budget cap on slowIdx, got capped=%v timedOut=%v", slowIdx.capped, slowIdx.timedOut)
+	}
+	if _, encOK := encodeRepoSymbolMap(slowIdx); encOK {
+		t.Fatal("expected wall-clock timed-out symmap not to encode for disk caching")
+	}
+}
+
 func TestBM25SessionTouchedBoostSkipsRecordLogAndResolvesPromotedNote(t *testing.T) {
 	tmp := hermeticEnv(t)
 	claudeProj := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-sample-repo")
@@ -268,11 +353,21 @@ func TestRepoSymbolDiskCacheGuardsAndNilMaps(t *testing.T) {
 
 	capped := repoSymbolMap{at: time.Now(), capped: true}
 	cappedBytes, ok := encodeRepoSymbolMap(capped)
-	if !ok || len(cappedBytes) != repoSymbolDiskHdrLen {
-		t.Fatalf("unexpected capped encode: len=%d ok=%v", len(cappedBytes), ok)
+	if !ok || len(cappedBytes) <= repoSymbolDiskHdrLen {
+		t.Fatalf("unexpected deterministic capped encode: len=%d ok=%v", len(cappedBytes), ok)
 	}
-	if _, decOK := decodeRepoSymbolMap(cappedBytes, repo); decOK {
-		t.Fatal("expected capped header to be rejected on decode")
+	cappedDec, decOK := decodeRepoSymbolMap(cappedBytes, repo)
+	if !decOK || !cappedDec.capped {
+		t.Fatalf("expected deterministic capped snapshot to decode with capped=true, got ok=%v capped=%v", decOK, cappedDec.capped)
+	}
+	badFlag := append([]byte(nil), cappedBytes...)
+	badFlag[12] = 2
+	if _, badOK := decodeRepoSymbolMap(badFlag, repo); badOK {
+		t.Fatal("expected unsupported header flag to be rejected on decode")
+	}
+	timedOut := repoSymbolMap{at: time.Now(), capped: true, timedOut: true}
+	if _, toOK := encodeRepoSymbolMap(timedOut); toOK {
+		t.Fatal("expected timed-out symmap not to encode")
 	}
 
 	zeroAt := make([]byte, repoSymbolDiskHdrLen)

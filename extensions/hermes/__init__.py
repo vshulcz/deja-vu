@@ -129,6 +129,8 @@ def _deja(args, payload="", timeout=10, cwd=None):
             input=payload,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
             cwd=cwd or _cwd(),
             creationflags=_NO_WINDOW,

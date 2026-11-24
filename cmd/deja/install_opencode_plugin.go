@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -528,11 +529,13 @@ var opencodeVersionMajorReal = func() int {
 		n, _ := v.(int)
 		return n
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, exe, "--version").Output()
+	cmd := exec.CommandContext(ctx, exe, "--version")
+	hideconsole.Apply(cmd)
+	cmd.WaitDelay = 200 * time.Millisecond
+	out, err := cmd.Output()
 	if err != nil {
-		opencodeVersionCache.Store(key, 0)
 		return 0
 	}
 	m := opencodeSemverRe.FindSubmatch(out)

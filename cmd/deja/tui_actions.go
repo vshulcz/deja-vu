@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/mark"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -138,6 +139,7 @@ func forgetInChild(dir string) func(string) error {
 			return err
 		}
 		cmd := exec.CommandContext(context.Background(), exe, "forget", "--session", id)
+		hideconsole.Apply(cmd)
 		cmd.Env = append(os.Environ(), "DEJA_INDEX_DIR="+dir)
 		out, err := cmd.CombinedOutput()
 		if err == nil {

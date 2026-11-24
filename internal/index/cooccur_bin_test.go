@@ -342,6 +342,9 @@ func TestCooccurBinRejectsMalformedInputs(t *testing.T) {
 		{1, 'a', 1, 0x80},       // truncated val len varint
 		{1, 'a', 1, 10, 'x'},    // val len past buffer
 		{1, 'b', 1, 1, 'z', 99}, // non-matching followed by bad varint
+		{0, 0, 0, 0},            // zero-filled bucket with kLen == 0
+		{1, 'b', 0},             // unmatched key with vCount == 0
+		{1, 'b', 0x80, 0x80, 0x80, 0x80, 0x04, 1, 'z'}, // unmatched key with huge vCount > len(b)
 	}
 	for i, mb := range malformedBuckets {
 		out := map[string][]string{}
