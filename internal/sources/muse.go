@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -410,15 +411,67 @@ var museSessionID = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-
 // payload names the session and sends transcript_path null, and the day
 // directory it sits under is the day it started.
 func MuseSessionPath(id string) string {
+	return museSessionPathBounded(id, nil)
+}
+
+func museSessionPathBounded(id string, stats *compactionLookupStats) string {
 	if !museSessionID.MatchString(id) {
 		return ""
 	}
-	for _, root := range MuseRoots() {
-		if m, _ := filepath.Glob(filepath.Join(root, "*", "*", "*", id, museLogName)); len(m) > 0 {
-			return m[0]
+	dirBudget, statBudget := 0, 0
+	var match string
+	var walk func(dir string, depth int)
+	walk = func(dir string, depth int) {
+		if match != "" || dirBudget >= compactionMaxDirEntries || statBudget >= compactionMaxStatCalls {
+			return
+		}
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return
+		}
+		sort.Slice(entries, func(i, j int) bool { return entries[i].Name() > entries[j].Name() })
+		for _, e := range entries {
+			if match != "" || dirBudget >= compactionMaxDirEntries || statBudget >= compactionMaxStatCalls {
+				return
+			}
+			dirBudget++
+			if stats != nil {
+				stats.DirEntries++
+			}
+			if !e.IsDir() {
+				continue
+			}
+			sub := filepath.Join(dir, e.Name())
+			if depth == 3 {
+				statBudget++
+				if stats != nil {
+					stats.StatCalls++
+				}
+				p := filepath.Join(sub, id, museLogName)
+				if info, err := os.Stat(p); err == nil && info.Mode().IsRegular() {
+					match = p
+					return
+				}
+				continue
+			}
+			walk(sub, depth+1)
 		}
 	}
-	return ""
+	for _, root := range MuseRoots() {
+		if match != "" || dirBudget >= compactionMaxDirEntries || statBudget >= compactionMaxStatCalls {
+			break
+		}
+		statBudget++
+		if stats != nil {
+			stats.StatCalls++
+		}
+		direct := filepath.Join(root, id, museLogName)
+		if info, err := os.Stat(direct); err == nil && info.Mode().IsRegular() {
+			return direct
+		}
+		walk(root, 1)
+	}
+	return match
 }
 
 // readMuseCompaction captures a Muse session for a PreCompact hook: the log

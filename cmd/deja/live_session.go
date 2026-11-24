@@ -346,8 +346,13 @@ func liveWhole(id string) (model.Session, bool) {
 // the host sends one. An asker the index does not hold yet is read off its own
 // store: a fork's first prompts come before any build has seen it, and they
 // were the ones answered with the fork's source.
-func askerLineage(dir, asker, transcript string, ids ...string) map[string]bool {
-	out, _ := askerLineageCut(dir, asker, transcript, ids...)
+func askerLineage(dir, asker, transcript string) map[string]bool {
+	out, _ := askerLineageCut(dir, asker, transcript)
+	return out
+}
+
+func askerLineageForHarness(dir, asker, transcript, harness string, ids ...string) map[string]bool {
+	out, _ := askerLineageCutForHarness(dir, asker, transcript, harness, ids...)
 	return out
 }
 
@@ -356,9 +361,8 @@ func askerLineageCut(dir, asker, transcript string, ids ...string) (map[string]b
 	return askerLineageCutForHarness(dir, asker, transcript, "", ids...)
 }
 
-// askerLineageCutForHarness resolves session lineage while skipping unrelated
-// external store probes when the caller already identified a harness whose
-// sessions live outside those stores (#6098).
+// askerLineageCutForHarness resolves session lineage using only the named
+// harness's store when harness is explicit and transcript is empty.
 func askerLineageCutForHarness(dir, asker, transcript, harness string, ids ...string) (map[string]bool, map[string]time.Time) {
 	set := map[string]bool{}
 	for _, id := range append([]string{asker}, ids...) {
@@ -370,17 +374,25 @@ func askerLineageCutForHarness(dir, asker, transcript, harness string, ids ...st
 			set[p] = true
 		}
 	}
+	hName := strings.ToLower(strings.TrimSpace(harness))
 	var heads []model.Session
-	skipExternal := transcript == "" && strings.EqualFold(strings.TrimSpace(harness), "deepseek")
-	if asker = strings.TrimSpace(asker); asker != "" && !skipExternal && !isSpawnedReader(asker) && !index.HasSession(dir, asker) {
-		if h, ok := askerHeadForHarness(asker, transcript, harness); ok {
-			heads = append(heads, withClaudeForkMark(dir, h))
-		} else if w, ok := sources.ClineForkSession(asker); ok {
-			// Read whole, so the copy it holds is left out and a sibling
-			// fork that went on past it is not (#5151).
-			return index.LineageWholeCut(dir, set, lineageOnly(w))
-		} else if src := claudeForkMark(dir, asker); src != "" {
-			heads = append(heads, model.Session{Harness: "claude", ID: asker, Kind: "fork", Parent: src})
+	if asker = strings.TrimSpace(asker); asker != "" && !isSpawnedReader(asker) && !index.HasSession(dir, asker) {
+		if h, ok := askerHeadForHarness(asker, transcript, hName); ok {
+			if h.Harness == "claude" || hName == "" || hName == "claude" {
+				h = withClaudeForkMark(dir, h)
+			}
+			heads = append(heads, h)
+		} else if hName == "" || hName == "cline" {
+			if w, ok := sources.ClineForkSession(asker); ok {
+				// Read whole, so the copy it holds is left out and a sibling
+				// fork that went on past it is not (#5151).
+				return index.LineageWholeCut(dir, set, lineageOnly(w))
+			}
+		}
+		if len(heads) == 0 && (hName == "" || hName == "claude") {
+			if src := claudeForkMark(dir, asker); src != "" {
+				heads = append(heads, model.Session{Harness: "claude", ID: asker, Kind: "fork", Parent: src})
+			}
 		}
 	}
 	return index.LineageCut(dir, set, heads...)
@@ -398,17 +410,36 @@ var askerHeads = struct {
 }{m: map[string]cachedAskerHead{}}
 
 func askerHeadForHarness(id, transcript, harness string) (model.Session, bool) {
-	if transcript == "" && strings.EqualFold(strings.TrimSpace(harness), "deepseek") {
-		return model.Session{}, false
+	hName := strings.ToLower(strings.TrimSpace(harness))
+	key := askerHeadCacheKey(id, transcript, hName)
+	now := time.Now()
+	askerHeads.Lock()
+	if hit, ok := askerHeads.m[key]; ok && (hit.ok || now.Sub(hit.at) < 2*time.Second) {
+		askerHeads.Unlock()
+		return hit.session, hit.ok
 	}
-	return askerHead(id, transcript)
+	askerHeads.Unlock()
+
+	s, ok := askerHeadUncached(id, transcript, hName)
+
+	askerHeads.Lock()
+	if len(askerHeads.m) >= liveSessionsMax {
+		clear(askerHeads.m)
+	}
+	askerHeads.m[key] = cachedAskerHead{session: s, ok: ok, at: now}
+	askerHeads.Unlock()
+	return s, ok
 }
 
-func askerHeadCacheKey(id, transcript string) string {
+func askerHeadCacheKey(id, transcript, hName string) string {
 	return strings.Join([]string{
 		id,
 		transcript,
+		hName,
+		os.Getenv("CODEX_HOME"),
+		os.Getenv("DEJA_CODEX_ROOT"),
 		os.Getenv("DEJA_COPILOT_ROOT"),
+		os.Getenv("COPILOT_HOME"),
 		os.Getenv("DEJA_GROK_ROOT"),
 		os.Getenv("DEJA_KIRO_ROOT"),
 		os.Getenv("DEJA_HERMES_HOME"),
@@ -423,33 +454,46 @@ func askerHeadCacheKey(id, transcript string) string {
 // transcript the payload names, or opencode's or Hermes' database or Copilot
 // CLI's session folder, which their payloads do not name a file in (#5137).
 func askerHead(id, transcript string) (model.Session, bool) {
-	key := askerHeadCacheKey(id, transcript)
-	now := time.Now()
-	askerHeads.Lock()
-	if hit, ok := askerHeads.m[key]; ok && (hit.ok || now.Sub(hit.at) < 2*time.Second) {
-		askerHeads.Unlock()
-		return hit.session, hit.ok
-	}
-	askerHeads.Unlock()
-
-	s, ok := askerHeadUncached(id, transcript)
-
-	askerHeads.Lock()
-	if len(askerHeads.m) >= liveSessionsMax {
-		clear(askerHeads.m)
-	}
-	askerHeads.m[key] = cachedAskerHead{session: s, ok: ok, at: now}
-	askerHeads.Unlock()
-	return s, ok
+	return askerHeadForHarness(id, transcript, "")
 }
 
-func askerHeadUncached(id, transcript string) (model.Session, bool) {
+func askerHeadUncached(id, transcript, hName string) (model.Session, bool) {
 	if transcript != "" && sources.IsGrokTranscript(transcript) {
 		return sources.GrokSessionHead(id, transcript)
 	}
 	if transcript != "" {
 		s, err := sources.TranscriptHead(transcript, id)
 		return s, err == nil
+	}
+	if hName != "" {
+		switch hName {
+		case "codex":
+			return sources.CodexSessionHead(id)
+		case "copilot":
+			s, err := sources.CopilotSessionHead(id)
+			return s, err == nil
+		case "opencode":
+			for _, s := range sources.LoadOpencodeSession(id) {
+				if s.ID == id {
+					return s, true
+				}
+			}
+			return model.Session{}, false
+		case "hermes":
+			if s, ok := sources.HermesSessionHead(id); ok && s.Parent != "" {
+				return s, true
+			}
+			return model.Session{}, false
+		case "kiro":
+			return sources.KiroSessionHead(id)
+		case "grok":
+			if s, ok := sources.GrokSessionHead(id, ""); ok && s.Parent != "" {
+				return s, true
+			}
+			return model.Session{}, false
+		default:
+			return model.Session{}, false
+		}
 	}
 	if s, err := sources.CopilotSessionHead(id); err == nil {
 		return s, true

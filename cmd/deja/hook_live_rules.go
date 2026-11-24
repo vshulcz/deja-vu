@@ -174,16 +174,25 @@ func readLiveHookTranscriptMessages(dir string, input promptHookInput, cwd, ws s
 	if input.TranscriptPath == "" && len(input.Messages) == 0 && input.Harness == "" && input.SessionID == "" {
 		return nil
 	}
+	resolvedPath := input.TranscriptPath
+	if resolvedPath == "" && len(input.Messages) == 0 && input.Harness != "mcode" {
+		resolvedPath = indexedTranscriptPath(dir, input.Harness, input.SessionID)
+	}
+	if resolvedPath != "" {
+		if msgs, ok := sources.ReadLiveTranscriptTailMessages(input.Harness, resolvedPath, input.SessionID); ok && len(msgs) > 0 {
+			if len(msgs) > 24 {
+				msgs = msgs[len(msgs)-24:]
+			}
+			return msgs
+		}
+	}
 	pre := precompactHookInput{
 		SessionID:      input.SessionID,
-		TranscriptPath: input.TranscriptPath,
+		TranscriptPath: resolvedPath,
 		CWD:            cwd,
 		Harness:        input.Harness,
 		Messages:       input.Messages,
 		noStoreScan:    true,
-	}
-	if pre.TranscriptPath == "" && len(pre.Messages) == 0 {
-		pre.TranscriptPath = indexedTranscriptPath(dir, input.Harness, input.SessionID)
 	}
 	tr, reason, _ := compactionSource(pre, ws)
 	if reason == "" && len(tr.Session.Messages) > 0 {

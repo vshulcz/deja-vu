@@ -139,6 +139,7 @@ type toolHookInput struct {
 	SessionID      string          `json:"session_id"`
 	ConversationID string          `json:"conversation_id"`
 	TranscriptPath string          `json:"transcript_path"`
+	Harness        string          `json:"harness"`
 	ToolUseID      string          `json:"tool_use_id"`
 	CWD            string          `json:"cwd"`
 	// Cursor leaves cwd empty and names the project here instead.
@@ -1012,7 +1013,7 @@ func askerSkip(dir string, input toolHookInput) func(index.SessionMeta, string) 
 		return nil
 	}
 	lineage := sync.OnceValues(func() (map[string]bool, map[string]time.Time) {
-		return askerLineageCut(dir, sid, input.TranscriptPath)
+		return askerLineageCutForHarness(dir, sid, input.TranscriptPath, input.Harness)
 	})
 	return func(meta index.SessionMeta, path string) bool {
 		if meta.ID == sid {

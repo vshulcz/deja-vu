@@ -167,7 +167,7 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	}
 	var self []string
 	if input.ConversationID != "" {
-		lineage, _ := askerLineageCut(dir, input.ConversationID, input.TranscriptPath, "")
+		lineage, _ := askerLineageCutForHarness(dir, input.ConversationID, input.TranscriptPath, "antigravity")
 		for id := range lineage {
 			self = append(self, id)
 		}

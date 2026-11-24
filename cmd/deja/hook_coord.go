@@ -388,7 +388,7 @@ func coordIsAncestor(st coordState, descendantID, ancestorID string) bool {
 	return false
 }
 
-func coordSameLineage(dir, selfID, selfParent, transcript, otherID string, st coordState, cachedLineage *map[string]bool) bool {
+func coordSameLineage(dir, selfID, selfParent, transcript, harness, otherID string, st coordState, cachedLineage *map[string]bool) bool {
 	if otherID == "" || otherID == selfID {
 		return true
 	}
@@ -402,7 +402,7 @@ func coordSameLineage(dir, selfID, selfParent, transcript, otherID string, st co
 		return true
 	}
 	if *cachedLineage == nil && dir != "" && selfID != "" {
-		*cachedLineage = askerLineage(dir, selfID, transcript, selfParent)
+		*cachedLineage = askerLineageForHarness(dir, selfID, transcript, harness, selfParent)
 	}
 	return (*cachedLineage)[otherID]
 }
@@ -434,6 +434,7 @@ func parseCoordPayloadView(raw []byte, fallbackCWD string, fallback toolHookInpu
 	out := coordPayloadView{
 		SessionID:      strings.TrimSpace(fallback.SessionID),
 		TranscriptPath: strings.TrimSpace(fallback.TranscriptPath),
+		Harness:        strings.ToLower(strings.TrimSpace(fallback.Harness)),
 		ToolName:       strings.TrimSpace(fallback.ToolName),
 		CWD:            strings.TrimSpace(fallbackCWD),
 	}
@@ -451,7 +452,9 @@ func parseCoordPayloadView(raw []byte, fallbackCWD string, fallback toolHookInpu
 	if out.TranscriptPath == "" {
 		out.TranscriptPath = firstJSONString(doc, "transcript_path", "transcriptPath")
 	}
-	out.Harness = strings.ToLower(firstJSONString(doc, "harness"))
+	if h := strings.ToLower(firstJSONString(doc, "harness")); h != "" {
+		out.Harness = h
+	}
 	out.EventName = firstJSONString(doc, "hook_event_name", "hookEventName", "event")
 	if out.ToolName == "" {
 		out.ToolName = firstJSONString(doc, "tool_name", "toolName", "tool")
@@ -756,7 +759,7 @@ func coordHandleToolFile(dir, cwd string, input toolHookInput, raw []byte) strin
 			var newestID string
 			var newestTouch coordFileTouch
 			for otherID, other := range st.Sessions {
-				if coordSameLineage(dir, view.SessionID, selfParent, view.TranscriptPath, otherID, st, &cachedLineage) {
+				if coordSameLineage(dir, view.SessionID, selfParent, view.TranscriptPath, view.Harness, otherID, st, &cachedLineage) {
 					continue
 				}
 				if touch, ok := other.Edits[p]; ok && touch.AtUnix > newestTouch.AtUnix {
@@ -1160,7 +1163,7 @@ func coordCheckMutatingGit(dir, cwd string, input toolHookInput, raw []byte) str
 		var sampleFile string
 		editCount := 0
 		for otherID, other := range st.Sessions {
-			if other.Worktree != wt || coordSameLineage(dir, view.SessionID, selfParent, view.TranscriptPath, otherID, st, &cachedLineage) {
+			if other.Worktree != wt || coordSameLineage(dir, view.SessionID, selfParent, view.TranscriptPath, view.Harness, otherID, st, &cachedLineage) {
 				continue
 			}
 			for fPath, touch := range other.Edits {
