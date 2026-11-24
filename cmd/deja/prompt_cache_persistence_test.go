@@ -137,10 +137,22 @@ const ctx = {
   tool: { hook: async () => {} },
 };
 const cleanup = await plugin.setup(ctx);
-const evA = { sessionID: "ses_A", system: [{ type: "text", text: "base" }], messages: [{ id: "mA1", role: "user", content: [{ type: "text", text: "first q" }] }] };
+const evA = { sessionID: "ses_A", system: [{ type: "text", text: "base" }], messages: [{ id: "mA1", role: "user", content: [{ type: "text", text: "first q\n" }] }] };
 for (const fn of contextHooks) await fn(evA);
 assert.equal(evA.system[0].text, "base\n\nDIGEST-1");
 assert.equal(evA.messages[0].content[0].text, "first q\n\n<deja-recall>\nPROMPT-1\n</deja-recall>");
+
+// Re-running on kept system & kept message must emit byte-identical prefixes.
+for (const fn of contextHooks) await fn(evA);
+assert.equal(evA.system[0].text, "base\n\nDIGEST-1");
+assert.equal(evA.messages[0].content[0].text, "first q\n\n<deja-recall>\nPROMPT-1\n</deja-recall>");
+
+// Empty system array reused across repeated calls must not duplicate DIGEST.
+const evEmptySys = { sessionID: "ses_EmptySys", system: [], messages: [] };
+for (const fn of contextHooks) await fn(evEmptySys);
+for (const fn of contextHooks) await fn(evEmptySys);
+assert.equal(evEmptySys.system.length, 1);
+assert.equal(evEmptySys.system[0].text, "DIGEST-2");
 
 const evB = { sessionID: "ses_B", system: [{ type: "text", text: "base" }], messages: [{ id: "mB1", role: "user", content: [{ type: "text", text: "other q" }] }] };
 for (const fn of contextHooks) await fn(evB);
@@ -168,7 +180,7 @@ const evA2 = {
   sessionID: "ses_A",
   system: [{ type: "text", text: "base" }],
   messages: [
-    { id: "mA1", role: "user", content: [{ type: "text", text: "first q" }] },
+    { id: "mA1", role: "user", content: [{ type: "text", text: "first q\n" }] },
     { id: "mA2", role: "user", content: [{ type: "text", text: "follow up" }] },
   ],
 };
@@ -188,7 +200,7 @@ const evB2 = {
   ],
 };
 for (const fn of contextHooks) await fn(evB2);
-assert.equal(evB2.system[0].text, "base\n\nDIGEST-2");
+assert.equal(evB2.system[0].text, "base\n\nDIGEST-3");
 assert.equal(evB2.messages[0].content[0].text, "other q\n\n<deja-recall>\nPROMPT-2\n</deja-recall>");
 assert.equal(evB2.messages[1].content[0].text, "beta second\n\n<deja-recall>\nPROMPT-4\n</deja-recall>");
 if (typeof cleanup === "function") await cleanup();
@@ -217,13 +229,22 @@ const hooks = await DejaRecall({ $: shell, client, directory: ` + strconv.Quote(
 const sysA = { system: ["base"] };
 await hooks["experimental.chat.system.transform"]({ sessionID: "ses_A" }, sysA);
 assert.equal(sysA.system[0], "base\n\nDIGEST-1");
-const mA1 = { info: { id: "mA1", role: "user", sessionID: "ses_A" }, parts: [{ type: "text", text: "first q" }] };
+await hooks["experimental.chat.system.transform"]({ sessionID: "ses_A" }, sysA);
+assert.equal(sysA.system[0], "base\n\nDIGEST-1");
+const sysEmpty = { system: [] };
+await hooks["experimental.chat.system.transform"]({ sessionID: "ses_EmptySys" }, sysEmpty);
+await hooks["experimental.chat.system.transform"]({ sessionID: "ses_EmptySys" }, sysEmpty);
+assert.equal(sysEmpty.system.length, 1);
+assert.equal(sysEmpty.system[0], "DIGEST-2");
+const mA1 = { info: { id: "mA1", role: "user", sessionID: "ses_A" }, parts: [{ type: "text", text: "first q\n" }] };
+await hooks["experimental.chat.messages.transform"]({ sessionID: "ses_A" }, { messages: [mA1] });
+assert.equal(mA1.parts[0].text, "first q\n\n<deja-recall>\nPROMPT-1\n</deja-recall>");
 await hooks["experimental.chat.messages.transform"]({ sessionID: "ses_A" }, { messages: [mA1] });
 assert.equal(mA1.parts[0].text, "first q\n\n<deja-recall>\nPROMPT-1\n</deja-recall>");
 
 const sysB = { system: ["base"] };
 await hooks["experimental.chat.system.transform"]({ sessionID: "ses_B" }, sysB);
-assert.equal(sysB.system[0], "base\n\nDIGEST-2");
+assert.equal(sysB.system[0], "base\n\nDIGEST-3");
 const mB1 = { info: { id: "mB1", role: "user", sessionID: "ses_B" }, parts: [{ type: "text", text: "other q" }] };
 await hooks["experimental.chat.messages.transform"]({ sessionID: "ses_B" }, { messages: [mB1] });
 assert.equal(mB1.parts[0].text, "other q\n\n<deja-recall>\nPROMPT-2\n</deja-recall>");
@@ -233,7 +254,7 @@ if (typeof hooks.dispose === "function") await hooks.dispose();
 const sysA2 = { system: ["base"] };
 await hooks["experimental.chat.system.transform"]({ sessionID: "ses_A" }, sysA2);
 assert.equal(sysA2.system[0], "base\n\nDIGEST-1");
-const mA1 = { info: { id: "mA1", role: "user", sessionID: "ses_A" }, parts: [{ type: "text", text: "first q" }] };
+const mA1 = { info: { id: "mA1", role: "user", sessionID: "ses_A" }, parts: [{ type: "text", text: "first q\n" }] };
 const mA2 = { info: { id: "mA2", role: "user", sessionID: "ses_A" }, parts: [{ type: "text", text: "follow up" }] };
 await hooks["experimental.chat.messages.transform"]({ sessionID: "ses_A" }, { messages: [mA1, mA2] });
 assert.equal(mA1.parts[0].text, "first q\n\n<deja-recall>\nPROMPT-1\n</deja-recall>");
@@ -242,7 +263,7 @@ assert.equal(mA2.parts[0].text, "follow up\n\n<deja-recall>\nPROMPT-3\n</deja-re
 await hooks["experimental.session.compacting"]({ sessionID: "ses_A" });
 const sysB2 = { system: ["base"] };
 await hooks["experimental.chat.system.transform"]({ sessionID: "ses_B" }, sysB2);
-assert.equal(sysB2.system[0], "base\n\nDIGEST-2");
+assert.equal(sysB2.system[0], "base\n\nDIGEST-3");
 const mB1 = { info: { id: "mB1", role: "user", sessionID: "ses_B" }, parts: [{ type: "text", text: "other q" }] };
 const mB2 = { info: { id: "mB2", role: "user", sessionID: "ses_B" }, parts: [{ type: "text", text: "beta second" }] };
 await hooks["experimental.chat.messages.transform"]({ sessionID: "ses_B" }, { messages: [mB1, mB2] });
@@ -254,8 +275,8 @@ if (typeof hooks.dispose === "function") await hooks.dispose();
 
 			runNodeScriptInDir(t, dir, "proc1.mjs", proc1)
 			runNodeScriptInDir(t, dir, "proc2.mjs", proc2)
-			if got := counts("ctx"); got != 2 {
-				t.Fatalf("hook-context calls = %d, want 2 (once per distinct session)", got)
+			if got := counts("ctx"); got != 3 {
+				t.Fatalf("hook-context calls = %d, want 3 (once per distinct session)", got)
 			}
 			if got := counts("prompt"); got != 4 {
 				t.Fatalf("hook-prompt calls = %d, want 4", got)
@@ -312,13 +333,22 @@ await fire("session_start", {});
 const d2 = await fire("before_agent_start", { prompt: "q3" });
 assert.equal(d2, undefined);
 
-const u1 = { role: "user", content: [{ type: "text", text: "first q" }] };
+const u1 = {
+  role: "user",
+  content: [
+    { type: "text", text: "<deja-recall>\nOLD-1\n</deja-recall>" },
+    { type: "text", text: "<deja-recall>\nOLD-2\n</deja-recall>" },
+    { type: "text", text: "first q" },
+  ],
+};
 const a1 = { role: "assistant", content: [{ type: "text", text: "ok" }] };
 const u2 = { role: "user", content: [{ type: "text", text: "second q" }] };
 const a2 = { role: "assistant", content: [{ type: "text", text: "ok2" }] };
 const u3 = { role: "user", content: [{ type: "text", text: "third q" }] };
 const c3 = await fire("context", { messages: [u1, a1, u2, a2, u3] });
+assert.equal(c3.messages[0].content.length, 2);
 assert.equal(c3.messages[0].content[0].text, "<deja-recall>\nPROMPT-1\n</deja-recall>");
+assert.equal(c3.messages[0].content[1].text, "first q");
 assert.equal(c3.messages[2].content[0].text, "<deja-recall>\nPROMPT-2\n</deja-recall>");
 assert.equal(c3.messages[4].content[0].text, "<deja-recall>\nPROMPT-3\n</deja-recall>");
 
@@ -379,18 +409,43 @@ const failMsg = { role: "user", content: [{ type: "tool_result", name: "run_comm
 const b2 = builder.build([u1, a1, u2, failMsg]);
 assert.equal(b2[0].content[0].text, "<deja-recall>\nPROMPT-1\n</deja-recall>");
 assert.equal(b2[2].content[0].text, "<deja-recall>\nPROMPT-2\n</deja-recall>");
-assert.ok(b2[3].content[0].content[0].result.includes("REPAIR-1"));
+assert.equal(b2[3].content[0].content[0].result, "failed\n\nREPAIR-1");
+
+// Re-running on kept messages is a no-op (returns undefined) and leaves b2 unchanged.
+const b2Kept = builder.build(b2);
+assert.equal(b2Kept, undefined);
+assert.equal(b2[0].content.length, 2);
+assert.equal(b2[0].content[0].text, "<deja-recall>\nPROMPT-1\n</deja-recall>");
+assert.equal(b2[2].content.length, 2);
+assert.equal(b2[2].content[0].text, "<deja-recall>\nPROMPT-2\n</deja-recall>");
+assert.equal(b2[3].content[0].content[0].result, "failed\n\nREPAIR-1");
+
+// Once a newer tool_result arrives, the historical failing tool_result must keep REPAIR-1 intact.
+const a2 = { role: "assistant", content: [{ type: "text", text: "re-running" }] };
+const okMsg = { role: "user", content: [{ type: "tool_result", name: "run_commands", tool_use_id: "tu_2", content: [{ query: "go test", result: "ok", success: true }] }] };
+const b2Next = builder.build([u1, a1, u2, failMsg, a2, okMsg]);
+assert.equal(b2Next[3].content[0].content[0].result, "failed\n\nREPAIR-1");
 `
 	proc2 := preamble + `
 assert.equal(rule.content(), "DIGEST-1");
-const u1 = { role: "user", content: [{ type: "text", text: "first q" }] };
+const u1Stacked = {
+  role: "user",
+  content: [
+    { type: "text", text: "<deja-recall>\nOLD-1\n</deja-recall>" },
+    { type: "text", text: "<deja-recall>\nOLD-2\n</deja-recall>" },
+    { type: "text", text: "first q" },
+  ],
+};
 const a1 = { role: "assistant", content: [{ type: "text", text: "running" }] };
 const u2 = { role: "user", content: [{ type: "text", text: "second q" }] };
 const failMsg = { role: "user", content: [{ type: "tool_result", name: "run_commands", tool_use_id: "tu_1", content: [{ query: "go test", result: "failed", success: false }] }] };
-const b3 = builder.build([u1, a1, u2, failMsg]);
+const a2 = { role: "assistant", content: [{ type: "text", text: "re-running" }] };
+const okMsg = { role: "user", content: [{ type: "tool_result", name: "run_commands", tool_use_id: "tu_2", content: [{ query: "go test", result: "ok", success: true }] }] };
+const b3 = builder.build([u1Stacked, a1, u2, failMsg, a2, okMsg]);
+assert.equal(b3[0].content.length, 2);
 assert.equal(b3[0].content[0].text, "<deja-recall>\nPROMPT-1\n</deja-recall>");
 assert.equal(b3[2].content[0].text, "<deja-recall>\nPROMPT-2\n</deja-recall>");
-assert.ok(b3[3].content[0].content[0].result.includes("REPAIR-1"));
+assert.equal(b3[3].content[0].content[0].result, "failed\n\nREPAIR-1");
 
 plugin.hooks.onEvent({ type: "status-notice", metadata: { kind: "auto_compaction", phase: "started" } });
 const b4 = builder.build([u2]);
@@ -506,22 +561,30 @@ const r1 = hooks.transformContext({
 });
 assert.equal(r1[0].content[1].text, "<deja-recall>\nPROMPT-1\n</deja-recall>");
 
+// Re-running on kept messages with attached recall parts must not stack blocks or re-query deja.
+const r1Again = hooks.transformContext({ messages: r1 });
+assert.equal(r1Again[0].content.length, 2);
+assert.equal(r1Again[0].content[1].text, "<deja-recall>\nPROMPT-1\n</deja-recall>");
+const r1Third = hooks.transformContext({ messages: r1Again });
+assert.equal(r1Third[0].content.length, 2);
+assert.equal(r1Third[0].content[1].text, "<deja-recall>\nPROMPT-1\n</deja-recall>");
+
 const r2 = hooks.transformContext({
   messages: [
-    { role: "user", content: "first q", meta: { messageId: "u1" } },
+    ...r1Again,
     { role: "assistant", content: "working" },
     { role: "user", content: "second q", meta: { messageId: "u2" } },
   ],
 });
+assert.equal(r2[0].content.length, 2);
 assert.equal(r2[0].content[1].text, "<deja-recall>\nPROMPT-1\n</deja-recall>");
+assert.equal(r2[2].content.length, 2);
 assert.equal(r2[2].content[1].text, "<deja-recall>\nPROMPT-2\n</deja-recall>");
 
 // Missed recalls must settle so repeated calls/restarts do not re-query deja.
 const rMiss1 = hooks.transformContext({
   messages: [
-    { role: "user", content: "first q", meta: { messageId: "u1" } },
-    { role: "assistant", content: "working" },
-    { role: "user", content: "second q", meta: { messageId: "u2" } },
+    ...r2,
     { role: "assistant", content: "done" },
     { role: "user", content: "__miss__", meta: { messageId: "u3" } },
   ],
@@ -539,9 +602,35 @@ const r3 = hooks.transformContext({
     { role: "user", content: "__miss__", meta: { messageId: "u3" } },
   ],
 });
+assert.equal(r3[0].content.length, 2);
 assert.equal(r3[0].content[1].text, "<deja-recall>\nPROMPT-1\n</deja-recall>");
+assert.equal(r3[2].content.length, 2);
 assert.equal(r3[2].content[1].text, "<deja-recall>\nPROMPT-2\n</deja-recall>");
 assert.equal(r3[4].content, "__miss__");
+
+// A duplicate stack already present on a message collapses back to one block across restart.
+const rDedup = hooks.transformContext({
+  messages: [
+    {
+      role: "user",
+      meta: { messageId: "u1" },
+      content: [
+        { type: "text", text: "first q" },
+        { type: "text", text: "<deja-recall>\nPROMPT-1\n</deja-recall>" },
+        { type: "text", text: "<deja-recall>\nEXTRA\n</deja-recall>" },
+      ],
+    },
+    { role: "assistant", content: "working" },
+    r3[2],
+    { role: "assistant", content: "done" },
+    { role: "user", content: "__miss__", meta: { messageId: "u3" } },
+  ],
+});
+assert.equal(rDedup[0].content.length, 2);
+assert.equal(rDedup[0].content[1].text, "<deja-recall>\nPROMPT-1\n</deja-recall>");
+assert.equal(rDedup[2].content.length, 2);
+assert.equal(rDedup[2].content[1].text, "<deja-recall>\nPROMPT-2\n</deja-recall>");
+assert.equal(rDedup[4].content, "__miss__");
 `
 
 	runNodeScriptInDir(t, dir, "cc1.mjs", proc1, "--experimental-strip-types", "--no-warnings")

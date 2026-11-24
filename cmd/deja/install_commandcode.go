@@ -146,13 +146,33 @@ function run(args: string[], input: string, timeout = 5000): string {
   }
 }
 
-// The text of a message the person typed, "" for tool results and the
-// harness's own turns.
-function typed(m: any): string {
-  if (!m || m.role !== "user" || (m.meta && (m.meta.isMeta || m.meta.isSummary))) return ""
-  if (typeof m.content === "string") return m.content
-  if (!Array.isArray(m.content) || m.content.some((b: any) => b && b.type === "tool_result")) return ""
-  return m.content.filter((b: any) => b && b.type === "text").map((b: any) => b.text).join("\n")
+const RECALL_BLOCK_RE = /^\s*<deja-(?:recall|memory)\b[\s\S]*<\/deja-(?:recall|memory)>\s*$/
+
+// cleanParts splits any trailing deja recall/known text parts off a user
+// message so keys stay stable across kept-message re-runs and duplicate piles
+// collapse to one block.
+function cleanParts(m: any, known: Set<string>) {
+  if (!m || m.role !== "user" || (m.meta && (m.meta.isMeta || m.meta.isSummary))) {
+    return { isUser: false, baseParts: [] as any[], stripped: [] as string[] }
+  }
+  if (typeof m.content === "string") {
+    return { isUser: true, baseParts: [{ type: "text", text: m.content }], stripped: [] as string[] }
+  }
+  if (!Array.isArray(m.content) || m.content.some((b: any) => b && b.type === "tool_result")) {
+    return { isUser: false, baseParts: [] as any[], stripped: [] as string[] }
+  }
+  const baseParts = m.content.slice()
+  const stripped: string[] = []
+  while (baseParts.length > 1) {
+    const tail = baseParts[baseParts.length - 1]
+    if (tail && tail.type === "text" && typeof tail.text === "string" && (RECALL_BLOCK_RE.test(tail.text) || known.has(tail.text))) {
+      stripped.unshift(tail.text)
+      baseParts.pop()
+    } else {
+      break
+    }
+  }
+  return { isUser: true, baseParts, stripped }
 }
 
 export default function (cmd: any) {
@@ -192,37 +212,54 @@ export default function (cmd: any) {
       if (!Array.isArray(messages)) return messages
       const keyOf = (m: any, idx: number, text: string) =>
         String((m.meta && m.meta.messageId) || idx) + "\n" + text
+      const scope = scopeOf()
+      let snap = promptCache.read(scope)
+      const seen = snap.session.recalled || {}
+      const known = new Set<string>(Object.values(seen).filter(Boolean) as string[])
+      const cleaned = messages.map((m: any) => {
+        const info = cleanParts(m, known)
+        const text = info.isUser
+          ? info.baseParts.filter((b: any) => b && b.type === "text").map((b: any) => b.text).join("\n")
+          : ""
+        return { ...info, text }
+      })
       let lastAt = -1
-      for (let i = messages.length - 1; i >= 0; i--) {
-        if (typed(messages[i])) {
+      for (let i = cleaned.length - 1; i >= 0; i--) {
+        if (cleaned[i].text) {
           lastAt = i
           break
         }
       }
       if (lastAt < 0) return messages
-      const scope = scopeOf()
-      let snap = promptCache.read(scope)
-      const seen = snap.session.recalled || {}
       const lastMsg = messages[lastAt]
-      const lastText = typed(lastMsg)
-      const lastKey = keyOf(lastMsg, lastAt, lastText)
+      const lastInfo = cleaned[lastAt]
+      const lastKey = keyOf(lastMsg, lastAt, lastInfo.text)
       if (!Object.hasOwn(seen, lastKey)) {
-        const answer = run(["hook-prompt", "--plain"], JSON.stringify({ prompt: lastText, session_id: session, cwd: cmd.cwd }), 10000)
-        snap = promptCache.write(scope, snap.epoch, (s: any) => {
+        const answer = lastInfo.stripped.length > 0
+          ? lastInfo.stripped[0]
+          : run(["hook-prompt", "--plain"], JSON.stringify({ prompt: lastInfo.text, session_id: session, cwd: cmd.cwd }), 10000)
+        const res = promptCache.write(scope, snap.epoch, (s: any) => {
           rememberEntry(s.recalled, lastKey, answer)
         })
+        if (res && !res.stale) snap = { epoch: res.epoch, session: res.session }
+        else snap = promptCache.read(scope)
       }
       const recalls = snap.session.recalled || {}
       let out: any[] | null = null
       for (let i = 0; i < messages.length; i++) {
+        const info = cleaned[i]
+        if (!info.text) continue
         const m = messages[i]
-        const text = typed(m)
-        if (!text) continue
-        const recall = recalls[keyOf(m, i, text)]
-        if (!recall || text.includes(recall)) continue
-        const content = typeof m.content === "string" ? [{ type: "text", text: m.content }] : m.content
-        if (!out) out = messages.slice()
-        out[i] = { ...m, content: [...content, { type: "text", text: recall }] }
+        const recall = recalls[keyOf(m, i, info.text)] || info.stripped[0] || ""
+        if (recall) {
+          if (info.text.includes(recall) && info.stripped.length === 0) continue
+          if (Array.isArray(m.content) && m.content.length === info.baseParts.length + 1 && info.stripped.length === 1 && info.stripped[0] === recall) continue
+          if (!out) out = messages.slice()
+          out[i] = { ...m, content: [...info.baseParts, { type: "text", text: recall }] }
+        } else if (info.stripped.length > 0) {
+          if (!out) out = messages.slice()
+          out[i] = { ...m, content: info.baseParts }
+        }
       }
       return out || messages
     },

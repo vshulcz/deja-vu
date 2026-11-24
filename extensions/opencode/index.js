@@ -326,6 +326,13 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
       const key = input?.sessionID || "default"
       const scope = scopeOf(key)
       let snap = promptCache.read(scope)
+      const sys0 = output.system.length ? String(output.system[0] || "") : ""
+      const sysPresent = trailingRecall(sys0, "", true).blocks[0]
+      if (!Object.hasOwn(snap.session, "digest") && sysPresent) {
+        snap = promptCache.write(scope, snap.epoch, (s) => {
+          if (!Object.hasOwn(s, "digest")) s.digest = sysPresent
+        })
+      }
       if (!Object.hasOwn(snap.session, "digest")) {
         // The session id, as the plugin `deja install opencode-auto` writes
         // sends it: without it deja hands the session its own work back and
@@ -354,8 +361,17 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         // request: "System message must be at the beginning." (#4058)
         // After opencode's own prompt, not before it: that prompt is the same
         // in every session and is what the provider's prompt cache keeps.
-        if (output.system.length) output.system[0] = output.system[0] + "\n\n" + context
-        else output.system.push(context)
+        if (output.system.length) {
+          const base = trailingRecall(sys0, context, true).body.trimEnd()
+          if (!base) {
+            output.system[0] = context
+            return
+          }
+          if (base !== sys0) output.system[0] = base
+          output.system[0] = output.system[0] + "\n\n" + context
+        } else {
+          output.system.push(context)
+        }
         return
       }
       // Nothing recalled: this machine has no history yet, the first index is

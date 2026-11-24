@@ -53,20 +53,25 @@ const RECALL_CLOSE = "</deja-recall>"
 // trailingRecall splits the recall blocks appended to the end of a text off
 // it: what the user wrote, and the blocks in the order they were added. extra
 // is a block as this plugin was given it, so one that came unframed is found
-// too.
-export function trailingRecall(text, extra = "") {
+// too. When allowWhole is false, a block at offset 0 is treated as user text
+// rather than appended recall; system transforms pass allowWhole=true because an
+// initially empty system[] starts with only the digest.
+export function trailingRecall(text, extra = "", allowWhole = false) {
   const raw = String(text || "")
   let body = raw
   const blocks = []
   for (;;) {
     const t = body.trimEnd()
-    if (extra && t.endsWith(extra) && t.length > extra.length) {
-      blocks.unshift(extra)
-      body = t.slice(0, t.length - extra.length)
-      continue
+    if (extra && t.endsWith(extra)) {
+      const cut = t.length - extra.length
+      if (cut === 0 ? allowWhole : t[cut - 1] === "\n") {
+        blocks.unshift(extra)
+        body = t.slice(0, cut)
+        continue
+      }
     }
     const at = t.endsWith(RECALL_CLOSE) ? t.lastIndexOf(RECALL_OPEN) : -1
-    if (at <= 0) break
+    if (at < 0 || (at === 0 ? !allowWhole : t[at - 1] !== "\n")) break
     blocks.unshift(t.slice(at))
     body = t.slice(0, at)
   }
@@ -75,13 +80,15 @@ export function trailingRecall(text, extra = "") {
 
 // settleRecall leaves the message's last text part carrying one recall block:
 // the one already there if another copy of the plugin put it in first, or
-// extra. Run on every model call, it replaces rather than appends, so a host
-// that keeps the message between calls does not collect a block per call.
+// extra. Run on every model call, it trims trailing whitespace on the body only
+// when settling a recall block so fresh, kept, and rebuilt prompts match byte
+// for byte, while untouched prompts stay verbatim.
 export function settleRecall(tail, extra) {
   if (!tail || typeof tail.text !== "string") return
-  const { body, blocks } = trailingRecall(tail.text, extra)
+  let { body, blocks } = trailingRecall(tail.text, extra)
   const keep = blocks[0] || extra || ""
-  const next = keep ? body + "\n\n" + keep : body
+  if (keep) body = body.trimEnd()
+  const next = keep ? (body ? body + "\n\n" + keep : keep) : body
   if (next !== tail.text) tail.text = next
 }
 

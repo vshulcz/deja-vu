@@ -224,13 +224,13 @@ function run(args, input = "", timeout = 10000) {
 
 function cleanUserParts(content, known) {
   if (!Array.isArray(content)) return [];
-  if (content.length > 1 && content[0] && content[0].type === "text" && typeof content[0].text === "string") {
-    const t = content[0].text;
-    if (known.has(t) || /^\s*<deja-(?:recall|memory)\b[\s\S]*<\/deja-(?:recall|memory)>\s*$/.test(t)) {
-      return content.slice(1);
-    }
+  let i = 0;
+  while (content.length - i > 1 && content[i] && content[i].type === "text" && typeof content[i].text === "string") {
+    const t = content[i].text;
+    if (!known.has(t) && !/^\s*<deja-(?:recall|memory)\b[\s\S]*<\/deja-(?:recall|memory)>\s*$/.test(t)) break;
+    i++;
   }
-  return content;
+  return i ? content.slice(i) : content;
 }
 
 // Cline wraps what the user typed in a mode tag before it becomes a message.
@@ -251,11 +251,28 @@ const COMMAND_TOOLS = new Set([
   "run_commands", "execute_command", "run_command", "Bash", "bash", "shell", "terminal",
 ]);
 
+function stripRepairText(text, knownRepairs) {
+  let out = String(text || "");
+  if (!knownRepairs || knownRepairs.size === 0) return out;
+  for (;;) {
+    let trimmed = false;
+    for (const r of knownRepairs) {
+      if (r && out.endsWith("\n\n" + r)) {
+        out = out.slice(0, out.length - r.length - 2);
+        trimmed = true;
+        break;
+      }
+    }
+    if (!trimmed) break;
+  }
+  return out;
+}
+
 // commandFailure finds the newest command tool_result that failed, as build()
 // sees it: {type:"tool_result", name, content:[{query,result,error,success}]}.
 // Returns the message index, the failing entry, and the text to look up — or
 // null when the last command did not fail.
-function commandFailure(messages) {
+function commandFailure(messages, knownRepairs) {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
     if (!m || !Array.isArray(m.content)) continue;
@@ -264,29 +281,37 @@ function commandFailure(messages) {
       const entries = Array.isArray(part.content) ? part.content : [];
       for (const e of entries) {
         if (!e || e.success !== false) continue;
-        const output = typeof e.result === "string" ? e.result : typeof e.error === "string" ? e.error : "";
+        const rawOutput = typeof e.result === "string" ? e.result : typeof e.error === "string" ? e.error : "";
+        const output = stripRepairText(rawOutput, knownRepairs);
         if (!output.trim()) continue;
         return { at: i, entry: e, id: part.tool_use_id || "", name: part.name, command: e.query || "", output };
       }
     }
-    // Only the most recent tool result is worth a repair; stop at the first
-    // message that carries one, failed or not.
+    // Only the most recent tool result triggers a fresh repair query; older
+    // historical failures are replayed from cached repairs below.
     if (m.content.some((p) => p && p.type === "tool_result")) break;
   }
   return null;
 }
 
 // appendRepair returns a copy of a tool_result part with the repair added to
-// the failing entry's result text. Editing result rather than adding a part of
-// a new shape keeps what cline serializes onto the wire valid.
-function appendRepair(part, line) {
+// the failing entry's result text (stripping any previously attached known
+// repair first so re-runs stay byte-identical).
+function appendRepair(part, line, knownRepairs) {
   return {
     ...part,
-    content: (Array.isArray(part.content) ? part.content : []).map((e) =>
-      e && e.success === false && typeof e.result === "string"
-        ? { ...e, result: e.result + "\n\n" + line }
-        : e,
-    ),
+    content: (Array.isArray(part.content) ? part.content : []).map((e) => {
+      if (!e || e.success !== false) return e;
+      if (typeof e.result === "string") {
+        const next = stripRepairText(e.result, knownRepairs) + "\n\n" + line;
+        return e.result === next ? e : { ...e, result: next };
+      }
+      if (typeof e.error === "string") {
+        const next = stripRepairText(e.error, knownRepairs) + "\n\n" + line;
+        return e.error === next ? e : { ...e, error: next };
+      }
+      return e;
+    }),
   };
 }
 
@@ -423,8 +448,14 @@ export default {
           // prefix. Silence is the common case: only non-empty answers inject.
           for (const u of users) {
             const extra = snap.session.recalled[u.key];
-            if (!extra) continue;
             const raw = Array.isArray(u.msg.content) ? u.msg.content : [];
+            if (!extra) {
+              if (raw.length !== u.parts.length) {
+                edit();
+                out[u.at] = { ...u.msg, content: u.parts };
+              }
+              continue;
+            }
             if (raw[0] && raw[0].type === "text" && raw[0].text === extra && raw.length === u.parts.length + 1) continue;
             edit();
             out[u.at] = {
@@ -438,9 +469,10 @@ export default {
         // same error before. cline's PreToolUse hook cannot carry this — it
         // keeps only cancel and overrideInput — but the builder's return is
         // what gets sent, so the repair rides beside the failing result in the
-        // same turn rather than a turn later. Silence unless the store holds a
-        // pair.
-        const fail = commandFailure(messages);
+        // same turn rather than a turn later. Historical failed results keep
+        // their cached repair across later turns so the prefix stays unchanged.
+        const knownRepairs = new Set(Object.values(snap.session.repairs || {}).filter(Boolean));
+        const fail = commandFailure(messages, knownRepairs);
         if (fail) {
           const repairKey = fail.id || (fail.at + "#" + fail.name + "#" + fail.output);
           let line = Object.hasOwn(snap.session.repairs, repairKey) ? snap.session.repairs[repairKey] : undefined;
@@ -455,18 +487,37 @@ export default {
               rememberEntry(s.repairs, repairKey, line);
             });
             if (res && !res.stale) snap = { epoch: res.epoch, session: res.session };
+            else snap = promptCache.read(scope);
           }
-          if (line) {
+          if (line) knownRepairs.add(line);
+        }
+
+        const repairs = snap.session.repairs || {};
+        for (let i = 0; i < messages.length; i++) {
+          const m = out ? out[i] : messages[i];
+          if (!m || !Array.isArray(m.content)) continue;
+          let changed = false;
+          const nextContent = m.content.map((part) => {
+            if (!part || part.type !== "tool_result" || !COMMAND_TOOLS.has(part.name)) return part;
+            const entries = Array.isArray(part.content) ? part.content : [];
+            const failing = entries.find((e) => {
+              if (!e || e.success !== false) return false;
+              const rawOut = typeof e.result === "string" ? e.result : typeof e.error === "string" ? e.error : "";
+              return stripRepairText(rawOut, knownRepairs).trim().length > 0;
+            });
+            if (!failing) return part;
+            const rawOutput = typeof failing.result === "string" ? failing.result : typeof failing.error === "string" ? failing.error : "";
+            const baseOutput = stripRepairText(rawOutput, knownRepairs);
+            const repairKey = part.tool_use_id || (i + "#" + part.name + "#" + baseOutput);
+            const rLine = Object.hasOwn(repairs, repairKey) ? repairs[repairKey] : "";
+            if (!rLine) return part;
+            if (rawOutput === baseOutput + "\n\n" + rLine) return part;
+            changed = true;
+            return appendRepair(part, rLine, knownRepairs);
+          });
+          if (changed) {
             edit();
-            const m = out[fail.at];
-            out[fail.at] = {
-              ...m,
-              content: m.content.map((p) =>
-                p === fail.entry || (p && p.type === "tool_result" && p.tool_use_id === fail.id)
-                  ? appendRepair(p, line)
-                  : p,
-              ),
-            };
+            out[i] = { ...m, content: nextContent };
           }
         }
 

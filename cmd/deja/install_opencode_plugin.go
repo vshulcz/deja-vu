@@ -198,6 +198,9 @@ export default {
       try {
         const key = event.sessionID || "default"
         if (event.sessionID) live.add(event.sessionID)
+        const sys0 = event.system?.length ? String(event.system[0]?.text || "") : ""
+        const sysPresent = trailingRecall(sys0, "", true).blocks[0]
+        if (!cache.has(key) && sysPresent) cache.set(key, sysPresent)
         if (!cache.has(key)) {
           // The session id rides along so the digest leaves this session
           // out: the context hook runs after the first message is stored,
@@ -213,6 +216,11 @@ export default {
         }
         const digest = cache.get(key)
         if (digest) {
+          if (event.system.length) {
+            const base = trailingRecall(sys0, digest, true).body.trimEnd()
+            if (!base) { event.system[0].text = digest; return }
+            if (base !== sys0) event.system[0].text = base
+          }
           if (event.system.length) event.system[0].text = event.system[0].text + "\n\n" + digest
           else event.system.push({ type: "text", text: digest })
           return
@@ -437,19 +445,22 @@ export default {
 const opencodeRecallSettleJS = `
 // trailingRecall splits the recall blocks appended to the end of a text off
 // it: what the user wrote, and the blocks in the order they were added.
-function trailingRecall(text, extra = "") {
+function trailingRecall(text, extra = "", allowWhole = false) {
   const raw = String(text || "")
   let body = raw
   const blocks = []
   for (;;) {
     const t = body.trimEnd()
-    if (extra && t.endsWith(extra) && t.length > extra.length) {
-      blocks.unshift(extra)
-      body = t.slice(0, t.length - extra.length)
-      continue
+    if (extra && t.endsWith(extra)) {
+      const cut = t.length - extra.length
+      if (cut === 0 ? allowWhole : t[cut - 1] === "\n") {
+        blocks.unshift(extra)
+        body = t.slice(0, cut)
+        continue
+      }
     }
     const at = t.endsWith("</deja-recall>") ? t.lastIndexOf("<deja-recall>") : -1
-    if (at <= 0) break
+    if (at < 0 || (at === 0 ? !allowWhole : t[at - 1] !== "\n")) break
     blocks.unshift(t.slice(at))
     body = t.slice(0, at)
   }
@@ -460,9 +471,10 @@ function trailingRecall(text, extra = "") {
 // there if another copy of the plugin put it in first, or extra.
 function settleRecall(tail, extra) {
   if (!tail || typeof tail.text !== "string") return
-  const { body, blocks } = trailingRecall(tail.text, extra)
+  let { body, blocks } = trailingRecall(tail.text, extra)
   const keep = blocks[0] || extra || ""
-  const next = keep ? body + "\n\n" + keep : body
+  if (keep) body = body.trimEnd()
+  const next = keep ? (body ? body + "\n\n" + keep : keep) : body
   if (next !== tail.text) tail.text = next
 }
 `
@@ -693,6 +705,9 @@ func legacyPluginJSFor(target, exe string) string { //nolint:funlen // the body 
         if (input.sessionID && compacting.delete(input.sessionID)) return
         const key = input.sessionID || "default"
         if (input.sessionID) live.add(input.sessionID)
+        const sys0 = output.system.length ? String(output.system[0] || "") : ""
+        const sysPresent = trailingRecall(sys0, "", true).blocks[0]
+        if (!cache.has(key) && sysPresent) cache.set(key, sysPresent)
         if (!cache.has(key)) {
           // The session id rides along so the digest leaves this session
           // out: the transform runs after the first message is stored, and
@@ -723,6 +738,11 @@ func legacyPluginJSFor(target, exe string) string { //nolint:funlen // the body 
           // model: "Not Found: System message must be at the beginning."
           // After opencode's own prompt, not before it: that prompt is the
           // same in every session and is what the provider's prompt cache keeps.
+          if (output.system.length) {
+            const base = trailingRecall(sys0, ctx, true).body.trimEnd()
+            if (!base) { output.system[0] = ctx; return }
+            if (base !== sys0) output.system[0] = base
+          }
           if (output.system.length) output.system[0] = output.system[0] + "\n\n" + ctx
           else output.system.push(ctx)
           return
