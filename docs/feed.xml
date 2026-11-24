@@ -11,6 +11,13 @@
     <name>vshulcz</name>
   </author>
   <entry>
+    <title>deja-vu: local memory, session search &amp; handoff across 52 coding agents</title>
+    <id>https://vshulcz.github.io/deja-vu/</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
+    <updated>2026-11-24T00:00:00Z</updated>
+    <summary>Shared local memory, session history search, cross-agent handoff, and uncommitted code recovery across 52 coding agents (Claude Code, Codex, Cursor, OpenCode, Gemini CLI, OpenClaw and 46 more agents). One Go binary, zero LLM calls.</summary>
+  </entry>
+  <entry>
     <title>What compaction drops, and how to get it back — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/after-compaction.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/after-compaction.html"></link>
@@ -23,13 +30,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/commands.html"></link>
     <updated>2026-11-24T00:00:00Z</updated>
     <summary>Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
-  </entry>
-  <entry>
-    <title>deja-vu: local memory, session search &amp; handoff across 52 coding agents</title>
-    <id>https://vshulcz.github.io/deja-vu/</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
-    <updated>2026-11-23T00:00:00Z</updated>
-    <summary>Shared local memory, session history search, cross-agent handoff, and uncommitted code recovery across 52 coding agents (Claude Code, Codex, Cursor, OpenCode, Gemini CLI, OpenClaw and 46 more agents). One Go binary, zero LLM calls.</summary>
   </entry>
   <entry>
     <title>Delete Cursor Chat History and Archived Chats — deja-vu</title>
