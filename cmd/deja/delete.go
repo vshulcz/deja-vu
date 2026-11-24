@@ -13,10 +13,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/cliarg"
 	"github.com/vshulcz/deja-vu/internal/digest"
-	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/proc"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -348,8 +349,7 @@ type cliStore struct{ bin string }
 var cliStores = map[string]cliStore{"opencode": {"opencode"}, "mimo": {"mimo"}}
 
 func (c cliStore) run(args ...string) ([]byte, error) {
-	cmd := exec.CommandContext(context.Background(), c.bin, args...)
-	hideconsole.Apply(cmd)
+	cmd := proc.CommandContext(context.Background(), c.bin, args...)
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
@@ -378,13 +378,14 @@ func runDeleteIn(dir string, args []string, in io.Reader, w io.Writer) error {
 			if strings.HasPrefix(a, "-") {
 				return unknownFlag("delete", a, deleteFlags)
 			}
-			if strings.TrimSpace(index.PastedSelector(a)) == "" {
+			sel, serr := cliarg.ParseSelector(a)
+			if serr != nil {
 				return idPrefixNeeded(dir, "delete needs a session id prefix", "delete needs a session id prefix (see `deja last`)")
 			}
 			if prefix != "" {
 				return fmt.Errorf("delete takes one session id; got %q and %q", prefix, a)
 			}
-			prefix = index.PastedSelector(a)
+			prefix = sel.Clean
 		}
 	}
 	if prefix == "" {

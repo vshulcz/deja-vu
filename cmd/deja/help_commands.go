@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/proc"
 )
 
 // helpEntry is one command as `deja help` lists it and as `deja <cmd> --help`
@@ -411,7 +412,7 @@ func runToolHelp(name string, rest []string) error {
 	if err != nil {
 		return fmt.Errorf("%s is not on PATH: %w — `deja help %s` is deja's page for it", name, err, name)
 	}
-	cmd := exec.CommandContext(context.Background(), bin, rest...)
+	cmd := proc.InteractiveCommandContext(context.Background(), bin, rest...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return cmd.Run()
 }

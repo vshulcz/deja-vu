@@ -6,14 +6,13 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/peers"
+	"github.com/vshulcz/deja-vu/internal/proc"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -21,8 +20,7 @@ import (
 // notices and server banners to stderr, and folding those into the result
 // made `mktemp -d` unparseable on any host with a banner configured.
 var sshRunner = func(name string, args ...string) (string, error) {
-	cmd := exec.Command(name, args...)
-	hideconsole.Apply(cmd)
+	cmd := proc.Command(name, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

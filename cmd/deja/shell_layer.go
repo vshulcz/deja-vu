@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vshulcz/deja-vu/internal/hideconsole"
+	"github.com/vshulcz/deja-vu/internal/proc"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -165,7 +165,7 @@ func runShellCommand(dir, cmdStr string, stdout, stderr io.Writer) error {
 	runHookShellBefore(dir, sessionID, cmdStr, stderr)
 
 	sh, shArgs := realShellCommand(cmdStr)
-	c := exec.CommandContext(context.Background(), sh, shArgs...)
+	c := proc.InteractiveCommandContext(context.Background(), sh, shArgs...)
 	c.Stdin = os.Stdin
 	var captured boundedBuffer
 	c.Stdout = io.MultiWriter(stdout, &captured)
@@ -347,8 +347,7 @@ func probeMCPCallThrough(dir, bin string) shellVerifyRow {
 	if !useInProcess {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		cmd := exec.CommandContext(ctx, bin, "mcp")
-		hideconsole.Apply(cmd)
+		cmd := proc.CommandContext(ctx, bin, "mcp")
 		cmd.Stdin = strings.NewReader(req)
 		cmd.Stdout = &out
 		if err := cmd.Run(); err != nil {

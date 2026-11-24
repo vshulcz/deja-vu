@@ -6,10 +6,11 @@ import (
 	"bytes"
 	"context"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/proc"
 )
 
 // processAncestorArgs reads /proc where there is one, and asks ps elsewhere
@@ -49,7 +50,7 @@ func procArgs(pid int) ([]string, int, bool) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	b, err := exec.CommandContext(ctx, "ps", "-ww", "-o", "ppid=", "-o", "args=", "-p", p).Output()
+	b, err := proc.CommandContext(ctx, "ps", "-ww", "-o", "ppid=", "-o", "args=", "-p", p).Output()
 	if err != nil {
 		return nil, 0, false
 	}

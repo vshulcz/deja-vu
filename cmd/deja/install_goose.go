@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/proc"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -1023,7 +1024,7 @@ func cmdGoose(dir string, rest []string, sourceInstance string) error {
 	if err != nil {
 		return fmt.Errorf("goose is not on PATH: %w", err)
 	}
-	cmd := exec.CommandContext(context.Background(), bin, rest...)
+	cmd := proc.InteractiveCommandContext(context.Background(), bin, rest...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	// Waited for through Ctrl-C, so the file goes with the session.
 	return runOutlivingSignals(cmd)

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
+	"github.com/vshulcz/deja-vu/internal/cliarg"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -392,18 +393,7 @@ func selectorMatchesOrigID(meta SessionMeta, sel string) bool {
 // always tried first, so an id that happens to carry a colon keeps working;
 // this only widens what matches.
 func splitSelector(sel string) (harness, id string) {
-	i := strings.IndexByte(sel, ':')
-	if i <= 0 || i == len(sel)-1 {
-		return "", sel
-	}
-	for _, r := range sel[:i] {
-		switch {
-		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_':
-		default:
-			return "", sel
-		}
-	}
-	return sel[:i], sel[i+1:]
+	return cliarg.SplitSelector(sel)
 }
 
 // PastedSelector strips what a paste carries around an id: surrounding
@@ -411,28 +401,7 @@ func splitSelector(sel string) (harness, id string) {
 // a chat arrives dressed like that, and every reading command refused it
 // (#921).
 func PastedSelector(raw string) string {
-	s := strings.TrimSpace(raw)
-	for len(s) >= 2 {
-		first, last := s[0], s[len(s)-1]
-		if (first == '"' && last == '"') || (first == '\'' && last == '\'') || (first == '`' && last == '`') {
-			s = strings.TrimSpace(s[1 : len(s)-1])
-			continue
-		}
-		if q, ok := strings.CutPrefix(s, "\u201c"); ok {
-			if inner, ok := strings.CutSuffix(q, "\u201d"); ok {
-				s = strings.TrimSpace(inner)
-				continue
-			}
-		}
-		if q, ok := strings.CutPrefix(s, "\u2018"); ok {
-			if inner, ok := strings.CutSuffix(q, "\u2019"); ok {
-				s = strings.TrimSpace(inner)
-				continue
-			}
-		}
-		break
-	}
-	return s
+	return cliarg.CleanSelector(raw)
 }
 
 // Forget tombstones the sessions o selects and rebuilds the index without them.

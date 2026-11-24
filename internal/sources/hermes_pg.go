@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/proc"
 )
 
 // Hermes can keep its session store in PostgreSQL instead of SQLite
@@ -34,8 +34,7 @@ const hermesPGWhere = `role in ('user','assistant') and content is not null and 
 // a package var so a test can stand in for psql without a live cluster; the
 // default shells out exactly like the SQLite path shells out to sqlite3.
 var HermesPGRunner = func(dsn, sql string) ([]byte, error) {
-	cmd := exec.Command("psql", dsn, "-tAXq", "-v", "ON_ERROR_STOP=1", "-c", sql)
-	hideconsole.Apply(cmd)
+	cmd := proc.Command("psql", dsn, "-tAXq", "-v", "ON_ERROR_STOP=1", "-c", sql)
 	out, err := cmd.Output()
 	if err != nil {
 		var ee *exec.ExitError

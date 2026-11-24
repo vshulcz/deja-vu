@@ -17,8 +17,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/proc"
 )
 
 // Zed's built-in agent keeps every thread in one SQLite store, and unlike the
@@ -423,8 +423,7 @@ func zstdDecode(frame []byte) ([]byte, error) {
 	if len(frame) == 0 {
 		return nil, errors.New("zed: empty thread body")
 	}
-	cmd := exec.CommandContext(context.Background(), "zstd", "-d", "-c", "-q")
-	hideconsole.Apply(cmd)
+	cmd := proc.CommandContext(context.Background(), "zstd", "-d", "-c", "-q")
 	cmd.Stdin = bytes.NewReader(frame)
 	var out, errBuf bytes.Buffer
 	cmd.Stdout = &out

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/vshulcz/deja-vu/internal/proc"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -569,7 +570,7 @@ func cmdAider(dir string, rest []string, sourceInstance string) error {
 			args = append(slices.Clone(rest), aiderReadArgs(rest, wd, aiderContextPath())...)
 		}
 	}
-	cmd := exec.CommandContext(context.Background(), bin, args...)
+	cmd := proc.InteractiveCommandContext(context.Background(), bin, args...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return runOutlivingSignals(cmd)
 }

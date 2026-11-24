@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/cliarg"
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -32,7 +33,7 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	}
 	// An id arrives from a chat wrapped in quotes or backticks and with the
 	// harness deja itself printed in front of it (#921).
-	o.id = index.PastedSelector(o.id)
+	o.id = cliarg.CleanSelector(o.id)
 	if o.id == "" {
 		return idPrefixNeeded(dir, "show needs an id prefix", showNeedsID)
 	}
@@ -327,13 +328,14 @@ func parseShow(args []string) (showOptions, error) {
 			// A whitespace-only token is no id at all: without this,
 			// `deja show "   "` sailed past the missing-id refusal and a
 			// leading empty argument was silently ignored (#5936).
-			if strings.TrimSpace(a) == "" {
+			sel, err := cliarg.ParseSelector(a)
+			if err != nil {
 				return o, errors.New(showNeedsID)
 			}
 			if o.id != "" {
 				return o, errors.New("show accepts one session id")
 			}
-			o.id = a
+			o.id = sel.Clean
 		}
 	}
 	// The id first: it is what the command is for, and checking the flag ahead
@@ -414,7 +416,7 @@ func cmdCtx(dir string, rest []string) error {
 	}
 	q := strings.Join(rest, " ")
 	if !strings.Contains(q, " ") {
-		q = index.PastedSelector(q)
+		q = cliarg.CleanSelector(q)
 	}
 	// Blank is not a query: it matched nothing and the search handed back the
 	// first session in the store, so `deja ctx "$TOPIC"` with the variable

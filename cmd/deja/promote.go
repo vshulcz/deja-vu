@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/cliarg"
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -62,16 +63,17 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 			if strings.HasPrefix(args[i], "-") {
 				return unknownFlag("promote", args[i], promoteFlags)
 			}
-			if strings.TrimSpace(index.PastedSelector(args[i])) == "" {
+			sel, serr := cliarg.ParseSelector(args[i])
+			if serr != nil {
 				return idPrefixNeeded(dir, "promote needs a session id prefix", "promote needs a session id prefix (see `deja last`)")
 			}
 			if prefix != "" {
 				return fmt.Errorf("promote takes one id-prefix — got %q and %q", prefix, args[i])
 			}
-			prefix = index.PastedSelector(args[i])
+			prefix = sel.Clean
 		}
 	}
-	if strings.TrimSpace(index.PastedSelector(prefix)) == "" {
+	if cliarg.CleanSelector(prefix) == "" {
 		return idPrefixNeeded(dir, "promote needs a session id prefix", "promote needs a session id prefix (see `deja last`)")
 	}
 	if !sources.NoteStates[state] {

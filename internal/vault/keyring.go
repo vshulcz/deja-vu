@@ -7,13 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
-	"github.com/vshulcz/deja-vu/internal/hideconsole"
+	"github.com/vshulcz/deja-vu/internal/proc"
 )
 
 // Keyring stores and retrieves raw 32-byte DEKs in an OS credential store.
@@ -32,8 +31,7 @@ var (
 func defaultExecKeyring(bin string, args []string, stdin string, extraEnv []string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, bin, args...)
-	hideconsole.Apply(cmd)
+	cmd := proc.CommandContext(ctx, bin, args...)
 	if len(extraEnv) > 0 {
 		cmd.Env = append(os.Environ(), extraEnv...)
 	}

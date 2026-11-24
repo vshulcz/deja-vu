@@ -7,6 +7,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/proc"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -1859,7 +1860,7 @@ func TestStartDetachedPIDReapsExitedChild(t *testing.T) {
 		t.Skip("POSIX zombie reaping test")
 	}
 	cmd := exec.CommandContext(t.Context(), "true")
-	pid, err := startDetachedPID(cmd)
+	pid, err := proc.StartDetachedPID(cmd)
 	if err != nil {
 		t.Fatalf("startDetachedPID: %v", err)
 	}
