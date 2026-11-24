@@ -12,7 +12,7 @@ import (
 // reaches the project from a machine that uses it — and the install proof is
 // the moment the reader has just been shown something real. Once, because the
 // second time it is a nag, and a nag costs more than a star is worth.
-const starText = "if deja saved you time, a GitHub star helps more developers find it — github.com/vshulcz/deja-vu"
+const starText = "if deja helped, star it: https://github.com/vshulcz/deja-vu · gh repo star vshulcz/deja-vu"
 
 // starLine returns the sentence the first time it is asked for a given index
 // and "" after that. The marker sits beside the index like .builtnote and
