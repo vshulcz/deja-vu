@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-<p align="center"><strong>Shared local memory, session history search, cross-agent handoff, and code recovery across 52 coding agents.</strong></p>
+<p align="center"><strong>Instant local memory for 52 coding agents — reads the session logs already on your disk.</strong></p>
 
 <p align="center"><a href="https://github.com/vshulcz/deja-vu#readme">English</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.zh.md">简体中文</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.zh-TW.md">繁體中文</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.ja.md">日本語</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.ko.md">한국어</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.es.md">Español</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.pt.md">Português</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.fr.md">Français</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.de.md">Deutsch</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.ru.md">Русский</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.tr.md">Türkçe</a> | <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.hi.md">हिन्दी</a></p>
 
@@ -17,7 +17,7 @@ One Go binary. No LLM, no embeddings, no API key. The network is used only by co
 **58% fewer tokens** on repeated repository tasks (53,558 vs 126,222 baseline; 52,815 vs 103,443 in alternated 11-run trials). **97.2% R@5** on LongMemEval-S (**88.9% hit@1** on the 470-question cleaned set), and **13.6 s** to index 19,195 sessions (**0.7–0.8 ms** in-process lookup).
 
 ```sh
-npx @vshulcz/deja-vu audit                         # inspect local stores, retention risk & recoverable files, no install
+npx @vshulcz/deja-vu audit --secrets               # scan local logs for expiry & leaked keys, no install
 npx @vshulcz/deja-vu "connection pool exhausted"   # search existing sessions, no install
 npx @vshulcz/deja-vu install --auto                # stage ~/.local/bin/deja & wire every installed agent
 ```

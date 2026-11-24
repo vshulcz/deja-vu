@@ -1854,7 +1854,7 @@ func TestNpmReadmeLeadsWithWhatTheMainOneLeadsWith(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, line := range []string{
-		"Shared local memory, session history search, cross-agent handoff, and code recovery across 52 coding agents.",
+		"Instant local memory for 52 coding agents — reads the session logs already on your disk.",
 	} {
 		if !strings.Contains(string(main), line) {
 			t.Fatalf("the main README no longer says %q — update this test with it", line)

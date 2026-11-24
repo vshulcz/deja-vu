@@ -38,7 +38,7 @@ npx @vshulcz/deja-vu install --auto                # 一步跨平台安装并接
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
 ```
 
-<p align="center"><sub>Homebrew：<code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code 插件：<code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills：<code>npx skills add vshulcz/deja-vu</code><br><a href="#安装">Windows（Scoop / winget）、国内 npm 镜像、Codex、OpenCode、OpenClaw 等</a> &middot; 免安装试用：<code>npx @vshulcz/deja-vu stats --no-index --card</code> 或 <code>npx @vshulcz/deja-vu audit</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">浏览器在线演示 →</a></sub></p>
+<p align="center"><sub>Homebrew：<code>brew install deja-vu &amp;&amp; deja install --auto</code> &middot; Claude Code 插件：<code>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu</code> &middot; Agent Skills：<code>npx skills add vshulcz/deja-vu</code><br><a href="#安装">Windows（Scoop / winget）、国内 npm 镜像、Codex、OpenCode、OpenClaw 等</a> &middot; 免安装试用：<code>npx @vshulcz/deja-vu stats --no-index --card</code> 或 <code>npx @vshulcz/deja-vu audit --secrets</code> &middot; <a href="https://vshulcz.github.io/deja-vu/view/">浏览器在线演示 →</a></sub></p>
 
 <table align="center">
 <tr>

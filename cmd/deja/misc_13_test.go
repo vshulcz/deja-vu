@@ -12,6 +12,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/stats"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 	"github.com/vshulcz/deja-vu/internal/usage"
 	"io"
 	"io/fs"
@@ -3981,8 +3982,15 @@ func TestStarLineIsSaidOncePerIndex(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if got := starLine(dir); !strings.Contains(got, "github.com/vshulcz/deja-vu") {
-		t.Fatalf("first call = %q", got)
+	got := starLine(dir)
+	if !strings.Contains(got, "https://github.com/vshulcz/deja-vu") {
+		t.Fatalf("first call missing clickable URL: %q", got)
+	}
+	if !strings.Contains(got, "gh repo star vshulcz/deja-vu") {
+		t.Fatalf("first call missing gh repo star command: %q", got)
+	}
+	if w := termwidth.Columns(got); w > noteWidth {
+		t.Fatalf("first call is %d columns, want <= %d: %q", w, noteWidth, got)
 	}
 	if again := starLine(dir); again != "" {
 		t.Fatalf("said twice: %q", again)
