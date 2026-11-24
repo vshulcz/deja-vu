@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - On Windows, `deja index` and the background refreshes no longer flash console windows. When `deja` ran without a console (started by a GUI host, a scheduled task or a detached refresh), each `sqlite3`, `git`, `zstd` or `psql` child opened a window of its own for as long as it ran. These children, and the detached `deja` refresh, version and warmup processes, now start with a console that has no window (#6156).
+- The prompt hook no longer spends its deadline listing a harness's store when the host names no transcript. Codex may send a null `transcript_path`; the hook then searched every rollout directory for the session id before reading anything, and on a large store under disk load hit the 10-second hook deadline. The hook now reads the transcript the index recorded for that session and skips the store search, so a session newer than the index goes without its live rules until it is indexed. PreCompact still searches the store (#6162).
 
 ## [0.25.0] - 2026-11-21
 

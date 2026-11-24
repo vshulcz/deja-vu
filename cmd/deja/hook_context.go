@@ -71,6 +71,10 @@ type precompactHookInput struct {
 	// CatchUp is a compaction found after the fact, which may be handed over
 	// again: it is captured once (catchUpCompactionWith).
 	CatchUp bool `json:"deja_catch_up"`
+	// noStoreScan keeps compactionSource off the store-wide search for a
+	// session by its id: a caller on the prompt path, where that context is
+	// optional, cannot spend the hook's deadline listing a store (#6162).
+	noStoreScan bool
 	// Grok and Antigravity spell all of this in camelCase. See hook_grok.go.
 	grokEnvelope
 }
