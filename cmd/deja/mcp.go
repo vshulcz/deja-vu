@@ -685,38 +685,47 @@ func callMCPRecall(dir string, raw json.RawMessage, served *int) (string, error)
 	return text, err
 }
 
-func callMCPToolRaw(dir, name string, raw json.RawMessage, served *int) (string, error) {
-	if name == "deja" {
-		var a struct {
-			Mode string `json:"mode"`
-		}
-		if err := decodeToolArgs(name, raw, &a); err != nil {
-			return "", err
-		}
-		mode := strings.ToLower(strings.TrimSpace(a.Mode))
-		if mode == "" || mode == "auto" {
-			mode = inferAutoMCPMode(raw)
-		}
-		target, ok := dispatcherModes[mode]
-		if !ok {
-			// Named, not guessed at: a model that invents a mode gets the list
-			// rather than an empty answer it will read as "no history".
-			// Named from what the tool declares rather than spelled out here:
-			// the seventh mode landed and this sentence still listed six.
-			return "", argErrorf("mode %q is not one of %s", a.Mode, strings.Join(declaredModes(), ", "))
-		}
-		return callMCPToolServed(dir, target, spreadQ(mode, raw), served)
+func callMCPDejaDispatch(dir string, raw json.RawMessage, served *int) (string, error) {
+	var a struct {
+		Mode string `json:"mode"`
 	}
-	raw = spreadQ(name, raw)
+	if err := decodeToolArgs("deja", raw, &a); err != nil {
+		return "", err
+	}
+	mode := strings.ToLower(strings.TrimSpace(a.Mode))
+	if mode == "" || mode == "auto" {
+		mode = inferAutoMCPMode(raw)
+	}
+	target, ok := dispatcherModes[mode]
+	if !ok {
+		// Named, not guessed at: a model that invents a mode gets the list
+		// rather than an empty answer it will read as "no history".
+		// Named from what the tool declares rather than spelled out here:
+		// the seventh mode landed and this sentence still listed six.
+		return "", argErrorf("mode %q is not one of %s", a.Mode, strings.Join(declaredModes(), ", "))
+	}
+	return callMCPToolServed(dir, target, spreadQ(mode, raw), served)
+}
+
+func checkMCPReadToolAccess(dir, name string, raw json.RawMessage) error {
 	switch name {
 	case "recall", "recall_context", "blame", "fix", "how", "orient", "handoff":
 		var scope struct {
 			Project string `json:"project"`
 		}
 		_ = json.Unmarshal(raw, &scope)
-		if err := checkMCPAccess(dir, "read", scope.Project); err != nil {
-			return "", err
-		}
+		return checkMCPAccess(dir, "read", scope.Project)
+	}
+	return nil
+}
+
+func callMCPToolRaw(dir, name string, raw json.RawMessage, served *int) (string, error) {
+	if name == "deja" {
+		return callMCPDejaDispatch(dir, raw, served)
+	}
+	raw = spreadQ(name, raw)
+	if err := checkMCPReadToolAccess(dir, name, raw); err != nil {
+		return "", err
 	}
 	switch name {
 	case "recall":

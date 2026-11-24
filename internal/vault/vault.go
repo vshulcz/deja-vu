@@ -124,6 +124,28 @@ func NotesPath() string {
 	return filepath.Join(homeDir(), ".local", "share", "deja", "notes.jsonl")
 }
 
+// DefaultIndexDir returns the default derived index path matching index.DefaultDir.
+func DefaultIndexDir() string {
+	if v := strings.TrimSpace(os.Getenv("DEJA_INDEX_DIR")); v != "" {
+		return v
+	}
+	if base := os.Getenv("XDG_CACHE_HOME"); filepath.IsAbs(base) {
+		return filepath.Join(base, "deja", "index.db")
+	}
+	h := homeDir()
+	if !filepath.IsAbs(h) {
+		return ""
+	}
+	return filepath.Join(h, ".cache", "deja", "index.db")
+}
+
+func effectiveIndexDir(indexDir string) string {
+	if indexDir != "" {
+		return indexDir
+	}
+	return DefaultIndexDir()
+}
+
 // ArchivePath returns the sealed archive path alongside indexDir.
 func ArchivePath(indexDir string) string {
 	return strings.TrimSuffix(indexDir, string(filepath.Separator)) + ".vault"
@@ -154,8 +176,9 @@ func IsLocked(indexDir string) bool {
 	if cfg.Locked {
 		return true
 	}
-	if idleExpired(indexDir, cfg) {
-		return autoLock(indexDir, cfg) == nil
+	dir := effectiveIndexDir(indexDir)
+	if idleExpired(dir, cfg) {
+		return autoLock(dir, cfg) == nil
 	}
 	return false
 }
@@ -211,8 +234,9 @@ func CheckUnlocked(indexDir string) ([]byte, error) {
 	if cfg.Locked {
 		return nil, ErrLocked
 	}
-	if idleExpired(indexDir, cfg) {
-		if lockErr := autoLock(indexDir, cfg); lockErr != nil {
+	dir := effectiveIndexDir(indexDir)
+	if idleExpired(dir, cfg) {
+		if lockErr := autoLock(dir, cfg); lockErr != nil {
 			return nil, lockErr
 		}
 		return nil, ErrLocked
@@ -254,8 +278,9 @@ func idleExpired(indexDir string, cfg Config) bool {
 			last = t
 		}
 	}
-	if indexDir != "" {
-		if fi, err := os.Stat(strings.TrimSuffix(indexDir, string(filepath.Separator)) + ".usage.jsonl"); err == nil {
+	dir := effectiveIndexDir(indexDir)
+	if dir != "" {
+		if fi, err := os.Stat(strings.TrimSuffix(dir, string(filepath.Separator)) + ".usage.jsonl"); err == nil {
 			if fi.ModTime().After(last) {
 				last = fi.ModTime()
 			}
@@ -272,12 +297,13 @@ func idleExpired(indexDir string, cfg Config) bool {
 // keyringless host with no DEJA_VAULT_KEY/DEJA_VAULT_PASSPHRASE fails loudly
 // instead of reporting "locked" while leaving the plaintext index on disk.
 func autoLock(indexDir string, cfg Config) error {
-	if indexDir != "" && hasPlaintextStore(indexDir) {
+	dir := effectiveIndexDir(indexDir)
+	if dir != "" && hasPlaintextStore(dir) {
 		dek, err := resolveDEK(cfg)
 		if err != nil {
 			return fmt.Errorf("auto-lock refused: cannot seal plaintext memory store — %w", err)
 		}
-		sealErr := SealTree(indexDir, dek)
+		sealErr := SealTree(dir, dek)
 		clear(dek)
 		if sealErr != nil {
 			return fmt.Errorf("auto-lock refused: sealing memory store failed — %w", sealErr)

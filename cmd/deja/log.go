@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -57,12 +58,18 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 			n, seenN = x, true
 		}
 	}
-	if err := enforceClientPolicy(dir, "cli", cliClientName(), "read", ""); err != nil {
-		return err
+	if jsonOut && jsonl {
+		return errors.New("log: choose either --json or --jsonl, not both")
 	}
 	if last {
+		if err := checkCLIAccess(dir, "read", ""); err != nil {
+			return err
+		}
 		snaps := usage.Snapshots(dir, 1)
 		if len(snaps) == 0 {
+			if jsonl {
+				return nil
+			}
 			// `--json` answers in JSON, including when the answer is that
 			// there is nothing: this shape is one object, and null is how a
 			// missing object is spelled. The sentence went out under the flag
@@ -92,6 +99,9 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 			fmt.Fprintf(os.Stderr, "deja: this digest is stamped later than this machine's clock, so it leads by its stamp — a digest served since may be older by that stamp and sit below it\n")
 		}
 		return nil
+	}
+	if err := enforceClientPolicy(dir, "cli", cliClientName(), "read", ""); err != nil {
+		return err
 	}
 	events, total := usage.EventsCounted(dir, n)
 	if jsonl {

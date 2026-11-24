@@ -51,6 +51,8 @@ func withTestVaultEnv(t *testing.T) (dir string, kr *memKeyring) {
 	t.Setenv("DEJA_VAULT_BACKEND", "")
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "config"))
 	t.Setenv("XDG_DATA_HOME", filepath.Join(tmp, "data"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(tmp, "cache"))
+	t.Setenv("DEJA_INDEX_DIR", "")
 	t.Setenv(EnvVaultFile, filepath.Join(tmp, "config", "deja", "vault.json"))
 	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "data", "deja", "notes.jsonl"))
 	t.Setenv(EnvVaultKey, "")
@@ -255,9 +257,9 @@ func TestVaultAutoLockRefusesToLockWithoutSealableKey(t *testing.T) {
 	if _, err := Init(indexDir, "auto-lock-passphrase", 1*time.Second); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
-	cfg, err := LoadConfig()
-	if err != nil {
-		t.Fatal(err)
+	cfg, loadErr := LoadConfig()
+	if loadErr != nil {
+		t.Fatal(loadErr)
 	}
 	// Keyringless host: no keyring entry and no env DEK/passphrase.
 	delete(kr.keys, cfg.KeyID)
@@ -280,9 +282,9 @@ func TestVaultAutoLockRefusesToLockWithoutSealableKey(t *testing.T) {
 	if IsLocked(indexDir) {
 		t.Fatal("IsLocked reported locked although no seal happened")
 	}
-	after, err := LoadConfig()
-	if err != nil {
-		t.Fatal(err)
+	after, afterErr := LoadConfig()
+	if afterErr != nil {
+		t.Fatal(afterErr)
 	}
 	if after.Locked {
 		t.Fatal("config Locked set although SealTree never ran")
@@ -849,3 +851,602 @@ func TestVaultOSKeyringCommandsAndEdgeCases(t *testing.T) {
 type errFailWriter struct{}
 
 func (errFailWriter) Write([]byte) (int, error) { return 0, errors.New("write failed") }
+
+func TestVaultAutoLockViaEmptyIndexDirSealsDefaultStore(t *testing.T) {
+	_, kr := withTestVaultEnv(t)
+	tmp := t.TempDir()
+	home := filepath.Join(tmp, "home")
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	// DefaultIndexDir precedence: HOME fallback -> XDG_CACHE_HOME -> DEJA_INDEX_DIR -> relative HOME.
+	t.Setenv("DEJA_INDEX_DIR", "")
+	t.Setenv("XDG_CACHE_HOME", "")
+	if got, want := DefaultIndexDir(), filepath.Join(home, ".cache", "deja", "index.db"); got != want {
+		t.Fatalf("DefaultIndexDir HOME fallback = %q, want %q", got, want)
+	}
+	xdgCache := filepath.Join(tmp, "xdg-cache")
+	t.Setenv("XDG_CACHE_HOME", xdgCache)
+	if got, want := DefaultIndexDir(), filepath.Join(xdgCache, "deja", "index.db"); got != want {
+		t.Fatalf("DefaultIndexDir XDG_CACHE_HOME = %q, want %q", got, want)
+	}
+	defaultIdx := filepath.Join(tmp, "default-index.db")
+	t.Setenv("DEJA_INDEX_DIR", defaultIdx)
+	if got := DefaultIndexDir(); got != defaultIdx {
+		t.Fatalf("DefaultIndexDir DEJA_INDEX_DIR = %q, want %q", got, defaultIdx)
+	}
+	t.Setenv("DEJA_INDEX_DIR", "")
+	t.Setenv("XDG_CACHE_HOME", "")
+	t.Setenv("HOME", "relative-home")
+	if got := DefaultIndexDir(); got != "" {
+		t.Fatalf("DefaultIndexDir relative HOME = %q, want empty", got)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("DEJA_INDEX_DIR", defaultIdx)
+
+	if err := os.MkdirAll(defaultIdx, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(defaultIdx, "sessions.bin"), []byte("plaintext-index"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Init("", "default-dir-pass", 5*time.Second); err != nil {
+		t.Fatalf("Init empty indexDir: %v", err)
+	}
+
+	// Expire idle timeout with no sealable key in keyring or env: CheckUnlocked("") and IsLocked("") must refuse.
+	cfg, loadErr := LoadConfig()
+	if loadErr != nil {
+		t.Fatal(loadErr)
+	}
+	cfg.UnlockedAt = time.Now().UTC().Add(-10 * time.Minute).Format(time.RFC3339Nano)
+	if err := saveConfig(cfg); err != nil {
+		t.Fatal(err)
+	}
+	kr.keys = map[string][]byte{}
+	t.Setenv(EnvVaultPassphrase, "")
+	t.Setenv(EnvVaultKey, "")
+
+	if IsLocked("") {
+		t.Fatal("IsLocked(\"\") reported true even though default plaintext store could not be sealed")
+	}
+	if _, err := CheckUnlocked(""); err == nil {
+		t.Fatal("CheckUnlocked(\"\") expected auto-lock refusal when no key is available")
+	}
+	if _, err := os.Stat(filepath.Join(defaultIdx, "sessions.bin")); err != nil {
+		t.Fatalf("plaintext default store missing after auto-lock refusal: %v", err)
+	}
+
+	// Provide passphrase so CheckUnlocked("") seals the default index directory instead of skipping SealTree.
+	t.Setenv(EnvVaultPassphrase, "default-dir-pass")
+	if _, err := CheckUnlocked(""); !errors.Is(err, ErrLocked) {
+		t.Fatalf("CheckUnlocked(\"\") after expiry with passphrase = %v, want ErrLocked", err)
+	}
+	if !IsLocked("") {
+		t.Fatal("IsLocked(\"\") = false after CheckUnlocked(\"\") sealed default store")
+	}
+	if _, err := os.Stat(ArchivePath(defaultIdx)); err != nil {
+		t.Fatalf("expected sealed archive at ArchivePath(defaultIdx): %v", err)
+	}
+	if _, err := os.Stat(defaultIdx); !os.IsNotExist(err) {
+		t.Fatalf("expected plaintext defaultIdx removed, stat=%v", err)
+	}
+
+	// Unlock("", "") uses env passphrase fallback and restores defaultIdx.
+	if err := Unlock("", ""); err != nil {
+		t.Fatalf("Unlock empty indexDir: %v", err)
+	}
+	gotBytes, readErr := os.ReadFile(filepath.Join(defaultIdx, "sessions.bin"))
+	if readErr != nil || string(gotBytes) != "plaintext-index" {
+		t.Fatalf("restored sessions.bin = (%q, %v)", gotBytes, readErr)
+	}
+
+	// Lock("", "default-dir-pass") seals again cleanly.
+	t.Setenv(EnvVaultPassphrase, "")
+	kr.keys = map[string][]byte{}
+	if err := Lock("", "bad-pass"); err == nil {
+		t.Fatal("Lock(\"\") with bad passphrase succeeded")
+	}
+	if err := Lock("", ""); err == nil {
+		t.Fatal("Lock(\"\") without passphrase/key succeeded")
+	}
+	if err := Lock("", "default-dir-pass"); err != nil {
+		t.Fatalf("Lock(\"\") with passphrase failed: %v", err)
+	}
+	if _, err := os.Stat(ArchivePath(defaultIdx)); err != nil {
+		t.Fatalf("expected sealed archive after Lock(\"\"): %v", err)
+	}
+}
+
+func TestVaultBranchErrorsAndLimits(t *testing.T) {
+	idx, _ := withTestVaultEnv(t)
+	if err := os.MkdirAll(filepath.Dir(idx), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Init(idx, "short", 0); err == nil {
+		t.Fatal("expected short passphrase error")
+	}
+	if _, err := Init(idx, "valid-passphrase-1", 0); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	if _, err := Init(idx, "valid-passphrase-1", 0); !errors.Is(err, ErrAlreadyInitialized) {
+		t.Fatalf("duplicate Init = %v, want ErrAlreadyInitialized", err)
+	}
+
+	// Invalid DEJA_VAULT_KEY and OpenLine error branches.
+	t.Setenv(EnvVaultKey, "not-hex")
+	if _, err := CheckUnlocked(idx); err == nil {
+		t.Fatal("expected CheckUnlocked error for malformed DEJA_VAULT_KEY")
+	}
+	t.Setenv(EnvVaultKey, strings.Repeat("aa", 32))
+	if _, err := CheckUnlocked(idx); err == nil {
+		t.Fatal("expected CheckUnlocked error for mismatched DEJA_VAULT_KEY")
+	}
+	t.Setenv(EnvVaultKey, "")
+
+	dek, unlockErr := CheckUnlocked(idx)
+	if unlockErr != nil {
+		t.Fatalf("CheckUnlocked: %v", unlockErr)
+	}
+	if _, err := OpenLine(dek, "notes", "plain-not-prefixed"); err == nil {
+		t.Fatal("expected OpenLine prefix error")
+	}
+	if _, err := OpenLine(dek, "notes", NoteLinePrefix+"!not-b64!"); err == nil {
+		t.Fatal("expected OpenLine base64 error")
+	}
+	if _, err := OpenLine(dek, "notes", NoteLinePrefix+toB64([]byte("short"))); err == nil {
+		t.Fatal("expected OpenLine short ciphertext error")
+	}
+
+	// Unlock error paths: missing passphrase and wrong passphrase.
+	t.Setenv(EnvVaultPassphrase, "")
+	if err := Unlock(idx, ""); err == nil {
+		t.Fatal("expected Unlock empty passphrase error")
+	}
+	if err := Unlock(idx, "wrong-passphrase"); err == nil {
+		t.Fatal("expected Unlock wrong passphrase error")
+	}
+
+	// Malformed salt/wrapped DEK in unwrapDEK.
+	if _, err := unwrapDEK(Config{Salt: "!", WrappedDEK: "!!", KeyID: "0000000000000000"}, "x"); err == nil {
+		t.Fatal("expected unwrapDEK bad salt error")
+	}
+	if _, err := unwrapDEK(Config{Salt: toB64([]byte("12345678")), WrappedDEK: "!", KeyID: "0000000000000000"}, "x"); err == nil {
+		t.Fatal("expected unwrapDEK bad wrapped DEK error")
+	}
+
+	// OpenTree validation errors: traversal "..", non-local abs path, oversized entry.
+	for _, tc := range []struct {
+		name string
+		size int64
+	}{
+		{name: "../escape", size: 0},
+		{name: "/abs/path", size: 0},
+		{name: "huge.bin", size: maxArchiveFileBytes + 1},
+	} {
+		var tarBuf bytes.Buffer
+		tw := tar.NewWriter(&tarBuf)
+		_ = tw.WriteHeader(&tar.Header{
+			Typeflag: tar.TypeReg,
+			Name:     tc.name,
+			Size:     tc.size,
+			Mode:     0o600,
+		})
+		var enc bytes.Buffer
+		cw, _ := newChunkWriter(&enc, dek)
+		_, _ = cw.Write(tarBuf.Bytes())
+		_ = cw.Close()
+		badIdx := filepath.Join(filepath.Dir(idx), "bad-"+strings.ReplaceAll(tc.name, "/", "_"))
+		if err := os.WriteFile(ArchivePath(badIdx), enc.Bytes(), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := OpenTree(badIdx, dek); err == nil {
+			t.Fatalf("expected OpenTree failure for entry %q (size=%d)", tc.name, tc.size)
+		}
+	}
+
+	// Check osKeyring and keyringCommand across darwin, linux, windows, and unknown OS.
+	t.Setenv("DEJA_VAULT_BACKEND", "passphrase")
+	var realKR osKeyring
+	if err := realKR.Set("0123456789abcdef", dek); err == nil {
+		t.Fatal("expected passphrase backend forced error from Set")
+	}
+	if _, err := realKR.Get("0123456789abcdef"); err == nil {
+		t.Fatal("expected passphrase backend forced error from Get")
+	}
+	if err := realKR.Delete("0123456789abcdef"); err != nil {
+		t.Fatalf("passphrase backend Delete: %v", err)
+	}
+	for _, goos := range []string{"darwin", "linux", "windows"} {
+		for _, op := range []string{"set", "get", "delete"} {
+			if _, _, _, _, err := keyringCommand(goos, op, "0123456789abcdef", hex.EncodeToString(dek)); err != nil {
+				t.Fatalf("keyringCommand(%s, %s): %v", goos, op, err)
+			}
+		}
+	}
+	if _, _, _, _, err := keyringCommand("plan9", "get", "0123456789abcdef", ""); err == nil {
+		t.Fatal("expected unsupported OS error from keyringCommand")
+	}
+
+	// Cover NotesPath fallback branches (empty DEJA_NOTES_FILE with/without XDG_DATA_HOME).
+	t.Setenv("DEJA_NOTES_FILE", "")
+	t.Setenv("XDG_DATA_HOME", filepath.Join(filepath.Dir(idx), "xdg-data"))
+	if p := NotesPath(); !strings.Contains(p, "xdg-data") {
+		t.Fatalf("NotesPath with XDG_DATA_HOME = %q", p)
+	}
+	t.Setenv("XDG_DATA_HOME", "")
+	if p := NotesPath(); p == "" {
+		t.Fatal("NotesPath fallback empty")
+	}
+	t.Setenv(EnvVaultFile, "")
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(filepath.Dir(idx), "xdg-cfg"))
+	if p := ConfigPath(); !strings.Contains(p, "xdg-cfg") {
+		t.Fatalf("ConfigPath with XDG_CONFIG_HOME = %q", p)
+	}
+
+	// Cover osKeyring Set/Get/Delete with mocked execKeyringFn (invalid keyID, bad hex, happy path).
+	t.Setenv("DEJA_VAULT_BACKEND", "")
+	savedExec := execKeyringFn
+	t.Cleanup(func() { execKeyringFn = savedExec })
+	if err := realKR.Set("bad-id", dek); err == nil {
+		t.Fatal("expected invalid key id from Set")
+	}
+	if _, err := realKR.Get("bad-id"); err == nil {
+		t.Fatal("expected invalid key id from Get")
+	}
+	if err := realKR.Delete("bad-id"); err != nil {
+		t.Fatalf("Delete bad-id: %v", err)
+	}
+	execKeyringFn = func(_ string, _ []string, _ string, _ []string) ([]byte, error) {
+		return nil, errors.New("boom")
+	}
+	_ = realKR.Name()
+	if err := realKR.Set("0123456789abcdef", dek); err == nil {
+		t.Fatal("expected execKeyringFn error on Set")
+	}
+	if _, err := realKR.Get("0123456789abcdef"); err == nil {
+		t.Fatal("expected execKeyringFn error on Get")
+	}
+	if runtime.GOOS != "windows" {
+		if err := realKR.Delete("0123456789abcdef"); err == nil {
+			t.Fatal("expected execKeyringFn error on Delete")
+		}
+	}
+	execKeyringFn = func(_ string, _ []string, _ string, _ []string) ([]byte, error) {
+		return []byte("not-hex\n"), nil
+	}
+	if _, err := realKR.Get("0123456789abcdef"); err == nil {
+		t.Fatal("expected corrupt hex error from Get")
+	}
+	execKeyringFn = func(_ string, _ []string, _ string, _ []string) ([]byte, error) {
+		return []byte(hex.EncodeToString(dek) + "\n"), nil
+	}
+	gotKR, krGetErr := realKR.Get("0123456789abcdef")
+	if krGetErr != nil || !bytes.Equal(gotKR, dek) {
+		t.Fatalf("mocked Get = (%x, %v)", gotKR, krGetErr)
+	}
+	if err := realKR.Set("0123456789abcdef", dek); err != nil {
+		t.Fatalf("mocked Set: %v", err)
+	}
+	if _, err := dpapiPath("0123456789abcdef"); err != nil {
+		t.Fatalf("dpapiPath with LOCALAPPDATA: %v", err)
+	}
+	t.Setenv("LOCALAPPDATA", "")
+	_, _ = dpapiPath("0123456789abcdef")
+
+	// Cover newChunkReader magic/short header, VerifyEOF trailing data, SealLine error, SealTree no-op.
+	if _, err := newChunkReader(bytes.NewReader([]byte("tiny")), dek); err == nil {
+		t.Fatal("expected short header error")
+	}
+	if _, err := newChunkReader(bytes.NewReader([]byte("BAD!01234567")), dek); err == nil {
+		t.Fatal("expected magic error")
+	}
+	var trailing bytes.Buffer
+	tcw2, _ := newChunkWriter(&trailing, dek)
+	_, _ = tcw2.Write([]byte("extra"))
+	_ = tcw2.Close()
+	trailing.WriteString("X")
+	crTrail, _ := newChunkReader(&trailing, dek)
+	if err := crTrail.VerifyEOF(); err == nil {
+		t.Fatal("expected VerifyEOF unexpected trailing data error")
+	}
+	var emptyWithExtra bytes.Buffer
+	tcw3, _ := newChunkWriter(&emptyWithExtra, dek)
+	_ = tcw3.Close()
+	emptyWithExtra.WriteString("X")
+	crExtra, _ := newChunkReader(&emptyWithExtra, dek)
+	if err := crExtra.VerifyEOF(); err == nil {
+		t.Fatal("expected VerifyEOF trailing bytes error")
+	}
+	if err := SealTree(filepath.Join(filepath.Dir(idx), "nonexistent-dir"), dek); err != nil {
+		t.Fatalf("SealTree on missing store: %v", err)
+	}
+
+	// Cover multi-chunk (>1MiB) SealTree/OpenTree, nested dir, sidecar-only hasPlaintextStore,
+	// parked .old.* file wipe, VerifyEOF non-final data chunk, Unlock keyring failSet & corrupt archive,
+	// and encryptExistingNotes/Snapshots blank/sealed/invalid lines.
+	sideOnly := filepath.Join(filepath.Dir(idx), "sidecar-only")
+	if err := os.WriteFile(sideOnly+".dejavu", []byte("dejavu-cache"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if !hasPlaintextStore(sideOnly) {
+		t.Fatal("hasPlaintextStore should detect sibling sidecar without base dir")
+	}
+	if err := os.WriteFile(sideOnly+".old.1", []byte("parked"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := SealTree(sideOnly, dek); err != nil {
+		t.Fatalf("SealTree sidecar-only: %v", err)
+	}
+	if err := OpenTree(sideOnly, dek); err != nil {
+		t.Fatalf("OpenTree sidecar-only: %v", err)
+	}
+	if got, err := os.ReadFile(sideOnly + ".dejavu"); err != nil || string(got) != "dejavu-cache" {
+		t.Fatalf("restored sidecar = (%q, %v)", got, err)
+	}
+
+	bigIdx := filepath.Join(filepath.Dir(idx), "big-index")
+	if err := os.MkdirAll(filepath.Join(bigIdx, "nested"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	bigPayload := bytes.Repeat([]byte("A"), archiveChunkSize+4096)
+	if err := os.WriteFile(filepath.Join(bigIdx, "nested", "chunked.bin"), bigPayload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := SealTree(bigIdx, dek); err != nil {
+		t.Fatalf("SealTree multi-chunk: %v", err)
+	}
+	if err := OpenTree(bigIdx, dek); err != nil {
+		t.Fatalf("OpenTree multi-chunk: %v", err)
+	}
+	if got, err := os.ReadFile(filepath.Join(bigIdx, "nested", "chunked.bin")); err != nil || !bytes.Equal(got, bigPayload) {
+		t.Fatalf("multi-chunk roundtrip mismatch (len=%d err=%v)", len(got), err)
+	}
+
+	var nonFinal bytes.Buffer
+	nfCW, _ := newChunkWriter(&nonFinal, dek)
+	_, _ = nfCW.Write([]byte("early-frame"))
+	_ = nfCW.flushChunk(false)
+	_ = nfCW.Close()
+	crNF, _ := newChunkReader(&nonFinal, dek)
+	if err := crNF.VerifyEOF(); err == nil {
+		t.Fatal("expected VerifyEOF error when non-final chunk holds data")
+	}
+
+	// Unlock keyring failure branch + corrupt archive failure branch.
+	idx2, kr2 := withTestVaultEnv(t)
+	if _, err := Init(idx2, "unlock-branch-pass", 0); err != nil {
+		t.Fatalf("Init idx2: %v", err)
+	}
+	kr2.failSet = true
+	if err := Unlock(idx2, "unlock-branch-pass"); err != nil {
+		t.Fatalf("Unlock with failSet fallback: %v", err)
+	}
+	cfg2, cfg2Err := LoadConfig()
+	if cfg2Err != nil || cfg2.KeyBackend != "passphrase" {
+		t.Fatalf("cfg2 after failSet Unlock = (%+v, %v), want KeyBackend=passphrase", cfg2, cfg2Err)
+	}
+	if err := os.MkdirAll(filepath.Dir(idx2), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(ArchivePath(idx2), []byte("corrupt"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Unlock(idx2, "unlock-branch-pass"); err == nil {
+		t.Fatal("expected Unlock failure on corrupt archive")
+	}
+
+	// encryptExistingNotes / encryptExistingSnapshots blank, sealed, and malformed JSON lines.
+	dek2, dek2Err := unwrapDEK(cfg2, "unlock-branch-pass")
+	if dek2Err != nil {
+		t.Fatal(dek2Err)
+	}
+	sealedLine, sealErr := SealNoteLine(dek2, []byte(`{"id":"1"}`))
+	if sealErr != nil {
+		t.Fatal(sealErr)
+	}
+	if err := os.MkdirAll(filepath.Dir(NotesPath()), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(NotesPath(), []byte("\n"+sealedLine+"\n"+`{"id":"2"}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := encryptExistingNotes(dek2); err != nil {
+		t.Fatalf("encryptExistingNotes: %v", err)
+	}
+	snapPath := strings.TrimSuffix(idx2, string(filepath.Separator)) + ".injections.jsonl"
+	if err := os.WriteFile(snapPath, []byte("\n{bad-json\n"+`{"digest":"plain"}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := encryptExistingSnapshots(idx2, dek2); err != nil {
+		t.Fatalf("encryptExistingSnapshots: %v", err)
+	}
+	_ = encryptExistingSnapshots("", dek2)
+
+	if err := os.MkdirAll(idx2, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(idx2, "late.txt"), []byte("late"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sealAEAD([]byte("short"), nil, []byte("x")); err == nil {
+		t.Fatal("expected sealAEAD error with invalid key length")
+	}
+	if _, err := openAEAD([]byte("short"), nil, make([]byte, 32)); err == nil {
+		t.Fatal("expected openAEAD error with invalid key length")
+	}
+	tmpBlock := ArchivePath(idx2) + ".tmp"
+	if err := os.MkdirAll(tmpBlock, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := SealTree(idx2, dek2); err == nil {
+		t.Fatal("expected SealTree OpenFile error when .tmp is a directory")
+	}
+	_ = os.Remove(tmpBlock)
+	blockFile := filepath.Join(filepath.Dir(idx2), "blocker")
+	if err := os.WriteFile(blockFile, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := SealTree(filepath.Join(blockFile, "idx"), dek2); err == nil {
+		t.Fatal("expected SealTree MkdirAll error under regular file")
+	}
+	if _, err := OpenLine(dek2, "d", NoteLinePrefix+"aGk="); err == nil {
+		t.Fatal("expected OpenLine truncated ciphertext error")
+	}
+	if _, err := OpenLine(dek2, "d", NoteLinePrefix+"!!!"); err == nil {
+		t.Fatal("expected OpenLine invalid base64 error")
+	}
+	t.Setenv(EnvVaultPassphrase, "")
+	if err := Unlock(idx2, ""); err == nil {
+		t.Fatal("expected Unlock error with empty passphrase")
+	}
+	if err := Unlock(idx2, "wrong-passphrase"); err == nil {
+		t.Fatal("expected Unlock error with wrong passphrase")
+	}
+	if err := Lock(idx2, "unlock-branch-pass"); err != nil {
+		t.Fatalf("Lock idx2: %v", err)
+	}
+	if err := os.MkdirAll(idx2, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(idx2, "late.txt"), []byte("late"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Lock(idx2, "wrong-passphrase"); err == nil {
+		t.Fatal("expected Lock error with wrong passphrase")
+	}
+	if err := Lock(idx2, ""); err == nil {
+		t.Fatal("expected Lock error without passphrase when plaintext remains locked")
+	}
+	if err := Lock(idx2, "unlock-branch-pass"); err != nil {
+		t.Fatalf("Lock via passphrase fallback: %v", err)
+	}
+
+	// Cover keyring Delete/Get/Set branches with stubbed execKeyringFn, chunk writer/reader error paths, and NotesPath.
+	branchExec := execKeyringFn
+	t.Cleanup(func() { execKeyringFn = branchExec })
+	execKeyringFn = func(_ string, _ []string, _ string, _ []string) ([]byte, error) {
+		return []byte("not-hex"), nil
+	}
+	t.Setenv("DEJA_VAULT_BACKEND", "")
+	if _, err := (osKeyring{}).Get("0123456789abcdef"); err == nil {
+		t.Fatal("expected corrupt hex error from osKeyring.Get")
+	}
+	if err := (osKeyring{}).Delete("0123456789abcdef"); err != nil {
+		t.Fatalf("osKeyring.Delete with stubbed exec: %v", err)
+	}
+	if err := (osKeyring{}).Delete("bad-id"); err != nil {
+		t.Fatalf("osKeyring.Delete invalid id: %v", err)
+	}
+	t.Setenv("DEJA_VAULT_BACKEND", "passphrase")
+	if err := (osKeyring{}).Delete("0123456789abcdef"); err != nil {
+		t.Fatalf("osKeyring.Delete passphrase backend: %v", err)
+	}
+	if _, _, _, _, err := keyringCommand("windows", "delete", "0123456789abcdef", ""); err != nil {
+		t.Fatalf("keyringCommand windows delete: %v", err)
+	}
+	if _, _, _, _, err := keyringCommand("freebsd", "get", "0123456789abcdef", ""); err == nil {
+		t.Fatal("expected unsupported platform error")
+	}
+	t.Setenv("DEJA_NOTES_FILE", "")
+	t.Setenv("XDG_DATA_HOME", filepath.Join(filepath.Dir(idx2), "xdata"))
+	if got := NotesPath(); !strings.Contains(got, "xdata") {
+		t.Fatalf("NotesPath with XDG_DATA_HOME = %q", got)
+	}
+	if _, err := newChunkWriter(failingWriter{}, dek2); err == nil {
+		t.Fatal("expected newChunkWriter error on failing writer")
+	}
+	if _, err := newChunkWriter(&failAfterWriter{left: 1}, dek2); err == nil {
+		t.Fatal("expected newChunkWriter error on streamID write failure")
+	}
+	if cwFail, err := newChunkWriter(&failAfterWriter{left: 2}, dek2); err != nil {
+		t.Fatalf("newChunkWriter failAfter(2): %v", err)
+	} else if _, err := cwFail.Write(bytes.Repeat([]byte("a"), archiveChunkSize)); err == nil {
+		t.Fatal("expected chunkWriter.Write flush error")
+	}
+	dirCfg := filepath.Join(filepath.Dir(idx2), "dir-as-cfg")
+	if err := os.MkdirAll(dirCfg, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(EnvVaultFile, dirCfg)
+	if _, err := LoadConfig(); err == nil {
+		t.Fatal("expected LoadConfig read error on directory path")
+	}
+	if _, err := newChunkReader(bytes.NewReader([]byte("SHORT")), dek2); err == nil {
+		t.Fatal("expected newChunkReader short header error")
+	}
+	if _, err := newChunkReader(bytes.NewReader([]byte("BADMAGIC01234567")), dek2); err == nil {
+		t.Fatal("expected newChunkReader bad magic error")
+	}
+	if err := OpenTree(filepath.Join(filepath.Dir(idx2), "no-such-index"), dek2); err == nil {
+		t.Fatal("expected OpenTree error on missing archive")
+	}
+
+	cfgBadKeyID := cfg2
+	cfgBadKeyID.KeyID = "0000000000000000"
+	if _, err := unwrapDEK(cfgBadKeyID, "unlock-branch-pass"); err == nil {
+		t.Fatal("expected unwrapDEK mismatch error")
+	}
+
+	// Corrupt vault.json config error branches across Lock/Unlock/IsLocked/CheckUnlocked.
+	badCfgPath := filepath.Join(filepath.Dir(idx2), "bad-vault.json")
+	if err := os.WriteFile(badCfgPath, []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(EnvVaultFile, badCfgPath)
+	if !Enabled() {
+		t.Fatal("expected Enabled()=true when corrupt vault file exists")
+	}
+	if !IsLocked(idx2) {
+		t.Fatal("expected IsLocked()=true on corrupt vault config")
+	}
+	if _, err := CheckUnlocked(idx2); err == nil {
+		t.Fatal("expected CheckUnlocked error on corrupt config")
+	}
+	if err := Lock(idx2, "unlock-branch-pass"); err == nil {
+		t.Fatal("expected Lock error on corrupt config")
+	}
+	if err := Unlock(idx2, "unlock-branch-pass"); err == nil {
+		t.Fatal("expected Unlock error on corrupt config")
+	}
+
+	// saveConfig error rollback branch in Init.
+	t.Setenv(EnvVaultFile, filepath.Join(blockFile, "vault.json"))
+	if _, err := Init(idx2, "unlock-branch-pass", 0); err == nil {
+		t.Fatal("expected Init error when vault config parent is a file")
+	}
+
+	// Non-absolute home/XDG fallback branches.
+	t.Setenv(EnvVaultFile, "")
+	t.Setenv("DEJA_INDEX_DIR", "")
+	t.Setenv("AppData", "relative-dir")
+	t.Setenv("XDG_CONFIG_HOME", "relative-dir")
+	t.Setenv("XDG_CACHE_HOME", "relative-dir")
+	t.Setenv("HOME", "relative-home")
+	if got := ConfigPath(); got != "" {
+		t.Fatalf("ConfigPath with relative HOME = %q, want empty", got)
+	}
+	if got := DefaultIndexDir(); got != "" {
+		t.Fatalf("DefaultIndexDir with relative HOME = %q, want empty", got)
+	}
+	if Enabled() {
+		t.Fatal("expected Enabled()=false when ConfigPath is empty")
+	}
+}
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) {
+	return 0, errors.New("write boom")
+}
+
+type failAfterWriter struct{ left int }
+
+func (w *failAfterWriter) Write(p []byte) (int, error) {
+	if w.left <= 0 {
+		return 0, errors.New("write boom after N")
+	}
+	w.left--
+	return len(p), nil
+}

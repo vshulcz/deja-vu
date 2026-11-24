@@ -1273,6 +1273,9 @@ one from something that is not deja, is skipped rather than shown with a missing
 half. The same rule decides what the counters in `stats --json` read, so the two
 never disagree about whether something happened.
 
+`deja log --jsonl` writes the same `Event` objects as newline-delimited JSON,
+one compact object per line, and prints nothing when the log is empty.
+
 `deja log --last --json` is a different shape: one object, the most recent
 injected digest itself. It carries `t` and `kind` as above, the `digest` text,
 `bytes`, and — each omitted when empty — `sessions`, the `policy` that allowed
@@ -1281,7 +1284,9 @@ it went to, `unreadable` for an injection whose payload could not be decoded,
 and `projects`, the projects the digest was built from. `projects`
 is absent on records written before it existed and on injections whose writer
 does not know them. It is `null` when no digest has been recorded: one object is the
-shape, and that is how a missing one is spelled.
+shape, and that is how a missing one is spelled. `deja log --last --jsonl`
+writes that single object on one compact line, and prints nothing when no
+digest has been recorded.
 
 ## `deja blame <path> --json`
 

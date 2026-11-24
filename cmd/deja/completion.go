@@ -297,7 +297,7 @@ _deja_completion() {
             COMPREPLY=( $(compgen -W "--json" -- "$cur") )
             ;;
         log)
-            COMPREPLY=( $(compgen -W "--last --json" -- "$cur") )
+            COMPREPLY=( $(compgen -W "--last --json --jsonl" -- "$cur") )
             ;;
         view)
             if [[ "$prev" == "--out" ]]; then
@@ -585,7 +585,7 @@ _deja() {
       _arguments '--json[print JSON]'
       ;;
     log)
-      _arguments '--last[print the most recent injected digest]' '--json[print JSON]' '1:count:'
+      _arguments '--last[print the most recent injected digest]' '--json[print JSON]' '--jsonl[print newline-delimited JSON]' '1:count:'
       ;;
     view)
       _arguments '--out=[write the page to a file]:file:_files' '--no-open[do not open the browser]'
@@ -790,6 +790,7 @@ complete -c deja -n '__fish_seen_subcommand_from update' -l force -d 'Write over
 complete -c deja -n '__fish_seen_subcommand_from wip' -l json
 complete -c deja -n '__fish_seen_subcommand_from log' -l last -d 'Print the most recent injected digest'
 complete -c deja -n '__fish_seen_subcommand_from log' -l json
+complete -c deja -n '__fish_seen_subcommand_from log' -l jsonl -d 'Print newline-delimited JSON'
 complete -c deja -n '__fish_seen_subcommand_from view' -l out -r -F -d 'Write the page to a file'
 complete -c deja -n '__fish_seen_subcommand_from view' -l no-open -d 'Do not open the browser'
 complete -c deja -n '__fish_seen_subcommand_from fix tests' -l limit -x -d 'Max results'
@@ -969,7 +970,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
             }
             'update' { @('--force') }
             'wip' { @('--json') }
-            'log' { @('--last', '--json') }
+            'log' { @('--last', '--json', '--jsonl') }
             'view' {
                 if ($previous -eq '--out') { @() }
                 else { @('--out', '--no-open') }

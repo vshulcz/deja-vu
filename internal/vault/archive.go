@@ -86,7 +86,7 @@ func Init(indexDir, passphrase string, autoLock time.Duration) (string, error) {
 	if err := encryptExistingNotes(dek); err != nil {
 		return "", err
 	}
-	if err := encryptExistingSnapshots(indexDir, dek); err != nil {
+	if err := encryptExistingSnapshots(effectiveIndexDir(indexDir), dek); err != nil {
 		return "", err
 	}
 	return cfg.KeyBackend, nil
@@ -102,9 +102,10 @@ func Lock(indexDir, passphrase string) error {
 	if err != nil {
 		return err
 	}
+	dir := effectiveIndexDir(indexDir)
 	var dek []byte
 	if !cfg.Locked {
-		dek, err = CheckUnlocked(indexDir)
+		dek, err = CheckUnlocked(dir)
 		if err == nil && len(dek) == 32 {
 			defer clear(dek)
 		}
@@ -116,11 +117,11 @@ func Lock(indexDir, passphrase string) error {
 		}
 		defer clear(dek)
 	}
-	if indexDir != "" && hasPlaintextStore(indexDir) {
+	if dir != "" && hasPlaintextStore(dir) {
 		if len(dek) != 32 {
 			return errors.New("passphrase or unlocked key required to seal plaintext index — pass DEJA_VAULT_PASSPHRASE or unlock first")
 		}
-		if err := SealTree(indexDir, dek); err != nil {
+		if err := SealTree(dir, dek); err != nil {
 			return err
 		}
 	}
@@ -154,9 +155,10 @@ func Unlock(indexDir, passphrase string) error {
 	}
 	defer clear(dek)
 
-	if indexDir != "" {
-		if _, err := os.Stat(ArchivePath(indexDir)); err == nil {
-			if err := OpenTree(indexDir, dek); err != nil {
+	dir := effectiveIndexDir(indexDir)
+	if dir != "" {
+		if _, err := os.Stat(ArchivePath(dir)); err == nil {
+			if err := OpenTree(dir, dek); err != nil {
 				return err
 			}
 		}

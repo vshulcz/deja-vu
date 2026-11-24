@@ -19,6 +19,8 @@ func TestPersonalNotesEncryptTransparentlyWithVault(t *testing.T) {
 	t.Setenv("DEJA_VAULT_FILE", filepath.Join(tmp, "vault.json"))
 	t.Setenv("DEJA_VAULT_BACKEND", "passphrase")
 	t.Setenv("DEJA_VAULT_PASSPHRASE", "sources-vault-pass")
+	t.Setenv("DEJA_INDEX_DIR", "")
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(tmp, "cache"))
 	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))
 	t.Setenv("DEJA_REPO_DIR", filepath.Join(tmp, "no-repo"))
 	oldIter := vault.KDFIterations
@@ -41,21 +43,21 @@ func TestPersonalNotesEncryptTransparentlyWithVault(t *testing.T) {
 		t.Fatalf("AppendPromotedSourced: %v", err)
 	}
 
-	raw, err := os.ReadFile(NotesFile())
-	if err != nil {
-		t.Fatal(err)
+	raw, readErr := os.ReadFile(NotesFile())
+	if readErr != nil {
+		t.Fatal(readErr)
 	}
 	if strings.Contains(string(raw), "canary") || strings.Contains(string(raw), "alpha") {
 		t.Fatalf("plaintext canary leaked in encrypted notes.jsonl: %s", raw)
 	}
 
 	// Inject a corrupt encrypted line alongside valid sealed lines; ParseNotesFile must still recover valid notes.
-	if err = os.WriteFile(NotesFile(), append(raw, []byte(vault.NoteLinePrefix+"!badb64!\n")...), 0o600); err != nil {
-		t.Fatal(err)
+	if writeErr := os.WriteFile(NotesFile(), append(raw, []byte(vault.NoteLinePrefix+"!badb64!\n")...), 0o600); writeErr != nil {
+		t.Fatal(writeErr)
 	}
-	ss, err := ParseNotesFile(NotesFile())
-	if err != nil {
-		t.Fatalf("ParseNotesFile: %v", err)
+	ss, parseErr := ParseNotesFile(NotesFile())
+	if parseErr != nil {
+		t.Fatalf("ParseNotesFile: %v", parseErr)
 	}
 	if len(ss) != 2 {
 		t.Fatalf("parsed %d sessions, want 2: %+v", len(ss), ss)
