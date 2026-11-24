@@ -369,13 +369,13 @@ func TestRedactEdgeBranches(t *testing.T) {
 			t.Errorf("looksLikeGoTest edge checks failed")
 		}
 		disabled := &kindPass{allow: map[string]bool{}}
-		if replaceWhole("jwt", jwtRE, "jwt", disabled) != "jwt" ||
-			replaceSubmatch("jwt", jwtRE, "jwt", disabled, nil) != "jwt" ||
-			replaceGroup("jwt", jwtRE, 0, "jwt", disabled, nil) != "jwt" {
+		if replaceWhole("jwt", jwtRE, "[redacted:jwt]", disabled) != "jwt" ||
+			replaceSubmatch("jwt", jwtRE, "[redacted:jwt]", disabled, nil) != "jwt" ||
+			replaceGroup("jwt", jwtRE, 0, "[redacted:jwt]", disabled, nil) != "jwt" {
 			t.Errorf("disabled replace helpers modified input")
 		}
 		optRE := regexp.MustCompile(`(opt)?(val)`)
-		if got := replaceGroup("val", optRE, 1, "credential", &kindPass{}, nil); got != "val" {
+		if got := replaceGroup("val", optRE, 1, "[redacted:credential]", &kindPass{}, nil); got != "val" {
 			t.Errorf("replaceGroup missing optional group = %q, want unchanged", got)
 		}
 	})
