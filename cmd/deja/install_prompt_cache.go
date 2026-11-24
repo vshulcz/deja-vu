@@ -28,7 +28,7 @@ function isTempDejaBin(dejaBin) {
     });
 }
 
-function promptCachePath(name, dejaBin = typeof DEJA === "string" ? DEJA : "") {
+function promptCachePath(name, dejaBin = typeof DEJA === "string" ? DEJA : (typeof HOOK === "string" ? HOOK : "")) {
   const override = process.env.DEJA_PROMPT_CACHE_FILE;
   if (override) return override;
   if (isTempDejaBin(dejaBin)) {
@@ -126,8 +126,10 @@ function rememberEntry(mapObj, key, val, maxEntries = 512) {
   }
 }
 
-function createSessionStore(name, maxSessions = 256) {
-  const pathOf = () => promptCachePath(name);
+function createSessionStore(name, optsOrMax = 256) {
+  const maxSessions = typeof optsOrMax === "number" ? optsOrMax : ((optsOrMax && optsOrMax.maxSessions) || 256);
+  const binOverride = optsOrMax && typeof optsOrMax === "object" && typeof optsOrMax.dejaBin === "string" ? optsOrMax.dejaBin : undefined;
+  const pathOf = () => promptCachePath(name, binOverride);
   const read = (scope) => {
     const data = readPromptCacheFile(pathOf());
     const raw = Object.hasOwn(data.sessions, scope) ? data.sessions[scope] : undefined;

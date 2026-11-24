@@ -1262,7 +1262,10 @@ start on a checkout with no sessions of its own injects the environment block,
 which is about the machine rather than the project, so that event is `empty`
 and carries its `bytes`. `into` names the agent session an injection went to,
 as the harness names it, and is absent when the writer did not know one — an
-MCP recall answers a tool call, not a session start. `unreadable` is true when
+MCP recall answers a tool call, not a session start. `hash` is a short hex
+fingerprint of the served text on digest injections, omitted when empty, so
+distinct equal-length outputs in one second are not mistaken for a doubled hook.
+`unreadable` is true when
 a hook was sent a payload deja could not decode: the memory went out anyway, so
 the row exists, and without this it is identical to one from a host that sent
 nothing at all. It says nothing about `into` — a decode that fails on one field

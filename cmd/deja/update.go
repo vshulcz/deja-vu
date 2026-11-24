@@ -274,7 +274,8 @@ func refreshInstalledPluginScripts(exe string, out io.Writer) {
 		text := string(b)
 		stale := pluginScriptOutdated(a.name, text) ||
 			(a.name == "opencode" && opencodePluginShapeStale(text)) ||
-			(a.name == "deepseek" && dshNoticeSourceRetired(text))
+			(a.name == "deepseek" && dshNoticeSourceRetired(text)) ||
+			(a.name == "openclaw" && openclawPluginOutdated())
 		if !stale {
 			continue
 		}

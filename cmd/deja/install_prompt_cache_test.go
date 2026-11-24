@@ -282,3 +282,114 @@ func TestAllPromptCacheWritersImportChmodSyncAndEnforceModes(t *testing.T) {
 		t.Fatal("expected at least one extension handling DEJA_PROMPT_CACHE_FILE")
 	}
 }
+
+func TestOpencodePluginsIsolateTempDejaBinPromptCache(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell stub only")
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is needed to run the generated plugin scripts")
+	}
+
+	dir := t.TempDir()
+	tempBinDir := filepath.Join(os.TempDir(), "deja-opencode-test-"+filepath.Base(dir))
+	if err = os.MkdirAll(tempBinDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(tempBinDir) })
+
+	tempBin := filepath.Join(tempBinDir, "deja")
+	if err = os.WriteFile(tempBin, []byte("#!/bin/sh\nprintf '{\"hookSpecificOutput\":{\"additionalContext\":\"<deja-recall>temp-digest</deja-recall>\"}}'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	v2Path := filepath.Join(dir, "opencode-v2.mjs")
+	if err = os.WriteFile(v2Path, []byte(opencodePluginJS(tempBin)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	v1Path := filepath.Join(dir, "kilocode-v1.mjs")
+	if err = os.WriteFile(v1Path, []byte(legacyPluginJSFor("kilocode-auto", tempBin)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	userCache := filepath.Join(dir, "xdg-cache")
+	workDir := filepath.Join(dir, "proj")
+	if err = os.MkdirAll(workDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	driverPath := filepath.Join(dir, "drive.mjs")
+	driverSrc := `
+import assert from "node:assert/strict";
+import v2Plugin from "./opencode-v2.mjs";
+import { DejaRecall } from "./kilocode-v1.mjs";
+
+const workDir = process.env.TEST_WORK_DIR;
+
+const contextHooks = [];
+await v2Plugin.setup({
+  location: { directory: workDir },
+  session: {
+    hook(name, fn) {
+      if (name === "context") contextHooks.push(fn);
+    },
+    async get() { return {}; },
+  },
+  tool: { async hook() {} },
+});
+assert.ok(contextHooks.length >= 1, "expected context hook");
+const ev = { sessionID: "s-v2", system: [{ type: "text", text: "sys" }] };
+await contextHooks[0](ev);
+assert.ok(ev.system[0].text.includes("temp-digest"), "v2 plugin should receive digest");
+
+const v1Hooks = await DejaRecall({
+  directory: workDir,
+  client: {
+    session: { async get() { return {}; } },
+    tui: { async showToast() {} },
+  },
+  $: () => ({
+    text: async () => JSON.stringify({ hookSpecificOutput: { additionalContext: "<deja-recall>temp-v1</deja-recall>" } }),
+    quiet: async () => {},
+  }),
+});
+const out = { system: ["sys"] };
+await v1Hooks["experimental.chat.system.transform"]({ sessionID: "s-v1" }, out);
+assert.ok(out.system[0].includes("temp-v1"), "v1 plugin should receive digest");
+`
+	if err = os.WriteFile(driverPath, []byte(driverSrc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.CommandContext(t.Context(), node, driverPath)
+	baseEnv := os.Environ()
+	env := make([]string, 0, len(baseEnv)+3)
+	for _, kv := range baseEnv {
+		if strings.HasPrefix(kv, "XDG_CACHE_HOME=") || strings.HasPrefix(kv, "DEJA_PROMPT_CACHE_FILE=") {
+			continue
+		}
+		env = append(env, kv)
+	}
+	env = append(env,
+		"XDG_CACHE_HOME="+userCache,
+		"DEJA_PROMPT_CACHE_FILE=",
+		"TEST_WORK_DIR="+workDir,
+	)
+	cmd.Env = env
+	if out, runErr := cmd.CombinedOutput(); runErr != nil {
+		t.Fatalf("running opencode temp-bin isolation driver: %v\n%s", runErr, out)
+	}
+
+	wantV2 := filepath.Join(tempBinDir, ".deja-cache", "opencode-auto.json")
+	if _, statErr := os.Stat(wantV2); statErr != nil {
+		t.Errorf("expected temp-isolated opencode-auto cache at %s: %v", wantV2, statErr)
+	}
+	wantV1 := filepath.Join(tempBinDir, ".deja-cache", "kilocode-auto.json")
+	if _, statErr := os.Stat(wantV1); statErr != nil {
+		t.Errorf("expected temp-isolated kilocode-auto cache at %s: %v", wantV1, statErr)
+	}
+	if _, statErr := os.Stat(filepath.Join(userCache, "deja-vu")); !os.IsNotExist(statErr) {
+		t.Errorf("temp deja bin leaked prompt cache into %s", filepath.Join(userCache, "deja-vu"))
+	}
+}

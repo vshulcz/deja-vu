@@ -158,3 +158,53 @@ func TestRepeatedInjectionsIgnoresWhatIsOlderThanTheWindow(t *testing.T) {
 		t.Errorf("the window kept the wrong one: %+v", got)
 	}
 }
+
+func TestRepeatedInjectionsDistinguishesDistinctEqualLengthDigestsInSameSecond(t *testing.T) {
+	const digestA = "tool-hook context for file alpha"
+	const digestB = "tool-hook context for file bravo"
+	if len(digestA) != len(digestB) {
+		t.Fatalf("test digests must have equal byte length: %d vs %d", len(digestA), len(digestB))
+	}
+
+	var dir string
+	for range 3 {
+		dir = filepath.Join(t.TempDir(), "index.db")
+		RecordDigestInto(dir, KindTool, digestA, "sess-1", 1, 0, []string{"alpha"}, "src-1")
+		RecordDigestInto(dir, KindTool, digestB, "sess-1", 1, 0, []string{"bravo"}, "src-1")
+		evs := read(Path(dir))
+		if len(evs) != 2 {
+			t.Fatalf("events len = %d, want 2", len(evs))
+		}
+		if evs[0].Time.Unix() == evs[1].Time.Unix() {
+			break
+		}
+	}
+	if evs := read(Path(dir)); evs[0].Time.Unix() != evs[1].Time.Unix() {
+		t.Skip("events crossed a second boundary on every retry")
+	}
+
+	if got := RepeatedInjections(dir, time.Time{}); len(got) != 0 {
+		t.Fatalf("RepeatedInjections(distinct equal-length digests) = %+v, want none", got)
+	}
+
+	var dupDir string
+	for range 3 {
+		dupDir = filepath.Join(t.TempDir(), "index.db")
+		RecordDigestInto(dupDir, KindTool, digestA, "sess-dup", 1, 0, []string{"alpha"}, "src-1")
+		RecordDigestInto(dupDir, KindTool, digestA, "sess-dup", 1, 0, []string{"alpha"}, "src-1")
+		evs := read(Path(dupDir))
+		if len(evs) != 2 {
+			t.Fatalf("dup events len = %d, want 2", len(evs))
+		}
+		if evs[0].Time.Unix() == evs[1].Time.Unix() {
+			break
+		}
+	}
+	if evs := read(Path(dupDir)); evs[0].Time.Unix() != evs[1].Time.Unix() {
+		t.Skip("dup events crossed a second boundary on every retry")
+	}
+	got := RepeatedInjections(dupDir, time.Time{})
+	if len(got) != 1 || got[0].Into != "sess-dup" || got[0].Count != 2 {
+		t.Fatalf("RepeatedInjections(identical digests) = %+v, want one count=2 repeat for sess-dup", got)
+	}
+}

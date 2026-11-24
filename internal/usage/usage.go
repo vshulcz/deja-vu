@@ -145,6 +145,9 @@ type Event struct {
 	// that fails on one field keeps the ones it read, so `into` can be there
 	// beside it.
 	Unreadable bool `json:"unreadable,omitempty"`
+	// Hash distinguishes distinct equal-size outputs injected into the same
+	// session within one second (#3421).
+	Hash string `json:"hash,omitempty"`
 	// CompactionSession, CompactionWorkspace and CompactionRevision identify a
 	// compaction interval. They are deliberately separate from Into: Into is
 	// the session that received an injection, while these identify a local
@@ -310,7 +313,11 @@ func recordFullAt(indexDir, kind string, bytes, sessions int, empty bool, raw in
 // recordFullAtUnread is recordFullAt for an injection whose receiver was in a
 // payload deja could not decode (#2161).
 func recordFullAtUnread(indexDir, kind string, bytes, sessions int, empty bool, raw int64, ids []string, into string, at time.Time, unreadable bool) {
-	recordEvent(indexDir, Event{Time: at, Kind: kind, Bytes: bytes, Sessions: sessions, Empty: empty, RawBytes: raw, SessionIDs: ids, Into: into, Unreadable: unreadable})
+	recordFullAtHash(indexDir, kind, bytes, sessions, empty, raw, ids, into, "", at, unreadable)
+}
+
+func recordFullAtHash(indexDir, kind string, bytes, sessions int, empty bool, raw int64, ids []string, into, hash string, at time.Time, unreadable bool) {
+	recordEvent(indexDir, Event{Time: at, Kind: kind, Bytes: bytes, Sessions: sessions, Empty: empty, RawBytes: raw, SessionIDs: ids, Into: into, Unreadable: unreadable, Hash: hash})
 }
 
 // recordEvent appends an already-shaped usage event. All callers share this

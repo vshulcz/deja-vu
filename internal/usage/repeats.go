@@ -36,6 +36,7 @@ func RepeatedInjections(indexDir string, since time.Time) []Repeat {
 		bytes      int
 		raw        int64
 		ids        string
+		hash       string
 	}
 	seen := map[key]*Repeat{}
 	for _, e := range read(Path(indexDir)) {
@@ -47,7 +48,7 @@ func RepeatedInjections(indexDir string, since time.Time) []Repeat {
 		if !since.IsZero() && e.Time.Before(since) {
 			continue
 		}
-		k := key{e.Into, e.Kind, e.Time.Unix(), e.Bytes, e.RawBytes, strings.Join(e.SessionIDs, ",")}
+		k := key{e.Into, e.Kind, e.Time.Unix(), e.Bytes, e.RawBytes, strings.Join(e.SessionIDs, ","), e.Hash}
 		if r := seen[k]; r != nil {
 			r.Count++
 			if e.Time.After(r.At) {

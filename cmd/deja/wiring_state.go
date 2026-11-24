@@ -100,6 +100,9 @@ func (st wiringState) opencodeNeedsRefresh() bool {
 		return false
 	}
 	js := string(b)
+	if !strings.Contains(js, "createSessionStore(") {
+		return true
+	}
 	v2 := strings.Contains(js, "export default")
 	if v2 && !strings.Contains(js, "HOOK_DEADLINE") {
 		return true
