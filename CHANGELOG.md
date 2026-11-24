@@ -7,11 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.1] - 2026-11-24
+
+Optional encrypted-at-rest memory (`deja init --encrypted`, `deja lock`,
+`deja unlock`), per-client access scopes and content-free audit logging,
+`ExitPlanMode` / `exit_plan_mode` hook checks, unified cross-harness MCP and
+hook dialect routing, faster cold sidecar lookups, and prompt-cache prefix
+preservation across restarts and compactions.
+
+### Added
+
+- Optional encrypted-at-rest memory store (`deja init --encrypted`, `deja lock`, `deja unlock`) seals derived index files, personal notes, and prompt caches into an encrypted `.vault` archive with OS keychain or passphrase-derived keys and optional `--auto-lock` idle eviction, alongside per-client token, project, and write scopes in `policy.json` and content-free `access` audit events (#6071, #6169).
+- `ExitPlanMode` and `exit_plan_mode` tool calls route through harness hooks and scope coupled-file and friction plan checks to the active project while deduplicating canonical file pairs (#6151).
+- PreToolUse, PostToolUse, and Antigravity MCP hooks normalize dialect payloads, coalesce Call-0 framing, prepend causal history on file recall, and route recall surfaces by action mode (#6149).
+- Expanded `after-compaction` guide with a visual diff, `jq` check, full compaction study breakdown and provenance, Cursor archived-chat and `dsh` v4 troubleshooting notes, and the Trendshift Go repository badge (#6154, #6157, #6159, #6167).
+
+### Changed
+
+- Hash-bucketed `cooccur.bin` and binary `DJSYMM01` `.symmap` sidecars, manifest-metadata session ranking, and `recoffsets.bin`-bounded role and recall scans replace full `gob` decodes and whole-log reads on cold paths. On a 9,455-session index (530 MB `records.bin`), cold median latency drops from 8,960 ms to 5,213 ms for `deja recall`, from 950 ms to 629 ms for `deja how`, and from 914 ms to 828 ms for `hook-prompt`, while `.symmap` shrinks from 4.5 MB to 2.1 MB (#6153, #6166).
+
 ### Fixed
 
-- MCP `recall` no longer fails with `ENOENT` while an index append retires a postings overlay. The append commits its manifest and then removes the overlays it folded in. A reader that listed `buckets/` before the removal opened an overlay that was gone, and recall failed until the next query. The token catalog read now starts again once from a fresh listing. An overlay that is still missing, or a damaged one, is still reported (#6168).
-- On Windows, `deja index` and the background refreshes no longer flash console windows. When `deja` ran without a console (started by a GUI host, a scheduled task or a detached refresh), each `sqlite3`, `git`, `zstd` or `psql` child opened a window of its own for as long as it ran. These children, and the detached `deja` refresh, version and warmup processes, now start with a console that has no window (#6156).
-- The prompt hook no longer spends its deadline listing a harness's store when the host names no transcript. Codex may send a null `transcript_path`; the hook then searched every rollout directory for the session id before reading anything, and on a large store under disk load hit the 10-second hook deadline. The hook now reads the transcript the index recorded for that session and skips the store search, so a session newer than the index goes without its live rules until it is indexed. PreCompact still searches the store (#6162).
+- Per-session digests, prompt recalls, and tool repairs persist across agent restarts and `deja_once` Hermes resumes, prompt caches isolate per project and harness, and OpenCode, Command Code, Oh My Pi, and Cline strip or avoid rewriting `<deja-recall>` markup in prior turns so provider KV prefix caches stay intact (#6155, #6160, #6165, #6169).
+- `hook-prompt` skips store-wide transcript directory walks when a host sends a null `transcript_path`, reading the indexed transcript path instead and bounding live session resolvers so large stores under disk load do not hit the 10-second hook deadline. From @vaibhav8a (#6162, #6163, #6165).
+- MCP `recall` rereads `buckets/` once from a fresh directory listing when an in-flight index append retires a folded postings overlay, preventing transient `ENOENT` failures while still reporting persistently missing or damaged overlays. Reported by @pedh, fixed by @vaibhav8a (#6168, #6170).
+- On Windows, `deja index`, Reasonix, and detached background refresh, version, and warmup children start without flashing console windows when launched from GUI hosts or scheduled tasks, and Hermes subprocesses force UTF-8 encoding. From @vaibhav8a (#6156, #6158, #6161, #6166).
+- Filtered noisy prompt localization targets, viewer command false positives, and unpinned live rules, snapshotted the MCP HTTP request handler per server instance to prevent a cancellation race, and quoted SQLite workspace strings in Devin tests (from @shgpavel) (#6148, #6150, #6152).
 
 ## [0.25.0] - 2026-11-21
 
@@ -2887,7 +2908,8 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.25.0...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.25.1...HEAD
+[0.25.1]: https://github.com/vshulcz/deja-vu/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/vshulcz/deja-vu/compare/v0.24.3...v0.25.0
 [0.24.3]: https://github.com/vshulcz/deja-vu/compare/v0.24.2...v0.24.3
 [0.24.2]: https://github.com/vshulcz/deja-vu/compare/v0.24.1...v0.24.2
