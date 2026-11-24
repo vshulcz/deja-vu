@@ -32,7 +32,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "What compaction drops, and how to get it back", "description": "What a context compaction keeps and what it silently drops — measured over 43 real compactions — and how to recover the commands, errors and edits the summary left out.", "url": "https://vshulcz.github.io/deja-vu/guide/after-compaction.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/after-compaction.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-24", "dateModified": "2026-11-23"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "What compaction drops, and how to get it back", "description": "What a context compaction keeps and what it silently drops — measured over 43 real compactions — and how to recover the commands, errors and edits the summary left out.", "url": "https://vshulcz.github.io/deja-vu/guide/after-compaction.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/after-compaction.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-24", "dateModified": "2026-11-24"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"After compaction","item":"https://vshulcz.github.io/deja-vu/guide/after-compaction.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What does context compaction actually keep?","acceptedAnswer":{"@type":"Answer","text":"Measured over 43 real compactions: 77% of the decisions survived the summary and 0.2% of the commands that had been run. Reasoning is summarised; the exact invocations, error text and edited spans are dropped."}},{"@type":"Question","name":"Can I recover what a compaction dropped?","acceptedAnswer":{"@type":"Answer","text":"Yes, if the full transcript is still on disk. Harnesses write the whole session to a log file; the compaction only shortens what is in the model context, not what was written."}},{"@type":"Question","name":"How do I stop losing work to compaction?","acceptedAnswer":{"@type":"Answer","text":"Index the transcripts and let the agent search them, so the summary stops being the only copy. Indexing before compaction runs keeps the session searchable even after the window collapses."}}]}</script>
 <style>
@@ -214,21 +214,31 @@
 <p>A long session compacts: the harness replaces earlier turns with a summary so the window keeps fitting. The session continues, the agent sounds like it remembers, and the specific thing you will need in twenty minutes is already gone.</p>
 
 <h2>What survives, measured</h2>
-<p>Over 43 real compactions taken from one machine's history, comparing each summary against the full transcript it replaced:</p>
+<p>Across 58 real transcripts and 43 compaction events taken from one machine's history, 2.59&nbsp;GB of raw conversation compressed into 0.72&nbsp;MB of summaries. Comparing each summary against the transcript it replaced:</p>
 <ul>
-<li><b>77%</b> of the decisions survived — the conclusions, the "we went with X because Y".</li>
+<li><b>~77%</b> of decision sentences survived — the conclusions, the "we went with X because Y".</li>
+<li><b>9.8%</b> of file paths survived.</li>
+<li><b>1.9%</b> of measured numbers survived.</li>
 <li><b>0.2%</b> of the commands that had actually been run survived.</li>
 </ul>
 <figure class="comp-fig">
-<svg viewBox="0 0 680 120" role="img" aria-label="Measured across 43 real compactions: 77% of prose decisions survived versus 0.2% of shell commands">
+<svg viewBox="0 0 680 222" role="img" aria-label="Measured across 58 transcripts and 43 real compactions (2.59 GB compressed to 0.72 MB): 77% of prose decisions survived, 9.8% of file paths, 1.9% of measured numbers, and 0.2% of shell commands">
   <text x="0" y="22" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="14" fill="#c4cdcf">Prose decisions survived</text>
   <text x="680" y="22" text-anchor="end" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="18" font-weight="700" fill="#afafd7">77%</text>
   <rect x="0" y="34" width="680" height="12" rx="4" fill="#161c1f"/>
   <rect x="0" y="34" width="524" height="12" rx="4" fill="#8787af"/>
-  <text x="0" y="78" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="14" fill="#c4cdcf">Shell commands survived</text>
-  <text x="680" y="78" text-anchor="end" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="18" font-weight="700" fill="#ff8700">0.2%</text>
+  <text x="0" y="78" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="14" fill="#c4cdcf">File paths survived</text>
+  <text x="680" y="78" text-anchor="end" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="18" font-weight="700" fill="#c4b5d8">9.8%</text>
   <rect x="0" y="90" width="680" height="12" rx="4" fill="#161c1f"/>
-  <rect x="0" y="90" width="4" height="12" rx="2" fill="#ff8700"/>
+  <rect x="0" y="90" width="67" height="12" rx="4" fill="#9d8fb8"/>
+  <text x="0" y="134" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="14" fill="#c4cdcf">Measured numbers survived</text>
+  <text x="680" y="134" text-anchor="end" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="18" font-weight="700" fill="#ffaf5f">1.9%</text>
+  <rect x="0" y="146" width="680" height="12" rx="4" fill="#161c1f"/>
+  <rect x="0" y="146" width="13" height="12" rx="3" fill="#ffaf5f"/>
+  <text x="0" y="190" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" font-size="14" fill="#c4cdcf">Shell commands survived</text>
+  <text x="680" y="190" text-anchor="end" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="18" font-weight="700" fill="#ff8700">0.2%</text>
+  <rect x="0" y="202" width="680" height="12" rx="4" fill="#161c1f"/>
+  <rect x="0" y="202" width="4" height="12" rx="2" fill="#ff8700"/>
 </svg>
 <div class="comp-grid">
   <div class="comp-card">
@@ -244,9 +254,9 @@
     </ul>
   </div>
 </div>
-<figcaption class="comp-cap">Synthetic example of the split measured across 43 compactions: intent survives in prose, while exact commands, errors and edited lines stay only in the raw log.</figcaption>
+<figcaption class="comp-cap">Synthetic example of the split measured across 58 transcripts and 43 compactions (2.59&nbsp;GB to 0.72&nbsp;MB): intent survives in prose, while exact commands, errors and edited lines stay only in the raw log.</figcaption>
 </figure>
-<p>The method, the corpus and the script are in the repository under <a href="benchmarks.html">benchmarks</a>, and the ratio holds across harnesses because they all summarise prose the same way.</p>
+<p>Those figures come from one machine's private session logs (recorded in <a href="https://github.com/vshulcz/deja-vu/blob/main/cmd/deja/compact.go">cmd/deja/compact.go</a>; the raw personal transcripts are not published). The reproducible seeded retrieval and context-cost suites live under <a href="benchmarks.html">benchmarks</a>, and you can inspect your own logs locally with the command below.</p>
 <p>That split is the whole problem. A summary is written in the language of intent, and the things that cost you an afternoon are not intent: the invocation with the four flags that finally worked, the error text you pasted, the exact span an edit replaced, the path of the file that turned out to matter. Ask after a compaction and you get a confident paraphrase of the plan with none of the parts you would have copied.</p>
 
 <h2>What compaction does not touch</h2>
@@ -254,7 +264,7 @@
 <p>So "lost to compaction" is a retrieval problem, not a data-loss problem. The work is there; nothing reads it back.</p>
 <p>You can inspect what is still in your own Claude Code logs without installing anything:</p>
 <pre>jq -r '.message.content? | arrays[] | select(.type == "tool_use" and .name == "Bash") | .input.command // empty' ~/.claude/projects/*/*.jsonl | tail -n 20</pre>
-<p>Codex keeps its logs under <code>~/.codex/sessions</code>, Cursor in <code>state.vscdb</code>, and the rest follow the paths in the <a href="../registry/README.html">format registry</a>.</p>
+<p>Watch <code>cleanupPeriodDays</code> in <code>~/.claude/settings.json</code>: Claude Code deletes transcripts older than 30 days by default, and setting it to <code>0</code> disables saving transcripts altogether (set a large number such as <code>99999</code> to keep them). Codex keeps its logs under <code>~/.codex/sessions</code>, Cursor in <code>state.vscdb</code>, and the rest follow the paths in the <a href="../registry/README.html">format registry</a>.</p>
 
 <h2>Getting it back</h2>
 <p>Two moments matter, and they are different.</p>
