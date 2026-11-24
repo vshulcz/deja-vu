@@ -4,33 +4,76 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 )
 
+var allowForegroundExecFuncs = map[string]map[string]bool{
+	"handoff.go":       {"runHandoff": true},
+	"help_commands.go": {"runToolHelp": true},
+	"install_aider.go": {"cmdAider": true},
+	"install_goose.go": {"cmdGoose": true},
+	"resume.go":        {"runResume": true},
+	"shell_layer.go":   {"runShellCommand": true},
+}
+
+var skipDetachedExecFiles = map[string]bool{
+	"digest_cache.go":   true,
+	"release_notice.go": true,
+}
+
 func TestBackgroundExecCallsApplyHideconsole(t *testing.T) {
 	t.Parallel()
-	files := []string{
-		"reasonix_ext.go",
-		"reasonix_ext_session.go",
-		"reasonix_ext_text.go",
-		"reasonix_ext_turns.go",
-		"warmup_windows.go",
-		"bench_read.go",
+	roots := []string{
+		filepath.Join("..", "..", "cmd"),
+		filepath.Join("..", "..", "internal"),
 	}
-	for _, path := range files {
-		checkBackgroundHideconsoleFile(t, path)
+	var checked int
+	for _, root := range roots {
+		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.IsDir() {
+				name := d.Name()
+				if name == "testdata" || strings.HasPrefix(name, ".") {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			name := d.Name()
+			if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+				return nil
+			}
+			if skipDetachedExecFiles[name] {
+				return nil
+			}
+			checked++
+			checkBackgroundHideconsoleFile(t, path, allowForegroundExecFuncs[name])
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("walk %s: %v", root, err)
+		}
+	}
+	if checked == 0 {
+		t.Fatal("walked zero non-test Go files")
 	}
 }
 
-func checkBackgroundHideconsoleFile(t *testing.T, path string) {
+func checkBackgroundHideconsoleFile(t *testing.T, path string, allowFuncs map[string]bool) {
 	t.Helper()
 	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, path, nil, 0)
+	file, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
 	if err != nil {
 		t.Fatalf("parse %s: %v", path, err)
+	}
+	if hasNonWindowsBuildTag(file) {
+		return
 	}
 	execAlias := pkgImportAlias(file, "os/exec", "exec")
 	if execAlias == "" {
@@ -41,7 +84,7 @@ func checkBackgroundHideconsoleFile(t *testing.T, path string) {
 	ast.Inspect(file, func(n ast.Node) bool {
 		switch fn := n.(type) {
 		case *ast.FuncDecl:
-			if fn.Body != nil {
+			if fn.Body != nil && !allowFuncs[fn.Name.Name] {
 				checkBackgroundHideconsoleBody(t, fset, path, execAlias, hideAlias, fn.Body)
 			}
 		case *ast.FuncLit:
@@ -51,6 +94,20 @@ func checkBackgroundHideconsoleFile(t *testing.T, path string) {
 		}
 		return true
 	})
+}
+
+func hasNonWindowsBuildTag(file *ast.File) bool {
+	for _, cg := range file.Comments {
+		if cg.Pos() >= file.Package {
+			continue
+		}
+		for _, c := range cg.List {
+			if strings.HasPrefix(c.Text, "//go:build ") && strings.Contains(c.Text, "!windows") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func checkBackgroundHideconsoleBody(t *testing.T, fset *token.FileSet, path, execAlias, hideAlias string, body *ast.BlockStmt) {

@@ -302,7 +302,7 @@ func decodeCooccurBucket(b []byte, wantList []string, out map[string][]string) b
 			return false
 		}
 		b = b[n:]
-		if kLen > uint64(len(b)) {
+		if kLen == 0 || kLen > uint64(len(b)) {
 			return false
 		}
 		key := b[:int(kLen)] //nolint:gosec // bounded by len(b) above
@@ -313,13 +313,13 @@ func decodeCooccurBucket(b []byte, wantList []string, out map[string][]string) b
 			return false
 		}
 		b = b[n:]
+		if vCount == 0 || vCount > uint64(len(b)) {
+			return false
+		}
 
 		match := want[string(key)]
 		var vals []string
 		if match {
-			if vCount > uint64(len(b)) {
-				return false
-			}
 			vals = make([]string, 0, int(vCount)) //nolint:gosec // bounded by remaining bytes above
 		}
 		for range vCount {

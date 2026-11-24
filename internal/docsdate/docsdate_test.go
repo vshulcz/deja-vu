@@ -3,6 +3,7 @@ package docsdate
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -157,3 +158,87 @@ type failWriter struct{}
 
 func (failWriter) Write([]byte) (int, error) { return 0, io.ErrClosedPipe }
 func (failWriter) Close() error              { return nil }
+
+// TestDayHandlesMissingUntrackedAndShallowFiles covers missing files,
+// untracked working files, staged files with no history in a shallow clone,
+// single-commit pages, and non-git repository errors.
+func TestDayHandlesMissingUntrackedAndShallowFiles(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	repo := t.TempDir()
+	if out, err := exec.CommandContext(t.Context(), "git", "-C", repo, "init", "-q").CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+	guideDir := filepath.Join(repo, "docs", "guide")
+	if err := os.MkdirAll(guideDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	d, err := New(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if cerr := d.Close(); cerr != nil {
+			t.Errorf("Dater.Close: %v", cerr)
+		}
+	}()
+
+	// Missing file returns empty date without error.
+	if got, err := d.Day("docs/guide/missing.html"); err != nil || got != "" {
+		t.Fatalf("missing file = (%q, %v), want (\"\", nil)", got, err)
+	}
+
+	// Single-commit file creates HEAD and returns that commit's UTC day.
+	single := filepath.Join(guideDir, "single.html")
+	if err := os.WriteFile(single, []byte("<article>single</article>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"add", "docs/guide/single.html"}, {"commit", "-qm", "init"}} {
+		cmd := exec.CommandContext(t.Context(), "git", append([]string{"-C", repo}, args...)...)
+		cmd.Env = append(os.Environ(),
+			"GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_NOSYSTEM=1",
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
+			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
+			"GIT_AUTHOR_DATE=2026-08-15T12:00:00Z", "GIT_COMMITTER_DATE=2026-08-15T12:00:00Z")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	if got, err := d.Day("docs/guide/single.html"); err != nil || got != "2026-08-15" {
+		t.Fatalf("single-commit file = (%q, %v), want (\"2026-08-15\", nil)", got, err)
+	}
+
+	// Untracked file returns today's UTC date once HEAD exists.
+	untracked := filepath.Join(guideDir, "untracked.html")
+	if err := os.WriteFile(untracked, []byte("<article>draft</article>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	wantToday := time.Now().UTC().Format("2006-01-02")
+	if got, err := d.Day("docs/guide/untracked.html"); err != nil || got != wantToday {
+		t.Fatalf("untracked file = (%q, %v), want (%q, nil)", got, err, wantToday)
+	}
+
+	// Tracked file with no commit history returns ErrNoHistory.
+	staged := filepath.Join(guideDir, "staged.html")
+	if err := os.WriteFile(staged, []byte("<article>staged</article>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.CommandContext(t.Context(), "git", "-C", repo, "add", "docs/guide/staged.html").CombinedOutput(); err != nil {
+		t.Fatalf("git add staged: %v\n%s", err, out)
+	}
+	if _, err := d.Day("docs/guide/staged.html"); !errors.Is(err, ErrNoHistory) {
+		t.Fatalf("tracked file with no commits err = %v, want ErrNoHistory", err)
+	}
+
+	// Non-git directory returns a git log error.
+	nonRepo := t.TempDir()
+	if err := os.WriteFile(filepath.Join(nonRepo, "a.html"), []byte("hi"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	bad := &Dater{root: nonRepo}
+	if _, err := bad.Day("a.html"); err == nil {
+		t.Fatal("non-git Day unexpectedly succeeded")
+	}
+}

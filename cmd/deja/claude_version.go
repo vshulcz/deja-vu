@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strconv"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/hideconsole"
 )
 
 // claudeEventSince is the first Claude Code release that knows an event, for
@@ -23,7 +25,10 @@ var claudeVersionReal = func() (v [3]int, ok bool) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, exe, "--version").Output()
+	cmd := exec.CommandContext(ctx, exe, "--version")
+	hideconsole.Apply(cmd)
+	cmd.WaitDelay = 200 * time.Millisecond
+	out, err := cmd.Output()
 	if err != nil {
 		return v, false
 	}

@@ -162,11 +162,20 @@ func resolvePlanText(cwd, inlinePlan, planFilePath string) string {
 		p = filepath.Join(cwd, p)
 	}
 	fi, err := os.Stat(p)
-	if err != nil || fi.IsDir() || fi.Size() <= 0 || fi.Size() > maxPlanFileBytes {
+	if err != nil || !fi.Mode().IsRegular() || fi.Size() <= 0 || fi.Size() > maxPlanFileBytes {
 		return ""
 	}
-	data, err := os.ReadFile(p)
+	f, err := os.Open(p)
 	if err != nil {
+		return ""
+	}
+	defer func() { _ = f.Close() }()
+	fi2, err := f.Stat()
+	if err != nil || !fi2.Mode().IsRegular() || fi2.Size() <= 0 || fi2.Size() > maxPlanFileBytes {
+		return ""
+	}
+	data, err := io.ReadAll(io.LimitReader(f, maxPlanFileBytes+1))
+	if err != nil || len(data) == 0 || len(data) > maxPlanFileBytes {
 		return ""
 	}
 	return string(data)

@@ -138,7 +138,7 @@ func TestAskerLineageCutForHarnessSkipsDeepseekExternalProbes(t *testing.T) {
 	}
 }
 
-func TestCappedRepoSymbolMapSkipsDiskCacheAndFallsBackForSymbolBrief(t *testing.T) {
+func TestCappedRepoSymbolMapFallsBackForSymbolBriefAndSkipsTimedOutDiskCache(t *testing.T) {
 	tmp := hermeticEnv(t)
 	dir := filepath.Join(tmp, "index.db")
 	t.Setenv("DEJA_INDEX_DIR", dir)
@@ -163,6 +163,7 @@ func TestCappedRepoSymbolMapSkipsDiskCacheAndFallsBackForSymbolBrief(t *testing.
 	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { repoSymbolMapCache.Delete(repo) })
 	files := map[string]string{
 		"aaa_other.go":        "package demo\n\nfunc AlphaNoise() {}\n",
 		"zeta_target.go":      "package demo\n\n// ZetaTargetSymbol keeps retry state.\nfunc ZetaTargetSymbol(n int) int {\n\treturn n + 1\n}\n",
@@ -190,8 +191,10 @@ func TestCappedRepoSymbolMapSkipsDiskCacheAndFallsBackForSymbolBrief(t *testing.
 			t.Fatalf("liveRecallBrief missing %q when symbol map was capped:\n%s", want, brief)
 		}
 	}
+	repoSymbolScanMaxFiles = prevMax
 
-	// Verify disk cache control: uncapped snapshot with valid mtime loads, capped snapshot is rejected.
+	// Deterministic capped snapshots persist with capped=true so liveRecallBrief
+	// still falls back; wall-clock timedOut snapshots are never cached.
 	st, err := os.Stat(repo)
 	if err != nil {
 		t.Fatal(err)
@@ -202,15 +205,34 @@ func TestCappedRepoSymbolMapSkipsDiskCacheAndFallsBackForSymbolBrief(t *testing.
 		capped:    false,
 		dirMtimes: mtimes,
 	})
-	if _, ok := loadRepoSymbolMapFromDisk(dir, repo, repo); !ok {
-		t.Fatalf("expected uncapped disk snapshot to load")
+	if uncapped, ok := loadRepoSymbolMapFromDisk(dir, repo, repo); !ok || uncapped.capped {
+		t.Fatalf("expected uncapped disk snapshot to load with capped=false, got ok=%v capped=%v", ok, uncapped.capped)
 	}
 	saveRepoSymbolMapToDisk(dir, repo, repo, repoSymbolMap{
 		at:        time.Now(),
 		capped:    true,
 		dirMtimes: mtimes,
 	})
+	cappedSnap, ok := loadRepoSymbolMapFromDisk(dir, repo, repo)
+	if !ok || !cappedSnap.capped {
+		t.Fatalf("expected deterministic capped disk snapshot to load with capped=true, got ok=%v capped=%v", ok, cappedSnap.capped)
+	}
+	repoSymbolMapCache.Delete(repo)
+	briefFromDisk := liveRecallBrief(dir, repo, "please inspect ZetaTargetSymbol")
+	for _, want := range []string{"zeta_target.go:", "zeta_caller.go", "TestZetaTargetSymbol"} {
+		if !strings.Contains(briefFromDisk, want) {
+			t.Fatalf("liveRecallBrief missing %q when capped symbol map loaded from disk:\n%s", want, briefFromDisk)
+		}
+	}
+
+	_ = os.Remove(repoSymbolDiskPath(dir, repo, repo))
+	saveRepoSymbolMapToDisk(dir, repo, repo, repoSymbolMap{
+		at:        time.Now(),
+		capped:    true,
+		timedOut:  true,
+		dirMtimes: mtimes,
+	})
 	if _, ok := loadRepoSymbolMapFromDisk(dir, repo, repo); ok {
-		t.Fatalf("expected capped disk snapshot to be rejected")
+		t.Fatalf("expected timed-out disk snapshot to be rejected")
 	}
 }

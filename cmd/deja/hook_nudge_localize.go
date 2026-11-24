@@ -94,12 +94,13 @@ type repoSymbolMap struct {
 	fileSizes  map[string]int64
 	numFiles   int
 	capped     bool
+	timedOut   bool
 }
 
 const (
 	repoSymbolDiskMagic   = "DJSYMM01"
 	repoSymbolDiskTTL     = 60 * time.Second
-	repoSymbolDiskVersion = 2
+	repoSymbolDiskVersion = 3
 	repoSymbolDiskHdrLen  = 8 + 4 + 1 + 8
 	maxSymDiskStrings     = 4_000_000
 	maxSymDiskEntries     = 4_000_000
@@ -145,6 +146,7 @@ func repoSymbolMapFresh(cached repoSymbolMap) bool {
 }
 
 func repoSymbolDiskPath(dir, scanRoot, cwd string) string {
+	dir = filepath.Clean(dir)
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(scanRoot + "\x00" + cwd))
 	return fmt.Sprintf("%s.symmap-%016x", dir, h.Sum64())
@@ -381,6 +383,9 @@ func (r *symBinReader) strInt64Map() (map[string]int64, bool) {
 }
 
 func encodeRepoSymbolMap(idx repoSymbolMap) ([]byte, bool) {
+	if idx.timedOut {
+		return nil, false
+	}
 	var hdr [repoSymbolDiskHdrLen]byte
 	copy(hdr[:8], repoSymbolDiskMagic)
 	binary.LittleEndian.PutUint32(hdr[8:12], repoSymbolDiskVersion)
@@ -392,9 +397,6 @@ func encodeRepoSymbolMap(idx repoSymbolMap) ([]byte, bool) {
 		atNano = idx.at.UnixNano()
 	}
 	binary.LittleEndian.PutUint64(hdr[13:21], uint64(atNano))
-	if idx.capped {
-		return hdr[:], true
-	}
 
 	var w symBinWriter
 	if w.nilableLen(len(idx.files), idx.files != nil) {
@@ -453,7 +455,7 @@ func parseRepoSymbolHeader(data []byte) (time.Time, bool) {
 	if len(data) < repoSymbolDiskHdrLen || string(data[:8]) != repoSymbolDiskMagic {
 		return time.Time{}, false
 	}
-	if binary.LittleEndian.Uint32(data[8:12]) != repoSymbolDiskVersion || data[12] != 0 {
+	if binary.LittleEndian.Uint32(data[8:12]) != repoSymbolDiskVersion || data[12] > 1 {
 		return time.Time{}, false
 	}
 	atNano := int64(binary.LittleEndian.Uint64(data[13:21])) //nolint:gosec // signed UnixNano bit-preserved in fixed header
@@ -625,6 +627,7 @@ func decodeRepoSymbolMap(data []byte, cwd string) (repoSymbolMap, bool) {
 		fileMtimes: fileMtimes,
 		fileSizes:  fileSizes,
 		numFiles:   numFiles,
+		capped:     data[12] == 1,
 	}, true
 }
 
@@ -697,7 +700,10 @@ func loadRepoSymbolMap(cwd string) repoSymbolMap {
 			if p != scanRoot && (isSkippedScanDir(name) || name == "testdata") {
 				return filepath.SkipDir
 			}
-			if info, infoErr := d.Info(); infoErr == nil {
+			// Use os.Stat so recorded directory mtimes match repoSymbolMapMtimesMatch
+			// on Windows NTFS, where DirEntry.Info reads the parent directory's cached
+			// entry rather than the directory's own file record.
+			if info, infoErr := os.Stat(p); infoErr == nil {
 				idx.dirMtimes[p] = info.ModTime().UnixNano()
 			}
 			return nil
@@ -712,6 +718,7 @@ func loadRepoSymbolMap(cwd string) repoSymbolMap {
 		}
 		if repoSymbolScanBudget > 0 && len(idx.files) >= repoSymbolScanMinFilesBeforeDeadline && time.Since(scanStart) >= repoSymbolScanBudget {
 			idx.capped = true
+			idx.timedOut = true
 			return filepath.SkipAll
 		}
 		if !indexWalkedRepoFileBounded(cwd, scanRoot, p, d, &idx, &bytesRead) {
@@ -726,7 +733,7 @@ func loadRepoSymbolMap(cwd string) repoSymbolMap {
 	}
 	idx.at = time.Now()
 	repoSymbolMapCache.Store(scanRoot, idx)
-	if dir, ok := repoSymbolDiskCacheAllowed(); ok && len(idx.dirMtimes) > 0 && !idx.capped {
+	if dir, ok := repoSymbolDiskCacheAllowed(); ok && len(idx.dirMtimes) > 0 && !idx.timedOut {
 		saveRepoSymbolMapToDisk(dir, scanRoot, cwd, idx)
 	}
 	return idx
@@ -753,9 +760,12 @@ func indexWalkedRepoFileBounded(cwd, scanRoot, p string, d fs.DirEntry, idx *rep
 		rel = r2
 	}
 	info, infoErr := d.Info()
-	if len(idx.files) < 64 && infoErr == nil {
-		idx.fileMtimes[p] = info.ModTime().UnixNano()
-		idx.fileSizes[p] = info.Size()
+	if len(idx.files) < 64 {
+		if st, stErr := os.Stat(p); stErr == nil {
+			info, infoErr = st, nil
+			idx.fileMtimes[p] = st.ModTime().UnixNano()
+			idx.fileSizes[p] = st.Size()
+		}
 	}
 	maxFile := maxRepoSymbolFileBytes
 	if infoErr == nil && info.Mode().IsRegular() && info.Size() >= 0 && (maxFile <= 0 || info.Size() <= maxFile) {

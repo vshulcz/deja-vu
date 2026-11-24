@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -472,6 +473,7 @@ func installReasonixViaCLI(cli, src string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, cli, "plugin", "install", src, "--name", reasonixPluginName, "--replace", "--yes")
+	hideconsole.Apply(cmd)
 	cmd.Env = append(os.Environ(), "REASONIX_HOME="+sources.ReasonixHome())
 	out, err := cmd.CombinedOutput()
 	if err != nil {

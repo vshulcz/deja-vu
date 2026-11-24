@@ -1504,3 +1504,26 @@ func TestOpencodePluginAfterHookHandlesPatchInputAndStringResult(t *testing.T) {
 		t.Error("1.x tool.execute.after missing patch input extraction")
 	}
 }
+
+func TestOpencodeVersionTimeoutDoesNotPoisonCacheAndAllowsSlowStart(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX shell stub required")
+	}
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "called")
+	bin := filepath.Join(dir, "opencode")
+	script := "#!/bin/sh\nif [ ! -f \"$DEJA_TEST_OPENCODE_MARKER\" ]; then\n  : > \"$DEJA_TEST_OPENCODE_MARKER\"\n  exit 1\nfi\nsleep 0.65\nprintf '2.1.0\\n'\n"
+	if err := os.WriteFile(bin, []byte(script), 0o755); err != nil {
+		t.Fatalf("write stub: %v", err)
+	}
+	t.Setenv("DEJA_OPENCODE_MAJOR", "")
+	t.Setenv("DEJA_TEST_OPENCODE_MARKER", marker)
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+"/bin"+string(os.PathListSeparator)+"/usr/bin")
+
+	if got := opencodeVersionMajorReal(); got != 0 {
+		t.Fatalf("first opencodeVersionMajorReal() = %d, want 0", got)
+	}
+	if got := opencodeVersionMajorReal(); got != 2 {
+		t.Fatalf("second opencodeVersionMajorReal() = %d, want 2", got)
+	}
+}

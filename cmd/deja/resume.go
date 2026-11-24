@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
+	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -148,6 +149,7 @@ func openInCodexApp(s model.Session, goos string) error {
 	}
 	fmt.Fprintf(os.Stderr, "deja: opening %s in the ChatGPT app\n", digest.Short(s.ID))
 	c := exec.CommandContext(context.Background(), argv[0], argv[1:]...)
+	hideconsole.Apply(c)
 	c.Stderr = os.Stderr
 	if err := c.Run(); err != nil {
 		return fmt.Errorf("the ChatGPT app did not open it (%w) — an app too old to take codex:// links does this; `deja resume %s` prints the codex command", err, s.ID)

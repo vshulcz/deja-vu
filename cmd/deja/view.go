@@ -17,6 +17,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/harnesscolor"
+	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -400,15 +401,15 @@ func clipForPage(s string) string {
 }
 
 func openInBrowser(path string) {
-	var cmd *exec.Cmd
+	name, args := "xdg-open", []string{path}
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = exec.CommandContext(context.Background(), "open", path)
+		name = "open"
 	case "windows":
-		cmd = exec.CommandContext(context.Background(), "cmd", "/c", "start", "", path)
-	default:
-		cmd = exec.CommandContext(context.Background(), "xdg-open", path)
+		name, args = "cmd", []string{"/c", "start", "", path}
 	}
+	cmd := exec.CommandContext(context.Background(), name, args...)
+	hideconsole.Apply(cmd)
 	_ = cmd.Start()
 }
 

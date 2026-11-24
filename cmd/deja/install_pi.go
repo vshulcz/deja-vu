@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -349,6 +350,7 @@ func piVersionAt(bin string) string {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, bin, "--version")
+	hideconsole.Apply(cmd)
 	// A wrapper that starts node without exec keeps stdout open after the
 	// kill; WaitDelay stops waiting for it.
 	cmd.WaitDelay = 200 * time.Millisecond
