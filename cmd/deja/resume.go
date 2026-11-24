@@ -6,17 +6,16 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/cliarg"
 	"github.com/vshulcz/deja-vu/internal/digest"
-	"github.com/vshulcz/deja-vu/internal/hideconsole"
-	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/proc"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -48,13 +47,14 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 		if strings.HasPrefix(a, "-") && a != "-" {
 			return fmt.Errorf("resume: unknown flag %q — it takes an id-prefix, --write-back, --exec and --app", a)
 		}
-		if strings.TrimSpace(index.PastedSelector(a)) == "" {
+		sel, serr := cliarg.ParseSelector(a)
+		if serr != nil {
 			return idPrefixNeeded(dir, "resume needs an id prefix", "resume needs an id prefix (see `deja last`)")
 		}
 		if prefix != "" {
 			return fmt.Errorf("resume takes one id-prefix — got %q and %q", prefix, a)
 		}
-		prefix = index.PastedSelector(a)
+		prefix = sel.Clean
 	}
 	if prefix == "" {
 		return idPrefixNeeded(dir, "resume needs an id prefix", "resume needs an id prefix (see `deja last`)")
@@ -132,7 +132,7 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	c := exec.CommandContext(context.Background(), parts[0], parts[1:]...)
+	c := proc.InteractiveCommandContext(context.Background(), parts[0], parts[1:]...)
 	if dir != "" {
 		c.Dir = dir
 	}
@@ -148,8 +148,7 @@ func openInCodexApp(s model.Session, goos string) error {
 		return err
 	}
 	fmt.Fprintf(os.Stderr, "deja: opening %s in the ChatGPT app\n", digest.Short(s.ID))
-	c := exec.CommandContext(context.Background(), argv[0], argv[1:]...)
-	hideconsole.Apply(c)
+	c := proc.CommandContext(context.Background(), argv[0], argv[1:]...)
 	c.Stderr = os.Stderr
 	if err := c.Run(); err != nil {
 		return fmt.Errorf("the ChatGPT app did not open it (%w) — an app too old to take codex:// links does this; `deja resume %s` prints the codex command", err, s.ID)

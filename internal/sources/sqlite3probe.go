@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vshulcz/deja-vu/internal/hideconsole"
+	"github.com/vshulcz/deja-vu/internal/proc"
 )
 
 // SQLite3NotFound is the problem reported when no sqlite3 is on PATH.
@@ -91,8 +91,7 @@ func sqlite3Progress() bool {
 func probeProgress(path string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), sqlite3ProbeBudget)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, path, "-readonly", ":memory:", ".timeout 5000", sqliteProgressArg, sqlite3ProbeQuery)
-	hideconsole.Apply(cmd)
+	cmd := proc.CommandContext(ctx, path, "-readonly", ":memory:", ".timeout 5000", sqliteProgressArg, sqlite3ProbeQuery)
 	cmd.WaitDelay = time.Second
 	out, err := cmd.Output()
 	if err != nil {
@@ -120,8 +119,7 @@ func ResetSQLite3Probe() {
 func probeSQLite3(path string) string {
 	ctx, cancel := context.WithTimeout(context.Background(), sqlite3ProbeBudget)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, path, "-readonly", ":memory:", ".timeout 5000", sqlite3ProbeQuery)
-	hideconsole.Apply(cmd)
+	cmd := proc.CommandContext(ctx, path, "-readonly", ":memory:", ".timeout 5000", sqlite3ProbeQuery)
 	cmd.WaitDelay = time.Second
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr

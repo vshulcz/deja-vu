@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/proc"
 )
 
 // releaseNoticeOff is the variable that silences the once-a-day line (#4622).
@@ -163,11 +164,11 @@ func spawnReleaseLook(stamp string) error {
 		return err
 	}
 	defer func() { _ = devNull.Close() }()
-	cmd := exec.CommandContext(context.Background(), exe, "version")
+	cmd := proc.CommandContext(context.Background(), exe, "version")
 	cmd.Env = append(os.Environ(), releaseLookEnv+"="+stamp)
 	cmd.Stdout = devNull
 	cmd.Stderr = devNull
-	return startDetached(cmd)
+	return proc.StartDetached(cmd)
 }
 
 // releaseLookRequested reports whether this process is the detached look. The

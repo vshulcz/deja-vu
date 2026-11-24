@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
-	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/proc"
 )
 
 func digestHandoff(s model.Session) string { return digest.Handoff(s, handoffBudget) }
@@ -44,8 +44,7 @@ func clipboardCommand() []string {
 // clipboard of the machine the reader is sitting at, ssh or not.
 func tuiCopy(osc func(string), text string) error {
 	if c := clipboardCommand(); c != nil {
-		cmd := exec.CommandContext(context.Background(), c[0], c[1:]...)
-		hideconsole.Apply(cmd)
+		cmd := proc.CommandContext(context.Background(), c[0], c[1:]...)
 		cmd.Stdin = strings.NewReader(text)
 		if err := cmd.Run(); err == nil {
 			return nil

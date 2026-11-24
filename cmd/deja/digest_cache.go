@@ -20,6 +20,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/proc"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -273,7 +274,7 @@ func requestHookRefresh(dir, cwd string) {
 	if err != nil {
 		return
 	}
-	cmd := exec.CommandContext(context.Background(), exe, "hook-refresh")
+	cmd := proc.CommandContext(context.Background(), exe, "hook-refresh")
 	cmd.Env = append(os.Environ(), "DEJA_HOOK_REFRESH=1", "CLAUDE_PROJECT_DIR="+cwd)
 	devNull, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
 	if err != nil {
@@ -296,7 +297,7 @@ var startRefresher = func(cmd *exec.Cmd) (int, error) {
 	if strings.HasSuffix(strings.TrimSuffix(cmd.Path, ".exe"), ".test") {
 		return 0, nil
 	}
-	return startDetachedPID(cmd)
+	return proc.StartDetachedPID(cmd)
 }
 
 // runHookRefresh recomputes the session-start digest for the cwd in the
@@ -768,7 +769,7 @@ func requestWarmup(dir string) {
 }
 
 func startDetachedWarmup(exe, sentinel string) error {
-	cmd := exec.CommandContext(context.Background(), exe, "index")
+	cmd := proc.CommandContext(context.Background(), exe, "index")
 	cmd.Env = append(os.Environ(), "DEJA_WARMUP_SENTINEL="+sentinel)
 	// The child clears the sentinel only while it still holds this claim.
 	b, err := os.ReadFile(sentinel)
@@ -783,7 +784,7 @@ func startDetachedWarmup(exe, sentinel string) error {
 	defer func() { _ = devNull.Close() }()
 	cmd.Stdout = devNull
 	cmd.Stderr = cmd.Stdout
-	pid, err := startDetachedPID(cmd)
+	pid, err := proc.StartDetachedPID(cmd)
 	if err != nil {
 		return err
 	}

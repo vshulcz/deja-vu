@@ -11,10 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/cliarg"
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/proc"
 	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -74,7 +76,8 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 			if strings.HasPrefix(args[i], "-") {
 				return unknownFlag("handoff", args[i], handoffFlags)
 			}
-			if strings.TrimSpace(index.PastedSelector(args[i])) == "" {
+			sel, serr := cliarg.ParseSelector(args[i])
+			if serr != nil {
 				return idPrefixNeeded(dir, "handoff: empty session id prefix",
 					"handoff: empty session id prefix (see `deja last`, or omit the argument to hand off the latest session)")
 			}
@@ -83,7 +86,7 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 			if prefix != "" {
 				return fmt.Errorf("handoff takes one id-prefix — got %q and %q", prefix, args[i])
 			}
-			prefix = index.PastedSelector(args[i])
+			prefix = sel.Clean
 		}
 	}
 	if canon, ok := handoffAlias[target]; ok {
@@ -161,7 +164,7 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 	if _, err := exec.LookPath(argv[0]); err != nil {
 		return fmt.Errorf("handoff: %s is not installed (looked for %q in PATH)", target, argv[0])
 	}
-	c := exec.CommandContext(context.Background(), argv[0], argv[1:]...)
+	c := proc.InteractiveCommandContext(context.Background(), argv[0], argv[1:]...)
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return c.Run()
 }

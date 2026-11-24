@@ -8,15 +8,14 @@ import (
 	"io"
 	"maps"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
-	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/proc"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -44,8 +43,7 @@ var (
 // rxRunHook runs one deja hook subcommand. A variable so the protocol tests
 // can stand a fake in for the child.
 var rxRunHook = func(ctx context.Context, exe string, args []string, stdin []byte) (string, error) {
-	cmd := exec.CommandContext(ctx, exe, args...)
-	hideconsole.Apply(cmd)
+	cmd := proc.CommandContext(ctx, exe, args...)
 	cmd.Stdin = bytes.NewReader(stdin)
 	var out bytes.Buffer
 	cmd.Stdout = &out

@@ -7,11 +7,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"github.com/vshulcz/deja-vu/internal/hideconsole"
+	"github.com/vshulcz/deja-vu/internal/proc"
 )
 
 // zstdDecodeFile decompresses a file's frames through the zstd CLI, keeping
@@ -60,8 +59,7 @@ func zstdDecodeFile(path, harness string, raw []byte) ([]byte, error) {
 }
 
 func zstdRun(in []byte) (out []byte, stderr string, err error) {
-	cmd := exec.CommandContext(context.Background(), "zstd", "-d", "-c", "-q")
-	hideconsole.Apply(cmd)
+	cmd := proc.CommandContext(context.Background(), "zstd", "-d", "-c", "-q")
 	cmd.Stdin = bytes.NewReader(in)
 	var o, e bytes.Buffer
 	cmd.Stdout = &o
@@ -85,8 +83,7 @@ func zstdScan(path, harness string, scan func(io.Reader) error) error {
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	cmd := exec.CommandContext(context.Background(), "zstd", "-d", "-c", "-q")
-	hideconsole.Apply(cmd)
+	cmd := proc.CommandContext(context.Background(), "zstd", "-d", "-c", "-q")
 	cmd.Stdin = f
 	out, err := cmd.StdoutPipe()
 	if err != nil {

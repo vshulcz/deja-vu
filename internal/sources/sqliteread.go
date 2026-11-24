@@ -14,7 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/vshulcz/deja-vu/internal/hideconsole"
+	"github.com/vshulcz/deja-vu/internal/proc"
 )
 
 // A read against a SQLite store is given up when it stops moving, not when a
@@ -69,11 +69,10 @@ func sqliteReadCmd(db string, tail ...string) (*sqliteRead, func()) {
 	} else {
 		args = append(append(args, setup...), tail...)
 	}
-	r := &sqliteRead{Cmd: exec.CommandContext(context.Background(), "sqlite3", args...), db: db, budget: budget, quit: make(chan struct{}), killed: make(chan struct{})}
+	r := &sqliteRead{Cmd: proc.CommandContext(context.Background(), "sqlite3", args...), db: db, budget: budget, quit: make(chan struct{}), killed: make(chan struct{})}
 	if in != nil {
 		r.Stdin = in
 	}
-	hideconsole.Apply(r.Cmd)
 	return r, r.release
 }
 

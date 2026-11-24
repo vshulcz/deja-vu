@@ -17,14 +17,12 @@ var allowForegroundExecFuncs = map[string]map[string]bool{
 	"help_commands.go": {"runToolHelp": true},
 	"install_aider.go": {"cmdAider": true},
 	"install_goose.go": {"cmdGoose": true},
+	"proc.go":          {"InteractiveCommandContext": true},
 	"resume.go":        {"runResume": true},
 	"shell_layer.go":   {"runShellCommand": true},
 }
 
-var skipDetachedExecFiles = map[string]bool{
-	"digest_cache.go":   true,
-	"release_notice.go": true,
-}
+var skipDetachedExecFiles = map[string]bool{}
 
 func TestBackgroundExecCallsApplyHideconsole(t *testing.T) {
 	t.Parallel()

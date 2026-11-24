@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"html/template"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -17,10 +16,10 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/harnesscolor"
-	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/proc"
 	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -408,8 +407,7 @@ func openInBrowser(path string) {
 	case "windows":
 		name, args = "cmd", []string{"/c", "start", "", path}
 	}
-	cmd := exec.CommandContext(context.Background(), name, args...)
-	hideconsole.Apply(cmd)
+	cmd := proc.CommandContext(context.Background(), name, args...)
 	_ = cmd.Start()
 }
 

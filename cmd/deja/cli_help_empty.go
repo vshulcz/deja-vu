@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/cliarg"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -67,7 +68,11 @@ func parseSearch(args []string) (search.Options, error) {
 			case "--role":
 				o.Role = v
 			case "--session":
-				o.Session = v
+				sel, err := cliarg.ParseSelector(v)
+				if err != nil {
+					return o, fmt.Errorf("%s needs value", a)
+				}
+				o.Session = sel.Clean
 			case "--sort":
 				switch strings.ToLower(v) {
 				case search.SortDate, "newest":

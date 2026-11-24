@@ -10,14 +10,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/vshulcz/deja-vu/internal/hideconsole"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/proc"
 )
 
 // Reasonix 1.x (npm `reasonix` 1.x, branch main-v2) keeps a session as a
@@ -154,8 +153,7 @@ func reasonixV4FramesOneByOne(frames [][]byte, sizes []int) ([][]byte, error) {
 }
 
 func reasonixZstd(in []byte) ([]byte, error) {
-	cmd := exec.CommandContext(context.Background(), "zstd", "-d", "-c", "-q")
-	hideconsole.Apply(cmd)
+	cmd := proc.CommandContext(context.Background(), "zstd", "-d", "-c", "-q")
 	cmd.Stdin = bytes.NewReader(in)
 	var out, errBuf bytes.Buffer
 	cmd.Stdout = &out

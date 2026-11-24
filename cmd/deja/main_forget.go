@@ -1,12 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/cliarg"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -59,11 +61,15 @@ func parseForgetArgs(args []string) (forgetArgs, error) {
 			}
 			switch args[i-1] {
 			case "--session":
-				o.Session = index.PastedSelector(args[i])
+				sel, err := cliarg.ParseSelector(args[i])
+				if err != nil {
+					return forgetArgs{}, errors.New("forget: --session needs a value")
+				}
+				o.Session = sel.Clean
 			case "--project":
 				o.Project = args[i]
 			case "--unforget":
-				unforget, unforgetGiven = index.PastedSelector(args[i]), true
+				unforget, unforgetGiven = cliarg.CleanSelector(args[i]), true
 			case "--before":
 				if d, err := parseDurAny(args[i]); err == nil {
 					// "older than 0 days" is the whole store, and the typo that

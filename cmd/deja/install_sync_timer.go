@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"unicode"
 
-	"github.com/vshulcz/deja-vu/internal/hideconsole"
+	"github.com/vshulcz/deja-vu/internal/proc"
 )
 
 // A sync nobody runs is a memory that stops at whichever machine it was made
@@ -253,8 +252,7 @@ func runServiceManager(name string, args ...string) (string, error) {
 	if underTestBinary() {
 		return "", nil
 	}
-	cmd := exec.CommandContext(context.Background(), name, args...)
-	hideconsole.Apply(cmd)
+	cmd := proc.CommandContext(context.Background(), name, args...)
 	out, err := cmd.CombinedOutput()
 	return strings.TrimSpace(string(out)), err
 }
