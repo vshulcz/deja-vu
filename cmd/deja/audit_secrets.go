@@ -89,12 +89,6 @@ func auditShouldSkipPath(p string) bool {
 	}
 }
 
-func auditScanFile(path string) map[string]int {
-	br := bufio.NewReaderSize(nil, auditReadBufBytes)
-	var lineBuf []byte
-	return auditScanFileWithReader(path, br, &lineBuf)
-}
-
 func auditScanFileWithReader(path string, br *bufio.Reader, lineBuf *[]byte) map[string]int {
 	if auditShouldSkipPath(path) {
 		return nil

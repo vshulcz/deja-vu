@@ -511,7 +511,7 @@ func asciiLower(s string) string {
 	var b strings.Builder
 	grown := false
 	last := 0
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c := s[i]
 		if c >= 'A' && c <= 'Z' {
 			if !grown {
@@ -563,7 +563,7 @@ func containsAnchored(s, sub string, anchor int) bool {
 	return false
 }
 
-func hasAWSSecretHint(lower string) bool {
+func hasAWSLabelHint(lower string) bool {
 	for i := 1; i+1 < len(lower); {
 		j := strings.IndexByte(lower[i:len(lower)-1], 'w')
 		if j < 0 {
@@ -603,66 +603,83 @@ func hasBearerOrBasic(lower string) bool {
 // hasProviderHint reports whether s contains any provider token prefix from
 // providerRE at a word boundary, scanning once per delimiter byte rather than once per prefix.
 func hasProviderHint(s string) bool {
+	return hasUnderscoreProviderHint(s) || hasHyphenProviderHint(s) || hasAIzaProviderHint(s)
+}
+
+func hasUnderscoreProviderHint(s string) bool {
 	for i := 0; i < len(s); {
 		j := strings.IndexByte(s[i:], '_')
 		if j < 0 {
-			break
+			return false
 		}
 		k := i + j
-		if k >= 2 {
-			p2 := s[k-2 : k]
-			if (p2 == "sk" || p2 == "rk") && (k == 2 || !isRegexpWordByte(s[k-3])) &&
-				(strings.HasPrefix(s[k+1:], "live_") || strings.HasPrefix(s[k+1:], "test_")) {
-				return true
-			}
-			if p2 == "hf" && (k == 2 || !isRegexpWordByte(s[k-3])) {
-				return true
-			}
-			if k >= 3 {
-				if s[k-3] == 'g' && s[k-2] == 's' && s[k-1] == 'k' && (k == 3 || !isRegexpWordByte(s[k-4])) {
-					return true
-				}
-				if s[k-3] == 'n' && s[k-2] == 'p' && s[k-1] == 'm' && (k == 3 || !isRegexpWordByte(s[k-4])) {
-					return true
-				}
-				if s[k-3] == 'g' && s[k-2] == 'h' && (k == 3 || !isRegexpWordByte(s[k-4])) {
-					switch s[k-1] {
-					case 'p', 'o', 's', 'u', 'r':
-						return true
-					}
-				}
-				if k >= 10 && s[k-10:k] == "github_pat" && (k == 10 || !isRegexpWordByte(s[k-11])) {
-					return true
-				}
-			}
+		if k >= 2 && hasUnderscorePrefixAt(s, k) {
+			return true
 		}
 		i = k + 1
 	}
+	return false
+}
+
+func hasUnderscorePrefixAt(s string, k int) bool {
+	p2 := s[k-2 : k]
+	if (p2 == "sk" || p2 == "rk") && (k == 2 || !isRegexpWordByte(s[k-3])) &&
+		(strings.HasPrefix(s[k+1:], "live_") || strings.HasPrefix(s[k+1:], "test_")) {
+		return true
+	}
+	if p2 == "hf" && (k == 2 || !isRegexpWordByte(s[k-3])) {
+		return true
+	}
+	if k < 3 {
+		return false
+	}
+	if s[k-3] == 'g' && s[k-2] == 's' && s[k-1] == 'k' && (k == 3 || !isRegexpWordByte(s[k-4])) {
+		return true
+	}
+	if s[k-3] == 'n' && s[k-2] == 'p' && s[k-1] == 'm' && (k == 3 || !isRegexpWordByte(s[k-4])) {
+		return true
+	}
+	if s[k-3] == 'g' && s[k-2] == 'h' && (k == 3 || !isRegexpWordByte(s[k-4])) {
+		switch s[k-1] {
+		case 'p', 'o', 's', 'u', 'r':
+			return true
+		}
+	}
+	return k >= 10 && s[k-10:k] == "github_pat" && (k == 10 || !isRegexpWordByte(s[k-11]))
+}
+
+func hasHyphenProviderHint(s string) bool {
 	for i := 0; i < len(s); {
 		j := strings.IndexByte(s[i:], '-')
 		if j < 0 {
-			break
+			return false
 		}
 		k := i + j
-		if k >= 2 {
-			if s[k-2] == 's' && s[k-1] == 'k' && (k == 2 || !isRegexpWordByte(s[k-3])) {
-				return true
-			}
-			if k >= 3 && s[k-3] == 'x' && s[k-2] == 'a' && s[k-1] == 'i' && (k == 3 || !isRegexpWordByte(s[k-4])) {
-				return true
-			}
-			if k >= 4 && s[k-4] == 'x' && s[k-3] == 'o' && s[k-2] == 'x' && (k == 4 || !isRegexpWordByte(s[k-5])) {
-				switch s[k-1] {
-				case 'b', 'p', 'c', 's':
-					return true
-				}
-			}
-			if k >= 5 && s[k-5:k] == "glpat" && (k == 5 || !isRegexpWordByte(s[k-6])) {
-				return true
-			}
+		if k >= 2 && hasHyphenPrefixAt(s, k) {
+			return true
 		}
 		i = k + 1
 	}
+	return false
+}
+
+func hasHyphenPrefixAt(s string, k int) bool {
+	if s[k-2] == 's' && s[k-1] == 'k' && (k == 2 || !isRegexpWordByte(s[k-3])) {
+		return true
+	}
+	if k >= 3 && s[k-3] == 'x' && s[k-2] == 'a' && s[k-1] == 'i' && (k == 3 || !isRegexpWordByte(s[k-4])) {
+		return true
+	}
+	if k >= 4 && s[k-4] == 'x' && s[k-3] == 'o' && s[k-2] == 'x' && (k == 4 || !isRegexpWordByte(s[k-5])) {
+		switch s[k-1] {
+		case 'b', 'p', 'c', 's':
+			return true
+		}
+	}
+	return k >= 5 && s[k-5:k] == "glpat" && (k == 5 || !isRegexpWordByte(s[k-6]))
+}
+
+func hasAIzaProviderHint(s string) bool {
 	for i := 2; i+1 < len(s); {
 		j := strings.IndexByte(s[i:len(s)-1], 'z')
 		if j < 0 {
@@ -748,7 +765,7 @@ func scanPass(s string, allow map[string]bool, fast bool) (string, Counts) {
 	}
 	s = redactKeyShapes(s, lower, &p)
 	s = redactAssignments(s, lower, &p)
-	s = redactCommandPasswords(s, lower, &p)
+	s = redactCLIFlags(s, lower, &p)
 	s = redactEntropy(s, &p)
 	return s, p.counts
 }
@@ -772,7 +789,7 @@ func redactKeyShapes(s, lower string, p *kindPass) string {
 			})
 		}
 	}
-	if p.on("aws-secret") && hasAWSSecretHint(lower) {
+	if p.on("aws-secret") && hasAWSLabelHint(lower) {
 		s = replaceSubmatch(s, awsSecretRE, "aws-secret", p, func(m []string) string {
 			return m[1] + m[2] + m[3] + "[redacted:aws-secret]" + closingQuote(m[3], m[5])
 		})
@@ -916,7 +933,7 @@ func redactAssignments(s, lower string, p *kindPass) string {
 	return s
 }
 
-type commandPasswordFlags struct {
+type cliFlagSpans struct {
 	sshpass, userPair, mysql, login bool
 }
 
@@ -929,10 +946,10 @@ func hasLoginCommand(w string) bool {
 		strings.Contains(w, "ftp") || strings.Contains(w, "smbclient")
 }
 
-// scanCommandPasswordFlags detects candidate command-line password flags in a
-// single pass over '-' delimiters in lower.
-func scanCommandPasswordFlags(lower string) commandPasswordFlags {
-	var flags commandPasswordFlags
+// scanCLIFlagSpans detects candidate CLI flag spans in a single pass over '-'
+// delimiters in lower.
+func scanCLIFlagSpans(lower string) cliFlagSpans {
+	var flags cliFlagSpans
 	for i := 0; i+1 < len(lower); {
 		j := strings.IndexByte(lower[i:], '-')
 		if j < 0 {
@@ -990,14 +1007,14 @@ func scanCommandPasswordFlags(lower string) commandPasswordFlags {
 	return flags
 }
 
-// redactCommandPasswords masks passwords passed on a command line, in a netrc
-// and in a cookie header.
-func redactCommandPasswords(s, lower string, p *kindPass) string {
+// redactCLIFlags masks values passed on a CLI flag, in a netrc entry, and in a
+// cookie header.
+func redactCLIFlags(s, lower string, p *kindPass) string {
 	if !p.on("command-password") && !p.on("password") && !p.on("cookie") {
 		return s
 	}
 	if p.on("command-password") && strings.IndexByte(lower, '-') >= 0 {
-		flags := scanCommandPasswordFlags(lower)
+		flags := scanCLIFlagSpans(lower)
 		if flags.sshpass {
 			s = replaceGroup(s, sshpassRE, 1, "command-password", p, nil)
 		}

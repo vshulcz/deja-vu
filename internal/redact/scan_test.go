@@ -73,7 +73,7 @@ func TestScanKindsSkipsDisabledPasses(t *testing.T) {
 	bearerTok := "Bearer " + "tok_live_9876543210abcdef9876543210"
 	pem := "-----BEGIN " + "RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEAnExampleLineOne\n-----END " + "RSA PRIVATE KEY-----"
 	jwtTok := "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6y"
-	pgURL := "postgres://svc:hunter2@db.example:5432/app"
+	pgURL := "postgres://" + "svc:hunter2" + "@db.example:5432/app"
 	hookURL := "https://hooks.slack.com/" + "services/T00000000/B00000000/X9aB2cD4eF6gH8jK0lM2nP4q"
 	tgTok := "123456789:AAbcdefghij1234567890abcdefghij1234"
 	cmdLine := "sshpass -p hunter22 ssh deploy@203.0.113.10"
@@ -239,8 +239,8 @@ func TestPreGateSoundness(t *testing.T) {
 			if awsSecretRE.FindStringIndex(s) == nil {
 				t.Fatalf("expected awsSecretRE match for %q", s)
 			}
-			if !hasAWSSecretHint(asciiLower(s)) {
-				t.Errorf("hasAWSSecretHint missed match %q", s)
+			if !hasAWSLabelHint(asciiLower(s)) {
+				t.Errorf("hasAWSLabelHint missed match %q", s)
 			}
 		}
 		for _, clean := range []string{
@@ -249,8 +249,8 @@ func TestPreGateSoundness(t *testing.T) {
 			"xaw",
 			"aaw",
 		} {
-			if hasAWSSecretHint(asciiLower(clean)) {
-				t.Errorf("hasAWSSecretHint false positive on %q", clean)
+			if hasAWSLabelHint(asciiLower(clean)) {
+				t.Errorf("hasAWSLabelHint false positive on %q", clean)
 			}
 		}
 	})
@@ -276,39 +276,119 @@ func TestPreGateSoundness(t *testing.T) {
 		}
 	})
 
-	t.Run("commandPasswordFlags", func(t *testing.T) {
+	t.Run("cliFlagSpans", func(t *testing.T) {
 		filler := strings.Repeat("ж", 60)
 		checks := []struct {
 			name string
 			re   *regexp.Regexp
 			in   string
-			flag func(commandPasswordFlags) bool
+			flag func(cliFlagSpans) bool
 		}{
-			{"sshpass", sshpassRE, "sshpass -p hunter22 ssh deploy@example.com", func(f commandPasswordFlags) bool { return f.sshpass }},
-			{"sshpass_utf8", sshpassRE, "sshpass " + filler + " -p=hunter22", func(f commandPasswordFlags) bool { return f.sshpass }},
-			{"userPair_space", userPairRE, "curl -u admin:hunter22 https://example.com", func(f commandPasswordFlags) bool { return f.userPair }},
-			{"userPair_long_eq", userPairRE, "curl --user=" + strings.Repeat("ю", 40) + ":hunter22", func(f commandPasswordFlags) bool { return f.userPair }},
-			{"mysql", mysqlPassRE, "mysql " + strings.Repeat("я", 100) + " -pSecret22 db", func(f commandPasswordFlags) bool { return f.mysql }},
-			{"mariadb", mysqlPassRE, "MARIADB -u root -pSecret22", func(f commandPasswordFlags) bool { return f.mysql }},
-			{"login_p", loginPassRE, "docker login -p=hunter22 registry.example", func(f commandPasswordFlags) bool { return f.login }},
-			{"login_pw_utf8", loginPassRE, "az login " + strings.Repeat("й", 100) + " --password=hunter22", func(f commandPasswordFlags) bool { return f.login }},
-			{"redis_a", loginPassRE, "redis-cli -a hunter22 ping", func(f commandPasswordFlags) bool { return f.login }},
-			{"ftp_with_token", loginPassRE, "ftp --with-token<hunter22", func(f commandPasswordFlags) bool { return f.login }},
+			{"sshpass", sshpassRE, "sshpass -p hunter22 ssh deploy@example.com", func(f cliFlagSpans) bool { return f.sshpass }},
+			{"sshpass_utf8", sshpassRE, "sshpass " + filler + " -p=hunter22", func(f cliFlagSpans) bool { return f.sshpass }},
+			{"userPair_space", userPairRE, "curl -u admin:hunter22 https://example.com", func(f cliFlagSpans) bool { return f.userPair }},
+			{"userPair_long_eq", userPairRE, "curl --user=" + strings.Repeat("ю", 40) + ":hunter22", func(f cliFlagSpans) bool { return f.userPair }},
+			{"mysql", mysqlPassRE, "mysql " + strings.Repeat("я", 100) + " -pSecret22 db", func(f cliFlagSpans) bool { return f.mysql }},
+			{"mariadb", mysqlPassRE, "MARIADB -u root -pSecret22", func(f cliFlagSpans) bool { return f.mysql }},
+			{"login_p", loginPassRE, "docker login -p=hunter22 registry.example", func(f cliFlagSpans) bool { return f.login }},
+			{"login_pw_utf8", loginPassRE, "az login " + strings.Repeat("й", 100) + " --password=hunter22", func(f cliFlagSpans) bool { return f.login }},
+			{"redis_a", loginPassRE, "redis-cli -a hunter22 ping", func(f cliFlagSpans) bool { return f.login }},
+			{"ftp_with_token", loginPassRE, "ftp --with-token<hunter22", func(f cliFlagSpans) bool { return f.login }},
 		}
 		for _, tc := range checks {
 			if tc.re.FindStringIndex(tc.in) == nil {
 				t.Fatalf("%s: expected regex match on %q", tc.name, tc.in)
 			}
-			flags := scanCommandPasswordFlags(asciiLower(tc.in))
+			flags := scanCLIFlagSpans(asciiLower(tc.in))
 			if !tc.flag(flags) {
-				t.Errorf("%s: scanCommandPasswordFlags(%q) = %+v, flag false", tc.name, tc.in, flags)
+				t.Errorf("%s: scanCLIFlagSpans(%q) = %+v, flag false", tc.name, tc.in, flags)
 			}
 		}
-		for _, clean := range []string{"my-project --co-author name", "2026-11-24T01:00:00Z foo-bar: baz"} {
-			flags := scanCommandPasswordFlags(asciiLower(clean))
-			if flags != (commandPasswordFlags{}) {
-				t.Errorf("scanCommandPasswordFlags(%q) = %+v, want all false", clean, flags)
+		for _, clean := range []string{"my-project --co-author name", "2026-11-24T01:00:00Z foo-bar: baz", "trailing-"} {
+			flags := scanCLIFlagSpans(asciiLower(clean))
+			if flags != (cliFlagSpans{}) {
+				t.Errorf("scanCLIFlagSpans(%q) = %+v, want all false", clean, flags)
 			}
+		}
+	})
+}
+
+func TestRedactEdgeBranches(t *testing.T) {
+	t.Run("StripEscapesAndDisplay", func(t *testing.T) {
+		if got := StripEscapes("plain ascii"); got != "plain ascii" {
+			t.Errorf("StripEscapes plain = %q", got)
+		}
+		if got := StripEscapes("end\x1b"); got != "end" {
+			t.Errorf("StripEscapes trailing esc = %q", got)
+		}
+		if got := StripEscapes("a\x1b[12"); got != "a" {
+			t.Errorf("StripEscapes unterminated CSI = %q", got)
+		}
+		if got := StripEscapes("a\x1b]0;title"); got != "a" {
+			t.Errorf("StripEscapes unterminated OSC = %q", got)
+		}
+		if got := StripEscapes("a\x1b]0;title\x1b\\b"); got != "ab" {
+			t.Errorf("StripEscapes OSC ST = %q", got)
+		}
+		if got := StripEscapes("a\x1bMb"); got != "ab" {
+			t.Errorf("StripEscapes two-rune = %q", got)
+		}
+	})
+
+	t.Run("ScanKindsAndTextEscapes", func(t *testing.T) {
+		if got, counts := scanPass("", nil, true); got != "" || counts != nil {
+			t.Errorf("scanPass empty = (%q, %v)", got, counts)
+		}
+		if got := ScanKinds("clean\x1b[31m line\x1b[0m", nil); len(got) != 0 {
+			t.Errorf("ScanKinds clean escapes = %v", got)
+		}
+		splitTok := "ghp" + "\x1b[0m_" + "AbCdEfGhIjKlMnOpQrStUvWxYz1234567890"
+		allow := map[string]bool{"github-token": true}
+		if counts := ScanKinds(splitTok, allow); counts["github-token"] != 1 {
+			t.Errorf("ScanKinds split escape = %v", counts)
+		}
+		if redacted, counts := Text(splitTok); counts["github-token"] != 1 || redacted == splitTok {
+			t.Errorf("Text split escape = (%q, %v)", redacted, counts)
+		}
+		if got, counts := TextKinds(`secret="shortsecret1"`, map[string]bool{"quoted-secret": true}); !strings.Contains(got, "[redacted:quoted-secret]") || counts["quoted-secret"] != 1 {
+			t.Errorf("TextKinds quoted-secret = (%q, %v)", got, counts)
+		}
+	})
+
+	t.Run("HelpersAndDisabledPasses", func(t *testing.T) {
+		if asciiLower("İ") != strings.ToLower("İ") || asciiLower("K") != strings.ToLower("K") {
+			t.Errorf("asciiLower Turkish I / Kelvin fallback mismatch")
+		}
+		if !containsAnchored("abc", "", 0) || containsAnchored("ab", "abcd", 1) {
+			t.Errorf("containsAnchored edge checks failed")
+		}
+		if !notASecretValue("") || chosenSecret("short") || chosenSecret("onlylettersvalue") || !chosenSecret("hasdigit123") {
+			t.Errorf("notASecretValue/chosenSecret edge checks failed")
+		}
+		if !looksLikeGoTest("Benchmark_16/sub") || looksLikeGoTest("Testing_lowercase/sub") {
+			t.Errorf("looksLikeGoTest edge checks failed")
+		}
+		disabled := &kindPass{allow: map[string]bool{}}
+		if replaceWhole("jwt", jwtRE, "jwt", disabled) != "jwt" ||
+			replaceSubmatch("jwt", jwtRE, "jwt", disabled, nil) != "jwt" ||
+			replaceGroup("jwt", jwtRE, 0, "jwt", disabled, nil) != "jwt" {
+			t.Errorf("disabled replace helpers modified input")
+		}
+		optRE := regexp.MustCompile(`(opt)?(val)`)
+		if got := replaceGroup("val", optRE, 1, "credential", &kindPass{}, nil); got != "val" {
+			t.Errorf("replaceGroup missing optional group = %q, want unchanged", got)
+		}
+	})
+
+	t.Run("OutboundAndEntropyEdges", func(t *testing.T) {
+		if maskableIPv4("1.2.3") || maskableIPv4("198.51.100.1") || maskableIPv4("203.0.113.1") {
+			t.Errorf("maskableIPv4 rejected doc/short address check failed")
+		}
+		if out, c := Outbound(":: and ::1 and 198.51.100.1 and 203.0.113.1"); c[OutboundIP] != 0 || !strings.Contains(out, "::1") {
+			t.Errorf("Outbound non-maskable IPs = (%q, %v)", out, c)
+		}
+		if out, c := Text("key=aBcDeFgHiJkLmNoPqRsTuVwXyZ123456\nval=" + strings.Repeat("A", 20)); out == "" || len(c) == 0 {
+			t.Errorf("Text entropy baseline failed")
 		}
 	})
 }
