@@ -130,9 +130,8 @@ func TestStreamingByteChunkedEnsureMatchesColdRebuild(t *testing.T) {
 	for _, name := range []string{"a.go", "b.go", "c.go"} {
 		parityWrite(t, filepath.Join(repoB, name), "package b\n", false)
 	}
-	wsA := filepath.Join(tmp, "work", "ws-a")
 	parityWrite(t, filepath.Join(tmp, "agy", "cache", "conversation_metadata.json"),
-		fmt.Sprintf(`{"conversations":{"ag-stream-1":{"summary":{"WorkspaceURIs":["file://%s"]}}}}`, wsA),
+		`{"conversations":{"ag-stream-1":{"summary":{"WorkspaceURIs":["file:///work/ws-a"]}}}}`,
 		false,
 	)
 	agPath := filepath.Join(tmp, "agy", "brain", "ag-stream-1", ".system_generated", "logs", "transcript.jsonl")
@@ -149,15 +148,18 @@ func TestStreamingByteChunkedEnsureMatchesColdRebuild(t *testing.T) {
 	)
 	parityPass(t, indexDir, false)
 
-	agView1 := fmt.Sprintf(`{"step_index":3,"source":"MODEL","type":"VIEW_FILE","status":"DONE","created_at":"2026-10-01T07:00:03Z","content":"File Path: file://%s\npackage b 🦊"}`, filepath.Join(repoB, "a.go")) + "\n"
+	agFileURI := func(name string) string {
+		return strings.ReplaceAll(filepath.ToSlash(filepath.Join(repoB, name)), " ", "%20")
+	}
+	agView1 := fmt.Sprintf(`{"step_index":3,"source":"MODEL","type":"VIEW_FILE","status":"DONE","created_at":"2026-10-01T07:00:03Z","content":"File Path: file://%s\npackage b 🦊"}`, agFileURI("a.go")) + "\n"
 	agCut := strings.Index(agView1, "🦊") + 2
 	parityWrite(t, agPath, agView1[:agCut], true)
 	parityPass(t, indexDir, false)
 
 	parityWrite(t, agPath,
 		agView1[agCut:]+
-			fmt.Sprintf(`{"step_index":4,"source":"MODEL","type":"VIEW_FILE","status":"DONE","created_at":"2026-10-01T07:00:04Z","content":"File Path: file://%s\npackage b"}`, filepath.Join(repoB, "b.go"))+"\n"+
-			fmt.Sprintf(`{"step_index":5,"source":"MODEL","type":"VIEW_FILE","status":"DONE","created_at":"2026-10-01T07:00:05Z","content":"File Path: file://%s\npackage b"}`, filepath.Join(repoB, "c.go"))+"\n"+
+			fmt.Sprintf(`{"step_index":4,"source":"MODEL","type":"VIEW_FILE","status":"DONE","created_at":"2026-10-01T07:00:04Z","content":"File Path: file://%s\npackage b"}`, agFileURI("b.go"))+"\n"+
+			fmt.Sprintf(`{"step_index":5,"source":"MODEL","type":"VIEW_FILE","status":"DONE","created_at":"2026-10-01T07:00:05Z","content":"File Path: file://%s\npackage b"}`, agFileURI("c.go"))+"\n"+
 			`{"step_index":6,"source":"MODEL","type":"PLANNER_RESPONSE","created_at":"2026-10-01T07:00:06Z","content":"Done"}`+"\n",
 		true,
 	)

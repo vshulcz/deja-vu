@@ -175,9 +175,9 @@ func TestRegistryFixturesTornWriteAndUTF8Safety(t *testing.T) {
 		// Claude: Edit old_string/new_string > editSpanMax + BOM + CRLF + long line
 		claudePath := filepath.Join(dir, "claude-utf8.jsonl")
 		claudeBody := "\xef\xbb\xbf" +
-			fmt.Sprintf(`{"type":"user","sessionId":"cl-utf8","timestamp":"2026-10-01T09:00:00Z","message":{"role":"user","content":"%s"}}`, longText) + "\r\n" +
-			fmt.Sprintf(`{"type":"assistant","sessionId":"cl-utf8","requestId":"req-1","timestamp":"2026-10-01T09:00:01Z","message":{"id":"m1","role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/app/a.go","old_string":"%s","new_string":"%s"}}]}}`, cjk, oddCyr) + "\r\n" +
-			fmt.Sprintf(`{"type":"assistant","sessionId":"cl-utf8","requestId":"req-2","timestamp":"2026-10-01T09:00:02Z","message":{"id":"m2","role":"assistant","content":[{"type":"tool_use","id":"t2","name":"Edit","input":{"file_path":"/work/app/a.go","old_string":"%s","new_string":"%s"}}]}}`, oddCyr, cjk) + "\r\n"
+			fmt.Sprintf(`{"type":"user","sessionId":"cl-utf8","timestamp":"2026-10-01T09:00:00Z","message":{"role":"user","content":%q}}`, longText) + "\r\n" +
+			fmt.Sprintf(`{"type":"assistant","sessionId":"cl-utf8","requestId":"req-1","timestamp":"2026-10-01T09:00:01Z","message":{"id":"m1","role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/app/a.go","old_string":%q,"new_string":%q}}]}}`, cjk, oddCyr) + "\r\n" +
+			fmt.Sprintf(`{"type":"assistant","sessionId":"cl-utf8","requestId":"req-2","timestamp":"2026-10-01T09:00:02Z","message":{"id":"m2","role":"assistant","content":[{"type":"tool_use","id":"t2","name":"Edit","input":{"file_path":"/work/app/a.go","old_string":%q,"new_string":%q}}]}}`, oddCyr, cjk) + "\r\n"
 		if err := os.WriteFile(claudePath, []byte(claudeBody[:len(claudeBody)-5]), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -212,7 +212,7 @@ func TestRegistryFixturesTornWriteAndUTF8Safety(t *testing.T) {
 		codexBody := "\xef\xbb\xbf" +
 			`{"timestamp":"2026-10-01T09:00:00Z","type":"session_meta","payload":{"id":"019fbcca-0000-7000-8000-000000000099","cwd":"/work/app"}}` + "\r\n" +
 			fmt.Sprintf(`{"timestamp":"2026-10-01T09:00:01Z","type":"response_item","payload":{"type":"custom_tool_call","name":"apply_patch","call_id":"c1","input":%q}}`, patch) + "\r\n"
-		if err := os.WriteFile(codexPath, []byte(codexBody), 0o600); err != nil {
+		if err = os.WriteFile(codexPath, []byte(codexBody), 0o600); err != nil {
 			t.Fatal(err)
 		}
 		codexSS, err := ParseCodexRollout(codexPath)
@@ -309,7 +309,7 @@ func TestCodexStreamingOffsetEquivalence(t *testing.T) {
 
 		// Simulate incremental prefix read on a copy containing only prefix, then tail from offset.
 		prefixPath := filepath.Join(dir, "rollout-prefix.jsonl")
-		if err := os.WriteFile(prefixPath, []byte(prefix), 0o600); err != nil {
+		if err = os.WriteFile(prefixPath, []byte(prefix), 0o600); err != nil {
 			t.Fatal(err)
 		}
 		prefixSS, err := ParseCodexRollout(prefixPath)
@@ -483,10 +483,13 @@ func TestAntigravityStreamingOffsetEquivalence(t *testing.T) {
 		path := makeTranscript(t, root, "ag-proj")
 		prefix := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","created_at":"2026-10-01T07:00:00Z","content":"work in repo b"}` + "\n" +
 			`{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","created_at":"2026-10-01T07:00:01Z","content":"reading files"}` + "\n"
+		fileURI := func(p string) string {
+			return strings.ReplaceAll(filepath.ToSlash(p), " ", "%20")
+		}
 		offset := int64(len(prefix))
-		tail := fmt.Sprintf(`{"step_index":2,"source":"MODEL","type":"VIEW_FILE","status":"DONE","created_at":"2026-10-01T07:00:02Z","content":"File Path: file://%s\npackage b"}`, fileA) + "\n" +
-			fmt.Sprintf(`{"step_index":3,"source":"MODEL","type":"VIEW_FILE","status":"DONE","created_at":"2026-10-01T07:00:03Z","content":"File Path: file://%s\npackage b"}`, fileB) + "\n" +
-			fmt.Sprintf(`{"step_index":4,"source":"MODEL","type":"VIEW_FILE","status":"DONE","created_at":"2026-10-01T07:00:04Z","content":"File Path: file://%s\npackage b"}`, fileC) + "\n"
+		tail := fmt.Sprintf(`{"step_index":2,"source":"MODEL","type":"VIEW_FILE","status":"DONE","created_at":"2026-10-01T07:00:02Z","content":"File Path: file://%s\npackage b"}`, fileURI(fileA)) + "\n" +
+			fmt.Sprintf(`{"step_index":3,"source":"MODEL","type":"VIEW_FILE","status":"DONE","created_at":"2026-10-01T07:00:03Z","content":"File Path: file://%s\npackage b"}`, fileURI(fileB)) + "\n" +
+			fmt.Sprintf(`{"step_index":4,"source":"MODEL","type":"VIEW_FILE","status":"DONE","created_at":"2026-10-01T07:00:04Z","content":"File Path: file://%s\npackage b"}`, fileURI(fileC)) + "\n"
 		if err := os.WriteFile(path, []byte(prefix+tail), 0o600); err != nil {
 			t.Fatal(err)
 		}
