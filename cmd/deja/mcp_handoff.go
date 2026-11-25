@@ -24,11 +24,7 @@ import (
 // of that harness in this project, or nothing for the newest session here that
 // is not being written right now.
 func mcpHandoff(dir, name string, raw json.RawMessage) (string, int, error) {
-	var a struct {
-		Session string `json:"session"`
-		Harness string `json:"harness"`
-		Project string `json:"project"`
-	}
+	var a mcpHandoffArgs
 	if err := decodeToolArgs(name, raw, &a); err != nil {
 		return "", 0, err
 	}
@@ -95,10 +91,12 @@ func handoffTargetForAgent(dir, sel, harness string, projects ...string) (model.
 	pol := policy.Load()
 	metas, _ := index.AllMetaShared(dir)
 	var newestMeta index.SessionMeta
-	names := digest.ProjectNameCandidates(cwd)
-	if project != "" {
-		names = []string{project}
-	}
+	handoffScope, _ := resolveQueryScope(QueryScopeInput{
+		CWD:        cwd,
+		Project:    project,
+		Activation: policy.ActivationMCP,
+	})
+	names := handoffScope.Projects
 	for _, name := range names {
 		for _, m := range metas {
 			inScope := index.ProjectInScopeStrict(m.Project, name) || (project != "" && howProjectMatches(m.Project, []string{name}))

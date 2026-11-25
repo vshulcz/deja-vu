@@ -95,6 +95,8 @@ func runHookExt(dir string, args []string, stdin io.Reader, stdout io.Writer) er
 	return emitExtResponse(stdout, resp)
 }
 
+var hookExtFlags = []string{"--host", "--op"}
+
 func parseHookExtFlags(args []string) (host, op string, err error) {
 	host = "generic"
 	for i := 0; i < len(args); i++ {
@@ -106,7 +108,7 @@ func parseHookExtFlags(args []string) (host, op string, err error) {
 			case "--op":
 				op = v
 			default:
-				return "", "", fmt.Errorf("hook-ext: unknown flag %q", k)
+				return "", "", unknownFlag("hook-ext", k, hookExtFlags)
 			}
 			continue
 		}
@@ -124,6 +126,9 @@ func parseHookExtFlags(args []string) (host, op string, err error) {
 			op = args[i+1]
 			i++
 		default:
+			if strings.HasPrefix(arg, "-") {
+				return "", "", unknownFlag("hook-ext", arg, hookExtFlags)
+			}
 			return "", "", fmt.Errorf("hook-ext: unexpected argument %q", arg)
 		}
 	}

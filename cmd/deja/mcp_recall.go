@@ -628,8 +628,6 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 	if err != nil {
 		return rankedRecall{}, err
 	}
-	live, cut := liveLineageCut(dir)
-	o.ExcludeSessions, o.ExcludeUpTo = live, cut
 	if cov.Stale && !warmupRunning(dir) {
 		// A store rewrote itself (cline, cursor); rebuilding inline would
 		// blow the client's tool timeout, so refresh detached and serve the
@@ -645,26 +643,50 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 	var pathScope []string
 	if p := strings.TrimSpace(project); filepath.IsAbs(p) {
 		if st, statErr := os.Stat(p); statErr == nil && st.IsDir() {
-			pathScope = howScope(p, "", false)
+			dirScope, _ := resolveQueryScope(QueryScopeInput{CWD: p, Activation: policy.ActivationMCP})
+			pathScope = dirScope.Projects
 		}
 	}
+	var live map[string]bool
+	var scope []string
+	added := ""
 	if len(pathScope) > 0 {
+		baseScope, _ := resolveQueryScope(QueryScopeInput{
+			IndexDir:           dir,
+			IncludeLiveLineage: true,
+			Activation:         policy.ActivationMCP,
+		})
+		baseScope.ApplyToSearch(&o)
+		live = baseScope.ExcludeIDs
 		o.Projects = pathScope
 	} else if strings.TrimSpace(project) != "" {
 		// Named by the caller: a filter, the way the tool describes it. It was
 		// accepted and then ignored.
-		o.Projects = []string{project}
-	}
-	// The project the agent is working in answers first. The prompt hook
-	// ranks inside it and recall ranked the whole machine, so the same
-	// question found the decision through the hook and buried it here: on a
-	// stand with ~1800 real sessions behind one project, the session that
-	// answered sat at 20-39 for the queries agents sent, or outside the
-	// candidates altogether. The rest of the machine follows.
-	var scope []string
-	added := ""
-	if project == "" && os.Getenv("DEJA_RECALL_GLOBAL") != "1" {
-		scope = howScope(howCwd(), "", false)
+		explicitScope, _ := resolveQueryScope(QueryScopeInput{
+			IndexDir:           dir,
+			Project:            project,
+			IncludeLiveLineage: true,
+			Activation:         policy.ActivationMCP,
+		})
+		explicitScope.ApplyToSearch(&o)
+		live = explicitScope.ExcludeIDs
+	} else {
+		// The project the agent is working in answers first. The prompt hook
+		// ranks inside it and recall ranked the whole machine, so the same
+		// question found the decision through the hook and buried it here: on a
+		// stand with ~1800 real sessions behind one project, the session that
+		// answered sat at 20-39 for the queries agents sent, or outside the
+		// candidates altogether. The rest of the machine follows.
+		poolScope, _ := resolveQueryScope(QueryScopeInput{
+			IndexDir:           dir,
+			CWD:                howCwd(),
+			RespectGlobalEnv:   true,
+			IncludeLiveLineage: true,
+			Activation:         policy.ActivationMCP,
+		})
+		live = poolScope.ExcludeIDs
+		o.ExcludeSessions, o.ExcludeUpTo = poolScope.ExcludeIDs, poolScope.ExcludeUpTo
+		scope = poolScope.Projects
 		o.PoolScope = scope
 	}
 	result, o2, hits, policyHidden, err := recallRankWithLive(dir, q, o, live, true)
