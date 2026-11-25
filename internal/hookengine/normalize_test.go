@@ -279,4 +279,77 @@ func TestNormalizeAntigravityEvent(t *testing.T) {
 	if got := ev.PreferredPrompt("fallback question"); got != "fallback question" {
 		t.Fatalf("empty LastUserInput fallback = %q", got)
 	}
+	if got := CleanAntigravityUserInput("<hook_context>x</hook_context> plain question"); got != "plain question" {
+		t.Fatalf("CleanAntigravityUserInput plain = %q", got)
+	}
+	ev.WorkspacePaths = nil
+	if got := ev.EffectiveWorkspace("/tmp/conv-fallback"); got != "/tmp/conv-fallback" {
+		t.Fatalf("EffectiveWorkspace convFallback = %q", got)
+	}
+}
+
+func TestHelpersProjectPathMapStringAndToolPredicates(t *testing.T) {
+	if got := ProjectPath("/tmp/cwd", []string{"/tmp/root"}); got != "/tmp/cwd" {
+		t.Fatalf("ProjectPath cwd = %q", got)
+	}
+	if got := ProjectPath("  ", []string{"", "/tmp/root"}); got != "/tmp/root" {
+		t.Fatalf("ProjectPath roots fallback = %q", got)
+	}
+	if got := ProjectPath("", []string{"   "}); got != "" {
+		t.Fatalf("ProjectPath blank = %q, want empty", got)
+	}
+
+	if got := MapString(nil, "a"); got != "" {
+		t.Fatalf("MapString nil = %q, want empty", got)
+	}
+	m := map[string]any{"blank": "   ", "num": 7, "ok": "val"}
+	if got := MapString(m, "blank", "num", "ok"); got != "val" {
+		t.Fatalf("MapString = %q, want val", got)
+	}
+	if got := MapString(m, "missing", "num"); got != "" {
+		t.Fatalf("MapString missing = %q, want empty", got)
+	}
+
+	if got := CopilotToolArgs(nil); got != nil {
+		t.Fatalf("CopilotToolArgs nil = %#v, want nil", got)
+	}
+	if got := CopilotToolArgs(json.RawMessage(`"{bad`)); got != nil {
+		t.Fatalf("CopilotToolArgs bad = %#v, want nil", got)
+	}
+
+	if got := FirstNonScratchSliceFromAny([]string{"/Users/alex/.claude/plans/p.md", "/tmp/a.go"}); got != "/tmp/a.go" {
+		t.Fatalf("FirstNonScratchSliceFromAny([]string) = %q", got)
+	}
+	if got := FirstNonScratchSliceFromAny(`["/tmp/b.go"]`); got != "/tmp/b.go" {
+		t.Fatalf("FirstNonScratchSliceFromAny(json) = %q", got)
+	}
+	if got := FirstNonScratchSliceFromAny(42); got != "" {
+		t.Fatalf("FirstNonScratchSliceFromAny(int) = %q, want empty", got)
+	}
+
+	if got := StripReadPathSelectors("", `C:\repo\main.go:10-20`); got != `C:\repo\main.go` {
+		t.Fatalf("StripReadPathSelectors windows drive = %q", got)
+	}
+	if got := StripReadPathSelectors("", ""); got != "" {
+		t.Fatalf("StripReadPathSelectors empty = %q", got)
+	}
+
+	if !IsDejaMCPToolCall("mcp__deja__recall") || IsDejaMCPToolCall("mcp_fs_read") {
+		t.Fatalf("IsDejaMCPToolCall mismatch")
+	}
+	if !IsExternalMCPCommandTool("mcp_fs_cmd") || IsExternalMCPCommandTool("mcp__deja__cmd") || IsExternalMCPCommandTool("Bash") {
+		t.Fatalf("IsExternalMCPCommandTool mismatch")
+	}
+	if !IsExternalMCPEditTool("mcp_fs_edit") || IsExternalMCPEditTool("mcp_fs_read") {
+		t.Fatalf("IsExternalMCPEditTool mismatch")
+	}
+	if !IsExternalMCPReadTool("mcp_fs_read") || IsExternalMCPReadTool("Read") {
+		t.Fatalf("IsExternalMCPReadTool mismatch")
+	}
+	if !IsReadOnlyFileTool("mcp_fs_read") {
+		t.Fatalf("IsReadOnlyFileTool(mcp_fs_read) = false, want true")
+	}
+	if !IsCommandTool("mcp_fs_exec") {
+		t.Fatalf("IsCommandTool(mcp_fs_exec) = false, want true")
+	}
 }
