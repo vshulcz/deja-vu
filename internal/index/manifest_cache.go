@@ -30,20 +30,6 @@ import (
 //
 // Contract: the cached Manifest is shared — read-only paths must not mutate
 // it. Writers keep using readManifest directly.
-var manifestCache struct {
-	mu sync.Mutex
-	// dir and fi are what the entry was read from: fi carries the file's
-	// identity as well as its time and size, so a manifest swapped in by a
-	// rebuild never reuses the entry of the one it replaced.
-	dir      string
-	fi       os.FileInfo
-	sessions os.FileInfo
-	m        Manifest
-	ok       bool
-	// views are derived from m and replaced with it (meta_views.go).
-	views *metaViews
-}
-
 func readManifestCached(dir string) (Manifest, error) {
 	// Plain stat: a failure here falls through to readManifest, which waits the
 	// swap out itself, so a wait added here cannot be made to fail (#1319).
@@ -55,18 +41,24 @@ func readManifestCached(dir string) (Manifest, error) {
 	if err != nil {
 		return readManifest(dir)
 	}
-	manifestCache.mu.Lock()
-	if manifestCache.ok && manifestCache.dir == dir && sameGeneration(manifestCache.fi, fi) && sameGeneration(manifestCache.sessions, si) {
-		m := manifestCache.m
-		manifestCache.mu.Unlock()
+	norm := normSnapshotDir(dir)
+	warmFileIdentity(fi)
+	warmFileIdentity(si)
+	snapshots.mu.Lock()
+	snap := snapshots.getOrCreateLocked(norm)
+	if snap.manifestOK && sameGeneration(snap.fi, fi) && sameGeneration(snap.sessions, si) {
+		snapshots.touchLocked(norm)
+		m := snap.m
+		snapshots.mu.Unlock()
 		return m, nil
 	}
-	manifestCache.mu.Unlock()
+	wantEpoch := snap.epoch
+	snapshots.mu.Unlock()
 	m, err := readManifest(dir)
 	if err != nil {
 		return m, err
 	}
-	cacheManifest(dir, fi, si, m)
+	storeManifestAtEpoch(dir, wantEpoch, fi, si, m)
 	return m, nil
 }
 
@@ -74,30 +66,37 @@ func readManifestCached(dir string) (Manifest, error) {
 // and si describe. Another generation of the index, so the bucket directories
 // cached for the last one go with it.
 func cacheManifest(dir string, fi, si os.FileInfo, m Manifest) {
-	manifestCache.mu.Lock()
-	manifestCache.dir, manifestCache.fi, manifestCache.sessions = dir, fi, si
-	manifestCache.m, manifestCache.ok = m, true
-	manifestCache.views = &metaViews{sessions: m.Sessions}
-	manifestCache.mu.Unlock()
-	dropBucketDirs(dir)
+	norm := normSnapshotDir(dir)
+	if norm == "" {
+		return
+	}
+	warmFileIdentity(fi)
+	warmFileIdentity(si)
+	snapshots.mu.Lock()
+	snap := snapshots.getOrCreateLocked(norm)
+	if !snap.manifestOK || !sameGeneration(snap.fi, fi) || !sameGeneration(snap.sessions, si) {
+		if snap.manifestOK || snap.hasDerived() {
+			snap.clearDerived()
+			snap.epoch = snapshots.nextEpochLocked()
+		}
+		snap.fi, snap.sessions = fi, si
+		snap.m, snap.manifestOK = m, true
+		snap.views = &metaViews{sessions: m.Sessions}
+	} else {
+		snap.m = m
+		if snap.views == nil || !sameTable(snap.views.sessions, m.Sessions) {
+			snap.views = &metaViews{sessions: m.Sessions}
+		}
+	}
+	snapshots.touchLocked(norm)
+	snapshots.mu.Unlock()
 }
 
 // moveManifestCache follows a directory renamed from tmp to dir: its files
 // are the same files, so a manifest cached for tmp is dir's now. Bucket
 // directories are cached by path, and both paths now name other files.
 func moveManifestCache(tmp, dir string) {
-	dropBucketDirs(tmp)
-	dropBucketDirs(dir)
-	dropBucketFileCount(tmp)
-	dropBucketFileCount(dir)
-	manifestCache.mu.Lock()
-	defer manifestCache.mu.Unlock()
-	switch manifestCache.dir {
-	case tmp:
-		manifestCache.dir = dir
-	case dir:
-		manifestCache.ok = false
-	}
+	moveSnapshot(tmp, dir)
 }
 
 // manifestGeneration is the manifest file as one stat sees it, nil when there
@@ -148,13 +147,7 @@ func Stamp(dir string) string {
 // without touching sessions.gob; a subsequent index writer must not reuse an
 // in-memory Manifest from before that atomic replacement.
 func invalidateManifestCache(dir string) {
-	dropBucketDirs(dir)
-	dropBucketFileCount(dir)
-	manifestCache.mu.Lock()
-	defer manifestCache.mu.Unlock()
-	if manifestCache.dir == dir {
-		manifestCache.ok = false
-	}
+	invalidateSnapshot(dir)
 }
 
 // The token catalog is every distinct token in the corpus — 180k strings on a
@@ -167,13 +160,7 @@ func invalidateManifestCache(dir string) {
 // would have hidden it.
 //
 // Contract: the returned map is shared and must not be mutated.
-var catalogCache struct {
-	mu  sync.Mutex
-	dir string
-	sig string
-	idx *tokenIndex
-	ok  bool
-}
+// catalogCache replaced by per-directory snapshots in snapshot.go.
 
 // tokenIndex is the catalog plus the same tokens bucketed by rune length.
 // Fuzzy matching only ever considers tokens within its edit limit of the
@@ -431,22 +418,23 @@ func tokenIndexCached(dir string) (*tokenIndex, error) {
 		i.dirs = dirs
 		return i, nil
 	}
-	catalogCache.mu.Lock()
-	if catalogCache.ok && catalogCache.dir == dir && catalogCache.sig == sig {
-		i := catalogCache.idx
-		catalogCache.mu.Unlock()
+	norm := normSnapshotDir(dir)
+	snapshots.mu.Lock()
+	snap := snapshots.getOrCreateLocked(norm)
+	if snap.catalogOK && snap.catalogSig == sig {
+		snapshots.touchLocked(norm)
+		i := snap.catalogIdx
+		snapshots.mu.Unlock()
 		return i, nil
 	}
-	catalogCache.mu.Unlock()
+	wantEpoch := snap.epoch
+	snapshots.mu.Unlock()
 	c, dirs, err := tokenCatalogDirs(dir)
 	if err != nil {
 		return nil, err
 	}
 	i := newTokenIndex(c)
 	i.dirs = dirs
-	catalogCache.mu.Lock()
-	catalogCache.dir, catalogCache.sig = dir, sig
-	catalogCache.idx, catalogCache.ok = i, true
-	catalogCache.mu.Unlock()
+	storeCatalogAtEpoch(dir, wantEpoch, sig, i)
 	return i, nil
 }

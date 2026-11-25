@@ -1754,12 +1754,7 @@ func sessionsHolding(t *testing.T, dir, word string) int {
 // cachedStale reports a cached directory of dir whose file on disk is no
 // longer the one it was read from.
 func cachedStale(dir string) string {
-	bucketDirCache.mu.Lock()
-	defer bucketDirCache.mu.Unlock()
-	if bucketDirCache.dir != dir {
-		return ""
-	}
-	for p, d := range bucketDirCache.byPath {
+	for p, d := range cachedBucketDirs(dir) {
 		fi, err := os.Stat(p)
 		if err != nil || !sameFileVersion(d.stat, fi) {
 			return p
@@ -1770,13 +1765,9 @@ func cachedStale(dir string) string {
 
 // cachedDirs is the directories cached for dir.
 func cachedDirs(dir string) map[*cachedBucketDir]bool {
-	bucketDirCache.mu.Lock()
-	defer bucketDirCache.mu.Unlock()
 	out := map[*cachedBucketDir]bool{}
-	if bucketDirCache.dir == dir {
-		for _, d := range bucketDirCache.byPath {
-			out[d] = true
-		}
+	for _, d := range cachedBucketDirs(dir) {
+		out[d] = true
 	}
 	return out
 }
@@ -1885,6 +1876,8 @@ func TestBucketDirsConcurrentReaders(t *testing.T) {
 	add("s1", "the walnut drops its leaves first")
 	var wg sync.WaitGroup
 	stop := make(chan struct{})
+	stopReaders := sync.OnceFunc(func() { close(stop); wg.Wait() })
+	defer stopReaders()
 	for range 8 {
 		wg.Go(func() {
 			for {
@@ -1895,13 +1888,15 @@ func TestBucketDirsConcurrentReaders(t *testing.T) {
 				}
 				_, _ = postingsFor(dir, "twalnut")
 				_, _ = SearchDetailed(dir, query.Options{Query: "walnut leaves", All: true})
+				if runtime.GOOS == "windows" {
+					time.Sleep(time.Millisecond)
+				}
 			}
 		})
 	}
 	add("s2", "a walnut sapling by the gate")
 	add("s3", "walnut husks stain the hands")
-	close(stop)
-	wg.Wait()
+	stopReaders()
 	if n := sessionsHolding(t, dir, "walnut"); n != 3 {
 		t.Fatalf("after concurrent reads walnut is in %d sessions, want 3", n)
 	}

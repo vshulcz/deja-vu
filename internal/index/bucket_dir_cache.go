@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 )
 
 // Every postings read starts with the bucket's directory, the list of the
@@ -24,13 +23,6 @@ import (
 // files no generation names are not kept.
 //
 // The entries are shared: callers must not modify them.
-var bucketDirCache struct {
-	mu sync.Mutex
-	// dir is the index the entries belong to. One index at a time: a process
-	// that reads another one starts over.
-	dir    string
-	byPath map[string]*cachedBucketDir
-}
 
 // cachedBucketDir is one bucket file's directory and the file it was read
 // from.
@@ -67,25 +59,23 @@ func bucketDirOf(p string, f *os.File) (*cachedBucketDir, error) {
 		return nil, err
 	}
 	dir := filepath.Dir(filepath.Dir(p))
-	bucketDirCache.mu.Lock()
-	if bucketDirCache.dir == dir {
-		if d := bucketDirCache.byPath[p]; d != nil && sameFileVersion(d.stat, fi) {
-			bucketDirCache.mu.Unlock()
-			return d, nil
-		}
+	norm := normSnapshotDir(dir)
+	warmFileIdentity(fi)
+	snapshots.mu.Lock()
+	snap := snapshots.getOrCreateLocked(norm)
+	if d := snap.byPath[p]; d != nil && sameFileVersion(d.stat, fi) {
+		snapshots.touchLocked(norm)
+		snapshots.mu.Unlock()
+		return d, nil
 	}
-	bucketDirCache.mu.Unlock()
+	wantEpoch := snap.epoch
+	snapshots.mu.Unlock()
 	entries, err := readBucketDir(f, fi)
 	if err != nil {
 		return nil, err
 	}
 	d := &cachedBucketDir{stat: fi, entries: entries, sorted: slices.IsSortedFunc(entries, func(a, b bucketEntry) int { return strings.Compare(a.tok, b.tok) })}
-	bucketDirCache.mu.Lock()
-	if bucketDirCache.dir != dir || bucketDirCache.byPath == nil {
-		bucketDirCache.dir, bucketDirCache.byPath = dir, map[string]*cachedBucketDir{}
-	}
-	bucketDirCache.byPath[p] = d
-	bucketDirCache.mu.Unlock()
+	storeBucketDirAtEpoch(dir, wantEpoch, p, d)
 	return d, nil
 }
 
@@ -98,10 +88,16 @@ func sameFileVersion(a, b os.FileInfo) bool {
 
 // dropBucketDirs forgets the cached directories of the index in dir.
 func dropBucketDirs(dir string) {
-	bucketDirCache.mu.Lock()
-	if bucketDirCache.dir == dir {
-		bucketDirCache.dir, bucketDirCache.byPath = "", nil
+	norm := normSnapshotDir(dir)
+	if norm == "" {
+		return
 	}
-	bucketDirCache.mu.Unlock()
-	dropCooccurCache(dir)
+	snapshots.mu.Lock()
+	snap := snapshots.getOrCreateLocked(norm)
+	snap.byPath = nil
+	snap.catalogOK, snap.catalogIdx, snap.catalogSig = false, nil, ""
+	snap.cooccurStat, snap.cooccurMap = nil, nil
+	snap.epoch = snapshots.nextEpochLocked()
+	snapshots.touchLocked(norm)
+	snapshots.mu.Unlock()
 }

@@ -45,7 +45,5 @@ func SetManifestFormatForTest(dir string, f int) error {
 // clearManifestCacheForTest drops the cached manifest so the next read sees what
 // was just written.
 func clearManifestCacheForTest() {
-	manifestCache.mu.Lock()
-	manifestCache.ok = false
-	manifestCache.mu.Unlock()
+	resetAllSnapshots()
 }

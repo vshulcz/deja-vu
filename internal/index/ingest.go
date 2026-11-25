@@ -247,7 +247,7 @@ func healthFromFiles(files map[string]FileIngest) map[string]HarnessIngest {
 }
 
 func rebuild(dir string, harness string, scope string, files map[string]FileState, progress io.Writer) error {
-	return rebuildWithTombstones(dir, harness, scope, files, progress, readTombstones())
+	return rebuildWithTombstones(dir, harness, scope, files, progress, readTombstonesAt(dir))
 }
 
 func rebuildWithTombstones(dir string, harness string, scope string, files map[string]FileState, progress io.Writer, dead map[string]bool) error {

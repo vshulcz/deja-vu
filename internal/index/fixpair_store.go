@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"sync/atomic"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -23,18 +22,8 @@ type fixRawDisk struct {
 	Pairs   []FixPair
 }
 
-var fixesCache struct {
-	mu    sync.Mutex
-	dir   string
-	fi    os.FileInfo
-	pairs []FixPair
-	ok    bool
-}
-
 func invalidateFixesCache() {
-	fixesCache.mu.Lock()
-	fixesCache.ok = false
-	fixesCache.mu.Unlock()
+	invalidateAllFixes()
 }
 
 // writeFixTables writes the raw pairs and the table judged from them, and
@@ -44,7 +33,8 @@ func invalidateFixesCache() {
 // truncating write that failed partway would ship an undecodable file, which
 // ReadFixes reports as no pairs at all — silence until the next full rebuild.
 func writeFixTables(dir string, raw []FixPair) {
-	invalidateFixesCache()
+	invalidateFixesFor(dir)
+	defer invalidateFixesFor(dir)
 	if len(raw) == 0 {
 		_ = os.Remove(fixRawPath(dir))
 		_ = os.Remove(fixesPath(dir))
@@ -307,23 +297,23 @@ func ReadFixes(dir string) []FixPair {
 	if err != nil {
 		return nil
 	}
-	fixesCache.mu.Lock()
-	if fixesCache.ok && fixesCache.dir == dir && sameGeneration(fixesCache.fi, fi) {
-		cached := slices.Clone(fixesCache.pairs)
-		fixesCache.mu.Unlock()
+	norm := normSnapshotDir(dir)
+	warmFileIdentity(fi)
+	snapshots.mu.Lock()
+	snap := snapshots.getOrCreateLocked(norm)
+	if snap.fixesOK && sameGeneration(snap.fixesFI, fi) {
+		snapshots.touchLocked(norm)
+		cached := slices.Clone(snap.fixesPairs)
+		snapshots.mu.Unlock()
 		return cached
 	}
-	fixesCache.mu.Unlock()
+	wantEpoch := snap.epoch
+	snapshots.mu.Unlock()
 	var out []FixPair
 	if err := readGob(p, &out); err != nil {
 		return nil
 	}
-	fixesCache.mu.Lock()
-	fixesCache.dir = dir
-	fixesCache.fi = fi
-	fixesCache.pairs = out
-	fixesCache.ok = true
-	fixesCache.mu.Unlock()
+	storeFixesAtEpoch(dir, wantEpoch, fi, out)
 	return slices.Clone(out)
 }
 

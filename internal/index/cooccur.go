@@ -307,13 +307,13 @@ func dropCooccurWords(dir string, drop func(word string) bool) error {
 // words drop names, if there are any.
 func writeCooccurWithout(dir string, m map[string][]string, drop func(word string) bool) error {
 	changed := false
+	next := make(map[string][]string, len(m))
 	for tok, ns := range m {
 		if drop(tok) {
-			delete(m, tok)
 			changed = true
 			continue
 		}
-		kept := ns[:0]
+		var kept []string
 		for _, n := range ns {
 			if drop(n) {
 				changed = true
@@ -322,10 +322,12 @@ func writeCooccurWithout(dir string, m map[string][]string, drop func(word strin
 			kept = append(kept, n)
 		}
 		if len(kept) == 0 {
-			delete(m, tok)
+			if len(ns) > 0 {
+				changed = true
+			}
 			continue
 		}
-		m[tok] = kept
+		next[tok] = kept
 	}
 	if !changed {
 		return nil
@@ -339,16 +341,17 @@ func writeCooccurWithout(dir string, m map[string][]string, drop func(word strin
 		}
 		digest.SetLearnedDecisionMarkers(keptDM)
 		if len(keptDM) > 0 {
-			m[cooccurDiscourseKey] = keptDM
-			defer delete(m, cooccurDiscourseKey)
+			next[cooccurDiscourseKey] = keptDM
+			defer delete(next, cooccurDiscourseKey)
 		}
 	}
 	// An empty map rather than no file, which a reader holding it open on
 	// Windows would refuse to let go; a read of either finds no neighbours.
-	if err := writeGobAtomic(cooccurPath(dir), m); err != nil {
+	if err := writeGobAtomic(cooccurPath(dir), next); err != nil {
 		return err
 	}
-	_ = writeCooccurBinAtomic(dir, m)
+	_ = writeCooccurBinAtomic(dir, next)
+	dropCooccurCache(dir)
 	return nil
 }
 
@@ -397,19 +400,17 @@ func cooccurUnindexed(dir string, words bucketPostings) map[string]bool {
 	return out
 }
 
-var cooccurCache struct {
-	mu   sync.Mutex
-	dir  string
-	stat os.FileInfo
-	m    map[string][]string
-}
-
 func dropCooccurCache(dir string) {
-	cooccurCache.mu.Lock()
-	if cooccurCache.dir == dir {
-		cooccurCache.dir, cooccurCache.stat, cooccurCache.m = "", nil, nil
+	norm := normSnapshotDir(dir)
+	if norm == "" {
+		return
 	}
-	cooccurCache.mu.Unlock()
+	snapshots.mu.Lock()
+	snap := snapshots.getOrCreateLocked(norm)
+	snap.cooccurStat, snap.cooccurMap = nil, nil
+	snap.epoch = snapshots.nextEpochLocked()
+	snapshots.touchLocked(norm)
+	snapshots.mu.Unlock()
 }
 
 func readCooccur(dir string) map[string][]string {
@@ -418,21 +419,24 @@ func readCooccur(dir string) map[string][]string {
 	if err != nil {
 		return nil
 	}
-	cooccurCache.mu.Lock()
-	if cooccurCache.dir == dir && cooccurCache.stat != nil && sameFileVersion(cooccurCache.stat, fi) {
-		m := cooccurCache.m
-		cooccurCache.mu.Unlock()
+	norm := normSnapshotDir(dir)
+	warmFileIdentity(fi)
+	snapshots.mu.Lock()
+	snap := snapshots.getOrCreateLocked(norm)
+	if snap.cooccurStat != nil && sameFileVersion(snap.cooccurStat, fi) {
+		snapshots.touchLocked(norm)
+		m := snap.cooccurMap
+		snapshots.mu.Unlock()
 		return m
 	}
-	cooccurCache.mu.Unlock()
+	wantEpoch := snap.epoch
+	snapshots.mu.Unlock()
 	var m map[string][]string
 	if err := readGob(p, &m); err != nil {
 		return nil
 	}
 	delete(m, cooccurDiscourseKey)
-	cooccurCache.mu.Lock()
-	cooccurCache.dir, cooccurCache.stat, cooccurCache.m = dir, fi, m
-	cooccurCache.mu.Unlock()
+	storeCooccurAtEpoch(dir, wantEpoch, fi, m)
 	return m
 }
 

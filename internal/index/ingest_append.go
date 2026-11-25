@@ -205,6 +205,9 @@ func appendPrepared(dir, harness, scope string, old Manifest, files, changed map
 		return filesTouched, messages, unreadable, err
 	}
 	dropStale(stale)
+	if len(stale) > 0 {
+		invalidateDerivedSnapshot(dir)
+	}
 	m.bucketsLeaving = 0
 	// The sidecars, from what this pass read and from the records already on
 	// file. The replacement path does the same three things after it carries

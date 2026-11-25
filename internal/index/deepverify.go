@@ -112,6 +112,7 @@ func DeepVerify(dir string) (DeepReport, error) {
 	if cerr != nil {
 		report.Findings = append(report.Findings, DeepFinding{Kind: "torn-log", Detail: "records.bin unreadable: " + cerr.Error()})
 	}
+	dead := readTombstonesAt(dir)
 	for _, p := range samplePaths(inSync, deepParseSample) {
 		if cerr != nil {
 			break
@@ -126,8 +127,12 @@ func DeepVerify(dir string) (DeepReport, error) {
 			continue
 		}
 		report.SampledFiles++
+		ss = dropShadowedPrompts(sources.FilterSessions(filterTombstonedSet(ss, dead)), m.Sessions)
 		seen := msgSeen{}
 		for _, s := range ss {
+			if !holdsText(s) {
+				continue
+			}
 			key := s.Key()
 			if _, known := m.Sessions[key]; !known {
 				report.Findings = append(report.Findings, DeepFinding{Kind: "parse-drift", Detail: key + " parses from " + p + " but is absent from the index"})
