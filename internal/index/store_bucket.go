@@ -214,11 +214,17 @@ func readBucketDir(f *os.File, fi os.FileInfo) ([]bucketEntry, error) {
 		entries = append(entries, bucketEntry{tok: string(tb), n: uint32(size)})
 	}
 	pos := dirLen
+	live := entries[:0]
 	for i := range entries {
-		entries[i].off = pos
+		off := pos
 		pos += uint64(entries[i].n)
+		if isBlankedWord(entries[i].tok) {
+			continue
+		}
+		entries[i].off = off
+		live = append(live, entries[i])
 	}
-	return entries, nil
+	return live, nil
 }
 
 // damagedOrOutdated names the two reasons an index cannot be read. A format

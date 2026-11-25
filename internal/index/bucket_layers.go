@@ -380,6 +380,9 @@ func blankDeadWords(dir string, words bucketPostings, dead []int64) (map[string]
 	}
 	close(work)
 	wg.Wait()
+	if len(gone) > 0 {
+		invalidateDerivedSnapshot(dir)
+	}
 	return gone, failed
 }
 
@@ -561,6 +564,11 @@ func blankedWord(tok string) (_ []byte, ok bool) {
 		}
 	}
 	return nil, false
+}
+
+// isBlankedWord reports whether tok was overwritten in place by blankedWord.
+func isBlankedWord(tok string) bool {
+	return strings.IndexByte(tok, 0) >= 0 || strings.IndexByte(tok, 0xff) >= 0
 }
 
 // hashedFillers is, by hashed bucket, three bytes that, followed by zeros,

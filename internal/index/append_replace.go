@@ -234,6 +234,7 @@ func scrubAfterSwap(dir string, offs []int64) {
 // scrubSwapped is scrubAfterSwap for the pass that just committed m to dir,
 // which has it in hand: reading it back cost a decode of every session row.
 func scrubSwapped(dir string, m Manifest, offs []int64) {
+	defer invalidateDerivedSnapshot(dir)
 	log := filepath.Join(dir, "records.bin")
 	neighbours := readCooccur(dir)
 	words, unindexed, err := deadWords(log, tablesFromStrings(m.RecordStrings), offs, neighbours != nil)

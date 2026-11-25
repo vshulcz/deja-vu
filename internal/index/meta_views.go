@@ -67,14 +67,7 @@ type cachedLineage struct {
 // viewsFor is the views of m's session table: the cached ones when m is the
 // cached manifest, fresh ones otherwise.
 func viewsFor(m Manifest) *metaViews {
-	manifestCache.mu.Lock()
-	v := manifestCache.views
-	hit := manifestCache.ok && v != nil && sameTable(v.sessions, m.Sessions)
-	manifestCache.mu.Unlock()
-	if hit {
-		return v
-	}
-	return &metaViews{sessions: m.Sessions}
+	return cachedViewsFor(m)
 }
 
 // sameTable reports whether a and b are one map. The cached views hold their

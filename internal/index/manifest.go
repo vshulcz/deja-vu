@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -637,13 +636,6 @@ func commitManifest(dir string, m Manifest, wroteRecords, share bool) error {
 	// then answers from the manifest before this one. The writer knows, so it
 	// says so.
 	invalidateManifestCache(dir)
-	if err == nil && share && mfi != nil && sfi != nil {
-		sessions := m.Sessions
-		if sessions == nil {
-			sessions = map[string]SessionMeta{}
-		}
-		cacheManifest(dir, mfi, sfi, manifestFromCore(core, sessions))
-	}
 	if err == nil && wroteRecords {
 		// Best effort: a table that could not be written leaves readers
 		// walking the log, which is what they did before it existed.
@@ -653,6 +645,14 @@ func commitManifest(dir string, m Manifest, wroteRecords, share bool) error {
 		// After the offset table, which it reads through. Also on a commit
 		// without records: a forget or a rename moves the walls.
 		_ = writeFrictionTexts(dir, m, core.RecordsSize)
+	}
+	invalidateManifestCache(dir)
+	if err == nil && share && mfi != nil && sfi != nil {
+		sessions := m.Sessions
+		if sessions == nil {
+			sessions = map[string]SessionMeta{}
+		}
+		cacheManifest(dir, mfi, sfi, manifestFromCore(core, sessions))
 	}
 	return err
 }
@@ -869,21 +869,17 @@ func recordsDamage(dir string, m Manifest, tolerateLonger bool) string {
 	return ""
 }
 
-var bucketFileCountCache struct {
-	mu    sync.Mutex
-	dir   string
-	mtime int64
-	count int
-	ok    bool
-}
-
 func dropBucketFileCount(dir string) {
-	buckets := filepath.Join(dir, "buckets")
-	bucketFileCountCache.mu.Lock()
-	if bucketFileCountCache.dir == dir || bucketFileCountCache.dir == buckets {
-		bucketFileCountCache.ok = false
+	indexDir, _ := indexDirForBucketsPath(dir)
+	if indexDir == "" {
+		return
 	}
-	bucketFileCountCache.mu.Unlock()
+	snapshots.mu.Lock()
+	snap := snapshots.getOrCreateLocked(indexDir)
+	snap.fileCountTarget, snap.fileCountMtime, snap.fileCount, snap.fileCountOK = "", 0, 0, false
+	snap.epoch = snapshots.nextEpochLocked()
+	snapshots.touchLocked(indexDir)
+	snapshots.mu.Unlock()
 }
 
 func countBucketFilesCached(dir string) int {
@@ -892,22 +888,20 @@ func countBucketFilesCached(dir string) int {
 		return 0
 	}
 	mtime := fi.ModTime().UnixNano()
-	bucketFileCountCache.mu.Lock()
-	if bucketFileCountCache.ok && bucketFileCountCache.dir == dir && bucketFileCountCache.mtime == mtime {
-		n := bucketFileCountCache.count
-		bucketFileCountCache.mu.Unlock()
+	indexDir, target := indexDirForBucketsPath(dir)
+	snapshots.mu.Lock()
+	snap := snapshots.getOrCreateLocked(indexDir)
+	if snap.fileCountOK && snap.fileCountTarget == target && snap.fileCountMtime == mtime {
+		snapshots.touchLocked(indexDir)
+		n := snap.fileCount
+		snapshots.mu.Unlock()
 		return n
 	}
-	bucketFileCountCache.mu.Unlock()
+	wantEpoch := snap.epoch
+	snapshots.mu.Unlock()
 
 	n := countBucketFiles(dir)
-
-	bucketFileCountCache.mu.Lock()
-	bucketFileCountCache.dir = dir
-	bucketFileCountCache.mtime = mtime
-	bucketFileCountCache.count = n
-	bucketFileCountCache.ok = true
-	bucketFileCountCache.mu.Unlock()
+	storeBucketFileCountAtEpoch(indexDir, wantEpoch, target, mtime, n)
 	return n
 }
 

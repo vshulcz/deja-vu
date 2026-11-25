@@ -178,8 +178,13 @@ func tombstoneMirrorPath(dir string) string {
 // readTombstones merges both copies: whichever survived is authoritative,
 // because a tombstone can only ever be removed deliberately through unforget.
 func readTombstones() map[string]bool {
+	return readTombstonesAt("")
+}
+
+// readTombstonesAt merges the config tombstones with dir's mirror copy.
+func readTombstonesAt(dir string) map[string]bool {
 	out := readTombstoneFile(tombstonePath())
-	for key := range readTombstoneFile(tombstoneMirrorPath("")) {
+	for key := range readTombstoneFile(tombstoneMirrorPath(dir)) {
 		out[key] = true
 	}
 	return out
@@ -431,7 +436,7 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 			return ForgetResult{}, err
 		}
 	}
-	dead := readTombstones()
+	dead := readTombstonesAt(dir)
 	matched := map[string]bool{}
 	result := ForgetResult{}
 	rows, exact := forgetRows(m, o)
@@ -802,7 +807,7 @@ func Unforget(dir, prefix string, progress io.Writer) (int, error) {
 		return 0, err
 	}
 	defer unlock()
-	set := readTombstones()
+	set := readTombstonesAt(dir)
 	lifted := 0
 	for key := range set {
 		session, _, hasContent := strings.Cut(key, "\x00")
