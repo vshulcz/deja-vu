@@ -5,7 +5,7 @@
 
 Parte de **[deja-vu](https://github.com/vshulcz/deja-vu)** (**< 1 ms** con SQLite FTS5 · **~4%** de tamaño de índice · **0** tokens LLM al indexar) · [Documentación](https://vshulcz.github.io/deja-vu/) · [Demo en navegador](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-Busca transcripciones pasadas de agentes de código, ejecuta `blame` por línea, recupera soluciones a errores y genera resúmenes de relevo entre Claude Code, Codex CLI, Cursor, opencode, Gemini CLI y 47 agentes más directamente desde Neovim.
+Busca transcripciones pasadas de agentes de código, ejecuta `blame` por línea, recupera soluciones a errores y genera resúmenes de relevo entre Claude Code, Codex CLI, Cursor, opencode, Gemini CLI y 48 agentes más directamente desde Neovim.
 
 ![Demostración de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -78,7 +78,7 @@ Ejecuta `:checkhealth deja` en Neovim para comprobar la detección del binario y
 
 | Recall | Tokens | Indexado y búsqueda |
 |---|---|---|
-| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas) | **58% menos tokens** (en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 52 agentes de programación |
+| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas) | **58% menos tokens** (en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 53 agentes de programación |
 
 ## Memoria de repositorio y relevo entre agentes
 

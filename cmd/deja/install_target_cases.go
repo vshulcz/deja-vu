@@ -32,7 +32,11 @@ func installTargetCase(target string) (installTargetFunc, bool) {
 		"qwen": func(exe string, uninstall bool) (installResult, error) {
 			return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
 		},
-		"qwen-auto":      installTargetQwenAuto,
+		"qwen-auto": installTargetQwenAuto,
+		"gigacode": func(exe string, uninstall bool) (installResult, error) {
+			return installMCPJSON(filepath.Join(sources.GigaCodeConfigDir(), "settings.json"), exe, uninstall)
+		},
+		"gigacode-auto":  installTargetGigaCodeAuto,
 		"trae":           installTrae,
 		"trae-auto":      installTargetTraeAuto,
 		"trae-ide":       installTraeIDE,
@@ -219,19 +223,28 @@ func installTargetGrokAuto(exe string, uninstall bool) (installResult, error) {
 
 // installTargetQwenAuto wires qwen's hook, MCP entry and status line.
 func installTargetQwenAuto(exe string, uninstall bool) (installResult, error) {
+	return installTargetQwenFamilyAuto(sources.QwenConfigDir(), installQwenAuto, installQwenStatusline, exe, uninstall)
+}
+
+// installTargetGigaCodeAuto wires gigacode's hooks, MCP entry and status line.
+func installTargetGigaCodeAuto(exe string, uninstall bool) (installResult, error) {
+	return installTargetQwenFamilyAuto(sources.GigaCodeConfigDir(), installGigaCodeAuto, installGigaCodeStatusline, exe, uninstall)
+}
+
+func installTargetQwenFamilyAuto(configDir string, wireHooks, wireStatusline func(string, bool) (installResult, error), exe string, uninstall bool) (installResult, error) {
 	// The hook first: it lives in the same file as the MCP entry, and a
 	// refusal after the entry was written left the target reported as
 	// refused with half its wiring in the file and a .bak beside it
 	// (#2745, the shape #2744 was about).
-	hooks, err := installQwenAuto(exe, uninstall)
+	hooks, err := wireHooks(exe, uninstall)
 	if err != nil {
 		return installResult{}, err
 	}
-	mcp, err := installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
+	mcp, err := installMCPJSON(filepath.Join(configDir, "settings.json"), exe, uninstall)
 	if err != nil {
 		return installResult{}, err
 	}
-	status, err := installQwenStatusline(exe, uninstall)
+	status, err := wireStatusline(exe, uninstall)
 	if err != nil {
 		return installResult{}, err
 	}

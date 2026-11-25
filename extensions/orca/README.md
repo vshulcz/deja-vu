@@ -2,7 +2,7 @@
 
 English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/orca/docs/zh.md) | [繁體中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/orca/docs/zh-TW.md) | [日本語](https://github.com/vshulcz/deja-vu/blob/main/extensions/orca/docs/ja.md) | [한국어](https://github.com/vshulcz/deja-vu/blob/main/extensions/orca/docs/ko.md) | [Español](https://github.com/vshulcz/deja-vu/blob/main/extensions/orca/docs/es.md) | [Português](https://github.com/vshulcz/deja-vu/blob/main/extensions/orca/docs/pt.md) | [Français](https://github.com/vshulcz/deja-vu/blob/main/extensions/orca/docs/fr.md) | [Deutsch](https://github.com/vshulcz/deja-vu/blob/main/extensions/orca/docs/de.md) | [Русский](https://github.com/vshulcz/deja-vu/blob/main/extensions/orca/docs/ru.md) | [Türkçe](https://github.com/vshulcz/deja-vu/blob/main/extensions/orca/docs/tr.md) | [हिन्दी](https://github.com/vshulcz/deja-vu/blob/main/extensions/orca/docs/hi.md)
 
-Orca v2 `trusted-worker` plugin for `deja` — brings session memory across fifty-two AI coding tools (Claude Code, Codex, Cursor, opencode, Gemini CLI, Orca, and more), including sessions recorded before `deja` was installed.
+Orca v2 `trusted-worker` plugin for `deja` — brings session memory across fifty-three AI coding tools (Claude Code, Codex, Cursor, opencode, Gemini CLI, Orca, and more), including sessions recorded before `deja` was installed.
 
 ![deja-vu demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -36,7 +36,7 @@ When `deja install orca-auto` has already written the native `UserPromptSubmit` 
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 52 coding agents |
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 53 coding agents |
 
 ## Repository memory & handoff
 

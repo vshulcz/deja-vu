@@ -8,7 +8,7 @@ Parte do **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** no Lon
 
 ![Demonstração do deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Memória persistente vinda do histórico local das suas sessões no Claude Code, Codex, Cursor, opencode, Zed e mais 47 agentes. Executa localmente via binário único `deja` em Go (`DEJA_OFFLINE=1` desativa a checagem diária).
+Memória persistente vinda do histórico local das suas sessões no Claude Code, Codex, Cursor, opencode, Zed e mais 48 agentes. Executa localmente via binário único `deja` em Go (`DEJA_OFFLINE=1` desativa a checagem diária).
 
 ## Instalação
 
@@ -51,7 +51,7 @@ Configurado por `${GROK_PLUGIN_ROOT}` e `.mcp.json`. No Grok Build 1.0.5 sem o b
 
 | Recall | Tokens | Indexação e busca |
 |---|---|---|
-| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 52 agentes de código |
+| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 53 agentes de código |
 
 ## Memória do repositório e handoff entre agentes
 

@@ -173,6 +173,8 @@ func statusDetectActiveHarness() string {
 		return "antigravity"
 	case os.Getenv("KIMI_CLI") != "":
 		return "kimi"
+	case os.Getenv("GIGACODE_PACKAGED_LAUNCH") != "" || os.Getenv("GIGACODE_CLI") != "":
+		return "gigacode"
 	case os.Getenv("QWEN_CODE") != "":
 		return "qwen"
 	default:
@@ -188,6 +190,8 @@ func statusNormalizeHarnessInput(raw string) string {
 		return "gemini"
 	case "cursor-cli":
 		return "cursor"
+	case "gigacode-cli":
+		return "gigacode"
 	default:
 		return raw
 	}

@@ -5,7 +5,7 @@
 
 IntelliJ IDEA, GoLand, PyCharm, WebStorm, RustRover, CLion, PhpStorm ve Rider (`2024.2+`) için yerel ajanlar arası oturum arama, AI satır geçmişi (Blame) ve iş devri eklentisi.
 
-[deja-vu](https://github.com/vshulcz/deja-vu); Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf ve 43 diğer kodlama ajanının diske yazdığı oturum kayıtlarını yerel BM25 dizininde indeksler, çıktı vermeden önce gizli anahtarları temizler ve bulut servisi kullanmaz.
+[deja-vu](https://github.com/vshulcz/deja-vu); Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf ve 44 diğer kodlama ajanının diske yazdığı oturum kayıtlarını yerel BM25 dizininde indeksler, çıktı vermeden önce gizli anahtarları temizler ve bulut servisi kullanmaz.
 
 **[Belgeler](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[Ölçümler](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
@@ -14,7 +14,7 @@ IntelliJ IDEA, GoLand, PyCharm, WebStorm, RustRover, CLion, PhpStorm ve Rider (`
 ## Özellikler
 
 - **Durum çubuğu bileşeni**: Etkin proje için canlı `deja statusline` istatistiklerini IDE durum çubuğunun sağında gösterir. Tıklandığında `deja-vu` eylem penceresini açar.
-- **AI oturumlarında arama (`Tools → deja-vu → Search AI Sessions...`)**: Desteklenen 52 kodlama ajanının tümünde yerel oturumları sorgular (`deja search --json`) ve seçilen kaydı salt okunur Markdown sekmesinde açar.
+- **AI oturumlarında arama (`Tools → deja-vu → Search AI Sessions...`)**: Desteklenen 53 kodlama ajanının tümünde yerel oturumları sorgular (`deja search --json`) ve seçilen kaydı salt okunur Markdown sekmesinde açar.
 - **Son AI oturumları (`Tools → deja-vu → Recent AI Sessions`)**: Makinedeki en güncel 50 oturumu (`deja last 50 --json`) hızlı arama filtresiyle listeler.
 - **Geçerli satır için AI Blame (Düzenleyici sağ tık menüsü / `Tools → deja-vu → AI Blame Current Line`)**: `deja blame <file>:<line> --json` komutunu (satır eşleşmezse `<file>` yedeğiyle) çalıştırır ve imlecin altındaki satırı yazan veya düzenleyen AI oturumunu açar.
 - **Ajanlar arası devir özeti kopyala (`Tools → deja-vu → Copy Cross-Agent Handoff`)**: Proje kökünde `deja handoff` çalıştırır, özeti panoya kopyalar ve salt okunur Markdown sekmesinde açar.
@@ -54,7 +54,7 @@ Kurulabilir arşiv `build/distributions/` dizinine yazılır.
 
 | İsabet (Recall) | Token | İndeksleme ve sorgu |
 |---|---|---|
-| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1) | **%58 daha az token** (tekrarlanan depo işlerinde) | 19,195 oturumu **13.6 sn**'de indeksler / 52 kodlama ajanı genelinde **0.7 ms** sorgu süresi |
+| LongMemEval-S'te **%97.2 R@5** (470 soruda %88.9 hit@1) | **%58 daha az token** (tekrarlanan depo işlerinde) | 19,195 oturumu **13.6 sn**'de indeksler / 53 kodlama ajanı genelinde **0.7 ms** sorgu süresi |
 
 ## Depo belleği ve ajanlar arası devir (`handoff`)
 

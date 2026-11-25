@@ -246,6 +246,11 @@ func compactionCandidatesForPath(harness, path string) []compactionCandidate {
 	if len(out) > 0 {
 		return out
 	}
+	if harness != "" {
+		if owner := CompactionTranscriptHarness(path); owner != "" && owner != harness {
+			return nil
+		}
+	}
 	if harness == "" {
 		harness = compactionHarnessByLayout(path)
 	}
@@ -644,6 +649,7 @@ var compactionPlanBuilders = map[string]func(id string, safeID bool) compactionS
 	"hermes":       compactionPlanHermes,
 	"goose":        compactionPlanGoose,
 	"qwen":         compactionPlanQwen,
+	"gigacode":     compactionPlanGigaCode,
 	"qoder":        compactionPlanQoder,
 	"kimi":         compactionPlanKimi,
 	"cline":        compactionPlanCline,
@@ -871,10 +877,17 @@ func compactionPlanGoose(id string, safeID bool) compactionSearchPlan {
 }
 
 func compactionPlanQwen(id string, safeID bool) compactionSearchPlan {
+	return compactionPlanQwenFamily(QwenRoot(), id, safeID)
+}
+
+func compactionPlanGigaCode(id string, safeID bool) compactionSearchPlan {
+	return compactionPlanQwenFamily(GigaCodeRoot(), id, safeID)
+}
+
+func compactionPlanQwenFamily(root, id string, safeID bool) compactionSearchPlan {
 	if !safeID {
 		return compactionSearchPlan{}
 	}
-	root := QwenRoot()
 	return compactionSearchPlan{
 		direct:  []string{filepath.Join(root, id+".jsonl")},
 		shallow: []compactionShallowSpec{{dir: filepath.Join(root, "projects"), rels: []string{filepath.Join("chats", id+".jsonl")}}},
@@ -1422,6 +1435,9 @@ func compactionSessionWorkspace(harness, path string, s model.Session) string {
 		return KimiSessionDir(path)
 	case "qwen":
 		dir, _ := QwenSessionDir(path)
+		return dir
+	case "gigacode":
+		dir, _ := GigaCodeSessionDir(path)
 		return dir
 	case "grok":
 		if strings.HasSuffix(path, "updates.jsonl") {

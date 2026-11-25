@@ -2553,6 +2553,7 @@ func hostStatuslineCases(home string) []struct {
 		{"cursor-auto", filepath.Join(home, ".cursor", "cli-config.json"), jsonAt("statusLine")},
 		{"copilot-auto", filepath.Join(home, ".copilot", "settings.json"), jsonAt("statusLine")},
 		{"qwen-auto", filepath.Join(home, ".qwen", "settings.json"), jsonAt("ui", "statusLine")},
+		{"gigacode-auto", filepath.Join(home, ".gigacode", "settings.json"), jsonAt("ui", "statusLine")},
 		{"codebuddy-auto", filepath.Join(home, ".codebuddy", "settings.json"), jsonAt("statusLine")},
 		{"grok-auto", filepath.Join(home, ".grok", "config.toml"), tomlAt("ui.status_line")},
 		{"kimi-auto", filepath.Join(home, ".kimi-code", "tui.toml"), tomlAt("status_line")},
@@ -2617,7 +2618,7 @@ func seedStatusline(t *testing.T, target, path, cmd string) {
 		seed = "[tui.statusline]\ntype = \"command\"\ncommand = " + string(q) + "\n"
 	case strings.HasSuffix(path, ".toml"):
 		seed = "[ui.status_line]\ntype = \"command\"\ncommand = " + string(q) + "\n"
-	case target == "qwen-auto":
+	case target == "qwen-auto" || target == "gigacode-auto":
 		seed = `{"ui":{"statusLine":{"type":"command","command":` + string(q) + `}}}`
 	default:
 		seed = `{"statusLine":{"type":"command","command":` + string(q) + `}}`

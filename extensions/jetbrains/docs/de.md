@@ -5,7 +5,7 @@
 
 Lokale agentenübergreifende Session-Suche, KI-Zeilen-Blame und Handoff für IntelliJ IDEA, GoLand, PyCharm, WebStorm, RustRover, CLion, PhpStorm und Rider (`2024.2+`).
 
-[deja-vu](https://github.com/vshulcz/deja-vu) indiziert die Session-Protokolle von Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf und 43 weiteren Coding-Agents in einem lokalen BM25-Index — mit automatischer Secret-Bereinigung und ohne Cloud-Dienst.
+[deja-vu](https://github.com/vshulcz/deja-vu) indiziert die Session-Protokolle von Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf und 44 weiteren Coding-Agents in einem lokalen BM25-Index — mit automatischer Secret-Bereinigung und ohne Cloud-Dienst.
 
 **[Dokumentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
@@ -14,7 +14,7 @@ Lokale agentenübergreifende Session-Suche, KI-Zeilen-Blame und Handoff für Int
 ## Funktionen
 
 - **Statusleisten-Widget**: Zeigt Live-Statistiken von `deja statusline` für das aktive Projekt rechts in der IDE-Statusleiste. Ein Klick öffnet das `deja-vu`-Aktionsmenü.
-- **KI-Sessions durchsuchen (`Tools → deja-vu → Search AI Sessions...`)**: Durchsucht lokale Sessions aller 52 unterstützten Coding-Agents (`deja search --json`) und öffnet das gewählte Protokoll in einem schreibgeschützten Markdown-Tab.
+- **KI-Sessions durchsuchen (`Tools → deja-vu → Search AI Sessions...`)**: Durchsucht lokale Sessions aller 53 unterstützten Coding-Agents (`deja search --json`) und öffnet das gewählte Protokoll in einem schreibgeschützten Markdown-Tab.
 - **Letzte KI-Sessions (`Tools → deja-vu → Recent AI Sessions`)**: Listet die 50 jüngsten Sessions auf dem Rechner (`deja last 50 --json`) mit Schnellsuche auf.
 - **AI Blame für aktuelle Zeile (Kontextmenü / `Tools → deja-vu → AI Blame Current Line`)**: Führt `deja blame <file>:<line> --json` (mit Fallback auf `<file>`) aus und öffnet die KI-Session, die die Zeile unter dem Cursor geschrieben oder geändert hat.
 - **Agenten-Handoff kopieren (`Tools → deja-vu → Copy Cross-Agent Handoff`)**: Führt `deja handoff` im Projektstamm aus, kopiert die Zusammenfassung in die Zwischenablage und öffnet sie in einem schreibgeschützten Markdown-Tab.
@@ -54,7 +54,7 @@ Das installierbare Archiv liegt anschließend unter `build/distributions/`.
 
 | Recall | Tokens | Indexierung & Suche |
 |---|---|---|
-| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 52 Coding-Agents hinweg |
+| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 53 Coding-Agents hinweg |
 
 ## Repository-Gedächtnis & Agenten-Übergabe
 

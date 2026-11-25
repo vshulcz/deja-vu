@@ -15,7 +15,7 @@ import (
 const LiveTranscriptTailBytes int64 = 256 << 10
 
 func liveTailSupportsHarness(harness string) bool {
-	return canReadCompactionTailByHarness(harness) || harness == "copilot" || harness == "qwen"
+	return canReadCompactionTailByHarness(harness) || harness == "copilot" || harness == "qwen" || harness == "gigacode"
 }
 
 // ReadLiveTranscriptTailMessages reads recent user and assistant turns from an
@@ -116,6 +116,7 @@ func readLiveTailFile(expectedHarness, path, sessionID string) ([]model.Message,
 	if errors.Is(err, ErrUnsupportedCompactionTranscript) && (qwenShapedHead(header) || qwenShapedHead(tail)) {
 		detected, err = "qwen", nil
 	}
+	detected = refineQwenShapedHarness(path, detected)
 	if err != nil || detected == "" {
 		return nil, false
 	}

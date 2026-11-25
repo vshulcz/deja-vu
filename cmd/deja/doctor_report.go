@@ -638,6 +638,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"grok", []string{filepath.Join(sources.GrokRoot(), "sessions")}, sources.GrokSessionFiles, sources.ParseGrokFile},
 		{"hermes", []string{sources.HermesHome(), sources.HermesProfilesRoot()}, sources.HermesSessionFiles, parseDoctorHermes},
 		{"qwen", []string{filepath.Join(sources.QwenRoot(), "projects")}, sources.QwenSessionFiles, sources.ParseQwenFile},
+		{"gigacode", []string{filepath.Join(sources.GigaCodeRoot(), "projects")}, sources.GigaCodeSessionFiles, sources.ParseGigaCodeFile},
 		{"qoder", []string{filepath.Join(sources.QoderRoot(), "projects")}, sources.QoderSessionFiles, sources.ParseQoderFile},
 		{"codebuddy", sources.CodeBuddyRoots(), sources.CodeBuddySessionFiles, sources.ParseCodeBuddyFile},
 		{"kimi", []string{filepath.Join(sources.KimiRoot(), "sessions")}, sources.KimiSessionFiles, sources.ParseKimiFile},

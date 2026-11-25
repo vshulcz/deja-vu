@@ -2993,6 +2993,16 @@ func plausibleSession(t *testing.T, harness string) model.Session {
 		t.Setenv("DEJA_QWEN_ROOT", filepath.Join(tmp, "qwen"))
 		s.Path = qwenTranscriptIn(t, filepath.Join(tmp, "qwen"), cwd, s.ID, true)
 	}
+	if harness == "gigacode" {
+		// GigaCode shares Qwen's cwd-keyed resume behavior under its own root.
+		tmp := t.TempDir()
+		cwd := filepath.Join(tmp, "app")
+		if err := os.MkdirAll(cwd, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("DEJA_GIGACODE_ROOT", filepath.Join(tmp, "gigacode"))
+		s.Path = qwenTranscriptIn(t, filepath.Join(tmp, "gigacode"), cwd, s.ID, true)
+	}
 	if harness == "codebuddy" {
 		// Like qwen, `codebuddy -r` finds a session only from the directory
 		// it ran in, which the transcript records (#4707).

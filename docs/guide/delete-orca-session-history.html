@@ -205,7 +205,7 @@ ${XDG_CONFIG_HOME:-~/.config}/orca/agent-session-journal.db
 <pre data-nosnippet>rm ~/Library/Application\ Support/orca/agent-session-journal.db</pre>
 
 <h2>Keeping it searchable instead</h2>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads this database through <code>sqlite3</code> — along with the other fifty-one agents' histories on the machine — into one local index:</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads this database through <code>sqlite3</code> — along with the other fifty-two agents' histories on the machine — into one local index:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "orca session about the build"</pre>
 

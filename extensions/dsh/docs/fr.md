@@ -8,7 +8,7 @@ Fait partie de **[★ vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)** (**
 
 ![Démo de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Plugin `session-query` pour DeepSeek Harness (`dsh`) et DSH Desktop (`anywhere-labs/dsh-desktop`). En plus de vos sessions DSH, il interroge localement les journaux de 51 autres agents de code présents sur la machine (Claude Code, Codex, Cursor, Gemini, Hermes, etc.) via l'exécutable Go unique `deja` et son index BM25 (`DEJA_OFFLINE=1` coupe le contrôle quotidien).
+Plugin `session-query` pour DeepSeek Harness (`dsh`) et DSH Desktop (`anywhere-labs/dsh-desktop`). En plus de vos sessions DSH, il interroge localement les journaux de 52 autres agents de code présents sur la machine (Claude Code, Codex, Cursor, Gemini, Hermes, etc.) via l'exécutable Go unique `deja` et son index BM25 (`DEJA_OFFLINE=1` coupe le contrôle quotidien).
 
 ## Installation
 
@@ -20,7 +20,7 @@ dsh plugin --profile web add dsh-deja
 dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 ```
 
-Si `deja` n'est pas encore installé, définissez `DEJA_BIN` ou configurez les 52 agents et `$DSH_HOME/plugins/deja/` :
+Si `deja` n'est pas encore installé, définissez `DEJA_BIN` ou configurez les 53 agents et `$DSH_HOME/plugins/deja/` :
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -75,7 +75,7 @@ Une page autonome sans étape de build est également incluse dans `extensions/d
 
 | Rappel | Tokens | Indexation & recherche |
 |---|---|---|
-| **97.2% R@5** sur LongMemEval-S (88.9% hit@1 sur 470 questions) | **58% de tokens en moins** (sur des tâches répétées) | **13.6 s** pour indexer 19,195 sessions / **0.7 ms** par requête sur 52 agents de code |
+| **97.2% R@5** sur LongMemEval-S (88.9% hit@1 sur 470 questions) | **58% de tokens en moins** (sur des tâches répétées) | **13.6 s** pour indexer 19,195 sessions / **0.7 ms** par requête sur 53 agents de code |
 
 ## Mémoire de dépôt & transfert inter-agents
 

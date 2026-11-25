@@ -149,6 +149,10 @@ func doctorHarnessStoresReport(w io.Writer, dir string, all bool, rep *doctorRep
 	rows.filesSkippingIn("qwen", qwenRoot, []string{qwenRoot}, doctorExists(qwenRoot),
 		sources.QwenSessionFiles(), sources.QwenSubagentFile, sources.QwenSidecarFiles()...)
 
+	gigaCodeRoot := filepath.Join(sources.GigaCodeRoot(), "projects")
+	rows.filesSkippingIn("gigacode", gigaCodeRoot, []string{gigaCodeRoot}, doctorExists(gigaCodeRoot),
+		sources.GigaCodeSessionFiles(), sources.GigaCodeSubagentFile, sources.GigaCodeSidecarFiles()...)
+
 	qoderRoot := filepath.Join(sources.QoderRoot(), "projects")
 	// Qoder has no sidecar shape of its own today: the transcripts are the
 	// store, and sub-agent turns are flagged inside them.

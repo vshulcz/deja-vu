@@ -145,7 +145,9 @@ func mcpPostToolHookReady(client string) bool {
 	c := strings.ToLower(strings.TrimSpace(client))
 	switch {
 	case strings.HasPrefix(c, "qwen"):
-		return qwenMCPPostHookReady()
+		return qwenFamilyMCPPostHookReady(sources.QwenConfigDir())
+	case strings.HasPrefix(c, "gigacode"):
+		return qwenFamilyMCPPostHookReady(sources.GigaCodeConfigDir())
 	case strings.HasPrefix(c, "gemini"):
 		return geminiMCPAfterHookReady()
 	default:
@@ -153,8 +155,8 @@ func mcpPostToolHookReady(client string) bool {
 	}
 }
 
-func qwenMCPPostHookReady() bool {
-	b, err := os.ReadFile(filepath.Join(sources.QwenConfigDir(), "settings.json"))
+func qwenFamilyMCPPostHookReady(configDir string) bool {
+	b, err := os.ReadFile(filepath.Join(configDir, "settings.json"))
 	if err != nil {
 		return false
 	}

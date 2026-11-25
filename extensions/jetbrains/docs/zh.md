@@ -5,7 +5,7 @@
 
 为 IntelliJ IDEA、GoLand、PyCharm、WebStorm、RustRover、CLion、PhpStorm 与 Rider（`2024.2+`）提供本地跨智能体会话检索、AI 代码行溯源（AI Line Blame）与跨智能体交接。
 
-[deja-vu](https://github.com/vshulcz/deja-vu) 会在本地 BM25 索引中索引 Claude Code、Codex、OpenCode、Cursor、Gemini CLI、Junie、GitHub Copilot、Aider、Windsurf 以及其他 43 款编程智能体写入磁盘的会话记录，输出前自动脱敏，不依赖任何云服务。
+[deja-vu](https://github.com/vshulcz/deja-vu) 会在本地 BM25 索引中索引 Claude Code、Codex、OpenCode、Cursor、Gemini CLI、Junie、GitHub Copilot、Aider、Windsurf 以及其他 44 款编程智能体写入磁盘的会话记录，输出前自动脱敏，不依赖任何云服务。
 
 **[文档](https://vshulcz.github.io/deja-vu/zh/)** · **[评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
@@ -14,7 +14,7 @@
 ## 功能特性
 
 - **状态栏小组件**：在 IDE 状态栏右侧实时显示当前项目的 `deja statusline` 统计信息，点击即可打开 `deja-vu` 操作弹窗。
-- **检索 AI 会话（`Tools → deja-vu → Search AI Sessions...`）**：跨全部 52 款受支持的编程智能体检索本地会话（`deja search --json`），并在只读 Markdown 编辑器标签页中打开所选会话记录。
+- **检索 AI 会话（`Tools → deja-vu → Search AI Sessions...`）**：跨全部 53 款受支持的编程智能体检索本地会话（`deja search --json`），并在只读 Markdown 编辑器标签页中打开所选会话记录。
 - **最近 AI 会话（`Tools → deja-vu → Recent AI Sessions`）**：列出本机最近 50 条会话（`deja last 50 --json`），支持实时快速搜索过滤。
 - **AI 当前行溯源（编辑器右键菜单 / `Tools → deja-vu → AI Blame Current Line`）**：运行 `deja blame <file>:<line> --json`（若无精确行匹配则回退至 `<file>`），打开编写或修改光标所在行的 AI 会话。
 - **复制跨智能体接力摘要（`Tools → deja-vu → Copy Cross-Agent Handoff`）**：在项目根目录运行 `deja handoff`，将摘要复制到系统剪贴板并在只读 Markdown 标签页中打开。
@@ -54,7 +54,7 @@ cd extensions/jetbrains
 
 | 召回率 | Token 用量 | 索引与检索耗时 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 52 个编程智能体的检索仅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 53 个编程智能体的检索仅 **0.7 ms** |
 
 ## 仓库记忆与跨智能体接力
 

@@ -1238,6 +1238,24 @@ func TestUpstreamHomeVariables(t *testing.T) {
 			t.Fatalf("QwenConfigDir=%q", got)
 		}
 	})
+
+	t.Run("gigacode GIGACODE_HOME and DEJA_GIGACODE_ROOT", func(t *testing.T) {
+		t.Setenv("GIGACODE_HOME", filepath.Join(home, "gc-home"))
+		t.Setenv("DEJA_GIGACODE_ROOT", "")
+		if got := GigaCodeConfigDir(); got != filepath.Join(home, "gc-home") {
+			t.Fatalf("GigaCodeConfigDir=%q", got)
+		}
+		if got := GigaCodeRoot(); got != filepath.Join(home, "gc-home") {
+			t.Fatalf("GigaCodeRoot=%q", got)
+		}
+		t.Setenv("DEJA_GIGACODE_ROOT", filepath.Join(home, "gc-read"))
+		if got := GigaCodeRoot(); got != filepath.Join(home, "gc-read") {
+			t.Fatalf("GigaCodeRoot=%q", got)
+		}
+		if got := GigaCodeConfigDir(); got != filepath.Join(home, "gc-home") {
+			t.Fatalf("GigaCodeConfigDir=%q", got)
+		}
+	})
 }
 
 func TestDejaHomeRootsDiscoversReadablePeerHomes(t *testing.T) {

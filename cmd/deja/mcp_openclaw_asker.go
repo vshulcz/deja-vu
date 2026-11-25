@@ -44,6 +44,7 @@ var mcpClientPrefixHarnesses = []struct {
 	{"cursor", []string{"cursor"}},
 	{"gemini", []string{"gemini"}},
 	{"qwen", []string{"qwen"}},
+	{"gigacode", []string{"gigacode"}},
 	{"opencode", []string{"opencode"}},
 	{"kimi", []string{"kimi"}},
 	{"goose", []string{"goose"}},

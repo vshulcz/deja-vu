@@ -528,6 +528,7 @@ var compactionSummaryFixtures = []struct {
 	{"copilot-chat", "copilot-chat/workspaceStorage/a1b2c3d4e5f6/chatSessions/3b7e1f1b-0000-4000-8000-000000000000.jsonl", "COPILOT-CHAT-SUMMARY"},
 	{"kimi", "kimi/sessions/wd_demo_0123456789ab/session_fixture01/agents/main/wire.jsonl", "KIMI-SUMMARY"},
 	{"qwen", "qwen/projects/-workspace-registry-demo/chats/registry-qwen.jsonl", "QWEN-SUMMARY"},
+	{"gigacode", "gigacode/projects/-workspace-registry-demo/chats/registry-gigacode.jsonl", "GIGACODE-SUMMARY"},
 	{"pi", "pi/session.jsonl", "PI-SUMMARY"},
 	{"pi", "pi/session.jsonl", "PI-BRANCH-SUMMARY"},
 	{"omp", "omp/session.jsonl", "OMP-SUMMARY"},
@@ -832,6 +833,7 @@ func TestRegistrySummariesLeaveTheWrappingOut(t *testing.T) {
 		{"roo", "roo/tasks/1767225700000/api_conversation_history.json", "ROO-SUMMARY the flaky test came from a stale timeout in the retry loop"},
 		{"kilocode", "kilocode/tasks/registry-kilocode/api_conversation_history.json", "KILO-SUMMARY the migration hung on an advisory lock that was never released"},
 		{"qwen", "qwen/projects/-workspace-registry-demo/chats/registry-qwen.jsonl", "<state_snapshot>QWEN-SUMMARY the sample parser fixture was found</state_snapshot>"},
+		{"gigacode", "gigacode/projects/-workspace-registry-demo/chats/registry-gigacode.jsonl", "<state_snapshot>GIGACODE-SUMMARY the sample parser fixture was found</state_snapshot>"},
 		{"zcode", "zcode/cli-db.sql", "ZCODE-SUMMARY the stream was cut short by the proxy idle timeout"},
 		{"antigravity", "antigravity/brain/registry-antigravity/.system_generated/logs/transcript.jsonl", "# USER Objective:\nANTIGRAVITY-SUMMARY inspect the transcript\n\n# User Requests\nThe following were user requests from the truncated conversation in chronological order:\n1. inspect the antigravity transcript"},
 	} {

@@ -6,7 +6,7 @@
 
 Часть **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** на LongMemEval-S) · [Документация](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Живое демо](https://vshulcz.github.io/deja-vu/view/) · [Бенчмарки](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-[deja](https://github.com/vshulcz/deja-vu) индексирует файлы сессий, которые кодинг-агенты уже записывают на диск — Claude Code, Codex, Cursor, opencode и ещё 48 инструментов — и отвечает по ним. Этот плагин встраивает индекс в Kimi Code: релевантная память приходит вместе с промптом, а агент умеет сам искать по истории.
+[deja](https://github.com/vshulcz/deja-vu) индексирует файлы сессий, которые кодинг-агенты уже записывают на диск — Claude Code, Codex, Cursor, opencode и ещё 49 инструментов — и отвечает по ним. Этот плагин встраивает индекс в Kimi Code: релевантная память приходит вместе с промптом, а агент умеет сам искать по истории.
 
 ![Демонстрация deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -61,7 +61,7 @@ CLI записывает тот же MCP-сервер в `~/.kimi-code/mcp.json`
 
 | Полнота (Recall) | Расход токенов | Индексация и поиск |
 |---|---|---|
-| **97.2% R@5** на LongMemEval-S (88.9% hit@1 на 470 вопросах) | **на 58% меньше токенов** (на повторных задачах) | **13.6 с** на индекс 19,195 сессий / **0.7 мс** на поиск по 52 кодинг-агентам |
+| **97.2% R@5** на LongMemEval-S (88.9% hit@1 на 470 вопросах) | **на 58% меньше токенов** (на повторных задачах) | **13.6 с** на индекс 19,195 сессий / **0.7 мс** на поиск по 53 кодинг-агентам |
 
 ## Память в репозитории и передача сессии (`handoff`)
 

@@ -6,11 +6,11 @@
 
 **[★ vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)** 扩展（LongMemEval-S **97.2% R@5**）· [文档](https://vshulcz.github.io/deja-vu/zh/) · [在线演示](https://vshulcz.github.io/deja-vu/view/) · [评测](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-> 面向 Claude Code、Codex、Cursor、Gemini CLI、OpenClaw、Hermes 及其他五十一个智能体的本机跨工具会话记忆索引（零大模型依赖、单 Go 二进制）。
+> 面向 Claude Code、Codex、Cursor、Gemini CLI、OpenClaw、Hermes 及其他五十二个智能体的本机跨工具会话记忆索引（零大模型依赖、单 Go 二进制）。
 
 ![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-> 在所有通过 [Magpie](https://github.com/yetone/magpie) 发往上游模型的对话请求里，自动附带来自本地 51 款其他编程智能体（Claude Code、Codex、Cursor、Gemini CLI、OpenClaw、Hermes 等）的跨智能体历史记忆。
+> 在所有通过 [Magpie](https://github.com/yetone/magpie) 发往上游模型的对话请求里，自动附带来自本地 52 款其他编程智能体（Claude Code、Codex、Cursor、Gemini CLI、OpenClaw、Hermes 等）的跨智能体历史记忆。
 
 基于单文件 Go 二进制 `deja` 与本地 BM25 全文索引运行，支持 OpenAI（`chat`、`responses`）、Anthropic（`anthropic`）和 Gemini（`gemini`）协议的 Magpie 请求路径，不启用任何额外大模型与云端向量库；除明确运行的命令以及可通过 `DEJA_OFFLINE=1` 关闭的每日版本检查外，扩展自身不产生外发连接。
 
@@ -20,7 +20,7 @@
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-`@vshulcz/magpie-deja` 依赖 `@vshulcz/deja-vu`，若本机 `PATH` 中尚未安装 `deja`，安装插件时会自动拉取对应平台的二进制。首次使用前可执行一次 `deja index` 建立本地会话索引，或运行 `deja install --auto` 为本机五十二个编程工具配置原生 MCP 工具（`recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff`）与生命周期钩子；当客户端自身已通过 `deja install` 注入记忆时，网关钩子会自动让步，不会重复注入。
+`@vshulcz/magpie-deja` 依赖 `@vshulcz/deja-vu`，若本机 `PATH` 中尚未安装 `deja`，安装插件时会自动拉取对应平台的二进制。首次使用前可执行一次 `deja index` 建立本地会话索引，或运行 `deja install --auto` 为本机五十三个编程工具配置原生 MCP 工具（`recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff`）与生命周期钩子；当客户端自身已通过 `deja install` 注入记忆时，网关钩子会自动让步，不会重复注入。
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
@@ -52,7 +52,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 | 召回率 | Token 用量 | 索引与检索耗时 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 52 个编程智能体的检索仅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 53 个编程智能体的检索仅 **0.7 ms** |
 
 ## 仓库记忆与跨智能体接力
 

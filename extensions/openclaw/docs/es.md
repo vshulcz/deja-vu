@@ -8,7 +8,7 @@ Parte de **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** en Lon
 
 ![Demostración de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Conecta el historial en disco de otros 51 agentes de programación (Claude Code, Codex, Cursor, Gemini, Zed, etc.) dentro de [OpenClaw](https://openclaw.ai). Se apoya en el binario único en Go `deja` y su índice BM25 local sin LLM (`DEJA_OFFLINE=1` desactiva el aviso diario).
+Conecta el historial en disco de otros 52 agentes de programación (Claude Code, Codex, Cursor, Gemini, Zed, etc.) dentro de [OpenClaw](https://openclaw.ai). Se apoya en el binario único en Go `deja` y su índice BM25 local sin LLM (`DEJA_OFFLINE=1` desactiva el aviso diario).
 
 ## Instalación
 
@@ -86,7 +86,7 @@ openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 
 | Recall | Tokens | Indexado y búsqueda |
 |---|---|---|
-| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas) | **58% menos tokens** (en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 52 agentes de programación |
+| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas) | **58% menos tokens** (en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 53 agentes de programación |
 
 ## Memoria de repositorio y relevo entre agentes
 
@@ -96,6 +96,6 @@ Comparte decisiones validadas y callejones sin salida del proyecto vía git en `
 
 ## Privacidad
 
-Índice almacenado en `~/.cache/deja/index.db` (`DEJA_INDEX_DIR`) con redacción automática de `sk-*`, `ghp_*`, `AKIA*` y `Bearer`. Funciona totalmente en local salvo que ejecutes `deja embed`. Configura los 52 agentes compatibles a la vez con `deja install --auto`.
+Índice almacenado en `~/.cache/deja/index.db` (`DEJA_INDEX_DIR`) con redacción automática de `sk-*`, `ghp_*`, `AKIA*` y `Bearer`. Funciona totalmente en local salvo que ejecutes `deja embed`. Configura los 53 agentes compatibles a la vez con `deja install --auto`.
 
 Parte de [deja-vu](https://github.com/vshulcz/deja-vu). MIT.

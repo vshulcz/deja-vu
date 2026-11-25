@@ -21,10 +21,14 @@ func QwenRoot() string { return EnvPath("DEJA_QWEN_ROOT", QwenConfigDir()) }
 // the sub-agent that wrote a file (#5223). DEJA_INCLUDE_SUBAGENTS=1 keeps the
 // whole run and =0 skips them.
 func QwenSessionFiles() []string {
+	return qwenFamilySessionFiles(QwenRoot())
+}
+
+func qwenFamilySessionFiles(root string) []string {
 	subagents := !SubagentsOff()
-	return walkFiles(filepath.Join(QwenRoot(), "projects"), func(p string) bool {
+	return walkFiles(filepath.Join(root, "projects"), func(p string) bool {
 		return strings.HasSuffix(p, ".jsonl") && filepath.Base(filepath.Dir(p)) == "chats" ||
-			subagents && QwenSubagentFile(p)
+			subagents && qwenFamilySubagentFile(root, p)
 	})
 }
 
@@ -35,7 +39,11 @@ func QwenSessionFiles() []string {
 // same wrong claim Continue's `sessions.json` and Kimi's `state.json` used to
 // produce (#3676).
 func QwenSidecarFiles() []string {
-	return walkFiles(filepath.Join(QwenRoot(), "projects"), func(p string) bool {
+	return qwenFamilySidecarFiles(QwenRoot())
+}
+
+func qwenFamilySidecarFiles(root string) []string {
+	return walkFiles(filepath.Join(root, "projects"), func(p string) bool {
 		base := filepath.Base(p)
 		switch {
 		case strings.HasSuffix(base, ".runtime.json"):
@@ -46,9 +54,9 @@ func QwenSidecarFiles() []string {
 		// beside a sub-agent's log (#4475).
 		case base == "session-organization.v1.json":
 			return true
-		case qwenUnder(p, "workflows"):
+		case qwenFamilyUnder(root, p, "workflows"):
 			return true
-		case qwenUnder(p, "subagents") && strings.HasSuffix(base, ".meta.json"):
+		case qwenFamilyUnder(root, p, "subagents") && strings.HasSuffix(base, ".meta.json"):
 			return true
 		}
 		return false
@@ -60,12 +68,26 @@ func QwenSidecarFiles() []string {
 // DEJA_INCLUDE_SUBAGENTS=0 the reader leaves them out, and doctor counts them
 // as skipped, not unread (#4475).
 func QwenSubagentFile(p string) bool {
-	return strings.HasSuffix(p, ".jsonl") && qwenUnder(p, "subagents")
+	return qwenFamilySubagentFile(QwenRoot(), p)
 }
 
-// qwenUnder reports whether p sits in the named directory of its project.
-func qwenUnder(p, dir string) bool {
-	rel, err := filepath.Rel(filepath.Join(QwenRoot(), "projects"), p)
+func qwenFamilySubagentFile(root, p string) bool {
+	return strings.HasSuffix(p, ".jsonl") && qwenFamilyUnder(root, p, "subagents")
+}
+
+func qwenFamilyProjectsUnder(root, p string) bool {
+	if root == "" || p == "" {
+		return false
+	}
+	rel, err := filepath.Rel(filepath.Join(root, "projects"), p)
+	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+func qwenFamilyUnder(root, p, dir string) bool {
+	if !qwenFamilyProjectsUnder(root, p) {
+		return false
+	}
+	rel, err := filepath.Rel(filepath.Join(root, "projects"), p)
 	if err != nil {
 		return false
 	}
@@ -81,7 +103,11 @@ func LoadQwen() []model.Session { return parseFiles(QwenSessionFiles(), ParseQwe
 // .../projects/-Users-x-projects-app/chats/s.jsonl. qwen resumes a session
 // only from the directory it belongs to.
 func QwenProjectDirBase(path string) string {
-	dir := projectDir(filepath.Join(QwenRoot(), "projects"), path)
+	return qwenFamilyProjectDirBase(QwenRoot(), path)
+}
+
+func qwenFamilyProjectDirBase(root, path string) string {
+	dir := projectDir(filepath.Join(root, "projects"), path)
 	base := filepath.Base(dir)
 	if base == "" || base == "." || base == string(filepath.Separator) {
 		return ""
@@ -100,10 +126,8 @@ func qwenFolderIs(cwd, base string) bool {
 	return enc == base || strings.EqualFold(enc, base)
 }
 
-// qwenTranscriptCWD is the directory the transcript at path records, when its
-// folder was named for it; "" otherwise.
-func qwenTranscriptCWD(path string) string {
-	base := QwenProjectDirBase(path)
+func qwenFamilyTranscriptCWD(root, path string) string {
+	base := qwenFamilyProjectDirBase(root, path)
 	if base == "" {
 		return ""
 	}
@@ -116,10 +140,14 @@ func qwenTranscriptCWD(path string) string {
 // /w/my-app and /w/my/app encode the same — so it is resolved on disk only
 // for a transcript that records none (#4259).
 func QwenSessionDir(path string) (dir string, recorded bool) {
-	if cwd := qwenTranscriptCWD(path); cwd != "" {
+	return qwenFamilySessionDir(QwenRoot(), path)
+}
+
+func qwenFamilySessionDir(root, path string) (dir string, recorded bool) {
+	if cwd := qwenFamilyTranscriptCWD(root, path); cwd != "" {
 		return cwd, true
 	}
-	base := QwenProjectDirBase(path)
+	base := qwenFamilyProjectDirBase(root, path)
 	if base == "" {
 		return "", false
 	}
@@ -137,18 +165,26 @@ func ParseQwenFileFromOffset(path string, offset int64) ([]model.Session, error)
 }
 
 func parseQwenFileFromOffset(path string, offset int64) ([]model.Session, error) {
-	return parseQwenScan(path, func(fn func(map[string]any)) error { return scanJSONLFromOffset(path, offset, fn) })
+	return parseQwenFamilyFileFromOffset("qwen", QwenRoot(), path, offset)
+}
+
+func parseQwenFamilyFileFromOffset(harness, root, path string, offset int64) ([]model.Session, error) {
+	return parseQwenFamilyScan(harness, root, path, func(fn func(map[string]any)) error { return scanJSONLFromOffset(path, offset, fn) })
 }
 
 // parseQwenScan reads the records scan hands over as the Qwen transcript at
 // path: the whole file, a tail from an offset, or a hook's bounded head.
 func parseQwenScan(path string, scan func(func(map[string]any)) error) ([]model.Session, error) {
-	project := cwdProjectName(qwenTranscriptCWD(path))
+	return parseQwenFamilyScan("qwen", QwenRoot(), path, scan)
+}
+
+func parseQwenFamilyScan(harness, root, path string, scan func(func(map[string]any)) error) ([]model.Session, error) {
+	project := cwdProjectName(qwenFamilyTranscriptCWD(root, path))
 	if project == "" {
-		project = claudeProjectName(projectDir(filepath.Join(QwenRoot(), "projects"), path))
+		project = claudeProjectName(projectDir(filepath.Join(root, "projects"), path))
 	}
 	s := model.Session{
-		Harness: "qwen",
+		Harness: harness,
 		ID:      strings.TrimSuffix(filepath.Base(path), ".jsonl"),
 		Project: project,
 		Path:    path,
@@ -158,7 +194,7 @@ func parseQwenScan(path string, scan func(func(map[string]any)) error) ([]model.
 	// not read as a second copy of the parent (#4483). The agent's name
 	// leads, so the parent's id is not a prefix of it: a whole id opens the
 	// newest session it prefixes.
-	child := QwenSubagentFile(path)
+	child := qwenFamilySubagentFile(root, path)
 	if child {
 		s.Kind = "subagent"
 		s.Parent = filepath.Base(filepath.Dir(path))

@@ -179,6 +179,7 @@ func ReadCompactionTranscript(path, nativeSessionID string) (CompactionTranscrip
 		return CompactionTranscript{}, compactionStage("detect_harness", err)
 	}
 	harness = refineClaudeShapedHarness(path, harness)
+	harness = refineQwenShapedHarness(path, harness)
 	calls, workspace, metricComplete, err := compactionToolCalls(harness, header, tail, tailOffset, nativeSessionID)
 	if err != nil {
 		return CompactionTranscript{}, compactionStage("scan_tool_calls", err)
@@ -415,6 +416,15 @@ func refineClaudeShapedHarness(path, harness string) string {
 	return harness
 }
 
+func refineQwenShapedHarness(path, harness string) string {
+	if harness == "qwen" && path != "" {
+		if owner := CompactionTranscriptHarness(path); owner == "gigacode" {
+			return owner
+		}
+	}
+	return harness
+}
+
 func parseCompactionSession(originalPath, harness, workspace string, data []byte) (model.Session, error) {
 	var sessions []model.Session
 	var err error
@@ -444,6 +454,8 @@ func parseCompactionSession(originalPath, harness, workspace string, data []byte
 		sessions = own
 	case "qwen":
 		sessions, err = parseQwenScan(originalPath, compactionMapScanner(originalPath, data))
+	case "gigacode":
+		sessions, err = parseGigaCodeScan(originalPath, compactionMapScanner(originalPath, data))
 	case "antigravity":
 		sessions, err = parseAntigravityWith(originalPath, compactionMapScanner(originalPath, data))
 	case "gemini":
@@ -976,6 +988,7 @@ func transcriptHead(path, nativeSessionID, known string) (model.Session, error) 
 				if errors.Is(err, ErrUnsupportedCompactionTranscript) && qwenShapedHead(head) {
 					harness, err = "qwen", nil
 				}
+				harness = refineQwenShapedHarness(path, harness)
 			}
 			if err != nil {
 				return model.Session{}, err

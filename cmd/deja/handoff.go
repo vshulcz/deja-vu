@@ -420,6 +420,8 @@ func handoffCommand(target, prompt string) ([]string, bool) {
 		return []string{"gemini", "-i", prompt}, true
 	case "qwen":
 		return []string{"qwen", "-i", prompt}, true
+	case "gigacode":
+		return []string{"gigacode", "-i", prompt}, true
 	case "aider":
 		return []string{"aider", "--message", prompt}, true
 	case "pi":
@@ -601,7 +603,7 @@ func pasteOnlyFooter(prefix string) string {
 }
 
 func handoffTargets() []string {
-	return []string{"claude", "codex", "opencode", "cursor", "copilot", "copilot-chat", "gemini", "qwen", "antigravity", "aider", "pi", "senpi", "omp", "amp", "prime", "grok", "cline", "goose", "kimi", "crush",
+	return []string{"claude", "codex", "opencode", "cursor", "copilot", "copilot-chat", "gemini", "qwen", "gigacode", "antigravity", "aider", "pi", "senpi", "omp", "amp", "prime", "grok", "cline", "goose", "kimi", "crush",
 		"kilocode", "mimo", "omnigent", "orca", "continue", "commandcode", "codebuddy", "trae", "muse", "kiro", "gjc", "kimchi", "codewhale", "junie", "hermes", "openclaw", "deepseek", "reasonix", "zcode", "devin",
 		"mcode", "clawcode", "ante"}
 }

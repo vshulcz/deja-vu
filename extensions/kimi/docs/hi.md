@@ -6,7 +6,7 @@
 
 **[deja-vu](https://github.com/vshulcz/deja-vu)** का हिस्सा (LongMemEval-S पर **97.2% R@5**) · [दस्तावेज़](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [लाइव डेमो](https://vshulcz.github.io/deja-vu/view/) · [बेंचमार्क](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-[deja](https://github.com/vshulcz/deja-vu) उन सेशन फ़ाइलों को इंडेक्स करता है जिन्हें कोडिंग एजेंट्स पहले ही डिस्क पर लिखते हैं — Claude Code, Codex, Cursor, opencode और 48 अन्य — और उनसे उत्तर देता है। यह प्लगइन उस इंडेक्स को Kimi Code में लाता है: प्रॉम्प्ट के साथ प्रासंगिक स्मृति आती है, और एजेंट स्वयं भी इतिहास खोज सकता है।
+[deja](https://github.com/vshulcz/deja-vu) उन सेशन फ़ाइलों को इंडेक्स करता है जिन्हें कोडिंग एजेंट्स पहले ही डिस्क पर लिखते हैं — Claude Code, Codex, Cursor, opencode और 49 अन्य — और उनसे उत्तर देता है। यह प्लगइन उस इंडेक्स को Kimi Code में लाता है: प्रॉम्प्ट के साथ प्रासंगिक स्मृति आती है, और एजेंट स्वयं भी इतिहास खोज सकता है।
 
 ![deja-vu डेमो](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -61,7 +61,7 @@ CLI `~/.kimi-code/mcp.json` में वही MCP सर्वर और `conf
 
 | रिकॉल (Recall) | टोकन | इंडेक्सिंग और खोज |
 |---|---|---|
-| LongMemEval-S पर **97.2% R@5** (470 प्रश्नों पर 88.9% hit@1) | **58% कम टोकन** (दोहराए गए रेपो कार्य पर) | 19,195 सेशन इंडेक्स करने में **13.6 s** / 52 कोडिंग एजेंट्स में **0.7 ms** खोज समय |
+| LongMemEval-S पर **97.2% R@5** (470 प्रश्नों पर 88.9% hit@1) | **58% कम टोकन** (दोहराए गए रेपो कार्य पर) | 19,195 सेशन इंडेक्स करने में **13.6 s** / 53 कोडिंग एजेंट्स में **0.7 ms** खोज समय |
 
 ## रेपो मेमोरी और एजेंट हैंडऑफ़
 

@@ -8,7 +8,7 @@ Teil von **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** auf Lo
 
 ![deja-vu Demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Bindet Sitzungsprotokolle von 51 weiteren Coding-Agenten (Claude Code, Codex, Cursor, Gemini, Zed u. a.) direkt in [OpenClaw](https://openclaw.ai) ein. Läuft komplett lokal mit der Go-Binary `deja` und BM25 ohne LLM (`DEJA_OFFLINE=1` deaktiviert die tägliche Prüfung).
+Bindet Sitzungsprotokolle von 52 weiteren Coding-Agenten (Claude Code, Codex, Cursor, Gemini, Zed u. a.) direkt in [OpenClaw](https://openclaw.ai) ein. Läuft komplett lokal mit der Go-Binary `deja` und BM25 ohne LLM (`DEJA_OFFLINE=1` deaktiviert die tägliche Prüfung).
 
 ## Installation
 
@@ -86,7 +86,7 @@ openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 
 | Recall | Tokens | Indexierung & Suche |
 |---|---|---|
-| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 52 Coding-Agents hinweg |
+| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 53 Coding-Agents hinweg |
 
 ## Repository-Gedächtnis & Agenten-Übergabe
 
@@ -96,6 +96,6 @@ Werkzeugwechsel mitten in der Aufgabe? Mit `deja handoff --to <agent>` (oder `ha
 
 ## Datenschutz
 
-Der Index liegt in `~/.cache/deja/index.db` (`DEJA_INDEX_DIR`), wobei `sk-*`, `ghp_*`, `AKIA*` und `Bearer` beim Indexieren entfernt werden. Ohne manuelles `deja embed` erfolgt kein Netzversand. Alle 52 unterstützten Agenten lassen sich per `deja install --auto` einbinden.
+Der Index liegt in `~/.cache/deja/index.db` (`DEJA_INDEX_DIR`), wobei `sk-*`, `ghp_*`, `AKIA*` und `Bearer` beim Indexieren entfernt werden. Ohne manuelles `deja embed` erfolgt kein Netzversand. Alle 53 unterstützten Agenten lassen sich per `deja install --auto` einbinden.
 
 Teil von [deja-vu](https://github.com/vshulcz/deja-vu). MIT.

@@ -195,9 +195,9 @@
 <article>
 
 <h1>Codex CLI memory &amp; config.toml hooks setup</h1>
-<p class="pagelede">wire ~/.codex/config.toml MCP and hooks.json across Codex rollouts and 51 other agents<span class="mins" data-mins></span></p>
+<p class="pagelede">wire ~/.codex/config.toml MCP and hooks.json across Codex rollouts and 52 other agents<span class="mins" data-mins></span></p>
 
-<p>Codex CLI gives you three built-in places for context: <code>AGENTS.md</code> (capped at 32 KiB by default via <code>project_doc_max_bytes</code>), <code>features.memories</code> (Codex-only LLM summaries of recent rollouts), and <code>~/.codex/config.toml</code> MCP servers plus <code>~/.codex/hooks.json</code>. Pairing Codex with <code>deja-vu</code> adds verbatim search across historical Codex rollouts, Claude Code, Cursor, opencode, and 48 other tools on disk.</p>
+<p>Codex CLI gives you three built-in places for context: <code>AGENTS.md</code> (capped at 32 KiB by default via <code>project_doc_max_bytes</code>), <code>features.memories</code> (Codex-only LLM summaries of recent rollouts), and <code>~/.codex/config.toml</code> MCP servers plus <code>~/.codex/hooks.json</code>. Pairing Codex with <code>deja-vu</code> adds verbatim search across historical Codex rollouts, Claude Code, Cursor, opencode, and 49 other tools on disk.</p>
 
 <div class="save-first"><b>Configure Codex MCP and hooks cleanly:</b> <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> writes the <code>[mcp_servers.deja]</code> block into <code>~/.codex/config.toml</code>, installs lifecycle hooks into <code>~/.codex/hooks.json</code>, and indexes existing <code>rollout-*.jsonl</code> transcripts.<div class="save-actions"><div class="save-cmd"><span class="p">$</span><code>brew install deja-vu &amp;&amp; deja install codex-auto</code><button type="button">copy</button></div><div class="save-cmd"><span class="p">$</span><code>npx @vshulcz/deja-vu install codex-auto</code><button type="button">copy</button></div><a class="save-btn" href="https://github.com/vshulcz/deja-vu">deja-vu on GitHub</a><a class="save-demo" href="memory-for-codex.html">Codex overview &rarr;</a></div></div>
 
@@ -213,7 +213,7 @@ args = ["mcp"]</pre>
 <thead><tr><th>Dimension</th><th>Codex <code>features.memories</code></th><th><code>deja-vu</code></th></tr></thead>
 <tbody>
 <tr><td>Day-zero past history</td><td>Builds forward from new summaries</td><td>Indexes existing <code>${CODEX_HOME:-~/.codex}/sessions/YYYY/MM/DD/rollout-*.jsonl</code> on disk immediately (13.6 s on 19,195 sessions)</td></tr>
-<tr><td>Cross-agent recall</td><td>Codex CLI only</td><td>Codex + Claude Code, Cursor, opencode, Gemini CLI, and 47 other coding agents</td></tr>
+<tr><td>Cross-agent recall</td><td>Codex CLI only</td><td>Codex + Claude Code, Cursor, opencode, Gemini CLI, and 48 other coding agents</td></tr>
 <tr><td>Verbatim error &amp; diff lookup</td><td>Compressed natural-language prose</td><td>SQLite + FTS5 verbatim commands, exit codes, stack traces, and secret-redacted transcripts (~15 ms query latency)</td></tr>
 <tr><td>Team repo sharing</td><td>Local per-user state</td><td><code>.deja/memory.jsonl</code> tracked in git with <code>merge=union</code></td></tr>
 </tbody>
