@@ -801,7 +801,7 @@ func driveOpenClawPlugin(t *testing.T, hook, event string) []map[string]any {
 	home := t.TempDir()
 	stub := filepath.Join(home, "deja")
 	calls := filepath.Join(home, "calls")
-	script := "#!/bin/sh\nin=$(cat)\nprintf '%s\\n' \"$in\" >> " + calls + "\n"
+	script := "#!/bin/sh\nif [ \"$1\" = \"hook-ext\" ]; then exit 2; fi\nin=$(cat)\nprintf '%s\\n' \"$in\" >> " + calls + "\n"
 	if err = os.WriteFile(stub, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}

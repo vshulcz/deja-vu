@@ -2578,7 +2578,7 @@ func TestARecordedExitStatusIsNotOverwritten(t *testing.T) {
 func TestCompletionsListEveryUserFacingCommand(t *testing.T) {
 	// Hooks are invoked by agents, not typed; warmup-status is internal.
 	internal := map[string]bool{
-		"hook-context": true, "hook-prompt": true, "hook-precompact": true,
+		"hook-context": true, "hook-ext": true, "hook-prompt": true, "hook-precompact": true,
 		"hook-antigravity": true, "hook-goose": true, "hook-goose-prompt": true,
 		"hook-refresh": true, "hook-session-end": true, "hook-mcp-call": true,
 		"hook-stop": true, "hook-plan": true, "hook-tool": true, "hook-tool-after": true, "hook-codewhale": true,

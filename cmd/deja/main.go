@@ -354,6 +354,11 @@ var commands = map[string]command{
 	"review": func(dir string, rest []string) error { return runReview(dir, rest, os.Stdout) },
 }
 
+func init() {
+	// Registered in init to avoid a static package-var init cycle through runSearch -> dispatchKnows -> commands.
+	commands["hook-ext"] = cmdHookExt
+}
+
 func run(args []string) error {
 	if len(args) > 0 && args[0] == framedFlag {
 		return runFramed(args[1:])
@@ -420,16 +425,19 @@ func run(args []string) error {
 			return nil
 		}
 	}
-	if strings.HasPrefix(args[0], "hook-") || args[0] == "statusline" || args[0] == "warmup-status" {
-		if dispatchKnows(args[0]) && !hookAccessAllowed(dir) {
-			if args[0] == "hook-session-end" && slices.Contains(args[1:], "--json") {
-				fmt.Println("{}")
+	// hook-ext enforces per-op access internally so blocked hooks still emit {"ok":true}.
+	if args[0] != "hook-ext" {
+		if strings.HasPrefix(args[0], "hook-") || args[0] == "statusline" || args[0] == "warmup-status" {
+			if dispatchKnows(args[0]) && !hookAccessAllowed(dir) {
+				if args[0] == "hook-session-end" && slices.Contains(args[1:], "--json") {
+					fmt.Println("{}")
+				}
+				return nil
 			}
-			return nil
-		}
-	} else if !accessExemptCommands[args[0]] {
-		if err := checkCLIAccess(dir, "read", ""); err != nil {
-			return err
+		} else if !accessExemptCommands[args[0]] {
+			if err := checkCLIAccess(dir, "read", ""); err != nil {
+				return err
+			}
 		}
 	}
 	switch args[0] {

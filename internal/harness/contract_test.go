@@ -39,6 +39,52 @@ func allContractSpecs(t *testing.T) []harness.Spec {
 			GuardUserEdits:    true,
 			PruneEmptyParents: 1,
 		},
+		&harness.YAMLSectionSpec{
+			HarnessName:      "yaml-section",
+			Path:             filepath.Join(dir, "yaml", "config.yaml"),
+			SectionKey:       "extensions:",
+			EntryKey:         "deja",
+			DropEmptySection: true,
+			RespectDocEnd:    true,
+		},
+		&harness.JSONHooksSpec{
+			HarnessName: "json-hooks-map",
+			Path:        filepath.Join(dir, "hooks", "settings.json"),
+			Mode:        harness.JSONHooksEventMap,
+			Rules: []harness.JSONHookRule{{
+				Event:   "SessionStart",
+				Matcher: "startup|resume",
+				Command: "/usr/local/bin/deja hook-context",
+				Timeout: 10,
+			}},
+		},
+		&harness.JSONHooksSpec{
+			HarnessName:       "json-hooks-flat",
+			Path:              filepath.Join(dir, "hooks", "deja.json"),
+			Mode:              harness.JSONHooksFlatList,
+			OwnedMarker:       `"deja-digest"`,
+			RemoveWhenEmpty:   true,
+			PruneEmptyParents: 1,
+			Rules: []harness.JSONHookRule{{
+				Name:    "deja-digest",
+				Event:   "SessionStart",
+				Command: "/usr/local/bin/deja hook-context --plain",
+			}},
+		},
+		&harness.MarkedBlockSpec{
+			HarnessName: "marked-paired",
+			Path:        filepath.Join(dir, "marked", "layer.yml"),
+			StartMarker: "# deja:start",
+			EndMarker:   "# deja:end",
+			Block:       "# deja:start\n- id: deja\n# deja:end",
+		},
+		&harness.MarkedBlockSpec{
+			HarnessName: "marked-line",
+			Path:        filepath.Join(dir, "marked", "hooks.toml"),
+			LineMarker:  "# deja: managed hook",
+			TableHeader: "[[hooks]]",
+			Block:       "# deja: managed hook\n[[hooks]]\nevent = \"SessionEnd\"\ncommand = \"/usr/local/bin/deja hook-session-end\"\ntimeout = 30\n",
+		},
 	}
 }
 

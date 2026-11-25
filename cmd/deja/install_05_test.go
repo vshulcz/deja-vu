@@ -103,7 +103,7 @@ func TestHermesMemoryWritePassesDashTextAfterSeparator(t *testing.T) {
 	dir := t.TempDir()
 	argvFile := filepath.Join(dir, "argv.json")
 	stub := filepath.Join(dir, "deja")
-	stubSrc := "#!" + py + "\nimport json, sys\njson.dump(sys.argv[1:], open(" + strconv.Quote(argvFile) + ", 'w'))\n"
+	stubSrc := "#!" + py + "\nimport json, sys\nif sys.argv[1:2] == ['hook-ext']: sys.exit(2)\njson.dump(sys.argv[1:], open(" + strconv.Quote(argvFile) + ", 'w'))\n"
 	if werr := os.WriteFile(stub, []byte(stubSrc), 0o755); werr != nil {
 		t.Fatal(werr)
 	}
@@ -173,7 +173,7 @@ func TestHermesToolsAskForFramedOutput(t *testing.T) {
 	dir := t.TempDir()
 	argvFile := filepath.Join(dir, "argv.json")
 	stub := filepath.Join(dir, "deja")
-	stubSrc := "#!" + py + "\nimport json, sys\nopen(" + strconv.Quote(argvFile) + ", 'a').write(json.dumps(sys.argv[1:]) + '\\n')\n"
+	stubSrc := "#!" + py + "\nimport json, sys\nif sys.argv[1:2] == ['hook-ext']: sys.exit(2)\nopen(" + strconv.Quote(argvFile) + ", 'a').write(json.dumps(sys.argv[1:]) + '\\n')\n"
 	if werr := os.WriteFile(stub, []byte(stubSrc), 0o755); werr != nil {
 		t.Fatal(werr)
 	}
@@ -288,6 +288,8 @@ func hermesNotesStand(t *testing.T, withStatus bool) (dir, calls string) {
 	src := "#!" + py + `
 import json, os, sys
 args = sys.argv[1:]
+if args[:1] == ["hook-ext"]:
+    sys.exit(2)
 open(` + strconv.Quote(calls) + `, "a").write(" ".join(args) + "\n")
 quiet = os.path.exists(` + strconv.Quote(filepath.Join(dir, "quiet")) + `)
 context = "" if quiet else "<deja-recall>\n- **zorbit** dec-0001 · retry in-process, no queue\n</deja-recall>"

@@ -2,12 +2,11 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
-	"fmt"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/harness"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -73,158 +72,60 @@ func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 	return installCodexHooksAt(exe, filepath.Join(sources.CodexHome(), "hooks.json"), filepath.Join(sources.CodexHome(), "config.toml"), codexHookWiring, uninstall)
 }
 
+func matchDejaHookCmd(actual, wantCmd string) (bool, bool) {
+	k := hookCommandKindOf(actual, wantCmd)
+	return k != hookNotDejas, k == hookDejas
+}
+
 // installCodexHooksAt writes wiring into the hooks file at path and moves the
 // trust pins kept in cfgPath with it. TRAE CLI, a codex-rs fork, reads the
 // same file in its own home.
 func installCodexHooksAt(exe, path, cfgPath string, wiring []hookWire, uninstall bool) (installResult, error) {
 	exe = hookExeFor(exe, uninstall)
-	old, err := readConfig(path)
+	rules := make([]harness.JSONHookRule, len(wiring))
+	for i, h := range wiring {
+		maxTimeout := 0
+		if h.Event == "SessionEnd" {
+			maxTimeout = codexSessionEndCap
+		}
+		rules[i] = harness.JSONHookRule{
+			Event:         h.Event,
+			Matcher:       h.Matcher,
+			Command:       hookRun(exe, h.Sub),
+			Timeout:       codexHookTimeout(h.Event),
+			MaxTimeout:    maxTimeout,
+			StatusMessage: hookStatusMessage(h.Event),
+		}
+	}
+	ops, _, _ := newCmdHarnessOps(false)
+	spec := &harness.JSONHooksSpec{
+		HarnessName:    "codex-hooks",
+		Path:           path,
+		Mode:           harness.JSONHooksEventMap,
+		Rules:          rules,
+		RewriteMatcher: true,
+		IsCommandMatch: matchDejaHookCmd,
+		IsAnyDejaHook:  dejaHookEntry,
+		Ops:            ops,
+	}
+	if uninstall {
+		ures, err := spec.Unwire()
+		if err != nil {
+			return installResult{}, err
+		}
+		if ures.Action != "unchanged" {
+			err = moveCodexHookTrust(cfgPath, path, ures.BeforeRoot, ures.AfterRoot)
+		}
+		return installResult{Path: path, Action: ures.Action}, err
+	}
+	wres, err := spec.Wire()
 	if err != nil {
 		return installResult{}, err
 	}
-	var root map[string]any
-	if len(bytes.TrimSpace(old)) == 0 {
-		root = map[string]any{}
-	} else if uerr := json.Unmarshal(old, &root); uerr != nil {
-		return installResult{}, configParseError(path, uerr)
+	if wres.Action != "unchanged" {
+		err = moveCodexHookTrust(cfgPath, path, wres.BeforeRoot, wres.AfterRoot)
 	}
-	// What the file held before, for the trust pins below: a second parse
-	// rather than a copy, since the update edits the maps in place.
-	var before map[string]any
-	_ = json.Unmarshal(old, &before)
-	for _, h := range wiring {
-		updateCodexHook(root, h.Event, hookRun(exe, h.Sub), h.Matcher, uninstall)
-	}
-	if hooks, _ := root["hooks"].(map[string]any); len(hooks) == 0 {
-		delete(root, "hooks")
-	}
-	next, err := marshalConfigLike(old, root)
-	if err != nil {
-		return installResult{}, err
-	}
-	next = append(next, '\n')
-	a, err := writeIfChanged(path, old, next)
-	if err == nil && a != "unchanged" {
-		// Codex's approval of each hook is pinned by position in its
-		// config.toml; see codex_hook_trust.go. Install moves hooks too: a
-		// second copy of deja's entry it drops shifts the reader's hooks
-		// after it up a place (#4227).
-		err = moveCodexHookTrust(cfgPath, path, before, root)
-	}
-	return installResult{Path: path, Action: a}, err
-}
-
-// updateCodexHook merges one deja hook for an event into codex's hooks.json,
-// idempotently: it adopts an entry we already own (so a move or an upgrade
-// updates in place) and adds one otherwise. Same shape as updateClaudeHook.
-func updateCodexHook(root map[string]any, event, cmd, matcher string, uninstall bool) {
-	hooks, _ := root["hooks"].(map[string]any)
-	if hooks == nil {
-		hooks = map[string]any{}
-		root["hooks"] = hooks
-	}
-	entries, _ := hooks[event].([]any)
-	var kept []any
-	found := false
-	for _, entryAny := range entries {
-		entry, _ := entryAny.(map[string]any)
-		if entry != nil && entryHasCommand(entry, cmd) {
-			if uninstall {
-				continue
-			}
-			// One of ours is enough. A config can carry the entry twice — a
-			// hand-edited copy, a merge that kept both sides — and adopting
-			// each of them left the hook firing twice on every prompt.
-			if found {
-				continue
-			}
-			found = true
-			adoptCodexHookEntry(entry, cmd, event)
-			// An install from before #5126 wrote 10 here, which codex clamps
-			// with a warning on every start. A lower value the reader set
-			// stays.
-			if event == "SessionEnd" {
-				capHookTimeout(entry, cmd, codexSessionEndCap)
-			}
-			// The matcher is part of the wiring, not a user setting, so an
-			// upgrade has to rewrite it: the SessionStart entry written when
-			// this meant "startup|resume" went on missing every compaction
-			// through any number of installs, because adopting it left the
-			// pattern alone.
-			if matcher == "" {
-				delete(entry, "matcher")
-			} else {
-				entry["matcher"] = matcher
-			}
-		}
-		kept = append(kept, entryAny)
-	}
-	if !uninstall && !found {
-		h := map[string]any{"type": "command", "command": cmd, "timeout": codexHookTimeout(event)}
-		// Codex surfaces statusMessage in its hook run summary.
-		if msg := hookStatusMessage(event); msg != "" {
-			h["statusMessage"] = msg
-		}
-		entry := map[string]any{"hooks": []any{h}}
-		// An event that applies to every turn has no matcher, and codex's own
-		// examples leave the key out rather than carrying an empty pattern.
-		if matcher != "" {
-			entry["matcher"] = matcher
-		}
-		kept = append(kept, entry)
-	}
-	if len(kept) == 0 {
-		delete(hooks, event)
-	} else {
-		hooks[event] = kept
-	}
-}
-
-// adoptHookTimeout sets the timeout on the hook deja owns inside an entry,
-// leaving any line a reader wrote around it alone.
-func adoptHookTimeout(entry map[string]any, cmd string, timeout int) {
-	hs, _ := entry["hooks"].([]any)
-	for _, hAny := range hs {
-		h, _ := hAny.(map[string]any)
-		if h == nil || h["type"] != "command" || hookCommandKindOf(h["command"], cmd) != hookDejas {
-			continue
-		}
-		h["timeout"] = timeout
-	}
-}
-
-// capHookTimeout lowers the timeout on the hook deja owns inside an entry to
-// limit when it asks for more, or says nothing at all.
-func capHookTimeout(entry map[string]any, cmd string, limit int) {
-	hs, _ := entry["hooks"].([]any)
-	for _, hAny := range hs {
-		h, _ := hAny.(map[string]any)
-		if h == nil || h["type"] != "command" || hookCommandKindOf(h["command"], cmd) != hookDejas {
-			continue
-		}
-		if t, ok := h["timeout"].(float64); !ok || t > float64(limit) {
-			h["timeout"] = limit
-		}
-	}
-}
-
-// adoptCodexHookEntry rewrites the command and status message of an entry deja
-// already owns.
-func adoptCodexHookEntry(entry map[string]any, cmd, event string) {
-	hs, _ := entry["hooks"].([]any)
-	for _, hAny := range hs {
-		h, _ := hAny.(map[string]any)
-		// hookDejas, not "deja runs in here somewhere": a line the reader
-		// wrote around our hook is theirs, and rewriting it throws away the
-		// rest of what it does (#2477).
-		if h == nil || h["type"] != "command" || hookCommandKindOf(h["command"], cmd) != hookDejas {
-			continue
-		}
-		h["command"] = cmd
-		if msg := hookStatusMessage(event); msg != "" {
-			h["statusMessage"] = msg
-		}
-	}
+	return installResult{Path: path, Action: wres.Action}, err
 }
 
 // entryHasCommand matches on the trailing subcommand rather than the whole
@@ -343,136 +244,34 @@ func installSettingsHookCmd(path, event, matcher string, timeout int, cmd string
 // old, dead entry keeps firing next to the new one for everyone who installed
 // before.
 func installSettingsHookRetiring(path, event, matcher string, timeout int, cmd string, uninstall bool, retire map[string]string) (installResult, error) {
-	old, err := readConfig(path)
-	if err != nil {
-		return installResult{}, err
-	}
-	var root map[string]any
-	// A settings file carrying comments cannot be rewritten without losing
-	// them, and a hook entry is an element in an event array rather than a key
-	// in an object, so the text path the MCP writers take does not reach here
-	// (#2744). What it can do is answer honestly: read the file with its
-	// comments blanked, and when there is nothing of deja's to change, say
-	// unchanged rather than refuse a file it was never going to touch.
-	jsonc := configIsJSONC(old)
-	source := old
-	if jsonc {
-		source = []byte(jsoncToJSON(string(old)))
-	}
-	if len(bytes.TrimSpace(source)) == 0 {
-		root = map[string]any{}
-	} else if uerr := json.Unmarshal(source, &root); uerr != nil {
-		return installResult{}, configParseError(path, uerr)
-	}
-	before := ""
-	if jsonc {
-		b, merr := json.Marshal(root)
-		if merr != nil {
-			return installResult{}, merr
-		}
-		before = string(b)
-	}
-	hooks, _ := root["hooks"].(map[string]any)
-	if hooks == nil {
-		hooks = map[string]any{}
-		root["hooks"] = hooks
-	}
-	for name, sub := range retire {
-		if name == event && sub == "" {
-			continue
-		}
-		old, _ := hooks[name].([]any)
-		var survivors []any
-		for _, entryAny := range old {
-			entry, _ := entryAny.(map[string]any)
-			if entry != nil && sub == "" && dejaHookEntry(entry) {
+	var filteredRetire map[string]string
+	if len(retire) > 0 {
+		filteredRetire = make(map[string]string, len(retire))
+		for name, sub := range retire {
+			if name == event && sub == "" {
 				continue
 			}
-			if entry != nil && sub != "" && entryHasCommand(entry, "deja "+sub) {
-				continue
-			}
-			survivors = append(survivors, entryAny)
-		}
-		if len(survivors) == 0 {
-			delete(hooks, name)
-		} else {
-			hooks[name] = survivors
+			filteredRetire[name] = sub
 		}
 	}
-	entries, _ := hooks[event].([]any)
-	var kept []any
-	found := false
-	for _, entryAny := range entries {
-		entry, _ := entryAny.(map[string]any)
-		if entry != nil && entryHasCommand(entry, cmd) {
-			if uninstall {
-				continue
-			}
-			// Take the entry over rather than leaving it as it was: an install
-			// from a new binary path, or from a version that gained a field,
-			// has to update ours in place or the change never reaches anyone
-			// who already had it. Only the first, for the same reason as
-			// above: a doubled entry is a hook that runs twice.
-			if found {
-				continue
-			}
-			found = true
-			adoptCodexHookEntry(entry, cmd, event)
-			// The timeout too. Qwen and gemini read it in milliseconds, and the
-			// 10 an older deja wrote kills the hook ten milliseconds in — which
-			// looks exactly like a harness with no hooks. Adopting the entry
-			// without this left everyone who installed before the fix with a
-			// hook that could never answer.
-			adoptHookTimeout(entry, cmd, timeout)
-			if hs, _ := entry["hooks"].([]any); len(hs) == 1 {
-				adoptMatcher(entry, hs, matcher)
-			}
-		}
-		kept = append(kept, entryAny)
+	spec := &harness.JSONHooksSpec{
+		HarnessName: "settings-hooks",
+		Path:        path,
+		Mode:        harness.JSONHooksEventMap,
+		RefuseJSONC: true,
+		Retired:     filteredRetire,
+		Rules: []harness.JSONHookRule{{
+			Event:         event,
+			Matcher:       matcher,
+			Command:       cmd,
+			Timeout:       timeout,
+			AdoptTimeout:  true,
+			StatusMessage: hookStatusMessage(event),
+		}},
+		IsCommandMatch: matchDejaHookCmd,
+		IsAnyDejaHook:  dejaHookEntry,
 	}
-	if !uninstall && !found {
-		h := map[string]any{"type": "command", "command": cmd, "timeout": timeout}
-		// The same line the adopt path above sets. Setting it only there meant
-		// a first install wrote the entry without it and a second install
-		// added it, so whoever installed once never saw the status line their
-		// harness would have shown while the hook ran — and the two installs
-		// produced different files, which is its own trap.
-		if msg := hookStatusMessage(event); msg != "" {
-			h["statusMessage"] = msg
-		}
-		entry := map[string]any{"hooks": []any{h}}
-		if matcher != "" {
-			entry["matcher"] = matcher
-		}
-		kept = append(kept, entry)
-	}
-	if len(kept) == 0 {
-		delete(hooks, event)
-	} else {
-		hooks[event] = kept
-	}
-	if len(hooks) == 0 {
-		delete(root, "hooks")
-	}
-	if jsonc {
-		after, merr := json.Marshal(root)
-		if merr != nil {
-			return installResult{}, merr
-		}
-		if string(after) == before {
-			// Nothing of deja's here either way: leave the reader's comments
-			// where they are and report the truth.
-			return installResult{Path: path, Action: "unchanged"}, nil
-		}
-		return installResult{}, fmt.Errorf("%s: deja cannot edit hooks in a file that carries comments — add or remove the hook by hand, or take the comments out", path)
-	}
-	next, err := marshalConfigLike(old, root)
-	if err != nil {
-		return installResult{}, err
-	}
-	next = append(next, '\n')
-	a, err := writeIfChanged(path, old, next)
-	return installResult{Path: path, Action: a}, err
+	return runJSONHooksSpec(spec, uninstall)
 }
 
 // kimiHookMarker identifies our block in a config the user also edits by
@@ -506,18 +305,9 @@ func installKimiAuto(exe string, uninstall bool) (installResult, error) {
 
 // kimiHooksUpdate is installKimiAuto without the write.
 func kimiHooksUpdate(path, exe string, uninstall bool) (old, next []byte, err error) {
-	old, err = readConfig(path)
-	if err != nil {
-		return nil, nil, err
-	}
+	ops, _, _ := newCmdHarnessOps(false)
+	var block []string
 	if !uninstall {
-		if err := tomlInlineKey(lfText(old), "[[hooks]]"); err != nil {
-			return nil, nil, configParseError(path, err)
-		}
-	}
-	s := strings.TrimRight(removeKimiHookBlock(removeUnmarkedKimiDejaHooks(lfText(old), exe)), "\n")
-	if !uninstall {
-		var block []string
 		for _, h := range kimiHooks {
 			c := hookRun(exe, h.args...)
 			if h.matcher == "" {
@@ -526,14 +316,27 @@ func kimiHooksUpdate(path, exe string, uninstall bool) (old, next []byte, err er
 				block = append(block, kimiHookEntryMatching(h.event, h.matcher, c))
 			}
 		}
-		if s != "" {
-			s += "\n\n"
-		}
-		s += strings.Join(block, "\n")
-	} else if s != "" {
-		s += "\n"
 	}
-	return old, []byte(s), nil
+	spec := &harness.MarkedBlockSpec{
+		HarnessName:  "kimi-hooks",
+		Path:         path,
+		LineMarker:   kimiHookMarker,
+		TableHeader:  "[[hooks]]",
+		StopPrefixes: []string{"[", "#"},
+		Block:        strings.Join(block, "\n"),
+		StripExtra:   func(doc string) string { return removeUnmarkedKimiDejaHooks(doc, exe) },
+		PreValidateWire: func(doc string) error {
+			return tomlInlineKey(doc, "[[hooks]]")
+		},
+		Ops: ops,
+	}
+	if uninstall {
+		var u []byte
+		old, u, _, err = spec.PlanUnwire()
+		return old, u, err
+	}
+	old, next, _, err = spec.PlanWire()
+	return old, next, err
 }
 
 // kimiHooks is what kimi-auto wires into config.toml.
@@ -731,32 +534,11 @@ func kimiHookEntryMatching(event, matcher, command string) string {
 // removeKimiHookBlock drops our marked entry and nothing else: the next table
 // header ends it, so a hand-written [[hooks]] below survives.
 func removeKimiHookBlock(s string) string {
-	lines := strings.Split(s, "\n")
-	var out []string
-	for i := 0; i < len(lines); i++ {
-		if strings.TrimSpace(lines[i]) != kimiHookMarker {
-			out = append(out, lines[i])
-			continue
-		}
-		i++ // skip the marker
-		if i < len(lines) && strings.HasPrefix(strings.TrimSpace(lines[i]), "[[hooks]]") {
-			i++
-		}
-		// deja's block ends at the next table header or the next comment. It
-		// writes no comments inside its own block, so a `#` line is always
-		// someone else's — running past one deleted the note a user had
-		// written above their next hook, and swallowed the marker of a second
-		// deja block, leaving that block behind unmarked and running (#1699).
-		for i < len(lines) {
-			t := strings.TrimSpace(lines[i])
-			if strings.HasPrefix(t, "[") || strings.HasPrefix(t, "#") {
-				break
-			}
-			i++
-		}
-		i-- // the loop's own i++ steps onto the next table header
-	}
-	return strings.TrimRight(strings.Join(out, "\n"), "\n") + "\n"
+	return (&harness.MarkedBlockSpec{
+		LineMarker:   kimiHookMarker,
+		TableHeader:  "[[hooks]]",
+		StopPrefixes: []string{"[", "#"},
+	}).StripLines(s)
 }
 
 // dejaHookEntry reports whether a settings.json hook entry runs deja. Used to
@@ -770,7 +552,7 @@ func dejaHookEntry(entry map[string]any) bool {
 		// whatever the old binary called.
 		// Both tool subcommands are spelled out: the match wants the whole
 		// token, so "hook-tool" does not find "hook-tool-after".
-		for _, sub := range []string{"hook-context", "hook-prompt", "hook-precompact", "hook-goose", "hook-antigravity", "hook-codewhale",
+		for _, sub := range []string{"hook-context", "hook-ext", "hook-prompt", "hook-precompact", "hook-goose", "hook-antigravity", "hook-codewhale",
 			"hook-tool", "hook-tool-after", "hook-spawn", "hook-session-end"} {
 			if isDejaHookCommand(cmd, "deja "+sub) {
 				return true

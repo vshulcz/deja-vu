@@ -117,8 +117,13 @@ func cmdHookPrecompact(dir string, rest []string) error {
 // payload does not name one: Kimi's PreCompact carries only the session id, and
 // the hook entry is the one place that knows whose session it is.
 func runHookPrecompactFor(dir, harness string) {
+	runHookPrecompactWith(dir, os.Stdin, harness)
+}
+
+// runHookPrecompactWith runs precompact handling reading payload bytes from stdin.
+func runHookPrecompactWith(dir string, stdin io.Reader, harness string) {
 	var input precompactHookInput
-	_ = json.Unmarshal(readHookStdin(), &input)
+	_ = json.Unmarshal(readHookPayloadFrom(stdin), &input)
 	input.adopt()
 	if input.Harness == "" {
 		input.Harness = harness
@@ -589,6 +594,20 @@ func indexNeedsRebuild(dir string) bool {
 // harness that has no session-start channel and has to carry the digest on its
 // per-prompt hook.
 func runHookContextMode(dir string, plain, once bool) error {
+	return runHookContextWith(dir, os.Stdin, os.Stdout, plain, once)
+}
+
+func readHookPayloadFrom(stdin io.Reader) []byte {
+	if stdin == nil || stdin == os.Stdin {
+		return readHookStdin()
+	}
+	return readHookPayload(stdin, hookStdinWait)
+}
+
+func runHookContextWith(dir string, stdin io.Reader, stdout io.Writer, plain, once bool) error {
+	if stdout == nil {
+		stdout = os.Stdout
+	}
 	// A session start is the one moment deja is guaranteed to run on every
 	// harness, which makes it the only reliable place to repair wiring left
 	// behind by an older binary. It costs one small file read when nothing
@@ -651,7 +670,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// cannot decode carries the session this injection went to, and losing it
 	// without a word left the audit log unable to tell that case from a host
 	// that sent nothing at all (#2161).
-	payload := readHookStdin()
+	payload := readHookPayloadFrom(stdin)
 	unreadable := len(bytes.TrimSpace(payload)) > 0 && json.Unmarshal(payload, &input) != nil
 	adoptCopilotHost(payload)
 	adoptCursorHost(payload)
@@ -706,7 +725,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// in parallel: both found the packet undelivered and it arrived twice. The
 	// prompt hook carries it there.
 	if !once {
-		if delivered, err := emitCompactionRecoveryLocked(seenTx, dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), eventName, shape, os.Stdout); delivered {
+		if delivered, err := emitCompactionRecoveryLocked(seenTx, dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), eventName, shape, stdout); delivered {
 			return err
 		}
 	}
@@ -789,9 +808,9 @@ func runHookContextMode(dir string, plain, once bool) error {
 	)
 	if digest == "" {
 		if parentBrief == "" {
-			return hookContextWithoutDigest(seenTx, dir, rewired, unreadable, plain, eventName, input.SessionID, withheld)
+			return hookContextWithoutDigest(seenTx, dir, stdout, rewired, unreadable, plain, eventName, input.SessionID, withheld)
 		}
-		emitParentBriefWithoutDigest(dir, parentBrief, eventName, plain)
+		emitParentBriefWithoutDigest(dir, stdout, parentBrief, eventName, plain)
 		return nil
 	}
 	// One actionable line so injected memory leads somewhere: models that see
@@ -826,7 +845,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 		seenTx.RecordIDs(sessionStartKeyPrefix+input.SessionID, onceDigestMarker)
 	}
 	if plain {
-		fmt.Fprintln(os.Stdout, digest)
+		fmt.Fprintln(stdout, digest)
 		return nil
 	}
 	var resp sessionStartHookResponse
@@ -844,7 +863,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// (#2697) — the silence #927 fixed on the environment-facts path, reached
 	// from the other side.
 	resp.SystemMessage = appendSessionStartSystemNotes(dir, rewired, resp.SystemMessage)
-	emitHookResponse(resp)
+	emitHookResponseTo(stdout, resp)
 	return nil
 }
 
@@ -887,20 +906,20 @@ func resolveContextSubagentBrief(dir, source, sessionID, parentSessionID, transc
 	return coordSubagentBriefForStart(dir, sessionID, resolvedParent, parentTranscript, ctxCWD)
 }
 
-func emitParentBriefWithoutDigest(dir, parentBrief, eventName string, plain bool) {
+func emitParentBriefWithoutDigest(dir string, stdout io.Writer, parentBrief, eventName string, plain bool) {
 	combined := parentBrief
 	if env, _ := environmentBlockFrom(dir, policy.ActivationAuto); env != "" {
 		combined += "\n\n" + env
 	}
 	out := frameRecall(combined)
 	if plain {
-		fmt.Fprintln(os.Stdout, out)
+		fmt.Fprintln(stdout, out)
 		return
 	}
 	var resp sessionStartHookResponse
 	resp.HookSpecificOutput.HookEventName = eventName
 	resp.HookSpecificOutput.AdditionalContext = out
-	emitHookResponse(resp)
+	emitHookResponseTo(stdout, resp)
 }
 
 func formatSessionStartLead(dir, source, sessionID, ctxCWD string, shell bool) string {
@@ -949,7 +968,7 @@ func appendSessionStartSystemNotes(dir string, rewired []string, msg string) str
 
 // hookContextWithoutDigest answers a session start that found no session from
 // this project: the machine's environment block, or a word about the build.
-func hookContextWithoutDigest(seenTx *hookengine.SeenTx, dir string, rewired []string, unreadable, plain bool, eventName, sessionID string, withheld int) error {
+func hookContextWithoutDigest(seenTx *hookengine.SeenTx, dir string, stdout io.Writer, rewired []string, unreadable, plain bool, eventName, sessionID string, withheld int) error {
 	// No session from this project, which is the usual state in a new
 	// checkout — and exactly where knowing what this machine is missing
 	// helps most. The block is about the machine, not the project, so it
@@ -970,7 +989,7 @@ func hookContextWithoutDigest(seenTx *hookengine.SeenTx, dir string, rewired []s
 			seenTx.RecordIDs(sessionStartKeyPrefix+sessionID, onceDigestMarker)
 		}
 		if plain {
-			fmt.Fprintln(os.Stdout, out)
+			fmt.Fprintln(stdout, out)
 			return nil
 		}
 		var resp sessionStartHookResponse
@@ -986,7 +1005,7 @@ func hookContextWithoutDigest(seenTx *hookengine.SeenTx, dir string, rewired []s
 			// like (#3065).
 			resp.SystemMessage = joinNotes(resp.SystemMessage, humanNotes(dir))
 		}
-		emitHookResponse(resp)
+		emitHookResponseTo(stdout, resp)
 		return nil
 	}
 	// A first build (or one forced by a new index format) is running in
@@ -1018,7 +1037,7 @@ func hookContextWithoutDigest(seenTx *hookengine.SeenTx, dir string, rewired []s
 			var resp sessionStartHookResponse
 			resp.HookSpecificOutput.HookEventName = eventName
 			resp.SystemMessage = line
-			emitHookResponse(resp)
+			emitHookResponseTo(stdout, resp)
 		}
 	}
 	return nil

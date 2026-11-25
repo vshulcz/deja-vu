@@ -411,3 +411,41 @@ func scanDoctorTOMLKeysFallback(text string) []string {
 	sort.Strings(out)
 	return out
 }
+
+func runYAMLSectionSpec(spec *harness.YAMLSectionSpec, uninstall bool) (installResult, error) {
+	if spec.Ops == nil {
+		ops, _, _ := newCmdHarnessOps(false)
+		spec.Ops = ops
+	}
+	if uninstall {
+		ures, err := spec.Unwire()
+		if err != nil {
+			return installResult{}, err
+		}
+		return installResult{Path: spec.Path, Action: ures.Action, Note: ures.Note}, nil
+	}
+	wres, err := spec.Wire()
+	if err != nil {
+		return installResult{}, err
+	}
+	return installResult{Path: spec.Path, Action: wres.Action, Note: wres.Note}, nil
+}
+
+func runJSONHooksSpec(spec *harness.JSONHooksSpec, uninstall bool) (installResult, error) {
+	if spec.Ops == nil {
+		ops, _, _ := newCmdHarnessOps(false)
+		spec.Ops = ops
+	}
+	if uninstall {
+		ures, err := spec.Unwire()
+		if err != nil {
+			return installResult{}, err
+		}
+		return installResult{Path: spec.Path, Action: ures.Action, Note: ures.Note}, nil
+	}
+	wres, err := spec.Wire()
+	if err != nil {
+		return installResult{}, err
+	}
+	return installResult{Path: spec.Path, Action: wres.Action, Note: wres.Note}, nil
+}
