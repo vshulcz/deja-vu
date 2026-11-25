@@ -351,7 +351,7 @@ func compactionOnlyManifest(dir string) (Manifest, bool) {
 	if len(merged) == 0 {
 		return Manifest{}, false
 	}
-	if _, err := os.Stat(filepath.Join(dir, "sessions.gob")); !errors.Is(err, fs.ErrNotExist) {
+	if _, err := statSessionsFile(dir); !errors.Is(err, fs.ErrNotExist) {
 		return Manifest{}, false
 	}
 	return Manifest{Version: 0, Compactions: merged, Sessions: map[string]SessionMeta{}}, true

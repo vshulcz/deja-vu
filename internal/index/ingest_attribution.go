@@ -594,7 +594,7 @@ func rereadsWholeSessions(p string) bool {
 		// it, and adding that to what the index held doubled the turns. Its
 		// counts start over with each pass, the goose trade above.
 		return true
-	case "grok", "zed", "hermes", "openclaw", "crush", "claude", "omnigent", "orca":
+	case "grok", "zed", "hermes", "openclaw", "crush", "claude", "omnigent", "orca", "kiro", "devin":
 		// The same shape: each asks for the sessions touched since the stamp
 		// and hands them back whole, so what comes back replaces what the
 		// index holds for that key rather than adding to it (#2075). The
@@ -663,6 +663,10 @@ func resolveStoreHarness(p string) string {
 		return "goose"
 	case "openclaw-db":
 		return "openclaw"
+	case "kiro-db":
+		return "kiro"
+	case "devin":
+		return "devin"
 	}
 	return ""
 }
@@ -765,6 +769,18 @@ func resolveStorePaths() map[string]string {
 		sources.ZedDB():      "zed",
 		sources.OmnigentDB(): "omnigent",
 		sources.OrcaDB():     "orca",
+	}
+	for _, db := range []struct {
+		path    string
+		harness string
+	}{
+		{sources.KiroDB(), "kiro"},
+		{sources.DevinSessionsDB(), "devin"},
+		{sources.DevinLegacySessionsDB(), "devin"},
+	} {
+		if db.path != "" {
+			out[db.path] = db.harness
+		}
 	}
 	for _, db := range sources.HermesDBs() {
 		out[db] = "hermes"

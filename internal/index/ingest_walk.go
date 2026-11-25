@@ -24,25 +24,8 @@ func sameFile(a, b FileState) bool {
 	return a.Path == b.Path && a.Size == b.Size && a.MTime == b.MTime &&
 		a.MetadataSize == b.MetadataSize && a.MetadataMTime == b.MetadataMTime &&
 		a.CWDSize == b.CWDSize && a.CWDMTime == b.CWDMTime &&
-		a.WALSize == b.WALSize && a.WALMTime == b.WALMTime
-}
-
-// walStat is the size and mtime of a SQLite store's write-ahead log, zero for
-// a store without one and for anything that is not a database. Hermes
-// checkpoints every 50 writes of one process, so a few short sessions live in
-// state.db-wal alone, and a walk that statted state.db called them unchanged
-// (#5140).
-func walStat(p string) (size, stamp int64) {
-	switch strings.ToLower(filepath.Ext(p)) {
-	case ".db", ".sqlite", ".sqlite3", ".vscdb":
-	default:
-		return 0, 0
-	}
-	fi, err := os.Lstat(p + "-wal")
-	if err != nil || !fi.Mode().IsRegular() {
-		return 0, 0
-	}
-	return fi.Size(), fi.ModTime().UnixNano()
+		a.WALSize == b.WALSize && a.WALMTime == b.WALMTime &&
+		a.SHMSize == b.SHMSize && a.SHMMTime == b.SHMMTime
 }
 
 // kindForPath returns the registry FileKind whose Match accepts p.
@@ -120,55 +103,7 @@ func harnessForPath(p string) string {
 // (grok, hermes, zed) read their store whole on every pass, for the life of
 // the index (#2075).
 func setDatabaseStoreWatermarks(files map[string]FileState, sessions map[string]SessionMeta) {
-	for h, db := range opencodeSchemaDBs {
-		setStoreLastUpdated(files, sessions, h, db())
-	}
-	setStoreLastUpdated(files, sessions, "goose", sources.GooseDB())
-	// grok's database had a since-the-watermark parser in the registry and
-	// nothing ever stamped it, so every pass read the store whole — the pass
-	// with one new line cost what reading everything costs (#2075).
-	//
-	// Safe to stamp because ParseGrokDBSince selects messages rather than
-	// sessions and normalises both sides with a millisecond backoff (#2150),
-	// which is the cursor shape. hermes compares whole seconds
-	// with a strict >, and zed returns whole threads; each needs its own fix
-	// before it can be stamped, so neither is here.
-	setStoreLastUpdated(files, sessions, "grok", sources.GrokDB())
-	// hermes, once its reader stopped dropping the watermark's own second
-	// (#2075). Several stores on one machine: current builds keep one at the
-	// root and older ones shard per profile, and each is stamped with its own
-	// newest — stamping them alike would give a quiet profile the busy one's
-	// time (#2071).
-	for _, db := range sources.HermesDBs() {
-		setStoreLastUpdated(files, sessions, "hermes", db)
-	}
-	// zed, whose cursor selects threads rather than messages: a continued
-	// thread comes back whole, so it joins rereadsWholeSessions below in the
-	// same change — the goose shape, not the cursor one (#2075).
-	setStoreLastUpdated(files, sessions, "zed", sources.ZedDB())
-	for _, db := range sources.CursorDBs() {
-		setStoreLastUpdated(files, sessions, "cursor", db)
-	}
-	for _, db := range sources.HermesDBs() {
-		setStoreLastUpdated(files, sessions, "hermes", db)
-	}
-	for _, db := range sources.OpenClawAgentDBs() {
-		setStoreLastUpdated(files, sessions, "openclaw", db)
-	}
-	// crush keeps one store per project and was never stamped, so one new
-	// turn re-read every session in it: 3000 replaced, 8 s (#4381). Its
-	// cursor selects sessions, so it is in rereadsWholeSessions too.
-	for _, db := range sources.CrushDBs() {
-		setStoreLastUpdated(files, sessions, "crush", db)
-	}
-	for _, db := range sources.TeleAgentSessionFiles() {
-		setStoreLastUpdated(files, sessions, "teleagent", db)
-	}
-	if cm := sources.ClaudeMemDBPath(); cm != "" {
-		setStoreLastUpdated(files, sessions, "claude", cm)
-	}
-	setStoreLastUpdated(files, sessions, "omnigent", sources.OmnigentDB())
-	setStoreLastUpdated(files, sessions, "orca", sources.OrcaDB())
+	stampDatabaseStores(files, sessions)
 }
 
 // sessionInStore reports whether a row came from the store being stamped.
@@ -719,7 +654,11 @@ func walkFileStateIn(reg []sources.Harness, p string, fi os.FileInfo, old map[st
 	if ok && k.Sidecar != nil {
 		fs.MetadataSize, fs.MetadataMTime = k.Sidecar(p)
 	}
-	fs.WALSize, fs.WALMTime = walStat(p)
+	if (ok && k.IsDBBacked()) || hasSQLiteExt(p) {
+		wm := readSQLiteSidecars(p)
+		fs.WALSize, fs.WALMTime = wm.WALSize, wm.WALMTime
+		fs.SHMSize, fs.SHMMTime = wm.SHMSize, wm.SHMMTime
+	}
 	// The kind's name is what harnessForPath answers for a path it matched;
 	// only a path no kind claims goes on to its probe names.
 	harness := k.Name

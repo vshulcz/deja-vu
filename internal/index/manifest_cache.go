@@ -51,7 +51,7 @@ func readManifestCached(dir string) (Manifest, error) {
 	if err != nil {
 		return readManifest(dir)
 	}
-	si, err := os.Stat(filepath.Join(dir, "sessions.gob"))
+	si, err := statSessionsFile(dir)
 	if err != nil {
 		return readManifest(dir)
 	}
@@ -111,9 +111,9 @@ func manifestGeneration(dir string) os.FileInfo {
 	return fi
 }
 
-// sessionsGeneration is manifestGeneration for sessions.gob.
+// sessionsGeneration is manifestGeneration for the sessions catalog.
 func sessionsGeneration(dir string) os.FileInfo {
-	fi, err := os.Stat(filepath.Join(dir, "sessions.gob"))
+	fi, err := statSessionsFile(dir)
 	if err != nil {
 		return nil
 	}

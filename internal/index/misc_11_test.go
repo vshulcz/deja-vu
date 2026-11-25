@@ -2760,7 +2760,7 @@ func TestZstdMissingLeavesIndexAlone(t *testing.T) {
 		if manifest, err = os.ReadFile(filepath.Join(idx, "manifest.gob")); err != nil {
 			t.Fatal(err)
 		}
-		if sessions, err = os.ReadFile(filepath.Join(idx, "sessions.gob")); err != nil {
+		if sessions, err = os.ReadFile(filepath.Join(idx, "sessions.bin")); err != nil {
 			t.Fatal(err)
 		}
 		return manifest, sessions
@@ -2774,7 +2774,7 @@ func TestZstdMissingLeavesIndexAlone(t *testing.T) {
 		t.Error("unchanged pass rewrote manifest.gob")
 	}
 	if !bytes.Equal(sessionsBefore, sessionsAfter) {
-		t.Error("unchanged pass rewrote sessions.gob")
+		t.Error("unchanged pass rewrote sessions.bin")
 	}
 }
 
