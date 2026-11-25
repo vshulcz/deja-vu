@@ -34,7 +34,7 @@ const (
 
 // rulesHarnesses are the harnesses whose global rules file deja knows, in the
 // order `deja rules` lists them.
-var rulesHarnesses = []string{"claude-code", "codex", "opencode", "gemini", "qwen", "kimi", "grok", "goose", "copilot", "vscode", "cline", "kilocode", "mimo", "omnigent", "orca", "zed", "antigravity", "cherrystudio", "hermes", "aider", "continue", "trae", "trae-ide", "pi", "omp", "senpi", "gjc", "prime", "kimchi", "codewhale", "junie", "crush", "codebuddy", "workbuddy", "commandcode", "kiro", "roo", "zcode", "amp", "cursor", "windsurf", "deepseek", "openclaw", "reasonix", "muse", "devin", "ante"}
+var rulesHarnesses = []string{"claude-code", "codex", "opencode", "gemini", "qwen", "gigacode", "kimi", "grok", "goose", "copilot", "vscode", "cline", "kilocode", "mimo", "omnigent", "orca", "zed", "antigravity", "cherrystudio", "hermes", "aider", "continue", "trae", "trae-ide", "pi", "omp", "senpi", "gjc", "prime", "kimchi", "codewhale", "junie", "crush", "codebuddy", "workbuddy", "commandcode", "kiro", "roo", "zcode", "amp", "cursor", "windsurf", "deepseek", "openclaw", "reasonix", "muse", "devin", "ante"}
 
 // rulesPath is the file a harness reads its global rules from, or "" when deja
 // does not know one. Only paths something already showed reach the model —
@@ -126,6 +126,8 @@ func rulesFileFor(harness string) rulesFile {
 		return sharedRules(filepath.Join(sources.GeminiHome(), "GEMINI.md"))
 	case "qwen":
 		return sharedRules(filepath.Join(sources.QwenConfigDir(), "QWEN.md"))
+	case "gigacode":
+		return sharedRules(filepath.Join(sources.GigaCodeConfigDir(), "GIGACODE.md"))
 	case "kimi":
 		return sharedRules(filepath.Join(sources.KimiConfigDir(), "AGENTS.md"))
 	case "grok":

@@ -2,7 +2,7 @@
 
 [English](../README.md) | [简体中文](zh.md) | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | Deutsch | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-Claude-kompatibles Plugin-Paket für CodeWhale — stellt den `deja`-MCP-Server (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`), den `deja-history`-Skill und `/deja` über Sessions aus 52 KI-Coding-Tools bereit.
+Claude-kompatibles Plugin-Paket für CodeWhale — stellt den `deja`-MCP-Server (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`), den `deja-history`-Skill und `/deja` über Sessions aus 53 KI-Coding-Tools bereit.
 
 ![deja-vu Demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -29,7 +29,7 @@ deja install codewhale-auto
 
 | Recall | Tokens | Indexierung & Suche |
 |---|---|---|
-| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 52 Coding-Agents hinweg |
+| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 53 Coding-Agents hinweg |
 
 ## Repository-Gedächtnis & Agenten-Übergabe
 

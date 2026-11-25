@@ -7,9 +7,9 @@
   </a>
 </p>
 
-<p align="center"><b>跨 52 个编程智能体的本地共享记忆、跨智能体交接与代码恢复。</b></p>
+<p align="center"><b>跨 53 个编程智能体的本地共享记忆、跨智能体交接与代码恢复。</b></p>
 
-<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 45 个智能体本来就把每次会话写在磁盘上。<br>
+<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes 以及另外 46 个智能体本来就把每次会话写在磁盘上。<br>
 deja 在本地索引全部历史，让智能体跨 <code>/compact</code> 保住上下文、用 <code>deja handoff</code> 中途换智能体接着做、用 <code>deja restore</code> 找回被覆盖的代码——无需 LLM，单个 Go 二进制。</p>
 
 <p align="center"><a href="../../README.md">English</a> | 简体中文 | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -135,7 +135,7 @@ skill 调用的是上面装好的 `deja` 二进制，自己不带。
 
 ## 能得到什么
 
-**在 Codex 里解决，Claude 记得。** 五十二个编程智能体把每一次对话都写进本地文件，
+**在 Codex 里解决，Claude 记得。** 五十三个编程智能体把每一次对话都写进本地文件，
 deja 把这些文件变成一层它们都能读的记忆。
 
 | | |
@@ -232,7 +232,7 @@ $ deja "jwt refresh token"
 细节见[压缩后自动恢复](../../docs/compaction.md)。
 
 Claude Code · Claw Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
-Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
+Grok Build · Hermes · Goose · Qwen Code · GigaCode CLI · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
 Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·

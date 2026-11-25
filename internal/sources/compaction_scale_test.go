@@ -158,6 +158,7 @@ func TestInteractiveHooksNeverCallUnboundedHarnessFiles(t *testing.T) {
 		"HermesSessionFiles":       true,
 		"GooseSessionFiles":        true,
 		"QwenSessionFiles":         true,
+		"GigaCodeSessionFiles":     true,
 		"QoderSessionFiles":        true,
 		"KimiSessionFiles":         true,
 		"ClineSessionFiles":        true,

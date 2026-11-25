@@ -580,7 +580,7 @@ stops the session. `deja install deepseek-auto` rewrites it.
 there — what an upgrade leaves behind, with every hook exiting 127.
 `switched_off` marks a `wired` row the harness has turned off, so it will not
 run the hook: Antigravity's plugin after `agy plugin disable deja`, the
-client's switch for every hook (`disableAllHooks` in claude-code and qwen,
+client's switch for every hook (`disableAllHooks` in claude-code, qwen, and gigacode,
 gemini's `hooksConfig.enabled`, codex's `[features] hooks`, openclaw's
 `hooks.internal.enabled`), or deja's extension or plugin disabled through the
 client (gemini, goose, pi, senpi, omp, gjc, cline, hermes, openclaw, dsh).
@@ -601,7 +601,7 @@ its entry names a deja binary that is no longer there, so the harness cannot
 start the server, and `switched_off` when the client will not start it: the
 entry is turned off (`"disabled": true`, opencode's `"enabled": false`, or
 `enabled: false` in goose, hermes, codex and grok, `disabled: true` on dsh's
-row), or a list or switch beside it says so — gemini and qwen `mcp.excluded`
+row), or a list or switch beside it says so — gemini, qwen, and gigacode `mcp.excluded`
 or an `mcp.allowed` without deja (gemini ignores an empty one), `gemini mcp
 disable`, copilot's `disabledMcpServers`, grok's `disabled_mcp_servers`, omp and gjc
 `disabledServers`, VS Code's `chat.mcp.access`, zcode's `features.mcp`,

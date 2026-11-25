@@ -5,7 +5,7 @@
 
 **[deja-vu](https://github.com/vshulcz/deja-vu)** 生態組件（**< 1 ms** SQLite FTS5 查詢 · **~4%** 索引體積佔用 · 索引階段 **0** LLM token）· [文件](https://vshulcz.github.io/deja-vu/) · [線上展示](https://vshulcz.github.io/deja-vu/view/) · [評測](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-直接在 Neovim 內檢索 Claude Code、Codex CLI、Cursor、opencode、Gemini CLI 與其他 47 款程式設計工具的歷史會話紀錄、執行行級 AI 會話溯源、找回錯誤修復方式，並產生跨代理接力摘要。
+直接在 Neovim 內檢索 Claude Code、Codex CLI、Cursor、opencode、Gemini CLI 與其他 48 款程式設計工具的歷史會話紀錄、執行行級 AI 會話溯源、找回錯誤修復方式，並產生跨代理接力摘要。
 
 ![deja-vu 示範](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -78,7 +78,7 @@ sections = {
 
 | 召回率 | Token 用量 | 索引與檢索耗時 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 52 個程式設計代理的檢索僅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 53 個程式設計代理的檢索僅 **0.7 ms** |
 
 ## 儲存庫記憶與跨代理接力
 

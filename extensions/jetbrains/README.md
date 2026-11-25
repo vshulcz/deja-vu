@@ -5,7 +5,7 @@ English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions
 
 Local cross-agent session recall, AI line blame, and handoff for IntelliJ IDEA, GoLand, PyCharm, WebStorm, RustRover, CLion, PhpStorm, and Rider (`2024.2+`).
 
-[deja-vu](https://github.com/vshulcz/deja-vu) indexes the session transcripts Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf, and 43 other coding agents write to disk — in a local BM25 index, with secrets redacted before output and no cloud service.
+[deja-vu](https://github.com/vshulcz/deja-vu) indexes the session transcripts Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf, and 44 other coding agents write to disk — in a local BM25 index, with secrets redacted before output and no cloud service.
 
 **[Documentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
@@ -14,7 +14,7 @@ Local cross-agent session recall, AI line blame, and handoff for IntelliJ IDEA, 
 ## Features
 
 - **Status bar widget**: Displays live `deja statusline` statistics for the active project on the right side of the IDE status bar. Clicking opens the `deja-vu` action popup.
-- **Search AI Sessions (`Tools → deja-vu → Search AI Sessions...`)**: Queries local sessions across all 52 supported coding agents (`deja search --json`) and opens the selected transcript in a read-only Markdown editor tab.
+- **Search AI Sessions (`Tools → deja-vu → Search AI Sessions...`)**: Queries local sessions across all 53 supported coding agents (`deja search --json`) and opens the selected transcript in a read-only Markdown editor tab.
 - **Recent AI Sessions (`Tools → deja-vu → Recent AI Sessions`)**: Lists the 50 most recent sessions on the machine (`deja last 50 --json`) with speed-search filtering.
 - **AI Blame Current Line (Editor context menu / `Tools → deja-vu → AI Blame Current Line`)**: Runs `deja blame <file>:<line> --json` (falling back to `<file>`) to open the AI session that wrote or modified the line under the caret.
 - **Copy Cross-Agent Handoff (`Tools → deja-vu → Copy Cross-Agent Handoff`)**: Runs `deja handoff` in the project root, copies the digest to the system clipboard, and opens it in a read-only Markdown tab.
@@ -54,7 +54,7 @@ The installable archive is written to `build/distributions/`.
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 52 coding agents |
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 53 coding agents |
 
 ## Repository memory & handoff
 

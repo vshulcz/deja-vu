@@ -203,7 +203,7 @@
 
 <h2>What panes share</h2>
 <ul>
-<li><b>Shared local index:</b> as soon as any harness writes a turn to disk, <code>deja</code> indexes it into <code>~/.cache/deja/index.db</code> (BM25 search with secret scrubbing) alongside all fifty-two supported agent formats.</li>
+<li><b>Shared local index:</b> as soon as any harness writes a turn to disk, <code>deja</code> indexes it into <code>~/.cache/deja/index.db</code> (BM25 search with secret scrubbing) alongside all fifty-three supported agent formats.</li>
 <li><b>Cross-harness handoffs:</b> when a Claude Code pane hits a wall or finishes a submodule and you open Codex in another pane, <code>deja handoff</code> and <code>SessionStart</code>/<code>UserPromptSubmit</code> hooks carry over settled decisions and recent commands (<a href="switch-agents-without-losing-context.html">session handoffs</a>).</li>
 <li><b>No duplicate mistakes across splits:</b> error resolutions recorded in one pane flow back via <code>fix</code> and per-file history in every other pane working on the same repo (<a href="parallel-sessions.html">parallel sessions</a>).</li>
 </ul>

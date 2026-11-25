@@ -210,11 +210,18 @@ var qwenHookWiring = []struct{ Event, Sub, Matcher string }{
 var qwenRetiredEvents = map[string]string{"PostToolUse": "hook-tool-after"}
 
 func installQwenAuto(exe string, uninstall bool) (installResult, error) {
+	return installQwenFamilyAuto(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall, qwenRetiredEvents)
+}
+
+func installGigaCodeAuto(exe string, uninstall bool) (installResult, error) {
+	return installQwenFamilyAuto(filepath.Join(sources.GigaCodeConfigDir(), "settings.json"), exe, uninstall, nil)
+}
+
+func installQwenFamilyAuto(path, exe string, uninstall bool, retire map[string]string) (installResult, error) {
 	exe = hookExeFor(exe, uninstall)
-	path := filepath.Join(sources.QwenConfigDir(), "settings.json")
 	var res installResult
 	for i, h := range qwenHookWiring {
-		r, err := installSettingsHookRetiring(path, h.Event, h.Matcher, 60000, hookRun(exe, h.Sub), uninstall, qwenRetiredEvents)
+		r, err := installSettingsHookRetiring(path, h.Event, h.Matcher, 60000, hookRun(exe, h.Sub), uninstall, retire)
 		if err != nil {
 			return installResult{}, err
 		}

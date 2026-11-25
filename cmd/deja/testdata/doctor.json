@@ -123,6 +123,15 @@
       "indexed_sessions": 0
     },
     {
+      "name": "gigacode",
+      "state": "missing",
+      "paths": [
+        "<tmp>/gigacode/projects"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "qoder",
       "state": "missing",
       "paths": [
@@ -529,6 +538,11 @@
       "path": "<tmp>/home/.qwen/settings.json"
     },
     {
+      "name": "gigacode",
+      "state": "config-missing",
+      "path": "<tmp>/home/.gigacode/settings.json"
+    },
+    {
       "name": "codebuddy",
       "state": "config-missing",
       "path": "<tmp>/home/.codebuddy/.mcp.json"
@@ -784,6 +798,11 @@
       "name": "qwen",
       "state": "missing",
       "path": "<tmp>/home/.qwen/settings.json"
+    },
+    {
+      "name": "gigacode",
+      "state": "missing",
+      "path": "<tmp>/home/.gigacode/settings.json"
     },
     {
       "name": "codebuddy",
@@ -1124,6 +1143,11 @@
     },
     {
       "name": "qwen",
+      "state": "missing",
+      "path": "<tmp>/home/.agents/skills/deja-history/SKILL.md"
+    },
+    {
+      "name": "gigacode",
       "state": "missing",
       "path": "<tmp>/home/.agents/skills/deja-history/SKILL.md"
     },

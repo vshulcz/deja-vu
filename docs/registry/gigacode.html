@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where GigaCode CLI stores its history — session format</title>
+<meta name="description" content="Where GigaCode CLI writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/gigacode.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where GigaCode CLI stores its history — session format">
+<meta property="og:description" content="Where GigaCode CLI writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/gigacode.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="noindex,follow">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where GigaCode CLI stores its history — session format">
+<meta name="twitter:description" content="Where GigaCode CLI writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where GigaCode CLI writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"GigaCode CLI session format","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/gigacode.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/gigacode.html","name":"GigaCode CLI session format","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="nav-cta" href="https://github.com/vshulcz/deja-vu"><span class="star-ic" aria-hidden="true">★</span>GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="amp.html">Amp</a><a href="ante.html">Ante</a><a href="antigravity.html">Antigravity</a><a href="cherrystudio.html">Cherry Studio</a><a href="claude-code.html">Claude Code</a><a href="clawcode.html">Claw Code</a><a href="cline.html">Cline</a><a href="codearts.html">CodeArts Desktop</a><a href="codebuddy.html">CodeBuddy Code</a><a href="codewhale.html">CodeWhale</a><a href="codex.html">Codex CLI</a><a href="commandcode.html">Command Code</a><a href="continue.html">Continue</a><a href="copilot.html">Copilot CLI</a><a href="crush.html">Crush</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="devin.html">Devin CLI</a><a href="doubao.html">Doubao</a><a href="gjc.html">gajae-code</a><a href="gemini.html">Gemini CLI</a><a href="gigacode.html" aria-current="page">GigaCode CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="jetbrains.html">JetBrains AI Assistant</a><a href="junie.html">Junie</a><a href="kilocode.html">Kilo Code</a><a href="kimchi.html">Kimchi Coding</a><a href="kimi.html">Kimi Code</a><a href="kiro.html">Kiro</a><a href="mimo.html">MiMo-Code</a><a href="mcode.html">MiniMax Code</a><a href="muse.html">Muse Code</a><a href="omnigent.html">Omnigent</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="orca.html">Orca</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qoder.html">Qoder</a><a href="qwen.html">Qwen Code</a><a href="reasonix.html">Reasonix</a><a href="roo.html">Roo Code</a><a href="senpi.html">Senpi</a><a href="teleagent.html">TeleAgent</a><a href="trae.html">TRAE CLI</a><a href="copilot-chat.html">VS Code Copilot Chat</a><a href="windsurf.html">Windsurf / Devin Desktop</a><a href="zcode.html">ZCode</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>GigaCode CLI session format</h1>
+<h2 id="store-and-files">Store and files</h2>
+<p>GigaCode CLI writes sessions below <code>${DEJA_GIGACODE_ROOT:-${GIGACODE_HOME:-~/.gigacode}}/projects/&lt;encoded-project&gt;/chats/*.jsonl</code>. The project directory uses the same slash-and-hyphen encoding as Claude Code and Qwen Code. The <code>chats/</code> directory is part of GigaCode&#39;s layout; only JSONL files directly inside it are session streams. A sub-agent&#39;s log, <code>subagents/&lt;session&gt;/agent-&lt;id&gt;.jsonl</code> in the same project directory, is read as a session of its own naming the parent session: the task, the files it changed and its last turns. <code>DEJA_INCLUDE_SUBAGENTS=1</code> takes the whole run and <code>=0</code> skips them.</p>
+<p>The GigaCode configuration directory defaults to <code>~/.gigacode</code> and honors <code>GIGACODE_HOME</code> for installer settings. <code>DEJA_GIGACODE_ROOT</code> relocates session reads only.</p>
+<h2 id="records">Records</h2>
+<p>Each line is a JSON object with <code>type</code>, <code>sessionId</code>, <code>timestamp</code>, and a <code>message</code> object. Message text is in <code>message.parts</code>; parts marked <code>thought: true</code> are reasoning and are excluded.</p>
+<pre><code class="language-json">{&#34;type&#34;:&#34;assistant&#34;,&#34;sessionId&#34;:&#34;session-7&#34;,&#34;timestamp&#34;:&#34;2026-11-25T09:00:01Z&#34;,&#34;message&#34;:{&#34;role&#34;:&#34;model&#34;,&#34;parts&#34;:[{&#34;text&#34;:&#34;The failing check is in parser.go.&#34;}]}}</code></pre>
+<p><code>message.role</code> <code>model</code> maps to <code>assistant</code> and <code>user</code> maps to <code>user</code>; when it is absent, the top-level <code>type</code> is used. Parts with text are joined with newlines. RFC 3339 and numeric Unix timestamps are accepted.</p>
+<p>Tool work sits in the same <code>parts</code> list as <code>functionCall</code> and <code>functionResponse</code>. Calls become command, file and edit records, and a <code>tool_result</code> record&#39;s <code>functionResponse</code> becomes tool output.</p>
+<h2 id="wiring">Wiring</h2>
+<ul>
+<li><strong>MCP</strong>: <code>deja install gigacode</code> adds <code>mcpServers.deja</code> to <code>${GIGACODE_HOME:-~/.gigacode}/settings.json</code>.</li>
+<li><strong>Skill</strong>: the shared <code>~/.agents/skills/deja-history/SKILL.md</code>. GigaCode lists skills under <code>/skills</code>, so the skill is also the command.</li>
+<li><strong>Rules</strong>: <code>deja rules sync</code> writes shared rules to <code>${GIGACODE_HOME:-~/.gigacode}/GIGACODE.md</code>.</li>
+<li><strong>Auto-recall</strong>: <code>deja install gigacode-auto</code> adds hooks to the same <code>settings.json</code>: <code>SessionStart</code> (digest), <code>UserPromptSubmit</code> (per-prompt recall), <code>PostToolUseFailure</code> on <code>run_shell_command</code> (the earlier fix for a failed command), <code>PostToolUse</code> on <code>read_file|edit|write_file</code> (the line deja keeps for that file), <code>PreCompact</code> and <code>SessionEnd</code> (the session you quit is back in the next one&#39;s MCP recall).</li>
+</ul>
+<h2 id="resume">Resume</h2>
+<p><code>gigacode -r &lt;id&gt;</code> reopens a session by id, and the id is the chat file&#39;s name —</p>
+<p>the same one deja indexes. The command has to run in the project directory, so</p>
+<p>deja takes that directory from the <code>cwd</code> the transcript records (when its</p>
+<p>encoded project folder matches), or from the encoded folder name for a</p>
+<p>transcript that records none, and prints <code>cd &lt;project&gt; &amp;&amp; gigacode -r &lt;id&gt;</code>.</p>
+<p>When the recorded directory is gone, or deja cannot tell which directory the</p>
+<p>session ran in, resume refuses and points at <code>deja show &lt;id&gt;</code>. On the screen</p>
+<p>bare <code>deja</code> opens, <code>r</code> runs the same command for the picked session and <code>o</code></p>
+<p>continues it in another agent.</p>
+<h2 id="status-line">Status line</h2>
+<p><code>deja install gigacode-auto</code> sets <code>ui.statusLine</code> in <code>settings.json</code> to a</p>
+<p>command with <code>refreshInterval: 1</code>. GigaCode pipes <code>session_id</code> and the workspace</p>
+<p>without a transcript path, so deja resolves the session by its id. A status line</p>
+<p>already set there is left alone.</p>
+<h2 id="known-quirks-and-drift">Known quirks and drift</h2>
+<ul>
+<li>JSONL can end in a partial line while GigaCode is writing. Malformed lines are skipped.</li>
+<li>System and other control records do not become messages.</li>
+<li>Project path encoding replaces every non-ASCII-alphanumeric rune with <code>-</code>, so paths with hyphens or non-ASCII characters depend on recorded <code>cwd</code> (verified on 26.11.141).</li>
+</ul>
+<p><strong>Last verified:</strong> 2026-11-25</p>
+
+<hr>
+<p>deja reads this format and 52 others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

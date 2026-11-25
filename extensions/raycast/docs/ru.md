@@ -6,7 +6,7 @@
 
 Часть **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** на LongMemEval-S) · [Документация](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Живое демо](https://vshulcz.github.io/deja-vu/view/) · [Бенчмарки](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-Поиск и продолжение сессий кодинг-агентов для Claude Code, Codex, Cursor, OpenCode, Gemini CLI и ещё 47 инструментов прямо из Raycast.
+Поиск и продолжение сессий кодинг-агентов для Claude Code, Codex, Cursor, OpenCode, Gemini CLI и ещё 48 инструментов прямо из Raycast.
 
 ![Демонстрация deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -33,7 +33,7 @@ brew install deja-vu && deja install --auto
 
 | Полнота (Recall) | Расход токенов | Индексация и поиск |
 |---|---|---|
-| **97.2% R@5** на LongMemEval-S (88.9% hit@1 на 470 вопросах) | **на 58% меньше токенов** (на повторных задачах) | **13.6 с** на индекс 19,195 сессий / **0.7 мс** на поиск по 52 кодинг-агентам |
+| **97.2% R@5** на LongMemEval-S (88.9% hit@1 на 470 вопросах) | **на 58% меньше токенов** (на повторных задачах) | **13.6 с** на индекс 19,195 сессий / **0.7 мс** на поиск по 53 кодинг-агентам |
 
 ## Память в репозитории и передача сессии (`handoff`)
 

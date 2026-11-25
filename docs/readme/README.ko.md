@@ -7,9 +7,9 @@
   </a>
 </p>
 
-<p align="center"><b>52개 코딩 에이전트를 아우르는 로컬 공유 기억, 에이전트 간 작업 인계, 코드 복구.</b></p>
+<p align="center"><b>53개 코딩 에이전트를 아우르는 로컬 공유 기억, 에이전트 간 작업 인계, 코드 복구.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes 등 52개 에이전트는 이미 모든 세션을 디스크에 저장합니다.<br>
+<p align="center">Claude Code, Codex, Cursor, OpenClaw, Gemini CLI, OpenCode, Hermes 등 53개 에이전트는 이미 모든 세션을 디스크에 저장합니다.<br>
 deja는 그 기록을 로컬에서 색인해 <code>/compact</code> 이후에도 컨텍스트를 유지하고, <code>deja handoff</code>로 작업을 인계하며, <code>deja restore</code>로 덮어쓴 코드를 복구합니다 — LLM 없이 단일 Go 바이너리로.</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | 한국어 | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -135,7 +135,7 @@ skill은 이미 설치된 `deja` 바이너리를 호출하며, 자체 바이너�
 
 ## 무엇을 얻나
 
-**Codex에서 해결하면 Claude가 기억합니다.** 쉰두 개의 코딩 에이전트가 모든 대화를 로컬 파일에 쓰고,
+**Codex에서 해결하면 Claude가 기억합니다.** 쉰세 개의 코딩 에이전트가 모든 대화를 로컬 파일에 쓰고,
 deja는 그 파일들을 모두가 읽을 수 있는 하나의 기억 계층으로 바꿉니다.
 
 | | |
@@ -246,7 +246,7 @@ $ deja "jwt refresh token"
 자세한 내용은 [압축 이후 자동 복구](../../docs/compaction.md)에 있습니다.
 
 Claude Code · Claw Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
-Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
+Grok Build · Hermes · Goose · Qwen Code · GigaCode CLI · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
 Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·

@@ -626,6 +626,7 @@ func TestHandoffCommandTable(t *testing.T) {
 		"opencode": {"opencode", "--prompt", "P"},
 		"gemini":   {"gemini", "-i", "P"},
 		"qwen":     {"qwen", "-i", "P"},
+		"gigacode": {"gigacode", "-i", "P"},
 		"aider":    {"aider", "--message", "P"},
 		"pi":       {"pi", "P"},
 		// Senpi's usage line takes the message as a trailing argument, the way

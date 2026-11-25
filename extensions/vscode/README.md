@@ -36,7 +36,7 @@ code --install-extension vshulcz.deja-status
 |---|---|
 | LongMemEval-S retrieval accuracy (470 cleaned questions) | **97.2% R@5**, **88.9% hit@1** |
 | Task token cost on repeated repository work | **58% fewer tokens**|
-| In-process lexical query latency | **0.7–0.8 ms** median across 52 coding agents |
+| In-process lexical query latency | **0.7–0.8 ms** median across 53 coding agents |
 | Day-zero indexing over 19,195 real sessions | **13.6 s**, zero API keys |
 
 ## Repository memory & handoff

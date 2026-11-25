@@ -332,7 +332,23 @@ var crushSessionID = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA
 // subagentNotReopened is the clients that have no command to reopen one of
 // their sub-agent runs on its own.
 var subagentNotReopened = map[string]bool{
-	"kimi": true, "qwen": true, "muse": true, "codebuddy": true, "devin": true, "gemini": true, "cursor": true,
+	"kimi": true, "qwen": true, "gigacode": true, "muse": true, "codebuddy": true, "devin": true, "gemini": true, "cursor": true,
+}
+
+func resumeQwenFamilySession(s model.Session, bin string, sessionDir func(string) (string, bool)) (string, string, error) {
+	// qwen/gigacode key sessions by the directory they ran in: run anywhere
+	// else, `<bin> -r <id>` answers "No saved session found".
+	short := digest.Short(s.ID)
+	dir, recorded := sessionDir(s.Path)
+	if recorded {
+		if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+			return "", "", fmt.Errorf("%s session %s ran in %s, which is gone, and `%s -r` finds a session only from there — `deja show %s` has the conversation", bin, short, dir, bin, short)
+		}
+	}
+	if dir == "" {
+		return "", "", fmt.Errorf("%s session %s: deja cannot tell which directory it ran in, and `%s -r` finds a session only from there — `deja show %s` has the conversation", bin, short, bin, short)
+	}
+	return dir, bin + " -r " + s.ID, nil
 }
 
 // resumeCommand maps a session to (workdir, command). workdir is empty when
@@ -375,7 +391,7 @@ func resumeCommand(s model.Session) (string, string, error) {
 // resumeHarnessCommand is the per-harness half of resumeCommand, once the
 // session is one deja can place in a command at all.
 //
-//nolint:gocyclo,gocognit,funlen // one case per harness, each its own resume rule
+//nolint:gocyclo,funlen // one case per harness, each its own resume rule
 func resumeHarnessCommand(s model.Session) (string, string, error) {
 	switch s.Harness {
 	case "claude":
@@ -715,21 +731,9 @@ func resumeHarnessCommand(s model.Session) (string, string, error) {
 		// session. Without it the recall was logged and never arrived (#4718).
 		return dir, "codebuddy -c -r " + s.ID, nil
 	case "qwen":
-		// qwen keys its sessions by the directory they ran in: run anywhere
-		// else, `qwen -r <id>` answers "No saved session found". Unlike
-		// opencode (#4201) there is no running it from elsewhere, so with the
-		// directory gone this refuses, as it does for a Cursor CLI chat (#4259).
-		short := digest.Short(s.ID)
-		dir, recorded := sources.QwenSessionDir(s.Path)
-		if recorded {
-			if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
-				return "", "", fmt.Errorf("qwen session %s ran in %s, which is gone, and `qwen -r` finds a session only from there — `deja show %s` has the conversation", short, dir, short)
-			}
-		}
-		if dir == "" {
-			return "", "", fmt.Errorf("qwen session %s: deja cannot tell which directory it ran in, and `qwen -r` finds a session only from there — `deja show %s` has the conversation", short, short)
-		}
-		return dir, "qwen -r " + s.ID, nil
+		return resumeQwenFamilySession(s, "qwen", sources.QwenSessionDir)
+	case "gigacode":
+		return resumeQwenFamilySession(s, "gigacode", sources.GigaCodeSessionDir)
 	case "openclaw":
 		key, err := sources.OpenClawSessionKey(s.Path, s.ID)
 		if err != nil {

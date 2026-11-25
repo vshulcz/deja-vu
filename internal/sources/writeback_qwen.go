@@ -14,20 +14,33 @@ import (
 // deja can resolve it.
 func init() {
 	registerWriteBack("qwen", qwenWriteBackRoots, renderQwen)
+	registerWriteBack("gigacode", gigaCodeWriteBackRoots, renderGigaCode)
 }
 
 func qwenWriteBackRoots() []string {
 	return []string{filepath.Join(QwenRoot(), "projects")}
 }
 
+func gigaCodeWriteBackRoots() []string {
+	return []string{filepath.Join(GigaCodeRoot(), "projects")}
+}
+
 func renderQwen(s model.Session, turns []model.Message) (string, []byte, error) {
+	return renderQwenFamily(s, turns, "Qwen Code", "qwen -r", QwenSessionDir)
+}
+
+func renderGigaCode(s model.Session, turns []model.Message) (string, []byte, error) {
+	return renderQwenFamily(s, turns, "GigaCode", "gigacode -r", GigaCodeSessionDir)
+}
+
+func renderQwenFamily(s model.Session, turns []model.Message, displayName, resumeCmd string, sessionDir func(string) (string, bool)) (string, []byte, error) {
 	if s.Kind == "subagent" {
-		return "", nil, &WriteBackRefusal{Harness: s.Harness, Reason: "session is a sub-agent run, which Qwen Code does not reopen on its own"}
+		return "", nil, &WriteBackRefusal{Harness: s.Harness, Reason: "session is a sub-agent run, which " + displayName + " does not reopen on its own"}
 	}
 	if filepath.Base(filepath.Dir(s.Path)) != "chats" || !strings.HasSuffix(s.Path, ".jsonl") || strings.TrimSuffix(filepath.Base(s.Path), ".jsonl") != s.ID {
-		return "", nil, &WriteBackRefusal{Harness: s.Harness, Reason: "the index has no chats/<id>.jsonl path for this session, which is where `qwen -r` looks"}
+		return "", nil, &WriteBackRefusal{Harness: s.Harness, Reason: "the index has no chats/<id>.jsonl path for this session, which is where `" + resumeCmd + "` looks"}
 	}
-	cwd, _ := QwenSessionDir(s.Path)
+	cwd, _ := sessionDir(s.Path)
 	var lines []any
 	parent := any(nil)
 	for i, m := range turns {

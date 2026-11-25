@@ -34,6 +34,7 @@ func TestMain(m *testing.M) {
 		"CLAUDE_CONFIG_DIR":       "",
 		"CODEX_HOME":              "",
 		"GEMINI_CLI_HOME":         "",
+		"GIGACODE_HOME":           "",
 		"CURSOR_CONFIG_DIR":       "",
 		"VSCODE_EXTENSIONS":       "",
 		"AIDER_CHAT_HISTORY_FILE": "",
@@ -80,6 +81,7 @@ func TestMain(m *testing.M) {
 		"DEJA_ANTIGRAVITY_ROOT": filepath.Join(root, "antigravity"),
 		"DEJA_GROK_ROOT":        filepath.Join(root, "grok"),
 		"DEJA_QWEN_ROOT":        filepath.Join(root, "qwen"),
+		"DEJA_GIGACODE_ROOT":    filepath.Join(root, "gigacode"),
 		// Claude Code's managed settings win over the user's, and a machine
 		// with a real file there would set cleanupPeriodDays for every test.
 		"DEJA_CLAUDE_MANAGED_SETTINGS": filepath.Join(root, "no-managed-settings.json"),
@@ -103,18 +105,20 @@ func TestMain(m *testing.M) {
 		"DEJA_TUI":        "",
 		// Active-harness environment variables read by `deja status` so tests
 		// running inside an agent session do not report the ambient host.
-		"ANTIGRAVITY_AGENT":      "",
-		"CLAUDECODE":             "",
-		"CLAUDE_CODE_ENTRYPOINT": "",
-		"CODEX_CI":               "",
-		"CODEX_MANAGED_BY_NPM":   "",
-		"CODEX_SANDBOX":          "",
-		"CODEX_THREAD_ID":        "",
-		"CURSOR_AGENT":           "",
-		"GEMINI_CLI":             "",
-		"KIMI_CLI":               "",
-		"OPENCODE":               "",
-		"QWEN_CODE":              "",
+		"ANTIGRAVITY_AGENT":        "",
+		"CLAUDECODE":               "",
+		"CLAUDE_CODE_ENTRYPOINT":   "",
+		"CODEX_CI":                 "",
+		"CODEX_MANAGED_BY_NPM":     "",
+		"CODEX_SANDBOX":            "",
+		"CODEX_THREAD_ID":          "",
+		"CURSOR_AGENT":             "",
+		"GEMINI_CLI":               "",
+		"KIMI_CLI":                 "",
+		"OPENCODE":                 "",
+		"QWEN_CODE":                "",
+		"GIGACODE_CLI":             "",
+		"GIGACODE_PACKAGED_LAUNCH": "",
 		// Dates render in the reader's zone (#849) and fixtures write fixed
 		// instants, so seven tests went red at UTC-3, UTC-11 or UTC+14 (#5044).
 		// A test about zones sets time.Local itself.

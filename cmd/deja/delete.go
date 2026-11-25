@@ -37,7 +37,7 @@ import (
 // chat index in VS Code's own state, Aider keeps a project's whole history in
 // one file, Amp's threads live on its servers.
 var deletable = map[string]bool{
-	"claude": true, "codex": true, "gemini": true, "qwen": true, "qoder": true, "copilot": true,
+	"claude": true, "codex": true, "gemini": true, "qwen": true, "gigacode": true, "qoder": true, "copilot": true,
 	"cline": true, "cursor": true, "kimi": true, "grok": true, "deepseek": true,
 	"pi": true, "senpi": true, "openclaw": true, "antigravity": true, "ante": true,
 }
@@ -262,7 +262,7 @@ func companions(s model.Session) []string {
 				}
 			}
 		}
-	case "qwen":
+	case "qwen", "gigacode":
 		// Sub-agent logs sit beside chats/, in subagents/<id>/.
 		if chats := filepath.Dir(s.Path); filepath.Base(chats) == "chats" {
 			out = []string{filepath.Join(filepath.Dir(chats), "subagents", s.ID)}

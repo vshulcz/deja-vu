@@ -8,7 +8,7 @@
 
 ![deja-vu 示範](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-為 [pi](https://github.com/badlogic/pi-mono) 接入跨越本機 51 款其他程式設計智慧體（Claude Code、Codex、Cursor、Gemini、OpenClaw、Hermes 等）工作階段歷史的本地記憶擴充套件。底層使用單一 Go 執行檔 `deja` 建立本地 BM25 索引，不依賴外部 LLM、向量模型或雲端帳號；除了主動執行的更新或同步指令，以及可用 `DEJA_OFFLINE=1` 停用的每日版本檢查外，不會發起任何網路連線。
+為 [pi](https://github.com/badlogic/pi-mono) 接入跨越本機 52 款其他程式設計智慧體（Claude Code、Codex、Cursor、Gemini、OpenClaw、Hermes 等）工作階段歷史的本地記憶擴充套件。底層使用單一 Go 執行檔 `deja` 建立本地 BM25 索引，不依賴外部 LLM、向量模型或雲端帳號；除了主動執行的更新或同步指令，以及可用 `DEJA_OFFLINE=1` 停用的每日版本檢查外，不會發起任何網路連線。
 
 ## 安裝
 
@@ -47,7 +47,7 @@ brew install deja-vu
 
 | 召回率 | Token 用量 | 索引與檢索耗時 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 52 個程式設計代理的檢索僅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 53 個程式設計代理的檢索僅 **0.7 ms** |
 
 ## 儲存庫記憶與跨代理接力
 
@@ -57,7 +57,7 @@ brew install deja-vu
 
 ## 隱私與安全
 
-索引位於 `~/.cache/deja/index.db`（可用 `DEJA_INDEX_DIR` 自訂），寫入索引前會自動遮罩 `sk-*`、`ghp_*`、`AKIA*` 與 `Bearer` 等金鑰。檢索完全在本地離線運作，唯有主動執行 `deja embed` 並設定向量端點時才會向外傳送資料。透過 `deja install --auto` 可在 52 款程式設計智慧體中統一啟用 `recall`、`fix`、`blame` 與 `handoff`。
+索引位於 `~/.cache/deja/index.db`（可用 `DEJA_INDEX_DIR` 自訂），寫入索引前會自動遮罩 `sk-*`、`ghp_*`、`AKIA*` 與 `Bearer` 等金鑰。檢索完全在本地離線運作，唯有主動執行 `deja embed` 並設定向量端點時才會向外傳送資料。透過 `deja install --auto` 可在 53 款程式設計智慧體中統一啟用 `recall`、`fix`、`blame` 與 `handoff`。
 
 ## 授權條款
 

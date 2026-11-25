@@ -6,7 +6,7 @@
 
 Teil von **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** auf LongMemEval-S) · [Dokumentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Live-Demo](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-[deja](https://github.com/vshulcz/deja-vu) indiziert die Session-Dateien auf deiner Festplatte — von Claude Code, Codex, Cursor, opencode und 48 weiteren Agents — und antwortet daraus. Dieses Plugin bringt den Index in Kimi Code: Relevanter Rückruf landet mit deinem Prompt, und der Agent kann selbst im Verlauf suchen.
+[deja](https://github.com/vshulcz/deja-vu) indiziert die Session-Dateien auf deiner Festplatte — von Claude Code, Codex, Cursor, opencode und 49 weiteren Agents — und antwortet daraus. Dieses Plugin bringt den Index in Kimi Code: Relevanter Rückruf landet mit deinem Prompt, und der Agent kann selbst im Verlauf suchen.
 
 ![deja-vu Demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -61,7 +61,7 @@ Zwei Dinge erkennt es nicht: einen manuell unter anderem Namen als `deja` einget
 
 | Recall | Tokens | Indexierung & Suche |
 |---|---|---|
-| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 52 Coding-Agents hinweg |
+| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 53 Coding-Agents hinweg |
 
 ## Repository-Gedächtnis & Agenten-Übergabe
 

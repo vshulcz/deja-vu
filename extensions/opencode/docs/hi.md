@@ -8,7 +8,7 @@
 
 ![deja-vu डेमो](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-[opencode](https://opencode.ai) के लिए आपके कंप्यूटर पर मौजूद 51 अन्य कोडिंग एजेंट्स (Claude Code, Codex, Cursor, Gemini, Hermes, Zed आदि) के इतिहास पर आधारित स्थानीय मेमोरी। यह एकल Go बाइनरी `deja` और स्थानीय BM25 इंडेक्स से बिना LLM के चलता है (`DEJA_OFFLINE=1` दैनिक अपडेट जाँच बंद करता है)।
+[opencode](https://opencode.ai) के लिए आपके कंप्यूटर पर मौजूद 52 अन्य कोडिंग एजेंट्स (Claude Code, Codex, Cursor, Gemini, Hermes, Zed आदि) के इतिहास पर आधारित स्थानीय मेमोरी। यह एकल Go बाइनरी `deja` और स्थानीय BM25 इंडेक्स से बिना LLM के चलता है (`DEJA_OFFLINE=1` दैनिक अपडेट जाँच बंद करता है)।
 
 ## इंस्टॉलेशन
 
@@ -54,7 +54,7 @@
 - `tools`: सभी 6 टूल्स उपलब्ध कराता है (डिफ़ॉल्ट `true`)।
 - `bin`: कस्टम `deja` बाइनरी पथ।
 
-सभी 52 टूल्स में 8 MCP मोड (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) सेट करने के लिए `deja install --auto` चलाएँ ([बिना संदर्भ खोए एजेंट बदलें](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html))।
+सभी 53 टूल्स में 8 MCP मोड (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) सेट करने के लिए `deja install --auto` चलाएँ ([बिना संदर्भ खोए एजेंट बदलें](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html))।
 
 ## कौन-सी बाइनरी उपयोग होती है
 
@@ -68,7 +68,7 @@
 
 | रिकॉल (Recall) | टोकन | इंडेक्सिंग और खोज |
 |---|---|---|
-| LongMemEval-S पर **97.2% R@5** (470 प्रश्नों पर 88.9% hit@1) | **58% कम टोकन** (दोहराए गए रेपो कार्य पर) | 19,195 सेशन इंडेक्स करने में **13.6 s** / 52 कोडिंग एजेंट्स में **0.7 ms** खोज समय |
+| LongMemEval-S पर **97.2% R@5** (470 प्रश्नों पर 88.9% hit@1) | **58% कम टोकन** (दोहराए गए रेपो कार्य पर) | 19,195 सेशन इंडेक्स करने में **13.6 s** / 53 कोडिंग एजेंट्स में **0.7 ms** खोज समय |
 
 ## रेपो मेमोरी और एजेंट हैंडऑफ़
 

@@ -5,7 +5,7 @@
 
 Recherche locale de sessions multi-agents, blame de ligne par IA et transfert de contexte pour IntelliJ IDEA, GoLand, PyCharm, WebStorm, RustRover, CLion, PhpStorm et Rider (`2024.2+`).
 
-[deja-vu](https://github.com/vshulcz/deja-vu) indexe localement avec BM25 les transcriptions écrites sur disque par Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf et 43 autres agents de code, avec caviardage des secrets avant affichage et sans aucun service cloud.
+[deja-vu](https://github.com/vshulcz/deja-vu) indexe localement avec BM25 les transcriptions écrites sur disque par Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf et 44 autres agents de code, avec caviardage des secrets avant affichage et sans aucun service cloud.
 
 **[Documentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
@@ -14,7 +14,7 @@ Recherche locale de sessions multi-agents, blame de ligne par IA et transfert de
 ## Fonctionnalités
 
 - **Widget de barre d'état** : affiche en direct les statistiques `deja statusline` du projet actif à droite de la barre d'état. Un clic ouvre le menu d'actions `deja-vu`.
-- **Rechercher des sessions IA (`Tools → deja-vu → Search AI Sessions...`)** : interroge les sessions locales des 52 agents pris en charge (`deja search --json`) et ouvre la transcription choisie dans un onglet Markdown en lecture seule.
+- **Rechercher des sessions IA (`Tools → deja-vu → Search AI Sessions...`)** : interroge les sessions locales des 53 agents pris en charge (`deja search --json`) et ouvre la transcription choisie dans un onglet Markdown en lecture seule.
 - **Sessions récentes (`Tools → deja-vu → Recent AI Sessions`)** : liste les 50 dernières sessions de la machine (`deja last 50 --json`) avec filtrage instantané.
 - **AI Blame sur la ligne courante (menu contextuel / `Tools → deja-vu → AI Blame Current Line`)** : exécute `deja blame <file>:<line> --json` (avec repli sur `<file>`) pour ouvrir la session IA qui a écrit ou modifié la ligne sous le curseur.
 - **Copier le transfert multi-agents (`Tools → deja-vu → Copy Cross-Agent Handoff`)** : lance `deja handoff` à la racine du projet, copie le résumé dans le presse-papiers et l'affiche dans un onglet Markdown en lecture seule.
@@ -54,7 +54,7 @@ L'archive installable est générée dans `build/distributions/`.
 
 | Rappel | Tokens | Indexation & recherche |
 |---|---|---|
-| **97.2% R@5** sur LongMemEval-S (88.9% hit@1 sur 470 questions) | **58% de tokens en moins** (sur des tâches répétées) | **13.6 s** pour indexer 19,195 sessions / **0.7 ms** par requête sur 52 agents de code |
+| **97.2% R@5** sur LongMemEval-S (88.9% hit@1 sur 470 questions) | **58% de tokens en moins** (sur des tâches répétées) | **13.6 s** pour indexer 19,195 sessions / **0.7 ms** par requête sur 53 agents de code |
 
 ## Mémoire de dépôt & transfert inter-agents
 

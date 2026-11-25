@@ -588,6 +588,7 @@ func detectLocalHarnessRoots(sig *benchHarnessSignals) {
 		path string
 	}{
 		{"gemini", sources.GeminiRoot()},
+		{"gigacode", filepath.Join(sources.GigaCodeRoot(), "projects")},
 		{"opencode", sources.OpencodeDB()},
 		{"codearts", sources.CodeArtsRoot()},
 		{"doubao", sources.DoubaoRoot()},

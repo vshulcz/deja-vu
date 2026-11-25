@@ -8,7 +8,7 @@
 
 ![deja-vu デモ](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-[pi](https://github.com/badlogic/pi-mono) 向けに、同じマシン上の他 51 種類のコーディングエージェント（Claude Code、Codex、Cursor、Gemini、OpenClaw、Hermes など）のセッション履歴を共有記憶として接続する拡張機能です。単一 Go バイナリの `deja` がローカルで BM25 インデックスを構築するため、LLM や埋め込みモデル、API キーは不要です。明示的に実行する更新・同期コマンドおよび `DEJA_OFFLINE=1` で無効化できる日次リリース確認を除き、通信は発生しません。
+[pi](https://github.com/badlogic/pi-mono) 向けに、同じマシン上の他 52 種類のコーディングエージェント（Claude Code、Codex、Cursor、Gemini、OpenClaw、Hermes など）のセッション履歴を共有記憶として接続する拡張機能です。単一 Go バイナリの `deja` がローカルで BM25 インデックスを構築するため、LLM や埋め込みモデル、API キーは不要です。明示的に実行する更新・同期コマンドおよび `DEJA_OFFLINE=1` で無効化できる日次リリース確認を除き、通信は発生しません。
 
 ## インストール
 
@@ -47,7 +47,7 @@ brew install deja-vu
 
 | 再現率 | トークン消費 | インデックス & 検索速度 |
 |---|---|---|
-| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1） | **トークン 58% 削減**（同一リポジトリの反復作業） | 19,195 セッションを **13.6 秒**でインデックス / 52 種のエージェント横断で **0.7 ms** 検索 |
+| LongMemEval-S で **97.2% R@5**（470 問で 88.9% hit@1） | **トークン 58% 削減**（同一リポジトリの反復作業） | 19,195 セッションを **13.6 秒**でインデックス / 53 種のエージェント横断で **0.7 ms** 検索 |
 
 ## リポジトリメモリとエージェント間の引き継ぎ
 
@@ -57,7 +57,7 @@ brew install deja-vu
 
 ## プライバシー
 
-インデックスは `~/.cache/deja/index.db`（`DEJA_INDEX_DIR` で変更可）に保存され、構築時に `sk-*`、`ghp_*`、`AKIA*`、`Bearer` トークンを自動マスクします。通常の検索はすべてローカルで完結し、明示的に `deja embed` を設定しない限り外部へ送信されません。52 ツール全体での連携（`recall` / `fix` / `blame` / `handoff`）は `deja install --auto` でまとめて設定できます。
+インデックスは `~/.cache/deja/index.db`（`DEJA_INDEX_DIR` で変更可）に保存され、構築時に `sk-*`、`ghp_*`、`AKIA*`、`Bearer` トークンを自動マスクします。通常の検索はすべてローカルで完結し、明示的に `deja embed` を設定しない限り外部へ送信されません。53 ツール全体での連携（`recall` / `fix` / `blame` / `handoff`）は `deja install --auto` でまとめて設定できます。
 
 ## ライセンス
 

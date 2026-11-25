@@ -5,7 +5,7 @@
 
 Parte do **[deja-vu](https://github.com/vshulcz/deja-vu)** (**< 1 ms** no SQLite FTS5 · **~4%** de pegada do índice · **0** tokens de LLM na ingestão) · [Documentação](https://vshulcz.github.io/deja-vu/) · [Demo no navegador](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-Busque transcrições anteriores de agentes de código, execute blame por linha de sessão de IA, recupere correções de erros e gere resumos de handoff entre Claude Code, Codex CLI, Cursor, opencode, Gemini CLI e mais 47 ferramentas direto do Neovim.
+Busque transcrições anteriores de agentes de código, execute blame por linha de sessão de IA, recupere correções de erros e gere resumos de handoff entre Claude Code, Codex CLI, Cursor, opencode, Gemini CLI e mais 48 ferramentas direto do Neovim.
 
 ![Demonstração do deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -78,7 +78,7 @@ Execute `:checkhealth deja` dentro do Neovim para verificar a detecção do bin�
 
 | Recall | Tokens | Indexação e busca |
 |---|---|---|
-| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 52 agentes de código |
+| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 53 agentes de código |
 
 ## Memória do repositório e handoff entre agentes
 

@@ -5,11 +5,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Add memory to Claw Code: search past sessions — deja-vu</title>
-<meta name="description" content="Claw Code writes session logs under ~/.claw/sessions and cannot search old runs. deja indexes them locally alongside the other fifty-one agents.">
+<meta name="description" content="Claw Code writes session logs under ~/.claw/sessions and cannot search old runs. deja indexes them locally alongside the other fifty-two agents.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-claw-code.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Add memory to Claw Code: search past sessions">
-<meta property="og:description" content="Claw Code writes session logs under ~/.claw/sessions and cannot search old runs. deja indexes them locally alongside the other fifty-one agents.">
+<meta property="og:description" content="Claw Code writes session logs under ~/.claw/sessions and cannot search old runs. deja indexes them locally alongside the other fifty-two agents.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-claw-code.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -25,13 +25,13 @@
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
 <meta name="twitter:title" content="Add memory to Claw Code: search past sessions">
-<meta name="twitter:description" content="Claw Code writes session logs under ~/.claw/sessions and cannot search old runs. deja indexes them locally alongside the other fifty-one agents.">
+<meta name="twitter:description" content="Claw Code writes session logs under ~/.claw/sessions and cannot search old runs. deja indexes them locally alongside the other fifty-two agents.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Claw Code", "description": "Claw Code writes session logs under ~/.claw/sessions and cannot search old runs. deja indexes them locally alongside the other fifty-one agents.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-claw-code.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-claw-code.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-14", "dateModified": "2026-11-16"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Claw Code", "description": "Claw Code writes session logs under ~/.claw/sessions and cannot search old runs. deja indexes them locally alongside the other fifty-two agents.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-claw-code.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-claw-code.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-14", "dateModified": "2026-11-16"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for Claw Code", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-claw-code.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Claw Code remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "Claw Code writes session JSONL transcripts under ~/.claw/sessions and can resume a session with claw --resume <id>, but a new run reads none of your other runs or sessions from other harnesses. deja indexes them locally so every session is searchable."}}, {"@type": "Question", "name": "Where does Claw Code store its session history?", "acceptedAnswer": {"@type": "Answer", "text": "Under ${CLAW_CONFIG_HOME:-~/.claw}/sessions/ as .jsonl transcripts and legacy .json snapshots, ignoring .meta.json and .deleted.json sidecars. Override the read path with DEJA_CLAWCODE_ROOT or DEJA_CLAWCODE_ROOTS."}}, {"@type": "Question", "name": "How do I add automatic recall to Claw Code?", "acceptedAnswer": {"@type": "Answer", "text": "Run deja install clawcode-auto. It writes mcpServers.deja, PreToolUse, PostToolUse, and PostToolUseFailure hooks into ${CLAW_CONFIG_HOME:-~/.claw}/settings.json, plus the deja-history skill and /deja command."}}]}</script>
 </head>
@@ -192,7 +192,7 @@
 <article>
 
 <h1>Adding memory to Claw Code</h1>
-<p class="pagelede">append-only JSONL logs under ~/.claw/sessions and recall across all fifty-two agents<span class="mins" data-mins></span></p>
+<p class="pagelede">append-only JSONL logs under ~/.claw/sessions and recall across all fifty-three agents<span class="mins" data-mins></span></p>
 
 <p>Claw Code (<code>claw</code>) writes append-only session logs and legacy snapshots on disk and can resume a specific run, but a fresh session reads none of your earlier runs — and nothing recorded in Claude Code, Codex, Cursor, or opencode. This page covers wiring <code>deja</code> into Claw Code.</p>
 <div class="term-shot"><img src="../assets/demo.gif" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier" loading="lazy"><p class="cap">same prompt before and after deja — local BM25 recall across past sessions on disk, zero LLM calls</p></div>
@@ -219,7 +219,7 @@
 <p>Claw Code does not expose a user <code>statusLine</code> hook in its terminal chrome, so <code>deja</code> leaves status output out.</p>
 
 <h2>The part that is not about Claw Code</h2>
-<p>The local BM25 index (<code>~/.cache/deja/index.db</code>) covers every agent's transcripts on the machine — fifty-two of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so fixes recorded in Claude Code, Codex, or opencode answer questions inside Claw Code, and vice versa. <a href="privacy.html">Indexing and search stay local</a>, with API keys and tokens scrubbed as the index is built.</p>
+<p>The local BM25 index (<code>~/.cache/deja/index.db</code>) covers every agent's transcripts on the machine — fifty-three of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so fixes recorded in Claude Code, Codex, or opencode answer questions inside Claw Code, and vice versa. <a href="privacy.html">Indexing and search stay local</a>, with API keys and tokens scrubbed as the index is built.</p>
 
 <h2>Repository memory &amp; handoff</h2>
 <p>Share vetted project decisions and dead ends through git in <code>.deja/memory.jsonl</code> (<code>deja repo candidates</code>, <code>deja repo add &lt;id&gt;</code>). Entries are redacted on write, stored sorted with <code>merge=union</code> so parallel branches merge cleanly, and loaded for any teammate who clones the repository (<code>{"activations":{"auto":{"repo":false}}}</code> in the trust policy keeps them out of hooks). See <a href="repo-memory.html">repo memory</a>.</p>

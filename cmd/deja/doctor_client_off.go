@@ -49,39 +49,8 @@ func clientMCPEntryOff(name string) string {
 // (#4468).
 func clientMCPDenied(name string) string {
 	switch name {
-	case "gemini", "qwen":
-		home := sources.GeminiHome()
-		if name == "qwen" {
-			home = sources.QwenConfigDir()
-		}
-		settings := filepath.Join(home, "settings.json")
-		root := readJSONConfig(settings)
-		// Both compare the server key exactly. Qwen reads each entry as a
-		// `*`/`?` pattern and an empty allow list as none; gemini starts
-		// everything when the allow list is empty.
-		listed := func(v any) bool {
-			for _, s := range jsonStrings(v) {
-				if s == "deja" || name == "qwen" && serverPatternMatch(s, "deja") {
-					return true
-				}
-			}
-			return false
-		}
-		if listed(jsonAt(root, "mcp", "excluded")) {
-			return mcpOffNote(name, "`mcp.excluded` lists deja", settings)
-		}
-		if allowed, ok := jsonAt(root, "mcp", "allowed").([]any); ok && !listed(allowed) &&
-			(name == "qwen" || len(jsonStrings(allowed)) > 0) {
-			return mcpOffNote(name, "`mcp.allowed` does not list deja", settings)
-		}
-		// What `gemini mcp disable deja` writes, under the lowercased id it
-		// looks the server up by.
-		if name == "gemini" {
-			p := filepath.Join(home, "mcp-server-enablement.json")
-			if jsonAt(readJSONConfig(p), "deja", "enabled") == false {
-				return mcpOffNote(name, "`deja.enabled: false`", p)
-			}
-		}
+	case "gemini", "qwen", "gigacode":
+		return geminiFamilyMCPDenied(name)
 	case "copilot":
 		p := filepath.Join(filepath.Dir(copilotMCPConfigPath()), "settings.json")
 		if listHasDeja(jsonAt(readJSONConfig(p), "disabledMcpServers")) {
@@ -170,20 +139,62 @@ func clientMCPDenied(name string) string {
 	return ""
 }
 
+func geminiFamilyMCPDenied(name string) string {
+	home := sources.GeminiHome()
+	switch name {
+	case "qwen":
+		home = sources.QwenConfigDir()
+	case "gigacode":
+		home = sources.GigaCodeConfigDir()
+	}
+	qwenShaped := name == "qwen" || name == "gigacode"
+	settings := filepath.Join(home, "settings.json")
+	root := readJSONConfig(settings)
+	// Both compare the server key exactly. Qwen/GigaCode read each entry as a
+	// `*`/`?` pattern and an empty allow list as none; gemini starts
+	// everything when the allow list is empty.
+	listed := func(v any) bool {
+		for _, s := range jsonStrings(v) {
+			if s == "deja" || qwenShaped && serverPatternMatch(s, "deja") {
+				return true
+			}
+		}
+		return false
+	}
+	if listed(jsonAt(root, "mcp", "excluded")) {
+		return mcpOffNote(name, "`mcp.excluded` lists deja", settings)
+	}
+	if allowed, ok := jsonAt(root, "mcp", "allowed").([]any); ok && !listed(allowed) &&
+		(qwenShaped || len(jsonStrings(allowed)) > 0) {
+		return mcpOffNote(name, "`mcp.allowed` does not list deja", settings)
+	}
+	// What `gemini mcp disable deja` writes, under the lowercased id it
+	// looks the server up by.
+	if name == "gemini" {
+		p := filepath.Join(home, "mcp-server-enablement.json")
+		if jsonAt(readJSONConfig(p), "deja", "enabled") == false {
+			return mcpOffNote(name, "`deja.enabled: false`", p)
+		}
+	}
+	return ""
+}
+
 // clientHooksOff reads the client's switch for every hook and its disable on
 // deja's own extension or plugin, for the hook rows (#4469, #4470).
 func clientHooksOff(name string) string {
 	switch name {
-	case "claude-code", "qwen":
+	case "claude-code", "qwen", "gigacode":
 		dir := sources.ClaudeConfigDir()
-		if name == "qwen" {
+		project := []string{".claude/settings.json", ".claude/settings.local.json"}
+		switch name {
+		case "qwen":
 			dir = sources.QwenConfigDir()
+			project = []string{".qwen/settings.json"}
+		case "gigacode":
+			dir = sources.GigaCodeConfigDir()
+			project = []string{".gigacode/settings.json"}
 		}
 		p := filepath.Join(dir, "settings.json")
-		project := []string{".claude/settings.json", ".claude/settings.local.json"}
-		if name == "qwen" {
-			project = []string{".qwen/settings.json"}
-		}
 		if readJSONConfig(p)["disableAllHooks"] == true &&
 			!projectSettingSays(project, false, "disableAllHooks") {
 			return hooksOffNote(name, "`disableAllHooks: true`", p)

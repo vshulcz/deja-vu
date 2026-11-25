@@ -2,7 +2,7 @@
 
 [English](../README.md) | [简体中文](zh.md) | 繁體中文 | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-適用於 `deja` 的 Orca v2 `trusted-worker` 外掛程式——將 52 款 AI 程式設計工具（Claude Code、Codex、Cursor、opencode、Gemini CLI、Orca 等）的會話記憶帶入 Orca，包含安裝 `deja` 之前早已留存的歷史會話。
+適用於 `deja` 的 Orca v2 `trusted-worker` 外掛程式——將 53 款 AI 程式設計工具（Claude Code、Codex、Cursor、opencode、Gemini CLI、Orca 等）的會話記憶帶入 Orca，包含安裝 `deja` 之前早已留存的歷史會話。
 
 ![deja-vu 示範](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -36,7 +36,7 @@ deja install orca-auto
 
 | 召回率 | Token 用量 | 索引與檢索耗時 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 52 個程式設計代理的檢索僅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 53 個程式設計代理的檢索僅 **0.7 ms** |
 
 ## 儲存庫記憶與跨代理接力
 

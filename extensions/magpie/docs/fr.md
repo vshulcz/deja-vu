@@ -8,7 +8,7 @@ Fait partie de **[★ vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)** (**
 
 ![Démo de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-> Enrichit automatiquement les requêtes traversant [Magpie](https://github.com/yetone/magpie) avec le contexte local issu de 51 autres agents de programmation (Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes, etc.).
+> Enrichit automatiquement les requêtes traversant [Magpie](https://github.com/yetone/magpie) avec le contexte local issu de 52 autres agents de programmation (Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes, etc.).
 
 Fonctionne avec les protocoles OpenAI (`chat`, `responses`), Anthropic (`anthropic`) et Gemini (`gemini`) grâce au binaire Go unique `deja` et son index BM25 local, sans LLM ni embeddings (`DEJA_OFFLINE=1` coupe la vérification quotidienne).
 
@@ -18,7 +18,7 @@ Fonctionne avec les protocoles OpenAI (`chat`, `responses`), Anthropic (`anthrop
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-Nécessite le binaire `deja` (`@vshulcz/deja-vu`, `brew install deja-vu` ou `install.sh`) et un index local préparé par `deja index`. Pour activer aussi `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember` et `handoff` sur les 52 agents pris en charge :
+Nécessite le binaire `deja` (`@vshulcz/deja-vu`, `brew install deja-vu` ou `install.sh`) et un index local préparé par `deja index`. Pour activer aussi `recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember` et `handoff` sur les 53 agents pris en charge :
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
@@ -50,7 +50,7 @@ Si la requête contient déjà `<deja-memory>` ou `<deja-recall>`, l'extension s
 
 | Rappel | Tokens | Indexation & recherche |
 |---|---|---|
-| **97.2% R@5** sur LongMemEval-S (88.9% hit@1 sur 470 questions) | **58% de tokens en moins** (sur des tâches répétées) | **13.6 s** pour indexer 19,195 sessions / **0.7 ms** par requête sur 52 agents de code |
+| **97.2% R@5** sur LongMemEval-S (88.9% hit@1 sur 470 questions) | **58% de tokens en moins** (sur des tâches répétées) | **13.6 s** pour indexer 19,195 sessions / **0.7 ms** par requête sur 53 agents de code |
 
 ## Mémoire de dépôt & transfert inter-agents
 

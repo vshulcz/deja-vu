@@ -6,7 +6,7 @@
 
 Parte de **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** en LongMemEval-S) · [Documentación](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Demo en vivo](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-[deja](https://github.com/vshulcz/deja-vu) indexa los archivos de sesión que los agentes de código ya escriben en disco —Claude Code, Codex, Cursor, opencode y 48 más— y responde a partir de ellos. Este plugin lleva ese índice a Kimi Code: el recuerdo llega junto al prompt y el propio agente puede consultar el historial.
+[deja](https://github.com/vshulcz/deja-vu) indexa los archivos de sesión que los agentes de código ya escriben en disco —Claude Code, Codex, Cursor, opencode y 49 más— y responde a partir de ellos. Este plugin lleva ese índice a Kimi Code: el recuerdo llega junto al prompt y el propio agente puede consultar el historial.
 
 ![Demostración de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -61,7 +61,7 @@ Dos cosas que no puede detectar: una entrada MCP añadida a mano bajo un nombre 
 
 | Recall | Tokens | Indexado y búsqueda |
 |---|---|---|
-| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas) | **58% menos tokens** (en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 52 agentes de programación |
+| **97.2% R@5** en LongMemEval-S (88.9% hit@1 en 470 preguntas) | **58% menos tokens** (en tareas repetidas) | **13.6 s** para indexar 19,195 sesiones / **0.7 ms** de búsqueda en 53 agentes de programación |
 
 ## Memoria de repositorio y relevo entre agentes
 
