@@ -31,8 +31,10 @@ func TestSeenKeySanitizationAndPrefixGuards(t *testing.T) {
 	if IsPrefixedKey("plain-session-1") || IsPrefixedKey("task:parent:1") {
 		t.Fatal("IsPrefixedKey matched non-reserved key")
 	}
-	if ShortHash("hello") != ShortHash("hello") || ShortHash("hello") == ShortHash("world") {
-		t.Fatal("ShortHash must be deterministic and distinct")
+	h1 := ShortHash("hello")
+	h2 := ShortHash("hello")
+	if h1 == "" || h1 != h2 || h1 == ShortHash("world") {
+		t.Fatal("ShortHash must be deterministic, non-empty, and distinct")
 	}
 }
 
