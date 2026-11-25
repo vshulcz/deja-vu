@@ -6,10 +6,17 @@
   <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
   <link rel="self" type="application/atom+xml" href="https://vshulcz.github.io/deja-vu/feed.xml"></link>
   <link rel="hub" href="https://pubsubhubbub.appspot.com/"></link>
-  <updated>2026-11-24T00:00:00Z</updated>
+  <updated>2026-11-25T00:00:00Z</updated>
   <author>
     <name>vshulcz</name>
   </author>
+  <entry>
+    <title>Compare Claude Code, Codex and Cursor memory — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/compare.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/compare.html"></link>
+    <updated>2026-11-25T00:00:00Z</updated>
+    <summary>Compare deja-vu (97.2% R@5 LongMemEval-S, 52 agents) against claude-mem, MemPalace, agentmemory, Mem0, Letta, MCP Memory, CASS, ctx, and agentsview.</summary>
+  </entry>
   <entry>
     <title>deja-vu: local memory, session search &amp; handoff across 52 coding agents</title>
     <id>https://vshulcz.github.io/deja-vu/</id>
@@ -58,13 +65,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html"></link>
     <updated>2026-11-21T00:00:00Z</updated>
     <summary>No API key or daemon: deja-vu (97.2% R@5 LongMemEval-S) indexes Claude Code, Codex, Cursor, opencode and 48 other agents via hooks and MCP.</summary>
-  </entry>
-  <entry>
-    <title>Compare Claude Code, Codex and Cursor memory — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/compare.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/compare.html"></link>
-    <updated>2026-11-21T00:00:00Z</updated>
-    <summary>Compare deja-vu (97.2% R@5 LongMemEval-S, 52 agents) against claude-mem, MemPalace, agentmemory, Mem0, Letta, MCP Memory, CASS, ctx, and agentsview.</summary>
   </entry>
   <entry>
     <title>What each memory tool knows the day you install it — deja-vu</title>
