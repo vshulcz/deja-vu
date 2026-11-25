@@ -348,26 +348,14 @@ func TestTheAgentsPageNamesEveryMCPMode(t *testing.T) {
 // a mode added there has to reach the page.
 func mcpToolModes(t *testing.T) []string {
 	t.Helper()
-	b, err := os.ReadFile("mcp.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	m := regexp.MustCompile(`"enum": \[\]string\{([^}]*)\}`).FindSubmatch(b)
-	if m == nil {
+	schema, _ := dejaTool()["inputSchema"].(map[string]any)
+	props, _ := schema["properties"].(map[string]any)
+	mode, _ := props["mode"].(map[string]any)
+	modes, _ := mode["enum"].([]string)
+	if len(modes) == 0 {
 		t.Fatal("the tool schema no longer declares a mode enum")
 	}
-	var out []string
-	for part := range strings.SplitSeq(string(m[1]), ",") {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		var s string
-		if json.Unmarshal([]byte(part), &s) == nil && s != "" {
-			out = append(out, s)
-		}
-	}
-	return out
+	return modes
 }
 
 // The agents page named the harnesses wired per prompt and before an action,

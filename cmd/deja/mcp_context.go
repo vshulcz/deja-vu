@@ -88,7 +88,8 @@ func contextByID(dir, q string, harness ...string) (string, idContext, bool) {
 		return "", idContext{}, false
 	}
 	whole := kept[0]
-	index.MarkUserRules(dir, &whole, howScope(howCwd(), "", false))
+	cwdScope, _ := resolveQueryScope(QueryScopeInput{CWD: howCwd(), Activation: policy.ActivationMCP})
+	index.MarkUserRules(dir, &whole, cwdScope.Projects)
 	search.ScrubMessages(&whole)
 	var b bytes.Buffer
 	search.PrintContext(&b, whole, "")
@@ -126,8 +127,14 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	} else if stale && !warmupRunning(dir) {
 		requestWarmup(dir)
 	}
-	live, cut := liveLineageCut(dir)
-	o.ExcludeSessions, o.ExcludeUpTo = live, cut
+	ctxScope, _ := resolveQueryScope(QueryScopeInput{
+		IndexDir:           dir,
+		Harness:            harness,
+		IncludeLiveLineage: true,
+		Activation:         policy.ActivationMCP,
+	})
+	ctxScope.ApplyToSearch(&o)
+	live := ctxScope.ExcludeIDs
 	result, err := index.SearchWithRecoveryDetailed(dir, o, mcpProgress())
 	if err != nil {
 		return "", 0, 0, nil, nil, "", err

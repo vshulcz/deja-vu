@@ -1992,28 +1992,11 @@ func trimBriefTitle(t string) string { return trimBriefTitleTo(t, briefTitleMax)
 // hook-context, because the text is hand-maintained and nothing compared it
 // with the dispatch table (#1654). TestHelpCoversEveryCommand is that
 // comparison.
-var helpHidden = map[string]bool{
-	"help":              true,
-	"hook-codewhale":    true,
-	"hook-context":      true,
-	"hook-goose":        true,
-	"hook-goose-prompt": true,
-	"hook-mcp-call":     true,
-	"hook-precompact":   true,
-	"hook-refresh":      true,
-	"hook-session-end":  true,
-	"hook-stop":         true,
-	"reasonix-ext":      true,
-	"warmup-status":     true,
-}
+var helpHidden = buildHelpHiddenCommands()
 
 // completionHiddenCommands are the ones deja runs for itself. Leaving a command
 // out is a decision recorded here rather than a name missing from three scripts.
-var completionHiddenCommands = map[string]bool{
-	"warmup-status": true,
-	// Reasonix starts it as the plugin's runtime and talks JSON-RPC to it.
-	"reasonix-ext": true,
-}
+var completionHiddenCommands = buildCompletionHiddenCommands()
 
 func hookDigest(dir string) string {
 	digest, _, _, _, _, _, _ := hookDigestResult(dir)

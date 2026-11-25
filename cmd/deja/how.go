@@ -6,14 +6,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
 
-	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -168,14 +166,20 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return ensureError(dir, err)
 	}
-	scope := howScope(howCwd(), project, allProjects)
+	resolvedScope, _ := resolveQueryScope(QueryScopeInput{
+		CWD:         howCwd(),
+		Project:     project,
+		AllProjects: allProjects,
+		Activation:  policy.ActivationSearch,
+	})
+	scope := resolvedScope.Projects
 	// Nothing here does not mean nothing anywhere: the scope is a default, and
 	// an agent told "no command on this machine mentions it" when one does
 	// goes and invents one (#3705, the reasoning #2630 wrote for the ignore
 	// rule). The counters too, not only the rows: the note that says a rule hid
 	// the answer is what keeps an agent from inventing a command, and a scope
 	// with nothing in it zeroes that note as surely as it zeroes the rows.
-	entries, hidden, ignored, widened, err := howEntriesWithFallback(dir, terms, scope, len(scope) > 0 && project == "", policy.ActivationSearch)
+	entries, hidden, ignored, widened, err := howEntriesWithFallback(dir, terms, scope, resolvedScope.CanWidenToMachine(), policy.ActivationSearch)
 	if err != nil {
 		return err
 	}
@@ -513,25 +517,12 @@ func howDirectMatch(cmd string, terms []string) bool {
 // of the working directory otherwise, and the whole machine when either
 // `--all-projects` or a directory belonging to no project says so.
 func howScope(cwd, project string, allProjects bool) []string {
-	if allProjects {
-		return nil
-	}
-	if strings.TrimSpace(project) != "" {
-		return []string{project}
-	}
-	if cwd == "" {
-		return nil
-	}
-	names := digest.ProjectNameCandidates(cwd)
-	// The name the rows show goes first, for howScopeName. The candidates
-	// open with the Claude-encoded reading of the directory, which turns a
-	// hyphen into a slash: the footer said "in my/app only", a name no row
-	// shows and --project does not take (#5321). The order does not change
-	// what matches; every name is tried.
-	if label := digest.ProjectLabel(cwd); label != "" {
-		names = append([]string{label}, slices.DeleteFunc(names, func(name string) bool { return name == label })...)
-	}
-	return names
+	scope, _ := resolveQueryScope(QueryScopeInput{
+		CWD:         cwd,
+		Project:     project,
+		AllProjects: allProjects,
+	})
+	return scope.Projects
 }
 
 // howCwd is the directory the answer is about. A caller with none — a daemon, a

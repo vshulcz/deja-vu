@@ -51,12 +51,7 @@ const (
 
 func mcpOrient(dir, name string, raw json.RawMessage) (string, int, error) {
 	setActiveDejaDir(dir)
-	var a struct {
-		Project   string    `json:"project"`
-		Limit     mcpNumber `json:"limit"`
-		SessionID string    `json:"session_id"`
-		CWD       string    `json:"cwd"`
-	}
+	var a mcpOrientArgs
 	if err := decodeToolArgs(name, raw, &a); err != nil {
 		return "", 0, err
 	}
@@ -81,14 +76,22 @@ func mcpOrient(dir, name string, raw json.RawMessage) (string, int, error) {
 			sid = os.Getenv("SESSION_ID")
 		}
 	}
-	scope := howScope(cwd, a.Project, false)
+	resolvedScope, _ := resolveQueryScope(QueryScopeInput{
+		CWD:        cwd,
+		Project:    a.Project,
+		Activation: policy.ActivationMCP,
+	})
+	scope := resolvedScope.Projects
 	cmds, hidden, ignored, err := howEntries(dir, nil, scope, policy.ActivationMCP)
 	if err != nil {
 		return "", 0, err
 	}
 	cmds = filterAndSortOrientCmds(cmds)
-	if strings.TrimSpace(a.Project) != "" && !howProjectMatches(a.Project, howScope(cwd, "", false)) {
-		cwd = ""
+	if resolvedScope.ExplicitProject != "" {
+		implicitScope, _ := resolveQueryScope(QueryScopeInput{CWD: cwd, Activation: policy.ActivationMCP})
+		if !implicitScope.MatchesProject(a.Project) {
+			cwd = ""
+		}
 	}
 	files := orientFiles(dir, scope, cwd)
 	if cwd != "" {
@@ -97,7 +100,7 @@ func mcpOrient(dir, name string, raw json.RawMessage) (string, int, error) {
 		}
 	}
 	repoEntries := orientRepoMemory(cwd, policy.ActivationMCP)
-	where := howScopeName(scope)
+	where := resolvedScope.Name()
 	if where == "" {
 		where = "this machine"
 	}
