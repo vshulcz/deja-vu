@@ -1,6 +1,7 @@
 package main
 
 import (
+	"maps"
 	"reflect"
 	"slices"
 	"strings"
@@ -587,9 +588,7 @@ func commandSpecFor(name string) (CommandSpec, bool) {
 
 func buildFlagsOfOtherCommands() map[string]string {
 	out := make(map[string]string, len(primaryFlagOwners))
-	for flag, cmd := range primaryFlagOwners {
-		out[flag] = cmd
-	}
+	maps.Copy(out, primaryFlagOwners)
 	inSearch := make(map[string]bool, len(searchFlags))
 	for _, f := range searchFlags {
 		inSearch[f] = true

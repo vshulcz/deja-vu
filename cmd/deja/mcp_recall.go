@@ -650,7 +650,8 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 	var live map[string]bool
 	var scope []string
 	added := ""
-	if len(pathScope) > 0 {
+	switch {
+	case len(pathScope) > 0:
 		baseScope, _ := resolveQueryScope(QueryScopeInput{
 			IndexDir:           dir,
 			IncludeLiveLineage: true,
@@ -659,7 +660,7 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 		baseScope.ApplyToSearch(&o)
 		live = baseScope.ExcludeIDs
 		o.Projects = pathScope
-	} else if strings.TrimSpace(project) != "" {
+	case strings.TrimSpace(project) != "":
 		// Named by the caller: a filter, the way the tool describes it. It was
 		// accepted and then ignored.
 		explicitScope, _ := resolveQueryScope(QueryScopeInput{
@@ -670,7 +671,7 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 		})
 		explicitScope.ApplyToSearch(&o)
 		live = explicitScope.ExcludeIDs
-	} else {
+	default:
 		// The project the agent is working in answers first. The prompt hook
 		// ranks inside it and recall ranked the whole machine, so the same
 		// question found the decision through the hook and buried it here: on a

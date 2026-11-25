@@ -242,7 +242,7 @@ func hasJSONField(t reflect.Type, name string) bool {
 }
 
 func TestMCPRegistryParityWithToolsListAndHandlers(t *testing.T) {
-	var canonical []string
+	canonical := make([]string, 0, len(mcpModeSpecs))
 	for _, spec := range mcpModeSpecs {
 		canonical = append(canonical, spec.Mode)
 	}
@@ -350,7 +350,7 @@ func TestQueryScopeParityAcrossCLIAndMCP(t *testing.T) {
 		t.Errorf("explicit project should win over DEJA_RECALL_GLOBAL, got %+v", explicitOverGlobal)
 	}
 
-	if _, err := resolveQueryScope(QueryScopeInput{Harness: "not-a-real-harness"}); err == nil {
+	if _, badErr := resolveQueryScope(QueryScopeInput{Harness: "not-a-real-harness"}); badErr == nil {
 		t.Fatal("resolveQueryScope with unknown harness succeeded, want error")
 	}
 

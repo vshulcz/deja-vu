@@ -113,18 +113,16 @@ func parseHookExtFlags(args []string) (host, op string, err error) {
 			continue
 		}
 		switch arg {
-		case "--host":
+		case "--host", "--op":
 			if i+1 >= len(args) {
-				return "", "", errors.New("hook-ext: --host needs a value")
+				return "", "", fmt.Errorf("hook-ext: %s needs a value", arg)
 			}
-			host = args[i+1]
 			i++
-		case "--op":
-			if i+1 >= len(args) {
-				return "", "", errors.New("hook-ext: --op needs a value")
+			if arg == "--host" {
+				host = args[i]
+			} else {
+				op = args[i]
 			}
-			op = args[i+1]
-			i++
 		default:
 			if strings.HasPrefix(arg, "-") {
 				return "", "", unknownFlag("hook-ext", arg, hookExtFlags)
