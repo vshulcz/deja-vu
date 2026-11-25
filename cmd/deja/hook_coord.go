@@ -10,14 +10,12 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 	"unicode"
 
-	"github.com/vshulcz/deja-vu/internal/atomicfile"
+	"github.com/vshulcz/deja-vu/internal/hookengine"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -25,50 +23,18 @@ import (
 )
 
 const (
-	coordFile               = ".coord"
-	coordStateVersion       = 1
-	coordTTL                = 30 * time.Minute
-	coordGitLockStaleAfter  = 10 * time.Minute
-	coordMaxSessions        = 64
-	coordMaxFilesPerSession = 32
-	coordMaxStamps          = 256
-	coordSpawnDedupWindow   = 5 * time.Second
+	coordGitLockStaleAfter = 10 * time.Minute
+	coordSpawnDedupWindow  = 5 * time.Second
 )
 
-var (
-	coordInProcMu sync.Mutex
-	coordNow      = time.Now
+var coordNow = time.Now
+
+type (
+	coordFileTouch = hookengine.CoordFileTouch
+	coordStamp     = hookengine.CoordStamp
+	coordSession   = hookengine.CoordSession
+	coordState     = hookengine.CoordState
 )
-
-type coordFileTouch struct {
-	AtUnix int64 `json:"at"`
-}
-
-type coordStamp struct {
-	AtUnix int64 `json:"at"`
-	Val    int64 `json:"val,omitempty"`
-}
-
-type coordSession struct {
-	ID                string                    `json:"id"`
-	ParentID          string                    `json:"parent,omitempty"`
-	Harness           string                    `json:"harness,omitempty"`
-	Worktree          string                    `json:"worktree,omitempty"`
-	UpdatedAt         int64                     `json:"updated"`
-	Edits             map[string]coordFileTouch `json:"edits,omitempty"`
-	Reads             map[string]coordFileTouch `json:"reads,omitempty"`
-	VerifyCmd         string                    `json:"verify_cmd,omitempty"`
-	VerifyAt          int64                     `json:"verify_at,omitempty"`
-	LastSpawnBriefKey string                    `json:"last_spawn_key,omitempty"`
-	LastSpawnBriefAt  int64                     `json:"last_spawn_at,omitempty"`
-	BriefedAt         int64                     `json:"briefed_at,omitempty"`
-}
-
-type coordState struct {
-	Version  int                      `json:"v"`
-	Sessions map[string]*coordSession `json:"sessions,omitempty"`
-	Stamps   map[string]coordStamp    `json:"stamps,omitempty"`
-}
 
 type coordActionKind int
 
@@ -79,199 +45,28 @@ const (
 )
 
 func coordPath(dir string) string {
-	return dir + coordFile
+	return dir + hookengine.CoordFile
 }
 
 func holdCoordLock(dir string) func() {
-	coordInProcMu.Lock()
-	if dir == "" {
-		return coordInProcMu.Unlock
-	}
-	lockPath := coordPath(dir) + ".lock"
-	_ = atomicfile.MkdirSharedAll(filepath.Dir(lockPath))
-	var release func()
-	for i := range 5 {
-		rel, ok, busy := takeInstallLock(lockPath, false)
-		if ok {
-			release = rel
-			break
-		}
-		if !busy || i == 4 {
-			break
-		}
-		time.Sleep(2 * time.Millisecond)
-	}
-	return func() {
-		if release != nil {
-			release()
-		}
-		coordInProcMu.Unlock()
-	}
+	_, release := hookengine.NewCoordStore(dir).Lock()
+	return release
 }
 
 func loadCoordState(dir string) coordState {
-	st := coordState{
-		Version:  coordStateVersion,
-		Sessions: map[string]*coordSession{},
-		Stamps:   map[string]coordStamp{},
-	}
-	if dir == "" {
-		return st
-	}
-	data, readErr := os.ReadFile(coordPath(dir))
-	if readErr != nil || len(data) == 0 {
-		return st
-	}
-	var parsed coordState
-	if unmarshalErr := json.Unmarshal(data, &parsed); unmarshalErr != nil {
-		return st
-	}
-	if parsed.Sessions != nil {
-		st.Sessions = parsed.Sessions
-	}
-	if parsed.Stamps != nil {
-		st.Stamps = parsed.Stamps
-	}
-	st.Version = coordStateVersion
-	return st
+	return hookengine.NewCoordStore(dir).LoadState()
 }
 
 func saveCoordState(dir string, st coordState) {
-	if dir == "" {
-		return
-	}
-	st.Version = coordStateVersion
-	data, marshalErr := json.Marshal(st)
-	if marshalErr != nil {
-		return
-	}
-	p := coordPath(dir)
-	_ = atomicfile.MkdirSharedAll(filepath.Dir(p))
-	_ = atomicfile.Write(p, data, 0o600)
-}
-
-func pruneTouchMap(m map[string]coordFileTouch, cutoffUnix int64) map[string]coordFileTouch {
-	if len(m) == 0 {
-		return nil
-	}
-	type entry struct {
-		path string
-		at   int64
-	}
-	kept := make([]entry, 0, len(m))
-	for p, t := range m {
-		if p != "" && t.AtUnix >= cutoffUnix {
-			kept = append(kept, entry{path: p, at: t.AtUnix})
-		}
-	}
-	if len(kept) == 0 {
-		return nil
-	}
-	if len(kept) > coordMaxFilesPerSession {
-		sort.Slice(kept, func(i, j int) bool {
-			if kept[i].at != kept[j].at {
-				return kept[i].at > kept[j].at
-			}
-			return kept[i].path < kept[j].path
-		})
-		kept = kept[:coordMaxFilesPerSession]
-	}
-	out := make(map[string]coordFileTouch, len(kept))
-	for _, e := range kept {
-		out[e.path] = coordFileTouch{AtUnix: e.at}
-	}
-	return out
+	hookengine.NewCoordStore(dir).SaveState(st)
 }
 
 func pruneCoordState(st *coordState, now time.Time) {
-	if st == nil {
-		return
-	}
-	if st.Sessions == nil {
-		st.Sessions = map[string]*coordSession{}
-	}
-	if st.Stamps == nil {
-		st.Stamps = map[string]coordStamp{}
-	}
-	cutoffUnix := now.UTC().Add(-coordTTL).Unix()
-
-	type sessEntry struct {
-		id string
-		s  *coordSession
-	}
-	keptSessions := make([]sessEntry, 0, len(st.Sessions))
-	for id, s := range st.Sessions {
-		if id == "" || s == nil || s.UpdatedAt < cutoffUnix {
-			continue
-		}
-		s.ID = id
-		s.Edits = pruneTouchMap(s.Edits, cutoffUnix)
-		s.Reads = pruneTouchMap(s.Reads, cutoffUnix)
-		if s.VerifyAt < cutoffUnix {
-			s.VerifyCmd = ""
-			s.VerifyAt = 0
-		}
-		if s.LastSpawnBriefAt < cutoffUnix {
-			s.LastSpawnBriefKey = ""
-			s.LastSpawnBriefAt = 0
-		}
-		if s.BriefedAt < cutoffUnix {
-			s.BriefedAt = 0
-		}
-		keptSessions = append(keptSessions, sessEntry{id: id, s: s})
-	}
-	if len(keptSessions) > coordMaxSessions {
-		sort.Slice(keptSessions, func(i, j int) bool {
-			if keptSessions[i].s.UpdatedAt != keptSessions[j].s.UpdatedAt {
-				return keptSessions[i].s.UpdatedAt > keptSessions[j].s.UpdatedAt
-			}
-			return keptSessions[i].id < keptSessions[j].id
-		})
-		keptSessions = keptSessions[:coordMaxSessions]
-	}
-	nextSessions := make(map[string]*coordSession, len(keptSessions))
-	for _, e := range keptSessions {
-		nextSessions[e.id] = e.s
-	}
-	st.Sessions = nextSessions
-
-	type stampEntry struct {
-		key string
-		st  coordStamp
-	}
-	keptStamps := make([]stampEntry, 0, len(st.Stamps))
-	for k, v := range st.Stamps {
-		if k != "" && v.AtUnix >= cutoffUnix {
-			keptStamps = append(keptStamps, stampEntry{key: k, st: v})
-		}
-	}
-	if len(keptStamps) > coordMaxStamps {
-		sort.Slice(keptStamps, func(i, j int) bool {
-			if keptStamps[i].st.AtUnix != keptStamps[j].st.AtUnix {
-				return keptStamps[i].st.AtUnix > keptStamps[j].st.AtUnix
-			}
-			return keptStamps[i].key < keptStamps[j].key
-		})
-		keptStamps = keptStamps[:coordMaxStamps]
-	}
-	nextStamps := make(map[string]coordStamp, len(keptStamps))
-	for _, e := range keptStamps {
-		nextStamps[e.key] = e.st
-	}
-	st.Stamps = nextStamps
+	hookengine.PruneCoordState(st, now)
 }
 
 func ensureCoordSession(st *coordState, id string, nowUnix int64) *coordSession {
-	if st.Sessions == nil {
-		st.Sessions = map[string]*coordSession{}
-	}
-	s := st.Sessions[id]
-	if s == nil {
-		s = &coordSession{ID: id}
-		st.Sessions[id] = s
-	}
-	s.UpdatedAt = nowUnix
-	return s
+	return st.EnsureSession(id, nowUnix)
 }
 
 // coordCanonicalPath resolves p relative to cwd, cleans it, resolves symlinks
@@ -1469,51 +1264,15 @@ func coordRecordCommandOutcome(dir, cwd, sessionID, cmd string, failed bool) int
 	if !failed && sessionID != "" && isCoordVerifyCommand(cmd) {
 		verifyNorm = normalizeVerifyCmdForBrief(cmd, cwd)
 	}
-	if !failed && verifyNorm == "" {
-		if streakKey == "" {
-			return 0
-		}
-		if _, statErr := os.Stat(coordPath(dir)); statErr != nil {
-			return 0
-		}
+	wt := ""
+	if !failed && verifyNorm != "" {
+		wt, _ = resolveCoordGitWorktree(cwd)
 	}
-	now := coordNow()
-	nowUnix := now.UTC().Unix()
-
-	release := holdCoordLock(dir)
-	defer release()
-
-	st := loadCoordState(dir)
-	pruneCoordState(&st, now)
-	if failed {
-		if streakKey == "" {
-			return 1
-		}
-		next := int(st.Stamps[streakKey].Val) + 1
-		st.Stamps[streakKey] = coordStamp{AtUnix: nowUnix, Val: int64(next)}
-		saveCoordState(dir, st)
-		return next
-	}
-
-	dirty := false
-	if streakKey != "" {
-		if _, exists := st.Stamps[streakKey]; exists {
-			delete(st.Stamps, streakKey)
-			dirty = true
-		}
-	}
-	if verifyNorm != "" {
-		wt, _ := resolveCoordGitWorktree(cwd)
-		sess := ensureCoordSession(&st, sessionID, nowUnix)
-		if wt != "" {
-			sess.Worktree = wt
-		}
-		sess.VerifyCmd = verifyNorm
-		sess.VerifyAt = nowUnix
-		dirty = true
-	}
-	if dirty {
-		saveCoordState(dir, st)
-	}
-	return 0
+	return hookengine.NewCoordStore(dir).RecordOutcome(coordNow(), hookengine.CoordOutcome{
+		SessionID: sessionID,
+		StreakKey: streakKey,
+		VerifyCmd: verifyNorm,
+		Worktree:  wt,
+		Failed:    failed,
+	})
 }

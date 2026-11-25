@@ -1,18 +1,11 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
-	"os"
-	"slices"
-	"sort"
 	"strings"
-	"sync"
 	"time"
-	"unicode"
 
-	"github.com/vshulcz/deja-vu/internal/atomicfile"
+	"github.com/vshulcz/deja-vu/internal/hookengine"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
@@ -28,19 +21,14 @@ import (
 // id a harness actually sends maps to itself, which is why no existing file
 // needs converting.
 func hookseenKey(s string) string {
-	return strings.Map(func(r rune) rune {
-		if unicode.IsSpace(r) || unicode.IsControl(r) {
-			return '_'
-		}
-		return r
-	}, s)
+	return hookengine.SeenKey(s)
 }
 
 // hookseenField reports whether a value can be one field of a line as it
 // stands. The session id above is mapped because it is only ever compared with
 // itself; a value is not, because it is compared with the index's own ids —
 // so one that cannot be a field is left out of the file instead.
-func hookseenField(s string) bool { return s != "" && hookseenKey(s) == s }
+func hookseenField(s string) bool { return hookengine.IsSeenField(s) }
 
 // alreadyInjected returns the session ids this hook already injected into the
 // given agent session, so follow-up prompts do not repeat the same memory.
@@ -56,132 +44,54 @@ func alreadyInjected(dir, sid string) map[string]bool {
 //
 // Empty when the file is missing, which is the same answer every one of those
 // questions gave before.
-type seenLines []string
+type seenLines hookengine.SeenLines
 
 func hookseenPath(dir string) string {
 	return dir + ".hookseen"
 }
 
-func hookseenLockPath(dir string) string {
-	return dir + ".hookseen.lock"
+func openHookseenTx(dir string) (*hookengine.SeenTx, func(), bool) {
+	return hookengine.NewLedger(dir).Lock()
 }
-
-var hookseenMu sync.Mutex
 
 // holdHookseenLock serializes concurrent hook invocations against the same
 // index so two hooks spawned in the same millisecond do not both read an
 // un-injected state and emit duplicate blocks (#5930). contended reports
 // whether another hook process held the lock when this caller arrived.
 func holdHookseenLock(dir string) (func(), bool) {
-	if strings.TrimSpace(dir) == "" {
-		return func() {}, false
-	}
-	inProcContended := !hookseenMu.TryLock()
-	if inProcContended {
-		hookseenMu.Lock()
-	}
-	path := hookseenLockPath(dir)
-	if release, ok, busy := takeInstallLock(path, false); ok || !busy {
-		return func() {
-			release()
-			hookseenMu.Unlock()
-		}, inProcContended
-	}
-	release, _, _ := takeInstallLock(path, true)
-	return func() {
-		release()
-		hookseenMu.Unlock()
-	}, true
+	_, release, contended := hookengine.NewLedger(dir).Lock()
+	return release, contended
 }
 
 func loadSeen(dir string) seenLines {
-	b, err := os.ReadFile(hookseenPath(dir))
-	if err != nil {
-		return nil
-	}
-	return seenLines(strings.Split(string(b), "\n"))
+	return seenLines(hookengine.NewLedger(dir).Read())
 }
 
 // injected is alreadyInjected over an already-read file.
 func (sl seenLines) injected(sid string) map[string]bool {
-	out := map[string]bool{}
-	if sid == "" {
-		return out
-	}
-	key := hookseenKey(sid)
-	for _, line := range sl {
-		parts := strings.Fields(line)
-		if len(parts) >= 2 && parts[0] == key {
-			out[parts[1]] = true
-		}
-	}
-	return out
+	return hookengine.SeenLines(sl).Injected(sid)
 }
 
 // recent is recentlyInjected over an already-read file.
 func (sl seenLines) recent(sid string, window int) map[string]bool {
-	out := map[string]bool{}
-	if sid == "" || window <= 0 {
-		return out
-	}
-	key := hookseenKey(sid)
-	kept := 0
-	for i := len(sl) - 1; i >= 0 && kept < window; i-- {
-		parts := strings.Fields(sl[i])
-		if len(parts) < 2 || parts[0] != key {
-			continue
-		}
-		kept++
-		out[parts[1]] = true
-	}
-	return out
+	return hookengine.SeenLines(sl).Recent(sid, window)
 }
 
 // recentInProject is recentlyInjectedInProject over an already-read file.
 func (sl seenLines) recentInProject(project string, window int) map[string]bool {
-	out := map[string]bool{}
-	if project == "" || window <= 0 {
-		return out
-	}
-	kept := 0
-	for i := len(sl) - 1; i >= 0 && kept < window; i-- {
-		parts := strings.Fields(sl[i])
-		if len(parts) < 4 || parts[3] != project {
-			continue
-		}
-		kept++
-		out[parts[1]] = true
-	}
-	return out
+	return hookengine.SeenLines(sl).RecentInProject(project, window)
 }
 
 // asked is askedRecently over an already-read file.
 func (sl seenLines) asked(sid, key string, window time.Duration) bool {
-	if sid == "" || key == "" || window <= 0 {
-		return false
-	}
-	want := hookseenKey(sid)
-	cutoff := time.Now().UTC().Add(-window)
-	for _, s := range slices.Backward(sl) {
-		parts := strings.Fields(s)
-		if len(parts) < 3 || parts[0] != want || parts[1] != key {
-			continue
-		}
-		t, err := time.Parse(time.RFC3339, parts[2])
-		if err != nil {
-			return false
-		}
-		return t.After(cutoff)
-	}
-	return false
+	return hookengine.SeenLines(sl).Asked(sid, key, window)
 }
 
 // blockFingerprint identifies what a block says, so the same words are not
 // shown to the same agent session twice while the session they came from stays
 // available for what else it holds.
 func blockFingerprint(body string) string {
-	sum := sha256.Sum256([]byte(strings.Join(strings.Fields(body), " ")))
-	return hex.EncodeToString(sum[:8])
+	return hookengine.BlockFingerprint(body)
 }
 
 // repeatAskWindow is how long one reader's question stays answered. An hour is
@@ -195,17 +105,15 @@ const repeatAskWindow = time.Hour
 // text: the same question typed twice with different filler is the same
 // question, and terms are what the ranking sees.
 func askKey(terms []string) string {
-	sorted := append([]string(nil), terms...)
-	sort.Strings(sorted)
-	sum := sha256.Sum256([]byte(strings.Join(sorted, " ")))
-	// The prefix keeps it out of the session-id space this file also holds.
-	return "ask:" + hex.EncodeToString(sum[:8])
+	return hookengine.AskKey(terms)
 }
 
 // isSpawnedReader reports whether this recall is for an agent the parent just
 // spawned rather than for someone typing. spawnRecall builds the id, and the
 // prefix is the only thing that separates the two readers here.
-func isSpawnedReader(sid string) bool { return strings.HasPrefix(sid, "task:") }
+func isSpawnedReader(sid string) bool {
+	return strings.HasPrefix(sid, hookengine.SpawnReaderPrefix)
+}
 
 // injectionCooldown is how many later injections a session sits out after
 // being shown. Counted in injections rather than minutes because that is what
@@ -242,53 +150,19 @@ func recentlyInjected(dir, sid string, window int) map[string]bool {
 // recall may send it again what it was already shown. Used when the harness
 // truncates the conversation and the blocks go with it.
 func forgetInjected(dir, sid string) {
-	// An early return, not a rule: with no id the filter below matches nothing
-	// and the file is rewritten unchanged, so this saves a read and a write.
-	if sid == "" {
-		return
+	hookengine.NewLedger(dir).ForgetSessions(sid)
+}
+
+func seenSessionIDs(ss []model.Session) []string {
+	ids := make([]string, 0, len(ss))
+	for _, s := range ss {
+		ids = append(ids, s.ID)
 	}
-	p := hookseenPath(dir)
-	b, err := os.ReadFile(p)
-	if err != nil {
-		return
-	}
-	// Every key this session's memory is filed under, not only the one the
-	// per-prompt hook writes: the session-start rows are `start:<sid>` and the
-	// once mark is `once:<sid>`, so a compaction dropped the prompt rows and
-	// kept the two that say the digest has already been sent — leaving the
-	// next start refusing to send back exactly what the compaction lost. On a
-	// harness whose only rows are those two, nothing was forgotten at all
-	// (#3307).
-	key := hookseenKey(sid)
-	keys := map[string]bool{key: true}
-	// Only for an id that is not itself one of those keys. No harness writes a
-	// session id beginning with a prefix deja owns, and if one ever did, the
-	// prefixed forms would be another session's rows rather than this one's —
-	// so the narrow, exact behaviour is what that case gets.
-	if !hookseenPrefixed(key) {
-		keys[hookseenKey(sessionStartKeyPrefix+sid)] = true
-		keys[hookseenKey(onceDigestKey(sid))] = true
-	}
-	var kept []string
-	for line := range strings.SplitSeq(string(b), "\n") {
-		if line == "" {
-			continue
-		}
-		// A packet's delivery mark stays. It names one capture, and the next
-		// compaction is a new capture with a new mark, so keeping it never holds
-		// a packet back. Dropping it did: a forked agent that compacts runs
-		// PreCompact under its parent's session id, and the parent's packet from
-		// a day earlier was delivered again on its next prompt.
-		if parts := strings.Fields(line); len(parts) >= 2 && keys[parts[0]] && !strings.HasPrefix(parts[1], "compaction:") {
-			continue
-		}
-		kept = append(kept, line)
-	}
-	out := ""
-	if len(kept) > 0 {
-		out = strings.Join(kept, "\n") + "\n"
-	}
-	_ = atomicfile.Write(p, []byte(out), 0o600)
+	return ids
+}
+
+func recordSeenSessionsFor(tx *hookengine.SeenTx, sid, project string, ss []model.Session) {
+	tx.RecordForProject(sid, project, seenSessionIDs(ss)...)
 }
 
 func rememberInjected(dir, sid string, ss []model.Session) {
@@ -300,147 +174,27 @@ func rememberInjected(dir, sid string, ss []model.Session) {
 // that have no project pass the empty string and write the old three-field
 // line.
 func rememberInjectedFor(dir, sid, project string, ss []model.Session) {
-	ids := make([]string, 0, len(ss))
-	for _, s := range ss {
-		ids = append(ids, s.ID)
-	}
-	rememberInjectedIDsFor(dir, sid, project, ids)
+	rememberInjectedIDsFor(dir, sid, project, seenSessionIDs(ss))
 }
 
 // rememberInjectedIDsFor is rememberInjectedFor for a caller that has the ids
 // rather than the sessions — the session-start hook, which serves out of a
 // cached digest and knows only what went into it.
 func rememberInjectedIDsFor(dir, sid, project string, ids []string) {
-	if sid == "" {
-		return
-	}
-	p := hookseenPath(dir)
-	// Past 1MB the dedup file used to stop writing entirely, which permanently
-	// broke dedup — the per-prompt hook then re-injected the same sessions turn
-	// after turn. Rotate instead: keep this session's own lines (so its dedup
-	// survives) plus the recent tail, then append. Rare (once per 1MB) and
-	// atomic, so concurrent hooks lose a few advisory entries at worst.
-	if fi, err := os.Stat(p); err == nil && fi.Size() > 1<<20 {
-		rotateHookseen(p, sid)
-	}
-	// O_RDWR so the append can read the last byte first: a hook killed before
-	// its newline leaves half a line, and writing onto it costs the record
-	// written after — a session deja then does not know it has shown, which is
-	// this file's whole job (#1967).
-	f, err := atomicfile.OpenSharedFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	if atomicfile.EndsMidLine(f) {
-		_, _ = f.WriteString("\n")
-	}
-	stamp := time.Now().UTC().Format(time.RFC3339)
-	for _, id := range ids {
-		// The value stays byte-exact: it is looked up against the index's own
-		// ids, and a mapped one would match nothing there. One that cannot be
-		// a field is dropped instead — a missing dedup entry costs a second
-		// showing, where a broken line costs the entry written after it.
-		if !hookseenField(id) {
-			continue
-		}
-		if project == "" {
-			fmt.Fprintf(f, "%s %s %s\n", hookseenKey(sid), id, stamp)
-			continue
-		}
-		// The project has no spaces by the time it gets here — it is one
-		// candidate name, not a path — so the line stays field-separated.
-		fmt.Fprintf(f, "%s %s %s %s\n", hookseenKey(sid), id, stamp, project)
-	}
+	hookengine.NewLedger(dir).RecordForProject(sid, project, ids...)
 }
 
 // rotateHookseen shrinks the dedup file to this session's lines plus the most
 // recent tail, written atomically so a concurrent hook never sees a torn file.
 func rotateHookseen(p, sid string) {
-	b, err := os.ReadFile(p)
-	if err != nil {
-		return
-	}
-	lines := strings.Split(string(b), "\n")
-	// The tail budget is well under the 1MB cap so rotation is infrequent.
-	const tailLines = 4000
-	start := 0
-	if len(lines) > tailLines {
-		start = len(lines) - tailLines
-	}
-	// The caller's own lines are kept beyond the tail so its dedup survives the
-	// rotation — but only as many as the tail itself. Keeping all of them left
-	// a long session able to fill the file with its own entries, after which
-	// every write rotated a megabyte again: the tool hooks write a token per
-	// call, so that is reachable rather than theoretical (#2164).
-	var keep, mine, packets []string
-	prefix := hookseenKey(sid) + " "
-	for i, ln := range lines {
-		if ln == "" {
-			continue
-		}
-		switch {
-		case i >= start:
-			keep = append(keep, ln)
-		case strings.HasPrefix(ln, prefix):
-			mine = append(mine, ln)
-		case compactionMark(ln):
-			packets = append(packets, ln)
-		}
-	}
-	if len(mine) > tailLines {
-		mine = mine[len(mine)-tailLines:]
-	}
-	if len(packets) > compactionMarksKept {
-		packets = packets[len(packets)-compactionMarksKept:]
-	}
-	_ = atomicfile.Write(p, []byte(strings.Join(append(append(packets, mine...), keep...), "\n")+"\n"), 0o600)
-}
-
-// compactionMarksKept bounds the compaction marks a rotation carries over. One
-// is written per compaction, so this is hundreds of compactions' worth.
-const compactionMarksKept = 1000
-
-// compactionMark reports a line that says a compaction packet was delivered,
-// or must not be. Those are once-only, and a long session's packet can be
-// delivered days before the rotation comes: losing the mark then delivers it
-// again into a session that has moved on.
-func compactionMark(line string) bool {
-	parts := strings.Fields(line)
-	return len(parts) >= 2 && strings.HasPrefix(parts[1], "compaction")
+	hookengine.RotateFile(p, sid)
 }
 
 // rememberInjectedIDs records arbitrary dedupe tokens against a session, so a
 // hook that injects something other than a session (a command, a file line)
 // can avoid repeating it to the same agent turn after turn.
 func rememberInjectedIDs(dir, sid string, ids ...string) {
-	if sid == "" {
-		return
-	}
-	p := hookseenPath(dir)
-	// Rotate rather than stop, for the reason rememberInjected does: a full
-	// file used to end the dedup for good, and the hooks that write tokens are
-	// the ones whose whole job is not repeating themselves to the same agent.
-	// Stopping here left that to whenever a session injection happened to
-	// rotate the file, and on a machine whose hooks inject tokens rather than
-	// sessions, nothing ever did (#2164).
-	if fi, err := os.Stat(p); err == nil && fi.Size() > 1<<20 {
-		rotateHookseen(p, sid)
-	}
-	f, err := atomicfile.OpenSharedFile(p, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0o600)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	if atomicfile.EndsMidLine(f) {
-		_, _ = f.WriteString("\n")
-	}
-	for _, id := range ids {
-		if !hookseenField(id) {
-			continue
-		}
-		fmt.Fprintf(f, "%s %s\n", hookseenKey(sid), id)
-	}
+	hookengine.NewLedger(dir).RecordIDs(sid, ids...)
 }
 func blockAlreadySentThisSession(dir, sid string) bool {
 	if sid == "" {
@@ -460,7 +214,7 @@ const digestsPerSession = 4
 
 // digestSeenPrefix marks a full digest's fingerprint in the seen list, so the
 // budget can count them without a row of its own.
-const digestSeenPrefix = "digest:"
+const digestSeenPrefix = hookengine.DigestSeenPrefix
 
 // digestBudgetSpent reports whether this session has had its full digests. A
 // spawned agent has no count of its own: it gets the pointer unless the
@@ -581,16 +335,4 @@ func clipTopic(topic string) string {
 		cut = cut[:i]
 	}
 	return strings.TrimRight(cut, " ,;:—-") + "…"
-}
-
-// hookseenPrefixed reports whether a key already carries one of the prefixes
-// deja writes its own rows under, so a session id shaped like one of them does
-// not reach across into another session's rows.
-func hookseenPrefixed(key string) bool {
-	for _, p := range []string{sessionStartKeyPrefix, "once:", "agy:"} {
-		if strings.HasPrefix(key, p) {
-			return true
-		}
-	}
-	return false
 }

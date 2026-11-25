@@ -2,12 +2,7 @@
 
 package main
 
-import (
-	"os"
-	"syscall"
-
-	"github.com/vshulcz/deja-vu/internal/atomicfile"
-)
+import "github.com/vshulcz/deja-vu/internal/atomicfile"
 
 // takeInstallLock holds an advisory lock on path. ok=false means there is no
 // lock — the directory could not be created, or `wait` was false and someone
@@ -19,20 +14,5 @@ import (
 // busy tells the two failures apart: somebody else holds the lock, rather than
 // this machine not letting deja have one at all.
 func takeInstallLock(path string, wait bool) (release func(), ok, busy bool) {
-	f, err := atomicfile.OpenSharedFile(path, os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		return func() {}, false, false
-	}
-	how := syscall.LOCK_EX
-	if !wait {
-		how |= syscall.LOCK_NB
-	}
-	if err := syscall.Flock(int(f.Fd()), how); err != nil {
-		_ = f.Close()
-		return func() {}, false, true
-	}
-	return func() {
-		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-		_ = f.Close()
-	}, true, false
+	return atomicfile.TakeAdvisoryLock(path, wait)
 }

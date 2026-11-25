@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
+	"github.com/vshulcz/deja-vu/internal/hookengine"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
@@ -425,13 +426,12 @@ func antigravityPromptBlockFrom(dir, question, conversationID, workspace, transc
 	if question == "" {
 		return ""
 	}
-	if strings.TrimSpace(conversationID) != "" {
+	if dir != "" && strings.TrimSpace(conversationID) != "" {
 		qKey := "q:" + shortHash(question)
 		dKey := antigravityDigestKey(conversationID)
-		if alreadyInjected(dir, dKey)[qKey] {
+		if !hookengine.NewLedger(dir).ClaimOnce(dKey, qKey) {
 			return ""
 		}
-		rememberInjectedIDs(dir, dKey, qKey)
 	}
 	body := map[string]any{
 		"prompt":     question,
@@ -478,7 +478,7 @@ func rememberDigestInjected(dir, conversationID string) {
 }
 
 func antigravityDigestKey(conversationID string) string {
-	return "agy:" + conversationID
+	return hookengine.AgyDigestKey(conversationID)
 }
 
 // antigravityDigestMarker is what the ledger row says: this conversation has
@@ -667,16 +667,5 @@ const checkpointStepType = "CHECKPOINT"
 // The marker is kept under a key of its own, so forgetting the conversation's
 // rows does not forget that this compaction was handled.
 func forgetOnCheckpoint(dir, conversationID, marker string) bool {
-	if strings.TrimSpace(conversationID) == "" || strings.TrimSpace(marker) == "" {
-		return false
-	}
-	key := "agy-compact:" + conversationID
-	token := "checkpoint:" + shortHash(marker)
-	if alreadyInjected(dir, key)[token] {
-		return false
-	}
-	rememberInjectedIDs(dir, key, token)
-	forgetInjected(dir, conversationID)
-	forgetInjected(dir, antigravityDigestKey(conversationID))
-	return true
+	return hookengine.NewLedger(dir).ForgetCheckpoint(conversationID, marker)
 }

@@ -270,3 +270,30 @@ func SettleRecall(text, extra string) string {
 	}
 	return body
 }
+
+// CoalesceRecallMessages merges non-empty recall messages into at most one sealed
+// frame, deduplicating identical unwrapped blocks while leaving a standalone
+// unframed or single-frame message untouched.
+func CoalesceRecallMessages(msgs []string) string {
+	nonEmpty := make([]string, 0, len(msgs))
+	for _, m := range msgs {
+		if strings.TrimSpace(m) != "" {
+			nonEmpty = append(nonEmpty, m)
+		}
+	}
+	if len(nonEmpty) == 0 {
+		return ""
+	}
+	if len(nonEmpty) == 1 && (IsSingleRecallFrame(nonEmpty[0]) || !strings.Contains(nonEmpty[0], recallOpenTag)) {
+		return nonEmpty[0]
+	}
+	seen := make(map[string]bool, len(nonEmpty))
+	parts := make([]string, 0, len(nonEmpty))
+	for _, m := range nonEmpty {
+		parts = AppendUnwrappedRecallParts(parts, m, seen)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return SealRecall(strings.Join(parts, "\n\n"))
+}

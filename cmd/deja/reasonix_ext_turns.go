@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
+	"github.com/vshulcz/deja-vu/internal/hookengine"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/proc"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -466,8 +467,7 @@ func (x *rxExt) onCompaction(ctx context.Context, fields map[string]json.RawMess
 	cwd := x.workspace
 	x.sess.digested = false
 	x.mu.Unlock()
-	forgetInjected(x.dir, key)
-	forgetInjected(x.dir, compactionFailureKey(key))
+	hookengine.NewLedger(x.dir).ForgetSessions(key, compactionFailureKey(key))
 	if recallIsOff() || cwd == "" || !policy.Load().Allows(policy.ActivationAuto, cwd) {
 		return nil
 	}

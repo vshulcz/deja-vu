@@ -313,13 +313,13 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if !built {
 		return emitCommittedNudgeOnly(dir, cwd, input.SessionID, asked, advisories, failNudge, ranked, matched, strong, skip, true, plain, stdout)
 	}
-	releaseSeenLock, _ := holdHookseenLock(dir)
-	latestFile := loadSeen(dir)
-	if !isSpawnedReader(input.SessionID) && latestFile.asked(input.SessionID, askKey(terms), repeatAskWindow) {
+	seenTx, releaseSeenLock, _ := openHookseenTx(dir)
+	latestFile := seenTx.Load()
+	if !isSpawnedReader(input.SessionID) && latestFile.Asked(input.SessionID, askKey(terms), repeatAskWindow) {
 		releaseSeenLock()
 		return emitCommittedNudgeOnly(dir, cwd, input.SessionID, asked, advisories, failNudge, nil, nil, nil, skip, false, plain, stdout)
 	}
-	latestSeen := latestFile.injected(input.SessionID)
+	latestSeen := latestFile.Injected(input.SessionID)
 	keptAdv, freshAdvToks := filterFreshPromptAdvisories(advisories, latestSeen)
 	latestNudge := joinPromptAdvisories(joinAdvisoryItems(keptAdv), failNudge)
 	latestWorth := effectiveDigestWorth(worthDigest, latestSeen, input.SessionID, ss, terms)
@@ -336,7 +336,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	fp := blockFingerprint(body)
 	if latestSeen[fp] || latestSeen[digestSeenPrefix+fp] {
 		if input.SessionID != "" && len(freshAdvToks) > 0 {
-			rememberInjectedIDs(dir, input.SessionID, freshAdvToks...)
+			seenTx.RecordIDs(input.SessionID, freshAdvToks...)
 		}
 		releaseSeenLock()
 		return emitNudgeOnly(stdout, plain, latestNudge)
@@ -358,7 +358,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		// Every quote was delivered to this reader already, so the block is the
 		// same injection wearing another session's header.
 		if input.SessionID != "" && len(freshAdvToks) > 0 {
-			rememberInjectedIDs(dir, input.SessionID, freshAdvToks...)
+			seenTx.RecordIDs(input.SessionID, freshAdvToks...)
 		}
 		releaseSeenLock()
 		return emitNudgeOnly(stdout, plain, latestNudge)
@@ -368,14 +368,14 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// stop a re-spawn of the same agent repeating itself — not to send the
 	// second one in blind. Handing it what the parent saw is the whole point.
 	if input.SessionID != "" && len(freshAdvToks) > 0 {
-		rememberInjectedIDs(dir, input.SessionID, freshAdvToks...)
+		seenTx.RecordIDs(input.SessionID, freshAdvToks...)
 	}
-	rememberInjectedIDs(dir, input.SessionID, fp)
-	rememberInjectedIDs(dir, input.SessionID, freshQuotes...)
+	seenTx.RecordIDs(input.SessionID, fp)
+	seenTx.RecordIDs(input.SessionID, freshQuotes...)
 	// Stamped, because the question is answered again once the window passes,
 	// where a block fingerprint holds for the life of the session.
-	rememberInjectedIDsFor(dir, input.SessionID, "", []string{askKey(terms)})
-	rememberInjectedFor(dir, input.SessionID, projectKey, shown)
+	seenTx.RecordForProject(input.SessionID, "", askKey(terms))
+	recordSeenSessionsFor(seenTx, input.SessionID, projectKey, shown)
 	showLine := confident && notesHaveReader() && dejaVuLineDue(dir, input.SessionID)
 	releaseSeenLock()
 	out := frameRecall(body)
