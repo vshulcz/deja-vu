@@ -1717,26 +1717,7 @@ func codexLineage(payload map[string]any) (kind, parent string) {
 // bounded window before offset so cumulative duplicates across an append cut
 // are skipped cleanly.
 func codexLastTokenTotalBefore(path string, offset int64) int64 {
-	if offset <= 0 {
-		return 0
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		return 0
-	}
-	defer func() { _ = f.Close() }()
-	start := max(0, offset-callWindow)
-	buf := make([]byte, offset-start)
-	if _, err := f.ReadAt(buf, start); err != nil && !errors.Is(err, io.EOF) {
-		return 0
-	}
-	if start > 0 {
-		if nl := bytes.IndexByte(buf, '\n'); nl >= 0 {
-			buf = buf[nl+1:]
-		} else {
-			return 0
-		}
-	}
+	buf := readAlignedWindowBefore(path, offset)
 	for _, raw := range slices.Backward(bytes.Split(buf, []byte("\n"))) {
 		if !bytes.Contains(raw, []byte("token_count")) {
 			continue

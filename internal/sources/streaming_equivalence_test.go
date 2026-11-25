@@ -557,3 +557,120 @@ func TestClaudeStreamingOffsetEquivalence(t *testing.T) {
 		t.Fatalf("merged Tokens = %+v, want %+v (tail=%+v)", merged, fullSS[0].Tokens, tailSS[0].Tokens)
 	}
 }
+
+func TestStreamingWindowAndSanitizerEdgeCases(t *testing.T) {
+	t.Run("CapEditSpanRepairsInvalidUTF8", func(t *testing.T) {
+		gotShort := capEditSpan("bad\xffspan")
+		if !utf8.ValidString(gotShort) || gotShort != "bad\uFFFDspan" {
+			t.Fatalf("capEditSpan short invalid UTF-8 = %q, want %q", gotShort, "bad\uFFFDspan")
+		}
+		over := "bad\xff" + strings.Repeat("x", editSpanMax+10)
+		gotOver := capEditSpan(over)
+		if !utf8.ValidString(gotOver) || len(gotOver) != editSpanMax+len("\uFFFD")-1 || !strings.HasPrefix(gotOver, "bad\uFFFD") {
+			t.Fatalf("capEditSpan over invalid UTF-8 invalid: valid=%v len=%d", utf8.ValidString(gotOver), len(gotOver))
+		}
+	})
+
+	t.Run("AlignedWindowAndSeedAntigravityBoundaries", func(t *testing.T) {
+		dir := t.TempDir()
+		if got := readAlignedWindowFrom(nil, 0); got != nil {
+			t.Fatalf("readAlignedWindowFrom(nil, 0) = %v, want nil", got)
+		}
+		if got := readAlignedWindowBefore(filepath.Join(dir, "missing.jsonl"), 32); got != nil {
+			t.Fatalf("missing readAlignedWindowBefore = %v, want nil", got)
+		}
+
+		emptyPath := filepath.Join(dir, "empty.jsonl")
+		if err := os.WriteFile(emptyPath, nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if got := readAlignedWindowBefore(emptyPath, 0); got != nil {
+			t.Fatalf("zero offset readAlignedWindowBefore = %v, want nil", got)
+		}
+		if got := readAlignedWindowBefore(emptyPath, 16); got != nil {
+			t.Fatalf("empty file readAlignedWindowBefore = %v, want nil", got)
+		}
+
+		winPath := filepath.Join(dir, "window.jsonl")
+		winBody := strings.Repeat("a", callWindow+100) + "\nKEEP\n"
+		if err := os.WriteFile(winPath, []byte(winBody), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if got := string(readAlignedWindowBefore(winPath, int64(len(winBody)))); got != "KEEP\n" {
+			t.Fatalf("aligned window = %q, want %q", got, "KEEP\n")
+		}
+
+		noNLPath := filepath.Join(dir, "nonl.jsonl")
+		noNLBody := strings.Repeat("a", callWindow+512)
+		if err := os.WriteFile(noNLPath, []byte(noNLBody), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if got := readAlignedWindowBefore(noNLPath, int64(len(noNLBody))); got != nil {
+			t.Fatalf("no-newline >callWindow readAlignedWindowBefore = %v, want nil", got)
+		}
+		var started time.Time
+		if cwd := seedAntigravityBefore(noNLPath, int64(len(noNLBody)), nil, nil, &started); cwd != "" {
+			t.Fatalf("seedAntigravityBefore no-newline = %q, want empty", cwd)
+		}
+	})
+
+	t.Run("CodexTokenBeforeAndResumesDefaultItemType", func(t *testing.T) {
+		dir := t.TempDir()
+		tokPath := filepath.Join(dir, "tokens.jsonl")
+		badTok := "not-json token_count\n" +
+			`{"type":"response_item","payload":{"text":"token_count"}}` + "\n" +
+			`{"type":"event_msg","payload":{"type":"other","text":"token_count"}}` + "\n"
+		if err := os.WriteFile(tokPath, []byte(badTok), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if got := codexLastTokenTotalBefore(tokPath, int64(len(badTok))); got != 0 {
+			t.Fatalf("codexLastTokenTotalBefore non-token events = %d, want 0", got)
+		}
+
+		goodTok := badTok + `{"type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"total_tokens":420}}}}` + "\n"
+		if err := os.WriteFile(tokPath, []byte(goodTok), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if got := codexLastTokenTotalBefore(tokPath, int64(len(goodTok))); got != 420 {
+			t.Fatalf("codexLastTokenTotalBefore = %d, want 420", got)
+		}
+
+		resPath := filepath.Join(dir, "rollout-default-call.jsonl")
+		prefix := `{"timestamp":"2026-10-01T08:00:00Z","type":"session_meta","payload":{"id":"cx-def","cwd":"/work/app"}}` + "\n" +
+			`{"timestamp":"2026-10-01T08:00:01Z","type":"response_item","payload":{"type":"message","role":"user","call_id":"note_call_1","content":"check _call fallback"}}` + "\n" +
+			`{"timestamp":"2026-10-01T08:00:02Z","type":"response_item","payload":{"type":"function_call","call_id":"fn_call_2","name":"view_file","arguments":"{}"}}` + "\n"
+		offset := int64(len(prefix))
+		tail := `{"timestamp":"2026-10-01T08:00:03Z","type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"note_call_1","output":"Process exited with code 0\nok\n"}}` + "\n" +
+			`{"timestamp":"2026-10-01T08:00:04Z","type":"response_item","payload":{"type":"function_call_output","call_id":"fn_call_2","output":"Process exited with code 0\nok\n"}}` + "\n"
+		if err := os.WriteFile(resPath, []byte(prefix+tail), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if !codexResumes(resPath, offset) {
+			t.Fatalf("codexResumes(non-command call payloads) = false, want true")
+		}
+	})
+
+	t.Run("SeedClaudeUsageBeforeSkipsNonUsageRows", func(t *testing.T) {
+		dir := t.TempDir()
+		clPath := filepath.Join(dir, "claude-usage.jsonl")
+		if got := seedClaudeUsageBefore(clPath, 0); got != nil {
+			t.Fatalf("seedClaudeUsageBefore(0) = %v, want nil", got)
+		}
+		clBody := `not-json "usage"` + "\n" +
+			`{"type":"system","message":{"usage":{"input_tokens":5}}}` + "\n" +
+			`{"type":"assistant","message":{"role":"assistant","usage":{"input_tokens":9}}}` + "\n" +
+			`{"type":"assistant","sessionId":"cl-edge","timestamp":"2026-10-01T08:00:01Z","message":{"id":"m_ok","role":"assistant","usage":{"input_tokens":77,"output_tokens":3}}}` + "\n"
+		if err := os.WriteFile(clPath, []byte(clBody), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		got := seedClaudeUsageBefore(clPath, int64(len(clBody)))
+		if len(got) != 1 {
+			t.Fatalf("seedClaudeUsageBefore len = %d, want 1 (%+v)", len(got), got)
+		}
+		for k, u := range got {
+			if u.Input != 77 || u.Output != 3 {
+				t.Fatalf("seedClaudeUsageBefore[%q] = %+v, want Input=77 Output=3", k, u)
+			}
+		}
+	})
+}

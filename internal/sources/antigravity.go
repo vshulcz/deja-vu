@@ -3,10 +3,8 @@ package sources
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"path"
@@ -486,24 +484,7 @@ func antigravityResumes(path string, offset int64) bool {
 }
 
 func antigravityHasPlannerInWindow(path string, offset int64) bool {
-	f, err := os.Open(path)
-	if err != nil {
-		return false
-	}
-	defer func() { _ = f.Close() }()
-	start := max(0, offset-callWindow)
-	buf := make([]byte, offset-start)
-	if _, err := f.ReadAt(buf, start); err != nil && !errors.Is(err, io.EOF) {
-		return false
-	}
-	if start > 0 {
-		if nl := bytes.IndexByte(buf, '\n'); nl >= 0 {
-			buf = buf[nl+1:]
-		} else {
-			return false
-		}
-	}
-	return bytes.Contains(buf, []byte(`"PLANNER_RESPONSE"`))
+	return bytes.Contains(readAlignedWindowBefore(path, offset), []byte(`"PLANNER_RESPONSE"`))
 }
 
 func antigravityToolCallDenied(status, text string) bool {
@@ -572,17 +553,9 @@ func seedAntigravityBefore(path string, offset int64, fromCalls map[model.Messag
 			*started = t
 		}
 	}
-	start := max(0, offset-callWindow)
-	buf := make([]byte, offset-start)
-	if _, err := f.ReadAt(buf, start); err != nil && !errors.Is(err, io.EOF) {
+	buf := readAlignedWindowFrom(f, offset)
+	if len(buf) == 0 {
 		return ""
-	}
-	if start > 0 {
-		if nl := bytes.IndexByte(buf, '\n'); nl >= 0 {
-			buf = buf[nl+1:]
-		} else {
-			return ""
-		}
 	}
 	cwd := ""
 	lines := bytes.Split(buf, []byte("\n"))

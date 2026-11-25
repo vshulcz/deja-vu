@@ -136,37 +136,17 @@ func parseClaudeTypedFromOffset(path string, offset int64) ([]model.Session, err
 }
 
 func seedClaudeUsageBefore(path string, offset int64) map[string]model.Tokens {
-	if offset <= 0 {
+	buf := readAlignedWindowBefore(path, offset)
+	if len(buf) == 0 {
 		return nil
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		return nil
-	}
-	defer func() { _ = f.Close() }()
-	start := max(0, offset-callWindow)
-	buf := make([]byte, offset-start)
-	if _, err := f.ReadAt(buf, start); err != nil && !errors.Is(err, io.EOF) {
-		return nil
-	}
-	if start > 0 {
-		if nl := bytes.IndexByte(buf, '\n'); nl >= 0 {
-			buf = buf[nl+1:]
-		} else {
-			return nil
-		}
 	}
 	var out map[string]model.Tokens
 	for raw := range bytes.SplitSeq(buf, []byte("\n")) {
 		if !bytes.Contains(raw, []byte(`"usage"`)) {
 			continue
 		}
-		raw = trimJSONSpace(raw)
-		if len(raw) == 0 {
-			continue
-		}
 		var v claudeLine
-		if json.Unmarshal(raw, &v) != nil || (v.Type != "assistant" && v.Type != "user") || v.Message == nil || v.Message.Usage == nil {
+		if json.Unmarshal(trimJSONSpace(raw), &v) != nil || (v.Type != "assistant" && v.Type != "user") || v.Message == nil || v.Message.Usage == nil {
 			continue
 		}
 		key := claudeCallIdentity(v)
