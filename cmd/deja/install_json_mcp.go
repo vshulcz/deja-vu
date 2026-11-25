@@ -549,69 +549,10 @@ func copilotMCPConfigPath() string {
 // differs from the common mcpServers shape: entries carry a type and an
 // enabled-tools list.
 func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
-	path := copilotMCPConfigPath()
-	old, err := readConfig(path)
-	if err != nil {
-		return installResult{}, err
-	}
-	var root map[string]any
-	var note string
-	if len(bytes.TrimSpace(old)) == 0 {
-		root = map[string]any{}
-	} else if configIsJSONC(old) {
-		// A comment is not a broken file, and refusing the target over one is
-		// how somebody who annotated their config could not install deja at
-		// all (#2783, the two targets #1664 did not reach).
-		command, args := mcpCommandArgs(exe)
-		return writeJSONCEntry(path, old, "mcpServers",
-			map[string]any{"type": "local", "command": command, "args": args, "tools": []string{"*"}}, uninstall)
-	} else if uerr := json.Unmarshal(old, &root); uerr != nil {
-		return installResult{}, configParseError(path, uerr)
-	}
-	m, _, err := mcpBlock(root, "mcpServers", path)
-	if err != nil {
-		// On the way out there is nothing of deja's in a block it never wrote,
-		// and refusing here would leave the rest of the target wired (#2399).
-		if uninstall {
-			return installResult{Path: path, Action: "unchanged"}, nil
-		}
-		return installResult{}, err
-	}
-	if m == nil {
-		// Adding the empty block on the way out rewrites a config that never
-		// mentioned deja, and leaves a .bak of it besides (#676).
-		if uninstall {
-			return installResult{Path: path, Action: "unchanged"}, nil
-		}
-		m = map[string]any{}
-		root["mcpServers"] = m
-		noteBlockAdded(path, "mcpServers")
-	}
-	if uninstall {
-		delete(m, "deja")
-		removeAdoptedDejaEntries(path, "mcpServers", m)
-		note = leftDejaEntriesNote(m)
-		// And the block, when deja is what put it there (#2604).
-		if len(m) == 0 && blockWasAdded(path, "mcpServers") {
-			delete(root, "mcpServers")
-			forgetBlockAdded(path, "mcpServers")
-		}
-	} else {
-		command, args := mcpCommandArgs(exe)
-		key := dejaEntryKey(m)
-		if key != "deja" {
-			noteBlockAdded(path, "mcpServers."+key)
-		}
-		m[key], note = mergeDejaEntry(m[key], map[string]any{"type": "local", "command": command, "args": args, "tools": []string{"*"}})
-		note = withOtherDejaEntries(note, m, key)
-	}
-	next, err := marshalConfigLike(old, root)
-	if err != nil {
-		return installResult{}, err
-	}
-	next = append(next, '\n')
-	a, err := writeIfChanged(path, old, next)
-	return installResult{Path: path, Action: a, Note: note}, err
+	command, args := mcpCommandArgs(exe)
+	return runJSONMCPSpec(copilotMCPConfigPath(), "mcpServers",
+		map[string]any{"type": "local", "command": command, "args": args, "tools": []string{"*"}},
+		uninstall, false)
 }
 
 // installOpenClawMCP wires deja into openclaw.json — OpenClaw keeps MCP
@@ -631,74 +572,10 @@ func installOpenClawMCP(exe string, uninstall bool) (installResult, error) {
 
 func installOpenClawMCPEntry(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
-	old, err := readConfig(path)
-	if err != nil {
-		return installResult{}, err
-	}
-	var root map[string]any
-	var note string
-	switch {
-	case len(bytes.TrimSpace(old)) == 0:
-		root = map[string]any{}
-	case configIsJSONC(old):
-		// Two keys deep, which the text writer takes as a dotted block key
-		// (#2783).
-		command, args := mcpLaunchCommandArgs(exe, uninstall)
-		return writeJSONCEntry(path, old, "mcp.servers",
-			map[string]any{"command": command, "args": args}, uninstall)
-	case json.Unmarshal(old, &root) != nil:
-		return installResult{}, openclawParseError(path, old)
-	}
-	mcp, _, err := mcpBlock(root, "mcp", path)
-	if err != nil {
-		if uninstall {
-			return installResult{Path: path, Action: "unchanged"}, nil
-		}
-		return installResult{}, err
-	}
-	if mcp == nil {
-		mcp = map[string]any{}
-		root["mcp"] = mcp
-	}
-	servers, _, err := mcpBlock(mcp, "servers", path)
-	if err != nil {
-		if uninstall {
-			return installResult{Path: path, Action: "unchanged"}, nil
-		}
-		return installResult{}, err
-	}
-	if servers == nil {
-		servers = map[string]any{}
-		mcp["servers"] = servers
-		noteBlockAdded(path, "mcp.servers")
-	}
-	if uninstall {
-		delete(servers, "deja")
-		removeAdoptedDejaEntries(path, "mcp.servers", servers)
-		note = leftDejaEntriesNote(servers)
-		if len(servers) == 0 && blockWasAdded(path, "mcp.servers") {
-			delete(mcp, "servers")
-			if len(mcp) == 0 {
-				delete(root, "mcp")
-			}
-			forgetBlockAdded(path, "mcp.servers")
-		}
-	} else {
-		command, args := mcpLaunchCommandArgs(exe, uninstall)
-		key := dejaEntryKey(servers)
-		if key != "deja" {
-			noteBlockAdded(path, "mcp.servers."+key)
-		}
-		servers[key], note = mergeDejaEntry(servers[key], map[string]any{"command": command, "args": args})
-		note = withOtherDejaEntries(note, servers, key)
-	}
-	next, err := marshalConfigLike(old, root)
-	if err != nil {
-		return installResult{}, err
-	}
-	next = append(next, '\n')
-	a, err := writeIfChanged(path, old, next)
-	return installResult{Path: path, Action: a, Note: note}, err
+	command, args := mcpLaunchCommandArgs(exe, uninstall)
+	return runJSONMCPSpec(path, "mcp.servers",
+		map[string]any{"command": command, "args": args},
+		uninstall, true)
 }
 
 // firstDirThatTakesAWrite is the directory a write would actually land in: the
@@ -800,65 +677,7 @@ func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
 // name or whose entry carries more than the command: Muse reads the legacy
 // mcp_servers as well as mcpServers, and wants a type and a mode (#4709).
 func installMCPJSONEntry(path, blockKey string, entry map[string]any, uninstall bool) (installResult, error) {
-	old, err := readConfig(path)
-	if err != nil {
-		return installResult{}, err
-	}
-	var root map[string]any
-	var note string
-	if len(bytes.TrimSpace(old)) == 0 {
-		root = map[string]any{}
-	} else if configIsJSONC(old) {
-		// A comment is not a broken file, and refusing the target over one is
-		// how somebody who annotated their config could not install deja at
-		// all (#1664).
-		return writeJSONCEntry(path, old, blockKey, entry, uninstall)
-	} else if uerr := json.Unmarshal(old, &root); uerr != nil {
-		return installResult{}, configParseError(path, uerr)
-	}
-	m, _, err := mcpBlock(root, blockKey, path)
-	if err != nil {
-		// On the way out there is nothing of deja's in a block it never wrote,
-		// and refusing here would leave the rest of the target wired (#2399).
-		if uninstall {
-			return installResult{Path: path, Action: "unchanged"}, nil
-		}
-		return installResult{}, err
-	}
-	if m == nil {
-		// Adding the empty block on the way out rewrites a config that never
-		// mentioned deja, and leaves a .bak of it besides (#676).
-		if uninstall {
-			return installResult{Path: path, Action: "unchanged"}, nil
-		}
-		m = map[string]any{}
-		root[blockKey] = m
-		noteBlockAdded(path, blockKey)
-	}
-	if uninstall {
-		delete(m, "deja")
-		removeAdoptedDejaEntries(path, blockKey, m)
-		note = leftDejaEntriesNote(m)
-		// And the block, when deja is what put it there (#2604).
-		if len(m) == 0 && blockWasAdded(path, blockKey) {
-			delete(root, blockKey)
-			forgetBlockAdded(path, blockKey)
-		}
-	} else {
-		key := dejaEntryKey(m)
-		if key != "deja" {
-			noteBlockAdded(path, blockKey+"."+key)
-		}
-		m[key], note = mergeDejaEntry(m[key], entry)
-		note = withOtherDejaEntries(note, m, key)
-	}
-	next, err := marshalConfigLike(old, root)
-	if err != nil {
-		return installResult{}, err
-	}
-	next = append(next, '\n')
-	a, err := writeIfChanged(path, old, next)
-	return installResult{Path: path, Action: a, Note: note}, err
+	return runJSONMCPSpec(path, blockKey, entry, uninstall, false)
 }
 
 // autoTargetFor maps a detected harness to the deepest integration it has: the

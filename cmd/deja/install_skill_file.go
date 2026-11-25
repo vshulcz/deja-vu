@@ -12,45 +12,7 @@ import (
 // the file is deja's own so an edited copy is kept rather than replaced, an
 // unchanged file reports unchanged, and an uninstall leaves nothing behind.
 func installSkillFile(path string, uninstall bool) (installResult, error) {
-	old, err := readConfig(path)
-	if err != nil {
-		return installResult{}, err
-	}
-	if uninstall {
-		if len(old) == 0 {
-			return installResult{Path: path, Action: "unchanged"}, nil
-		}
-		if err := os.Remove(path); err != nil {
-			return installResult{}, err
-		}
-		// The skill's own directory, and the ones deja made above it: the
-		// prune beside the guidance files goes by name — `deja-history`, then
-		// `skills` — and this file is `deja-search` under directories of its
-		// own (#3698).
-		pruneCreatedDir(filepath.Dir(path))
-		return installResult{Path: path, Action: "removed"}, nil
-	}
-	// The copy these harnesses had under the CLI skill's name comes out rather
-	// than outliving the fix, the way the retired command files do (#3665).
-	if err := dropRetiredSkillFile(path); err != nil {
-		return installResult{}, err
-	}
-	noteCreatedDirs(filepath.Dir(path))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return installResult{}, err
-	}
-	next := []byte(skillFile(skillBody))
-	if bytes.Equal(old, next) {
-		return installResult{Path: path, Action: "unchanged"}, nil
-	}
-	if err := writeSkillOfOurs(path, old, next); err != nil {
-		return installResult{}, err
-	}
-	action := "wrote"
-	if len(old) > 0 {
-		action = "updated"
-	}
-	return installResult{Path: path, Action: action}, nil
+	return runSkillFileSpec(path, uninstall)
 }
 
 // dropRetiredSkillFile removes the manual deja wrote under `deja-search`, the

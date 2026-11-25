@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -183,127 +182,7 @@ type tomlMCPBlock struct {
 }
 
 func installTOML(path, block string, uninstall bool) (installResult, error) {
-	old, err := readConfig(path)
-	if err != nil {
-		return installResult{}, err
-	}
-	text := lfText(old)
-	// A file somebody has already broken by hand. The JSON targets refuse one
-	// and say where; this path spliced its block in regardless, so deja's entry
-	// landed in a file the harness cannot load and the harness's own error
-	// named deja's lines (#3576).
-	if terr := tomlHeadersClose(text); terr != nil {
-		return installResult{}, configParseError(path, terr)
-	}
-	if !uninstall {
-		if terr := tomlInlineKey(text, "[mcp_servers.deja]"); terr != nil {
-			return installResult{}, configParseError(path, terr)
-		}
-	}
-	blocks := tomlMCPBlocks(text)
-	hasDeja := false
-	for _, b := range blocks {
-		if b.key == "deja" {
-			hasDeja = true
-			break
-		}
-	}
-	if !uninstall && !hasDeja {
-		if key := foreignTOMLDejaKey(text); key != "" {
-			noteBlockAdded(path, "mcp_servers."+key)
-			next := []byte(updateTOMLMCPBlock(text, key, block))
-			a, werr := writeIfChanged(path, old, next)
-			res := installResult{Path: path, Action: a}
-			// Said on the run that adopted the entry, not on every run after it
-			// (#5298). key keeps the quotes it was written with, so trim them
-			// before %q or a quoted key is quoted twice.
-			if werr == nil && a != "unchanged" {
-				res.Note = fmt.Sprintf("updated %q, which already ran deja, instead of adding a second entry", strings.Trim(key, `"'`))
-			}
-			return res, werr
-		}
-	}
-
-	// The splicing below counts newlines, so it works in LF and writeIfChanged
-	// puts the file's own endings back. Left as read, a CRLF file grew a blank
-	// line per install: TrimRight("\n") leaves the carriage return behind.
-	s := removeCodexDejaBlock(text)
-	if uninstall {
-		for _, key := range foreignTOMLDejaKeys(s) {
-			for _, name := range tomlRecordedNames(key) {
-				if blockWasAdded(path, name) {
-					s = removeTOMLMCPBlock(s, key)
-					forgetBlockAdded(path, name)
-					break
-				}
-			}
-		}
-	}
-	s = strings.TrimRight(s, "\n")
-	var note string
-	if !uninstall {
-		if s != "" {
-			s += "\n\n"
-		}
-		// The block is written fresh, so the reader's `enabled = false` on the
-		// one it replaces went with it and the next start ran deja (#4467).
-		if tomlDejaSwitchedOff(text) {
-			block = strings.TrimRight(block, "\n") + "\nenabled = false\n"
-			note = switchedOffNote
-		}
-		s += block
-		// One block of deja's is rewritten where it stands. Moved to the end
-		// it traded places with the status line grok-auto and trae-auto write
-		// to the same file, which also goes last, and every repeat install
-		// rewrote the file and reported a change.
-		var own []tomlMCPBlock
-		for _, b := range blocks {
-			if b.key == "deja" {
-				own = append(own, b)
-			}
-		}
-		// Rewritten, not replaced, when it already runs deja: the keys deja
-		// does not own are the reader's — startup_timeout_sec,
-		// tool_timeout_sec, env_vars — and every install, upgrades included,
-		// used to drop them (#5161). One that runs some other program under
-		// deja's name, or carries a url beside the command, is replaced whole;
-		// its snapshot is the .bak.
-		if len(own) == 1 && !tomlBlockIsForeign(tomlCodeLines(text), own[0]) && !tomlBlockHasKey(tomlCodeLines(text), own[0], "url") {
-			s = strings.TrimRight(updateTOMLMCPBlock(text, "deja", block), "\n") + "\n"
-		} else if len(own) == 1 {
-			lines := strings.Split(text, "\n")
-			keep := own[0].end
-			for keep > own[0].start+1 && strings.TrimSpace(lines[keep-1]) == "" {
-				keep--
-			}
-			out := append(append(append([]string{}, lines[:own[0].start]...), strings.Split(strings.TrimRight(block, "\n"), "\n")...), lines[keep:]...)
-			s = strings.TrimRight(strings.Join(out, "\n"), "\n") + "\n"
-		}
-	} else {
-		note = leftNamedDejaEntriesNote(foreignTOMLDejaKeys(s))
-		if s != "" {
-			s += "\n"
-		}
-	}
-	a, err := writeIfChanged(path, old, []byte(s))
-	return installResult{Path: path, Action: a, Note: note}, err
-}
-
-// tomlDejaSwitchedOff reports whether `[mcp_servers.deja]` carries
-// `enabled = false`, the switch codex and grok both read.
-func tomlDejaSwitchedOff(s string) bool {
-	lines := tomlCodeLines(s)
-	for _, b := range tomlMCPBlocks(s) {
-		if b.key != "deja" {
-			continue
-		}
-		for i := b.start + 1; i < b.end; i++ {
-			if key, value, ok := tomlLineKeyValue(lines[i]); ok && key == "enabled" && value == "false" {
-				return true
-			}
-		}
-	}
-	return false
+	return runTOMLMCPSpec(path, "[mcp_servers.deja]", block, nil, uninstall)
 }
 
 // tomlMCPBlocks takes the file's text as read, not tomlCodeLines output: it
@@ -360,29 +239,6 @@ func tomlMCPHeader(line string) (string, bool) {
 		parts = append(parts, p)
 	}
 	return strings.Join(parts, "."), true
-}
-
-func foreignTOMLDejaKey(s string) string {
-	keys := foreignTOMLDejaKeys(s)
-	if len(keys) == 0 {
-		return ""
-	}
-	return keys[0]
-}
-
-func foreignTOMLDejaKeys(s string) []string {
-	lines := tomlCodeLines(s)
-	seen := map[string]bool{}
-	var keys []string
-	for _, b := range tomlMCPBlocks(s) {
-		if b.key == "deja" || seen[b.key] || !tomlBlockRunsDeja(lines, b) {
-			continue
-		}
-		seen[b.key] = true
-		keys = append(keys, b.key)
-	}
-	sort.Strings(keys)
-	return keys
 }
 
 // tomlBlockRunsDeja is entryIsDejaServer for a [mcp_servers.X] table: deja as
@@ -546,60 +402,6 @@ func tomlStringValues(s string) []string {
 	return out
 }
 
-// updateTOMLMCPBlock rewrites the wiring inside `[mcp_servers.key]` and keeps
-// every line deja does not own. The block is somebody's hand work — a
-// startup timeout, an env, a comment — and the JSON side already promises the
-// same through mergeDejaEntry (#2269).
-func updateTOMLMCPBlock(s, key, replacement string) string {
-	lines := strings.Split(s, "\n")
-	code := tomlCodeLines(s)
-	var target tomlMCPBlock
-	found := false
-	for _, block := range tomlMCPBlocks(s) {
-		if block.key == key {
-			target = block
-			found = true
-			break
-		}
-	}
-	if !found {
-		return s
-	}
-	var owned []string
-	replacementLines := strings.Split(strings.TrimRight(replacement, "\n"), "\n")
-	for _, line := range replacementLines[1:] {
-		k, _, ok := tomlLineKeyValue(line)
-		if ok && tomlOwnedMCPKey(k) {
-			owned = append(owned, line)
-		}
-	}
-
-	body := make([]string, 0, target.end-target.start)
-	inserted := false
-	for i := target.start + 1; i < target.end; i++ {
-		k, value, ok := tomlLineKeyValue(code[i])
-		if !ok || !tomlOwnedMCPKey(k) {
-			body = append(body, lines[i])
-			continue
-		}
-		if !inserted {
-			body = append(body, owned...)
-			inserted = true
-		}
-		if k == "args" {
-			_, i = tomlArrayValue(code, i, target.end, value)
-		}
-	}
-	if !inserted {
-		body = append(owned, body...)
-	}
-
-	out := append([]string{}, lines[:target.start+1]...)
-	out = append(out, body...)
-	out = append(out, lines[target.end:]...)
-	return strings.Join(out, "\n")
-}
-
 // tomlRecordedNames is every name an install may have recorded for a
 // hand-named table. Before #5159 the name was the header as written, quotes
 // and all — `mcp_servers."deja-vu"` — and an uninstall that only asked for the
@@ -616,22 +418,6 @@ func tomlRecordedNames(key string) []string {
 		}
 	}
 	return names
-}
-
-// tomlOwnedMCPKey names the keys an install rewrites. `type` stays on the list
-// though deja no longer writes it: an older codex block put `type = "stdio"`
-// there, and a reinstall drops it rather than keeping it as one of the reader's
-// own lines (#5590).
-func tomlOwnedMCPKey(key string) bool {
-	switch key {
-	case "type", "command", "args":
-		return true
-	}
-	return false
-}
-
-func removeCodexDejaBlock(s string) string {
-	return removeTOMLMCPBlock(s, "deja")
 }
 
 // removeTOMLMCPBlock removes one named MCP table without disturbing its
