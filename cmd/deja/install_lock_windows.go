@@ -4,7 +4,6 @@ package main
 
 import (
 	"errors"
-	"os"
 	"syscall"
 	"unsafe"
 
@@ -26,24 +25,7 @@ var (
 // for what it is for. LockFileEx blocks without the FAIL_IMMEDIATELY flag,
 // which is the `wait` case here.
 func takeInstallLock(path string, wait bool) (release func(), ok, busy bool) {
-	f, err := atomicfile.OpenSharedFile(path, os.O_CREATE|os.O_RDWR, 0o600)
-	if err != nil {
-		return func() {}, false, false
-	}
-	h := syscall.Handle(f.Fd())
-	var ol syscall.Overlapped
-	flags := uint32(installLockExclusive)
-	if !wait {
-		flags |= installLockFailImmediately
-	}
-	if err := installLockFileEx(h, flags, 0, 1, 0, &ol); err != nil {
-		_ = f.Close()
-		return func() {}, false, true
-	}
-	return func() {
-		_ = installUnlockFileEx(h, 0, 1, 0, &ol)
-		_ = f.Close()
-	}, true, false
+	return atomicfile.TakeAdvisoryLock(path, wait)
 }
 
 func installLockFileEx(h syscall.Handle, flags, reserved, low, high uint32, ol *syscall.Overlapped) error {

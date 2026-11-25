@@ -2,13 +2,11 @@ package main
 
 import (
 	"fmt"
-	"hash/fnv"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
+	"github.com/vshulcz/deja-vu/internal/hookengine"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -2642,9 +2641,7 @@ func truncateToolLine(s string, limit int) string {
 
 // shortHash fingerprints the injected line for per-session dedupe.
 func shortHash(s string) string {
-	h := fnv.New64a()
-	_, _ = h.Write([]byte(s))
-	return strconv.FormatUint(h.Sum64(), 16)
+	return hookengine.ShortHash(s)
 }
 
 // toolSessionCount words a count for a line read inside an action.

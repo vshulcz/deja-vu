@@ -245,13 +245,9 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 		return nil
 	}
 	token := "fix:" + shortHash(line)
-	releaseSeenLock, _ := holdHookseenLock(dir)
-	if alreadyInjected(dir, sessionID)[token] {
-		releaseSeenLock()
+	if dir != "" && sessionID != "" && !hookengine.NewLedger(dir).ClaimOnce(sessionID, token) {
 		return nil
 	}
-	rememberInjectedIDs(dir, sessionID, token)
-	releaseSeenLock()
 	payload := frameRecall(truncateToolLine(line, toolAfterMaxBytes))
 	// The receiving session too: this is the repair delivered at the failure,
 	// the surface with the best evidence behind it, and it was the one that
