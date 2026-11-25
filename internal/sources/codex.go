@@ -398,6 +398,8 @@ func parseCodexRolloutPath(path string, offset int64, id, project, harness strin
 	// is still talking in. One line re-read is cheaper than carrying state.
 	head := ""
 	headID := ""
+	var seedProvider string
+	var seedLastTokens int64
 	if offset > 0 {
 		if id, cwd, payload, at := codexRolloutHead(path); id != "" {
 			s.ID, headID = id, id
@@ -406,6 +408,7 @@ func parseCodexRolloutPath(path string, offset int64, id, project, harness strin
 			// so its start would come from the tail alone.
 			s.Touch(at)
 			s.Kind, s.Parent = codexLineage(payload)
+			seedProvider, _ = payload["model_provider"].(string)
 			if cwd != "" {
 				s.Project = projectName(cwd)
 				// And carried into the parse: a patch names its files relative
@@ -414,11 +417,12 @@ func parseCodexRolloutPath(path string, offset int64, id, project, harness strin
 				head = cwd
 			}
 		}
+		seedLastTokens = codexLastTokenTotalBefore(path, offset)
 	}
 	// An append is parsed from an offset, so the head above already settled the
 	// identity; a parent's session_meta sitting in the new bytes must not take
 	// it over (#3933).
-	ss, err := parseCodexRolloutWithScanner(s, offset > 0, head, func(fn func(map[string]any)) error {
+	ss, err := parseCodexRolloutWithSeed(s, offset > 0, head, seedProvider, seedLastTokens, func(fn func(map[string]any)) error {
 		return scanJSONLFromOffset(path, offset, fn)
 	}, func() bool { return offset > 0 && codexRoledBefore(path, offset) })
 	// A tail with no message carries only its time (below). Without the head's
@@ -436,6 +440,10 @@ func parseCodexRolloutPath(path string, offset int64, id, project, harness strin
 // roledBefore says whether the bytes before an appended tail already carry
 // the roled stream; nil when the scan covers the whole rollout.
 func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD string, scan func(func(map[string]any)) error, roledBefore func() bool) ([]model.Session, error) {
+	return parseCodexRolloutWithSeed(s, idSettled, knownCWD, "", 0, scan, roledBefore)
+}
+
+func parseCodexRolloutWithSeed(s model.Session, idSettled bool, knownCWD, seedProvider string, seedLastTokens int64, scan func(func(map[string]any)) error, roledBefore func() bool) ([]model.Session, error) {
 	// A command and its exit code arrive in separate records joined by call_id,
 	// so the command line is annotated after the fact — the same shape opencode
 	// gets for free from a column.
@@ -457,8 +465,8 @@ func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD stri
 	var inheritedTokens *model.Tokens
 	var inheritedTools map[string]int
 	var inheritedToolErrs int
-	var modelProvider string
-	var lastTokenTotal int64
+	modelProvider := seedProvider
+	lastTokenTotal := seedLastTokens
 	var events []model.Message
 	var trae *traeTurns
 	if s.Harness == "trae" {
@@ -1155,7 +1163,24 @@ func leadingCD(cmd string) (target, rest string, ok bool) {
 
 // codexResumes sends a rollout back for a whole read when its tail holds the
 // resolved exit (non-zero, or 0 for a command) of a call emitted before it (#4443).
-var codexResumes = resumesUnlessSettling(`_call`, func(m map[string]any) (calls, failed, clean []string) {
+func codexResumes(path string, offset int64) bool {
+	if offset <= 0 {
+		return true
+	}
+	applied := false
+	_ = scanJSONLHinted(path, offset, []byte("thread_settings_applied"), func(m map[string]any) {
+		payload, _ := m["payload"].(map[string]any)
+		if str(payload["type"]) == "thread_settings_applied" {
+			applied = true
+		}
+	})
+	if applied {
+		return false
+	}
+	return codexSettlingResumes(path, offset)
+}
+
+var codexSettlingResumes = resumesUnlessSettling(`_call`, func(m map[string]any) (calls, failed, clean []string) {
 	payload, _ := m["payload"].(map[string]any)
 	if payload == nil {
 		return nil, nil, nil
@@ -1218,11 +1243,24 @@ var codexResumes = resumesUnlessSettling(`_call`, func(m map[string]any) (calls,
 	}
 	var ids []string
 	for _, it := range items {
-		if str(it["type"]) != "function_call" {
-			continue
-		}
 		id, _ := it["call_id"].(string)
 		if id == "" {
+			continue
+		}
+		switch str(it["type"]) {
+		case "custom_tool_call":
+			if str(it["name"]) == "exec" {
+				body, _ := it["input"].(string)
+				for _, in := range codexExecCalls(body) {
+					if in.Cmd != "" && worthIndexing(in.Cmd) {
+						ids = append(ids, id)
+						break
+					}
+				}
+			}
+			continue
+		case "function_call":
+		default:
 			continue
 		}
 		norm := traeShellCall(it)
@@ -1545,9 +1583,7 @@ func codexPatchText(s *model.Session, body, cwd string, t time.Time) {
 		if span == "" {
 			continue
 		}
-		if len(span) > editSpanMax {
-			span = span[:editSpanMax]
-		}
+		span = capEditSpan(span)
 		s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: f + "\n" + span, Time: t})
 	}
 }
@@ -1641,7 +1677,7 @@ func codexRolloutHead(path string) (id, cwd string, payload map[string]any, at t
 			rec.Timestamp = l.m["timestamp"]
 			ok = l.ok
 		} else {
-			ok = json.Unmarshal(trimJSONSpace(l.raw), &rec) == nil
+			ok = json.Unmarshal(bytes.TrimPrefix(trimJSONSpace(l.raw), []byte("\xef\xbb\xbf")), &rec) == nil
 		}
 		if !ok || rec.Type != "session_meta" {
 			if err != nil {
@@ -1675,4 +1711,30 @@ func codexLineage(payload map[string]any) (kind, parent string) {
 		return "fork", p
 	}
 	return "", ""
+}
+
+// codexLastTokenTotalBefore finds the last cumulative token_count total in the
+// bounded window before offset so cumulative duplicates across an append cut
+// are skipped cleanly.
+func codexLastTokenTotalBefore(path string, offset int64) int64 {
+	buf := readAlignedWindowBefore(path, offset)
+	for _, raw := range slices.Backward(bytes.Split(buf, []byte("\n"))) {
+		if !bytes.Contains(raw, []byte("token_count")) {
+			continue
+		}
+		m, ok, _ := decodeJSONObjectLine(raw)
+		if !ok || str(m["type"]) != "event_msg" {
+			continue
+		}
+		payload, _ := m["payload"].(map[string]any)
+		if str(payload["type"]) != "token_count" {
+			continue
+		}
+		info, _ := payload["info"].(map[string]any)
+		tot, _ := info["total_token_usage"].(map[string]any)
+		if total := int64Of(tot["total_tokens"]); total > 0 {
+			return total
+		}
+	}
+	return 0
 }

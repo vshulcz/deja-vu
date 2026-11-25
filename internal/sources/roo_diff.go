@@ -206,9 +206,7 @@ func rooEditRecords(blocks []any, workspace string) (spans, wrote []string) {
 			if span == "" {
 				continue
 			}
-			if len(span) > editSpanMax {
-				span = span[:editSpanMax]
-			}
+			span = capEditSpan(span)
 			spans = append(spans, path+"\n"+span)
 		}
 		for _, w := range written {

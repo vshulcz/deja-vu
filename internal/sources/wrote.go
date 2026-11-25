@@ -298,9 +298,7 @@ func unifiedPatch(patch, override string, resolve func(string) string) (files, s
 			}
 			i = j - 1
 			if span := strings.Join(removed, "\n"); cur != "" && strings.TrimSpace(span) != "" {
-				if len(span) > editSpanMax {
-					span = span[:editSpanMax]
-				}
+				span = capEditSpan(span)
 				spans = append(spans, cur+"\n"+span)
 			}
 		}
