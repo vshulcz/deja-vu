@@ -32,7 +32,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "CLI reference", "description": "Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.", "url": "https://vshulcz.github.io/deja-vu/guide/commands.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/commands.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-07-19", "dateModified": "2026-11-24"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "CLI reference", "description": "Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.", "url": "https://vshulcz.github.io/deja-vu/guide/commands.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/commands.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-07-19", "dateModified": "2026-11-25"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"CLI reference","item":"https://vshulcz.github.io/deja-vu/guide/commands.html"}]}</script>
 </head>
 <body>
@@ -45,6 +45,7 @@
 <a href="agents.html">Agents &amp; MCP</a>
 <a href="search.html">Search</a>
 <a href="commands.html" aria-current="page">CLI reference</a>
+<a href="configuration.html">Configuration</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
 <details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
@@ -271,6 +272,7 @@
 <h2 id="configuration">Configuration files</h2>
 <p>User configuration lives in <code>~/.config/deja</code> (or <code>$XDG_CONFIG_HOME/deja</code> when set to an absolute path). Missing or malformed files fall back to the defaults below so recall never breaks on a bad config; <code>deja doctor</code> reports what is in force.</p>
 <table><thead><tr><th>File</th><th>Format &amp; settings</th></tr></thead><tbody>
+<tr><td><code>config.toml</code></td><td>User-owned TOML (<code>~/.config/deja/config.toml</code> or <code>DEJA_CONFIG_FILE</code>) for <code>[embed]</code> (including periodic <code>every</code>), <code>[hooks]</code>, and <code>[index]</code> defaults; never touched by install or uninstall. See the <a href="configuration.html">Configuration guide</a>.</td></tr>
 <tr><td><code>policy.json</code></td><td>JSON object (<code>DEJA_POLICY_FILE</code> overrides the path). Four optional keys:<br>
 <code>"activations"</code>: map of surface (<code>"search"</code>, <code>"mcp"</code>, <code>"auto"</code>) to origin rules (<code>"local"</code>, <code>"imported"</code>, <code>"imported:&lt;group&gt;"</code>, <code>"*"</code> &rarr; <code>true</code>/<code>false</code>). The most specific rule wins; omitted surfaces allow all origins. <code>DEJA_AUTORECALL_LOCAL_ONLY=1</code> sets <code>activations.auto.imported</code> to <code>false</code>.<br>
 <code>"ignore"</code>: array of shell globs matched against session path and project to keep out of recall and <code>sync</code>. Default when omitted: <code>["*/.claude/jobs/*"]</code>; writing the key replaces the default.<br>

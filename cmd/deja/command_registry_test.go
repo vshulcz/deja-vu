@@ -183,7 +183,7 @@ func TestCompletionParityAcrossAllFourShells(t *testing.T) {
 
 	zeroOrDedicated := []string{
 		"aider", "brief", "check", "ctx", "embed", "goose", "help",
-		"hook-antigravity", "hook-codewhale", "hook-goose", "hook-goose-prompt",
+		"hook-antigravity", "hook-codewhale", "hook-embed", "hook-goose", "hook-goose-prompt",
 		"hook-mcp-call", "hook-plan", "hook-precompact", "hook-refresh", "hook-stop",
 		"reasonix-ext", "share", "sources", "statusline", "version", "warmup", "warmup-status",
 	}

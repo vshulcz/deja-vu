@@ -71,6 +71,7 @@ https://vshulcz.github.io/deja-vu/guide/resume-a-session.html
 https://vshulcz.github.io/deja-vu/guide/agents.html
 https://vshulcz.github.io/deja-vu/guide/search.html
 https://vshulcz.github.io/deja-vu/guide/commands.html
+https://vshulcz.github.io/deja-vu/guide/configuration.html
 https://vshulcz.github.io/deja-vu/guide/harnesses.html
 https://vshulcz.github.io/deja-vu/guide/privacy.html
 https://vshulcz.github.io/deja-vu/guide/benchmarks.html

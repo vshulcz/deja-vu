@@ -20,6 +20,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/termwidth"
+	"github.com/vshulcz/deja-vu/internal/userconfig"
 )
 
 var version = "dev"
@@ -32,6 +33,8 @@ var version = "dev"
 var errAlreadySaid = errors.New("already said")
 
 func main() {
+	// Process env exits with main; restore is only needed by in-process tests.
+	_ = userconfig.Apply()
 	// The detached look an interactive run started once a day (#4622).
 	if stamp, ok := releaseLookRequested(os.Args[1:], index.DefaultDir()); ok {
 		runReleaseLook(stamp, defaultDoctorVersionLookup())
@@ -310,6 +313,7 @@ var commands = map[string]command{
 	"hook-precompact": cmdHookPrecompact,
 	"wip":             func(dir string, args []string) error { return runWIP(dir, args, os.Stdout) },
 	"hook-refresh":    func(dir string, _ []string) error { runHookRefresh(dir); return nil },
+	"hook-embed":      func(dir string, _ []string) error { runHookEmbed(dir); return nil },
 	"view":            runView,
 	"audit":           func(dir string, rest []string) error { return runAudit(dir, rest, os.Stdout) },
 	"status":          func(dir string, rest []string) error { return runStatus(dir, rest, os.Stdout) },
@@ -363,6 +367,8 @@ func run(args []string) error {
 	if len(args) > 0 && args[0] == framedFlag {
 		return runFramed(args[1:])
 	}
+	restoreConfig := userconfig.Apply()
+	defer restoreConfig()
 	dir := index.DefaultDir()
 	// Before anything reads or writes: every path deja writes hangs off the
 	// home directory, and it answers "" when there is none, so
@@ -404,6 +410,7 @@ func run(args []string) error {
 	}
 	sourceInstance := os.Getenv("DEJA_SOURCE_INSTANCE")
 	warnBrokenPolicy(args[0], os.Stderr)
+	warnBrokenConfig(args[0], os.Stderr)
 	if wantsHelp(args[1:]) {
 		// `deja aider --help` is aider's: the help page promises the rest of
 		// the line goes to the tool, and answering with deja's page left no

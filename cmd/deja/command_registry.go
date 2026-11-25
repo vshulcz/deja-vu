@@ -173,6 +173,7 @@ var commandSpecs = []CommandSpec{
 			{Name: "--mcode"},
 		},
 	},
+	{Name: "hook-embed", HelpHidden: true},
 	{
 		Name: "hook-ext",
 		Flags: []FlagSpec{
