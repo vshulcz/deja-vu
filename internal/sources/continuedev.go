@@ -315,9 +315,7 @@ func continueToolWork(states []continueToolCallSt, at time.Time) []model.Message
 			}
 			for _, span := range olds {
 				if IndexEdits() && span != "" {
-					if len(span) > editSpanMax {
-						span = span[:editSpanMax]
-					}
+					span = capEditSpan(span)
 					out = append(out, model.Message{Role: RoleEdit, Text: path + "\n" + span, Time: at})
 				}
 			}

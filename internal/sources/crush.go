@@ -446,9 +446,7 @@ func crushMessages(role, parts string, at time.Time) ([]crushRecord, []crushResu
 						if span == "" {
 							continue
 						}
-						if len(span) > editSpanMax {
-							span = span[:editSpanMax]
-						}
+						span = capEditSpan(span)
 						out = append(out, crushRecord{model.Message{Role: RoleEdit, Text: path + "\n" + crushPlainText(span), Time: at}, p.Data.ID})
 					}
 				}
@@ -535,9 +533,7 @@ func crushReplacedSymbol(tool, content, metadata string, failed bool) (string, b
 	if strings.TrimSpace(old) == "" {
 		return "", false
 	}
-	if len(old) > editSpanMax {
-		old = old[:editSpanMax]
-	}
+	old = capEditSpan(old)
 	return path + "\n" + crushPlainText(old), true
 }
 

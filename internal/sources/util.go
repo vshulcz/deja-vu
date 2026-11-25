@@ -43,6 +43,23 @@ func capParsedMessage(s string) string {
 	return s[:cut]
 }
 
+// capEditSpan bounds an edit span to editSpanMax bytes on a UTF-8 rune
+// boundary and repairs any invalid UTF-8 sequences.
+func capEditSpan(s string) string {
+	res := s
+	if len(res) > editSpanMax {
+		cut := editSpanMax
+		for cut > 0 && !utf8.RuneStart(res[cut]) {
+			cut--
+		}
+		res = res[:cut]
+	}
+	if utf8.ValidString(res) {
+		return res
+	}
+	return strings.ToValidUTF8(res, "\uFFFD")
+}
+
 // Source is a named harness root.
 type Source struct{ Name, Root string }
 

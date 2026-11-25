@@ -59,5 +59,8 @@ func ParseQoderFileFromOffset(path string, offset int64) ([]model.Session, error
 func parseQoderFromOffset(path string, offset int64) ([]model.Session, error) {
 	return parseClaudeTypedWithOptions(path, func(fn func([]byte)) error {
 		return scanJSONLBytes(path, offset, fn)
-	}, claudeParseOptions{Harness: "qoder"})
+	}, claudeParseOptions{
+		Harness:    "qoder",
+		priorUsage: seedClaudeUsageBefore(path, offset),
+	})
 }

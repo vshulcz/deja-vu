@@ -110,9 +110,7 @@ func (e *aiderEdits) hold(path, old, written string, t time.Time) {
 		return
 	}
 	if IndexEdits() && strings.TrimSpace(old) != "" {
-		if len(old) > editSpanMax {
-			old = old[:editSpanMax]
-		}
+		old = capEditSpan(old)
 		e.pending[path] = append(e.pending[path], model.Message{Role: RoleEdit, Text: path + "\n" + old, Time: t})
 	}
 	if IndexWrites() {

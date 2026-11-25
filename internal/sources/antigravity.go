@@ -3,6 +3,7 @@ package sources
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -453,6 +454,7 @@ func antigravityResumes(path string, offset int64) bool {
 	}
 	ok := true
 	seenPlanner := false
+	needsPlannerBefore := false
 	_ = scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		if !ok || seenPlanner {
 			return
@@ -465,6 +467,7 @@ func antigravityResumes(path string, offset int64) bool {
 			seenPlanner = true
 			return
 		}
+		needsPlannerBefore = true
 		text := capParsedMessage(str(m["content"]))
 		if antigravityToolCallDenied(str(m["status"]), text) {
 			ok = false
@@ -476,7 +479,31 @@ func antigravityResumes(path string, offset int64) bool {
 			}
 		}
 	})
+	if ok && needsPlannerBefore && offset > callWindow && !antigravityHasPlannerInWindow(path, offset) {
+		return false
+	}
 	return ok
+}
+
+func antigravityHasPlannerInWindow(path string, offset int64) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	start := max(0, offset-callWindow)
+	buf := make([]byte, offset-start)
+	if _, err := f.ReadAt(buf, start); err != nil && !errors.Is(err, io.EOF) {
+		return false
+	}
+	if start > 0 {
+		if nl := bytes.IndexByte(buf, '\n'); nl >= 0 {
+			buf = buf[nl+1:]
+		} else {
+			return false
+		}
+	}
+	return bytes.Contains(buf, []byte(`"PLANNER_RESPONSE"`))
 }
 
 func antigravityToolCallDenied(status, text string) bool {
@@ -529,22 +556,25 @@ func seedAntigravityBefore(path string, offset int64, fromCalls map[model.Messag
 		return ""
 	}
 	defer func() { _ = f.Close() }()
-	// Read the first line for the session start timestamp fallback when offset
-	// is beyond the window.
-	var head [2048]byte
-	if n, rerr := f.ReadAt(head[:], 0); n > 0 && (rerr == nil || rerr == io.EOF) {
-		if nl := bytes.IndexByte(head[:n], '\n'); nl > 0 {
-			var first map[string]any
-			if json.Unmarshal(bytes.TrimPrefix(head[:nl], []byte("\ufeff")), &first) == nil {
-				if t, terr := time.Parse(time.RFC3339Nano, str(first["created_at"])); terr == nil {
-					*started = t
-				}
-			}
+	// Read the first line with an unbounded line reader for the session start
+	// timestamp fallback when offset is beyond the window.
+	r := jsonlReader()
+	r.Reset(f)
+	l, _ := readJSONLine(r)
+	r.Reset(nil)
+	jsonlReaders.Put(r)
+	first, ok := l.m, l.ok
+	if !l.long {
+		first, ok, _ = decodeJSONObjectLine(l.raw)
+	}
+	if ok {
+		if t, terr := time.Parse(time.RFC3339Nano, str(first["created_at"])); terr == nil {
+			*started = t
 		}
 	}
 	start := max(0, offset-callWindow)
 	buf := make([]byte, offset-start)
-	if _, err := f.ReadAt(buf, start); err != nil && err != io.EOF {
+	if _, err := f.ReadAt(buf, start); err != nil && !errors.Is(err, io.EOF) {
 		return ""
 	}
 	if start > 0 {
@@ -622,11 +652,9 @@ func antigravityDropDeniedCall(msgs []model.Message, running []int, asked int) (
 }
 
 func antigravityResolveProject(s *model.Session, path, cwd, subWorkspace, parent string, fromOffset bool) {
-	if !fromOffset {
-		if p := projectFromPaths(s.Messages); !isHomeOrEmptyProject(p) {
-			s.Project = p
-			return
-		}
+	if p := projectFromPaths(s.Messages); !isHomeOrEmptyProject(p) {
+		s.Project = p
+		return
 	}
 	if !isHomeOrEmptyProject(s.Project) {
 		if fromOffset && projectFromPaths(s.Messages) == "" {
@@ -791,9 +819,7 @@ func antigravityToolCalls(v any, t time.Time) ([]model.Message, string) {
 			case "edit_file":
 				if p != "" && IndexEdits() {
 					if span := strings.TrimSpace(antigravityArg(args, "Target")); span != "" {
-						if len(span) > editSpanMax {
-							span = span[:editSpanMax]
-						}
+						span = capEditSpan(span)
 						out = append(out, model.Message{Role: RoleEdit, Text: p + "\n" + span, Time: t})
 					}
 				}
@@ -1206,10 +1232,7 @@ func antigravityRemovedLines(text string) string {
 		}
 	}
 	span := strings.TrimSpace(strings.Join(lines, "\n"))
-	if len(span) > editSpanMax {
-		span = span[:editSpanMax]
-	}
-	return span
+	return capEditSpan(span)
 }
 
 // antigravityPath pulls the file a step names, as a plain path: the transcript

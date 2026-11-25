@@ -156,10 +156,7 @@ func unifiedDiffSpans(file, patch string) []string {
 		if len(removed) == 0 {
 			return
 		}
-		span := strings.Join(removed, "\n")
-		if len(span) > editSpanMax {
-			span = span[:editSpanMax]
-		}
+		span := capEditSpan(strings.Join(removed, "\n"))
 		out = append(out, file+"\n"+span)
 		removed = nil
 	}
