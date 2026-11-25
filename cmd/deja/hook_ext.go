@@ -99,8 +99,17 @@ var hookExtFlags = []string{"--host", "--op"}
 
 func parseHookExtFlags(args []string) (host, op string, err error) {
 	host = "generic"
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
+	want := ""
+	for _, arg := range args {
+		if want != "" {
+			if want == "--host" {
+				host = arg
+			} else {
+				op = arg
+			}
+			want = ""
+			continue
+		}
 		if k, v, ok := strings.Cut(arg, "="); ok && strings.HasPrefix(k, "--") {
 			switch k {
 			case "--host":
@@ -114,21 +123,16 @@ func parseHookExtFlags(args []string) (host, op string, err error) {
 		}
 		switch arg {
 		case "--host", "--op":
-			if i+1 >= len(args) {
-				return "", "", fmt.Errorf("hook-ext: %s needs a value", arg)
-			}
-			i++
-			if arg == "--host" {
-				host = args[i]
-			} else {
-				op = args[i]
-			}
+			want = arg
 		default:
 			if strings.HasPrefix(arg, "-") {
 				return "", "", unknownFlag("hook-ext", arg, hookExtFlags)
 			}
 			return "", "", fmt.Errorf("hook-ext: unexpected argument %q", arg)
 		}
+	}
+	if want != "" {
+		return "", "", fmt.Errorf("hook-ext: %s needs a value", want)
 	}
 	return strings.ToLower(strings.TrimSpace(host)), strings.ToLower(strings.TrimSpace(op)), nil
 }
