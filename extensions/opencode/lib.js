@@ -24,6 +24,22 @@ export function contextText(raw) {
   }
 }
 
+// parseHookExtEnvelope validates a hook-ext JSON envelope. A legacy binary
+// prints empty output or non-JSON text on unknown subcommands, so null tells
+// callers to fall back; an object with boolean ok (including ok: false) came
+// from hook-ext and must not fall back.
+export function parseHookExtEnvelope(raw) {
+  const text = String(raw || "").trim()
+  if (!text || text[0] !== "{") return null
+  try {
+    const parsed = JSON.parse(text)
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && typeof parsed.ok === "boolean") {
+      return parsed
+    }
+  } catch {}
+  return null
+}
+
 // userTurns is every user message in a request, oldest first, each with a key
 // that stays the same from one request to the next: opencode's message id, or
 // where a shape carries none, the message's place among the user messages and

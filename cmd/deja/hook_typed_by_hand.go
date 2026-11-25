@@ -9,6 +9,8 @@ import (
 // settled, five runs each (#2668):
 //
 //	per action, and the ones that must stay cheap
+//	  hook-context       under 10 ms
+//	  hook-ext           10 to 110 ms
 //	  hook-tool          10 ms
 //	  hook-tool-after    10 ms
 //	  hook-plan          under 10 ms

@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -210,10 +211,14 @@ func cmdWarmupStatus(dir string, rest []string) error {
 	if len(rest) > 0 {
 		return fmt.Errorf("warmup-status takes no arguments — got %q", rest[0])
 	}
-	if st := readWarmupStatus(dir); st != nil {
-		fmt.Fprintln(os.Stdout, st.line())
-	}
+	runWarmupStatus(dir, os.Stdout)
 	return nil
+}
+
+func runWarmupStatus(dir string, stdout io.Writer) {
+	if st := readWarmupStatus(dir); st != nil {
+		fmt.Fprintln(stdout, st.line())
+	}
 }
 
 // emptyRecallAnswerPolicy adds the reason when a rule, not the query, is why

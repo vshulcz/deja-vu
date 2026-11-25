@@ -1535,11 +1535,16 @@ func TestOpenClawPluginForgetsOnCompaction(t *testing.T) {
 	// The session it sends is checked by driving the plugin
 	// (TestOpenClawPluginStampsTheTranscriptID); here, that the capture is told
 	// the file and whose store it is.
-	if !strings.Contains(js, `ask(["hook-precompact"], {
-          session_id: at.id,
-          transcript_path: event?.sessionFile || "",`) ||
-		!strings.Contains(js, `harness: "openclaw"`) {
-		t.Fatalf("the forget is not the one deja means — no hook-precompact with this session:\n%s", js)
+	for _, want := range []string{
+		`askExt("precompact"`,
+		`ask(["hook-precompact"]`,
+		`session_id: at.id,`,
+		`transcript_path: event?.sessionFile || "",`,
+		`harness: "openclaw"`,
+	} {
+		if !strings.Contains(js, want) {
+			t.Fatalf("the forget is missing %s:\n%s", want, js)
+		}
 	}
 }
 
@@ -1578,7 +1583,7 @@ func TestOpenClawPluginShowsTheReceiptInAnOwnerDM(t *testing.T) {
 	home := t.TempDir()
 	stub := filepath.Join(home, "deja")
 	reply := `{"systemMessage":"deja-vu — from Codex CLI, 2 weeks ago: \"zorbit drain\" (via zorbit, drain)","hookSpecificOutput":{"additionalContext":"RECALLED drain with --grace 40"}}`
-	script := "#!/bin/sh\nin=$(cat)\nprintf '%s\\n' \"$*\" >> \"$DEJA_CALLS\"\n" +
+	script := "#!/bin/sh\nif [ \"$1\" = \"hook-ext\" ]; then exit 2; fi\nin=$(cat)\nprintf '%s\\n' \"$*\" >> \"$DEJA_CALLS\"\n" +
 		"case \"$in\" in *zorbit*) ;; *) exit 0 ;; esac\n" +
 		"case \"$*\" in\n" +
 		"  'hook-prompt --plain') printf 'RECALLED drain with --grace 40' ;;\n" +
@@ -1757,8 +1762,8 @@ func TestOpenClawPluginOpensWithTheProjectDigest(t *testing.T) {
 	home := t.TempDir()
 	stub := filepath.Join(home, "deja")
 	calls := filepath.Join(home, "calls")
-	script := "#!/bin/sh\nin=$(cat)\nprintf '%s\\n' \"$in\" >> " + calls + "\n" +
-		"case \"$1\" in hook-context) printf 'DIGEST for this project' ;; esac\n"
+	script := "#!/bin/sh\nin=$(cat)\n" +
+		"case \"$1\" in hook-context) printf '%s\\n' \"$in\" >> " + calls + "; printf 'DIGEST for this project' ;; esac\n"
 	if werr := os.WriteFile(stub, []byte(script), 0o755); werr != nil {
 		t.Fatal(werr)
 	}

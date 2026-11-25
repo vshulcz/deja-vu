@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/harness"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -109,23 +110,54 @@ def _cwd(**kwargs):
     return os.getcwd()
 
 
+_HOOK_EXT = None
+
+
+def _run_deja(args, payload="", timeout=10, cwd=None):
+    return subprocess.run(
+        [DEJA, *args],
+        input=payload,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=timeout,
+        cwd=cwd or _cwd(),
+        creationflags=_NO_WINDOW,
+    )
+
+
 def _deja(args, payload="", timeout=10):
     """Never let memory break a turn: a failure here returns nothing."""
     try:
-        done = subprocess.run(
-            [DEJA, *args],
-            input=payload,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout,
-            cwd=_cwd(),
-            creationflags=_NO_WINDOW,
-        )
-        return done.stdout.strip()
+        return _run_deja(args, payload, timeout=timeout).stdout.strip()
     except Exception:
         return ""
+
+
+def _deja_ext(op, payload=None, timeout=10, cwd=None):
+    # Call the JSON envelope endpoint for op; return parsed dict or None to fall back.
+    global _HOOK_EXT
+    if _HOOK_EXT is False:
+        return None
+    body = json.dumps({} if payload is None else payload, default=str)
+    try:
+        done = _run_deja(["hook-ext", "--host", "hermes", "--op", op], body, timeout=timeout, cwd=cwd)
+    except subprocess.TimeoutExpired:
+        return None
+    except Exception:
+        _HOOK_EXT = False
+        return None
+    raw = (done.stdout or "").strip()
+    try:
+        parsed = json.loads(raw) if raw else None
+    except Exception:
+        parsed = None
+    if isinstance(parsed, dict) and isinstance(parsed.get("ok"), bool):
+        _HOOK_EXT = True
+        return parsed
+    _HOOK_EXT = False
+    return None
 
 
 def _provider_active():
@@ -226,13 +258,16 @@ def _watch_compaction(session_id, history, parent_session_id=""):
     if _provider_active():
         # deja-memory captures it from on_pre_compress.
         return
-    payload = json.dumps({
+    cwd = os.getenv("TERMINAL_CWD") or os.getcwd()
+    req_obj = {
         "session_id": sid,
-        "cwd": os.getenv("TERMINAL_CWD") or os.getcwd(),
+        "cwd": cwd,
         "harness": "hermes",
+        "source": "hermes",
         "messages": _bounded_messages(before[1]),
-    }, default=str)
-    _deja(["hook-precompact"], payload, timeout=10)
+    }
+    if _deja_ext("precompact", req_obj, timeout=10, cwd=cwd) is None:
+        _deja(["hook-precompact"], json.dumps(req_obj, default=str), timeout=10)
 
 
 def watch(session_id=None, conversation_history=None, parent_session_id="", **kwargs):
@@ -260,14 +295,22 @@ def recall(session_id=None, user_message=None, is_first_turn=False, **kwargs):
         # The session id, so hook-context stamps this session live: a first
         # turn returns before hook-prompt runs, and the deja tool answered it
         # with the session asking (#4246).
-        start = json.dumps({"session_id": session_id or "", "cwd": cwd, "deja_once": True})
-        digest = _deja(["hook-context", "--plain"], start)
+        start_obj = {"session_id": session_id or "", "cwd": cwd, "deja_once": True, "once": True, "plain": True}
+        ext = _deja_ext("context", start_obj, cwd=cwd)
+        if ext is not None:
+            digest = (ext.get("context") or "").strip() if ext.get("ok") else ""
+        else:
+            digest = _deja(["hook-context", "--plain"], json.dumps({"session_id": session_id or "", "cwd": cwd, "deja_once": True}))
         if digest:
             return {"context": digest}
     if not user_message:
         return None
-    payload = json.dumps({"prompt": user_message, "session_id": session_id or "", "cwd": cwd})
-    hit = _deja(["hook-prompt", "--plain"], payload)
+    prompt_obj = {"prompt": user_message, "session_id": session_id or "", "cwd": cwd, "plain": True}
+    ext = _deja_ext("prompt", prompt_obj, cwd=cwd)
+    if ext is not None:
+        hit = (ext.get("context") or "").strip() if ext.get("ok") else ""
+    else:
+        hit = _deja(["hook-prompt", "--plain"], json.dumps({"prompt": user_message, "session_id": session_id or "", "cwd": cwd}))
     return {"context": hit} if hit else None
 
 
@@ -285,13 +328,19 @@ def _file_line(tool_name, args, result, session_id):
         tool_input = {**args, "file_path": path}
     else:
         return None
-    payload = json.dumps({
+    cwd = os.getenv("TERMINAL_CWD") or os.getcwd()
+    tool_obj = {
         "tool_name": tool,
         "tool_input": tool_input,
         "session_id": session_id or "",
-        "cwd": os.getenv("TERMINAL_CWD") or os.getcwd(),
-    })
-    line = _deja(["hook-tool", "--plain"], payload, timeout=5)
+        "cwd": cwd,
+        "plain": True,
+    }
+    ext = _deja_ext("tool-before", tool_obj, timeout=5, cwd=cwd)
+    if ext is not None:
+        line = (ext.get("context") or "").strip() if ext.get("ok") else ""
+    else:
+        line = _deja(["hook-tool", "--plain"], json.dumps({"tool_name": tool, "tool_input": tool_input, "session_id": session_id or "", "cwd": cwd}), timeout=5)
     return result + "\n\n" + line if line else None
 
 
@@ -312,13 +361,19 @@ def repair(tool_name=None, result=None, session_id=None, args=None, **kwargs):
             return None
     except Exception:
         pass
-    payload = json.dumps({
+    cwd = os.getenv("TERMINAL_CWD") or os.getcwd()
+    after_obj = {
         "tool_name": tool_name,
         "tool_response": result,
         "session_id": session_id or "",
-        "cwd": os.getenv("TERMINAL_CWD") or os.getcwd(),
-    })
-    line = _deja(["hook-tool-after", "--plain"], payload, timeout=5)
+        "cwd": cwd,
+        "plain": True,
+    }
+    ext = _deja_ext("tool-after", after_obj, timeout=5, cwd=cwd)
+    if ext is not None:
+        line = (ext.get("context") or "").strip() if ext.get("ok") else ""
+    else:
+        line = _deja(["hook-tool-after", "--plain"], json.dumps({"tool_name": tool_name, "tool_response": result, "session_id": session_id or "", "cwd": cwd}), timeout=5)
     return result + "\n\n" + line if line else None
 
 
@@ -329,7 +384,8 @@ def finalize(session_id=None, **kwargs):
     # this one now rather than twenty minutes from now (#4210).
     if not session_id:
         return None
-    _deja(["hook-session-end"], json.dumps({"session_id": session_id, "cwd": os.getcwd()}), timeout=3)
+    if _deja_ext("session-end", {"session_id": session_id, "cwd": os.getcwd()}, timeout=3) is None:
+        _deja(["hook-session-end"], json.dumps({"session_id": session_id, "cwd": os.getcwd()}), timeout=3)
     return None
 
 
@@ -344,6 +400,13 @@ def search(raw_args):
     # "--" when the query names one of deja's own flags: searching for
     # "--json" or "--all-matches" otherwise dies in flag parsing and comes back
     # as an empty history.
+    slash_args = ("-- " + query) if query.startswith("-") else query
+    ext = _deja_ext("slash", {"args": slash_args}, timeout=120)
+    if ext is not None:
+        if not ext.get("ok"):
+            return (ext.get("error") or "").strip() or f"Nothing in your history matches {query!r}."
+        found = (ext.get("output") or "").strip()
+        return found or f"Nothing in your history matches {query!r}."
     args = ["search", "--", query] if query.startswith("-") else ["search", query]
     found = _deja(args, timeout=120)
     return found or f"Nothing in your history matches {query!r}."
@@ -392,94 +455,45 @@ func yamlQuote(s string) string {
 // and `hermes mcp add` prompts before saving, which an installer cannot answer.
 func installHermesMCP(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.HermesHome(), "config.yaml")
-	old, err := readConfig(path)
-	if err != nil {
-		return installResult{}, err
-	}
 	// Hermes passes its MCP servers only PATH, HOME, XDG_* and a few more, so
 	// the entry names the launcher, which carries DEJA_INDEX_DIR (#5269).
 	if !uninstall {
 		exe = hookExeFor(exe, false)
 	}
-	var note string
-	next := lfText(old)
-	edited := false
-	if !uninstall {
-		// The same refusals the fresh entry gets: a second top-level
-		// mcp_servers:, which Hermes reads instead, is not one to edit.
-		doc := next
-		if doc != "" && !strings.HasSuffix(doc, "\n") {
-			doc += "\n"
-		}
-		if _, err := yamlTopKeyEnd(doc, "mcp_servers:"); err != nil {
-			return installResult{}, fmt.Errorf("%s: %w", path, err)
-		}
-		lines, n, done, err := hermesEditEntry(strings.Split(next, "\n"), exe)
-		if err != nil {
-			return installResult{}, fmt.Errorf("%s: %w", path, err)
-		}
-		if done {
-			next, note, edited = strings.Join(lines, "\n"), n, true
-		}
-	}
-	if !edited {
-		if err := hermesEntriesRemovable(next); err != nil {
-			return installResult{}, fmt.Errorf("%s: %w", path, err)
-		}
-		next = removeHermesMCPBlock(next)
-	}
-	if !uninstall && !edited {
-		pad, ok := hermesBlockIndent(next)
-		if !ok {
-			pad = "  "
-		}
-		entry := pad + "deja:\n" + pad + pad + "command: " + yamlQuote(exe) + "\n" +
-			pad + pad + "args:\n" + pad + pad + pad + "- mcp\n" + pad + pad + "enabled: true\n"
-		if next != "" && !strings.HasSuffix(next, "\n") {
-			next += "\n"
-		}
-		at, err := yamlTopKeyEnd(next, "mcp_servers:")
-		if err != nil {
-			return installResult{}, fmt.Errorf("%s: %w", path, err)
-		}
-		if at >= 0 {
-			next = next[:at] + entry + next[at:]
-		} else {
-			// Before a `...` document end, where #4260 puts the plugins block
-			// too: a key after it is a second document Hermes cannot parse.
-			block := "\nmcp_servers:\n" + entry
-			end, at := -1, 0
-			for _, line := range strings.SplitAfter(next, "\n") {
-				if yamlDocumentEnd(line) {
-					end = at
-				}
-				at += len(line)
+	spec := &harness.YAMLSectionSpec{
+		HarnessName:        "hermes-mcp",
+		Path:               path,
+		SectionKey:         "mcp_servers:",
+		EntryKey:           "deja",
+		DefaultIndent:      "  ",
+		RespectDocEnd:      true,
+		PadAppendedSection: true,
+		Inspect: func(doc string) harness.YAMLProbeInfo {
+			return harness.YAMLProbeInfo{
+				DejaKeys: yamlDejaEntryNames(doc, "mcp_servers:"),
 			}
-			if end >= 0 {
-				next = next[:end] + strings.TrimPrefix(block, "\n") + next[end:]
-			} else {
-				next += block
+		},
+		EditExisting: func(doc string) (string, bool, bool, string, error) {
+			lines, n, done, err := hermesEditEntry(strings.Split(doc, "\n"), exe)
+			if err != nil || !done {
+				return "", false, false, "", err
 			}
-			noteBlockAdded(path, "mcp_servers")
-		}
-	} else if uninstall && blockWasAdded(path, "mcp_servers") {
-		// The container goes with the entry when deja is what put it there —
-		// a config the reader owned came back carrying an `mcp_servers:` they
-		// never wrote (#2606, the shape #2604 fixed for the JSON writers). One
-		// they wrote stays, with or without entries under it.
-		if trimmed := dropEmptyYAMLKey(next, "mcp_servers:"); trimmed != next {
-			next = trimmed
-			forgetBlockAdded(path, "mcp_servers")
-		}
+			return strings.Join(lines, "\n"), true, false, n, nil
+		},
+		CheckRemovable: hermesEntriesRemovable,
+		RemoveEntries:  removeHermesMCPBlock,
+		BuildEntry: func(pad string, _ bool) string {
+			return pad + "deja:\n" + pad + pad + "command: " + yamlQuote(exe) + "\n" +
+				pad + pad + "args:\n" + pad + pad + pad + "- mcp\n" + pad + pad + "enabled: true\n"
+		},
+		OtherDejaNames: func(doc string) []string {
+			return yamlDejaEntryNames(doc, "mcp_servers:")
+		},
+		FormatNote: func(baseNote string, _ bool, otherNames []string) string {
+			return withOtherDejaNames(baseNote, otherNames)
+		},
 	}
-	// The file's own final newline, the way both goose writers keep it: this
-	// was the only writer that did not, so a config whose deja block ended it
-	// came back without one (#2606, #2730).
-	if !uninstall {
-		note = withOtherDejaNames(note, yamlDejaEntryNames(next, "mcp_servers:"))
-	}
-	a, werr := writeIfChanged(path, old, []byte(keepTrailingNewline(lfText(old), next)))
-	return installResult{Path: path, Action: a, Note: note}, werr
+	return runYAMLSectionSpec(spec, uninstall)
 }
 
 // removeHermesMCPBlock drops our entry and nothing else: the block ends at the

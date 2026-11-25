@@ -419,7 +419,7 @@ func mentionsDeja(b []byte) bool {
 	// The subcommands rather than the binary's name: a snapshot names whatever
 	// path deja was installed from, which need not end in "deja" at all.
 	for _, marker := range []string{
-		"hook-prompt", "hook-context", "hook-tool", "hook-goose", "hook-plan",
+		"hook-prompt", "hook-context", "hook-tool", "hook-ext", "hook-goose", "hook-plan",
 		"hook-precompact", "hook-antigravity", "hook-codewhale", "deja:", "\"deja\"", "deja-recall",
 		// The harnesses that do not write the word on its own: zed names the
 		// server, dsh opens a block, codex and grok put the name in a TOML

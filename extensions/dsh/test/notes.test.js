@@ -112,6 +112,7 @@ writeFileSync(
 const fs = require("node:fs");
 const args = process.argv.slice(2);
 if (args[0] === "version") { console.log("deja 0.0.0-test"); process.exit(0); }
+if (args[0] === "hook-ext") process.exit(2);
 fs.appendFileSync(${JSON.stringify(CALLS)}, args.join(" ") + "\\n");
 if (args[0] === "search") { console.log("HIT"); process.exit(0); }
 if (args.includes("--notes")) process.exit(0);

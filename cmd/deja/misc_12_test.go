@@ -2402,7 +2402,7 @@ func recordingDeja(t *testing.T) (string, func() []pluginCall) {
 	dir := t.TempDir()
 	log := filepath.Join(dir, "calls")
 	stub := filepath.Join(dir, "deja")
-	script := "#!/bin/sh\nin=$(cat)\nprintf '%s|%s\\n' \"$*\" \"$in\" >> " + log + "\n"
+	script := "#!/bin/sh\nif [ \"$1\" = \"hook-ext\" ]; then exit 2; fi\nin=$(cat)\nprintf '%s|%s\\n' \"$*\" \"$in\" >> " + log + "\n"
 	if err := os.WriteFile(stub, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}

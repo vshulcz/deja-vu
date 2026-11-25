@@ -374,6 +374,11 @@ var helpEntries = []helpEntry{
 		usage:    []string{"deja hook-tool-after [--plain] [--copilot] [--mcode]"},
 		desc:     "after a failed command: what followed it before",
 		examples: []string{"deja hook-tool-after --plain < payload.json"}},
+	{name: "hook-ext", group: groupAgents,
+		usage:    []string{"deja hook-ext [--host <name>] --op <op>"},
+		desc:     "JSON envelope bridge for runtime extensions",
+		more:     "Reads an extension request from stdin and writes one JSON response line for OpenCode, OpenClaw, DSH, or Hermes.",
+		examples: []string{"deja hook-ext --host opencode --op status < payload.json"}},
 }
 
 func helpEntryFor(name string) (helpEntry, bool) {

@@ -2,13 +2,13 @@ package main
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/harness"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -53,6 +53,20 @@ import { execFile } from "node:child_process";
 
 const DEJA = %q;
 
+let hookExt = null;
+
+function parseHookExtEnvelope(raw) {
+  const text = String(raw || "").trim();
+  if (!text) return null;
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && typeof parsed.ok === "boolean") {
+      return parsed;
+    }
+  } catch {}
+  return null;
+}
+
 // "/deja --session <id> -- <query>" searches one conversation; dsh's composer
 // shortcut writes exactly that line. Anything else stays one plain query.
 const SESSION = /^--session\s+(\S+)(?:\s+--\s*([\s\S]*))?$/;
@@ -91,6 +105,61 @@ function apply(ctx) {
       // index. "--" then keeps a query that starts with a dash from being read
       // as a flag, which came back as an error the caller cannot tell from an
       // empty history. A scoped query keeps both properties.
+      const slashRaw = bare
+        ? (query.startsWith("-") ? "--session " + bare + " -- " + query : "--session " + bare + " " + query)
+        : (query.startsWith("-") ? "-- " + query : query);
+      if (hookExt !== false) {
+        const ext = await new Promise((resolve) => {
+          let settled = false;
+          const finish = (val) => {
+            if (settled) return;
+            settled = true;
+            resolve(val);
+          };
+          try {
+            const child = execFile(
+              DEJA,
+              ["hook-ext", "--host", "dsh", "--op", "slash"],
+              {
+                windowsHide: true,
+                encoding: "utf8",
+                timeout: 20000,
+                maxBuffer: 4 * 1024 * 1024,
+              },
+              (err, stdout) => {
+                const parsed = parseHookExtEnvelope(stdout);
+                if (parsed !== null) {
+                  hookExt = true;
+                  finish(parsed);
+                  return;
+                }
+                if (err && (err.killed || err.code === "ETIMEDOUT")) {
+                  finish(null);
+                  return;
+                }
+                hookExt = false;
+                finish(null);
+              },
+            );
+            child.on("error", () => {
+              hookExt = false;
+              finish(null);
+            });
+            if (child.stdin) {
+              child.stdin.on("error", () => {});
+              child.stdin.end(JSON.stringify({ args: slashRaw }));
+            }
+          } catch {
+            hookExt = false;
+            finish(null);
+          }
+        });
+        if (ext !== null) {
+          if (!ext.ok) return { kind: "error", text: String(ext.error || "Nothing in this machine's history matches that.") };
+          const text = String(ext.output || "").trim();
+          return { kind: "success", text: text || "Nothing in this machine's history matches that." };
+        }
+      }
       const args = bare
         ? (query.startsWith("-") ? ["search", "--session", bare, "--", query] : ["search", "--session", bare, query])
         : (query.startsWith("-") ? ["search", "--", query] : ["search", query]);
@@ -184,6 +253,94 @@ const notesReady = import("./lib.js")
 
 // Memory is optional: a plugin that throws in an assembly ends the turn, and
 // sync hook calls run on the host's main thread so they are tightly capped.
+let hookExt = null;
+
+function parseHookExtEnvelope(raw) {
+  const text = String(raw || "").trim();
+  if (!text) return null;
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && typeof parsed.ok === "boolean") {
+      return parsed;
+    }
+  } catch {}
+  return null;
+}
+
+function askExt(op, payload) {
+  if (hookExt === false) return null;
+  try {
+    const out = execFileSync(DEJA, ["hook-ext", "--host", "dsh", "--op", op], {
+      windowsHide: true,
+      input: JSON.stringify(payload || {}),
+      encoding: "utf8",
+      timeout: 3000,
+      maxBuffer: 4 * 1024 * 1024,
+      stdio: ["pipe", "pipe", "ignore"],
+    });
+    const parsed = parseHookExtEnvelope(out);
+    if (parsed !== null) {
+      hookExt = true;
+      return parsed;
+    }
+    hookExt = false;
+    return null;
+  } catch (err) {
+    const parsed = parseHookExtEnvelope(err && err.stdout);
+    if (parsed !== null) {
+      hookExt = true;
+      return parsed;
+    }
+    if (err && (err.killed || err.code === "ETIMEDOUT")) return null;
+    hookExt = false;
+    return null;
+  }
+}
+
+function askExtAsync(op, payload) {
+  if (hookExt === false) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (val) => {
+      if (settled) return;
+      settled = true;
+      resolve(val);
+    };
+    try {
+      const child = execFile(
+        DEJA,
+        ["hook-ext", "--host", "dsh", "--op", op],
+        { windowsHide: true, encoding: "utf8", timeout: 20000, maxBuffer: 4 * 1024 * 1024 },
+        (err, stdout) => {
+          const parsed = parseHookExtEnvelope(stdout);
+          if (parsed !== null) {
+            hookExt = true;
+            finish(parsed);
+            return;
+          }
+          if (err && (err.killed || err.code === "ETIMEDOUT")) {
+            finish(null);
+            return;
+          }
+          hookExt = false;
+          finish(null);
+        },
+      );
+      child.on("error", () => {
+        hookExt = false;
+        finish(null);
+      });
+      if (child.stdin) {
+        child.stdin.on("error", () => {});
+        child.stdin.end(JSON.stringify(payload || {}));
+      }
+    } catch {
+      hookExt = false;
+      finish(null);
+    }
+  });
+}
+
 function ask(args, payload) {
   try {
     return execFileSync(DEJA, args, {
@@ -232,8 +389,17 @@ function cardLoaded() {
   return (globalThis[Symbol.for("deja-vu.dsh.notes-card")] || 0) > 0;
 }
 
-function askHook(hook, payload) {
-  if (!notes || !notes.board.hasReader() || !cardLoaded()) return inert(ask([hook, "--plain"], payload));
+function askHook(hook, payload, op) {
+  const wantNotes = Boolean(notes && notes.board.hasReader() && cardLoaded());
+  const extReq = { ...payload, plain: !wantNotes };
+  if (extReq.deja_once) extReq.once = true;
+  const ext = askExt(op, extReq);
+  if (ext !== null) {
+    if (!ext.ok) return "";
+    if (wantNotes && ext.note) notes.board.push(payload.session_id, ext.note);
+    return inert(ext.context || "");
+  }
+  if (!wantNotes) return inert(ask([hook, "--plain"], payload));
   const reply = notes.split(ask([hook], payload));
   notes.board.push(payload.session_id, reply.notes);
   return inert(reply.context);
@@ -251,7 +417,7 @@ function inert(text) {
 // The session goes with the prompt: a compaction's recovery packet is kept
 // for this session, and only a prompt that names it gets the packet back.
 function recall(prompt, cwd, sid) {
-  return askHook("hook-prompt", { prompt, cwd, session_id: sid, harness: "deepseek" });
+  return askHook("hook-prompt", { prompt, cwd, session_id: sid, harness: "deepseek" }, "prompt");
 }
 
 // dsh names a session "session-<uuid>" and its log's folder the same; deja
@@ -286,7 +452,10 @@ function watchCompaction(ctx, capturing, compacted) {
         try {
           if (c.sessions && typeof c.sessions.flush === "function") await c.sessions.flush(session);
         } catch {}
-        await askAsync(["hook-precompact"], { session_id: sid, cwd, harness: "deepseek" });
+        const ext = await askExtAsync("precompact", { session_id: sid, cwd, harness: "deepseek" });
+        if (ext === null) {
+          await askAsync(["hook-precompact"], { session_id: sid, cwd, harness: "deepseek" });
+        }
         compacted.add(sid);
         const snap = promptCache.read(dshScope(cwd, sid));
         promptCache.write(dshScope(cwd, sid), snap.epoch, (s) => {
@@ -381,7 +550,7 @@ function projectDigest(agent) {
     source: "startup",
     deja_once: true,
     harness: "deepseek",
-  });
+  }, "context");
   if (scope) {
     const snap = promptCache.read(scope);
     promptCache.write(scope, snap.epoch, (s) => {
@@ -532,8 +701,13 @@ function apply(ctx) {
     if (!sid || !live.has(sid)) return;
     const cwd = live.get(sid);
     live.delete(sid);
-    if (sync) ask(["hook-session-end"], { session_id: sid, cwd });
-    else askAsync(["hook-session-end"], { session_id: sid, cwd });
+    if (sync) {
+      if (askExt("session-end", { session_id: sid, cwd, harness: "deepseek" }) === null) ask(["hook-session-end"], { session_id: sid, cwd });
+    } else {
+      askExtAsync("session-end", { session_id: sid, cwd, harness: "deepseek" }).then((ext) => {
+        if (ext === null) return askAsync(["hook-session-end"], { session_id: sid, cwd });
+      });
+    }
   };
   try {
     // The stamp is under the bare uuid, so the end has to name that too: the
@@ -622,17 +796,24 @@ async function toolNote(exec, result) {
   if (args.old_string || args.old_str) editFields.old_string = String(args.old_string || args.old_str);
   if (args.new_string || args.new_str || args.content || args.file_text) editFields.new_string = String(args.new_string || args.new_str || args.content || args.file_text);
   if ((exec.name === "read" || exec.name === "edit" || exec.name === "write") && args.file_path) {
+    const input = { file_path: String(args.file_path), ...editFields };
+    const ext = await askExtAsync("tool-before", { tool_name: exec.name, tool_input: input, plain: true, harness: "deepseek", ...base });
+    if (ext !== null) return ext.ok ? (ext.context || "") : "";
     return askAsync(["hook-tool", "--plain"], {
       tool_name: exec.name,
-      tool_input: { file_path: String(args.file_path), ...editFields },
+      tool_input: input,
       ...base,
     });
   }
   // The profile's other editor names the file "path"; view is its read.
   if (exec.name === "str_replace_editor" && args.path) {
+    const tName = args.command === "view" ? "read" : "edit";
+    const input = { file_path: String(args.path), ...editFields };
+    const ext = await askExtAsync("tool-before", { tool_name: tName, tool_input: input, plain: true, harness: "deepseek", ...base });
+    if (ext !== null) return ext.ok ? (ext.context || "") : "";
     return askAsync(["hook-tool", "--plain"], {
-      tool_name: args.command === "view" ? "read" : "edit",
-      tool_input: { file_path: String(args.path), ...editFields },
+      tool_name: tName,
+      tool_input: input,
       ...base,
     });
   }
@@ -648,9 +829,22 @@ async function toolNote(exec, result) {
     // The marker goes before the lookup, as the index drops it: an error
     // whose last line is "[exit code: 1]" matches nothing on file.
     const response = status.body;
+    const tName = exec.name === "pwsh" ? "powershell" : "bash";
+    const tInput = { command: String(args.command || "") };
+    const isErr = Boolean((result && result.isError) || status.failed);
+    const ext = await askExtAsync("tool-after", {
+      tool_name: tName,
+      tool_input: tInput,
+      tool_response: response,
+      is_error: isErr,
+      plain: true,
+      harness: "deepseek",
+      ...base,
+    });
+    if (ext !== null) return ext.ok ? (ext.context || "") : "";
     return askAsync(["hook-tool-after", "--plain"], {
-      tool_name: exec.name === "pwsh" ? "powershell" : "bash",
-      tool_input: { command: String(args.command || "") },
+      tool_name: tName,
+      tool_input: tInput,
       tool_response: response,
       ...base,
     });
@@ -713,67 +907,36 @@ func autoRow(withAuto bool) string {
 		"      name: " + yamlQuote(dshAutoPath()) + "\n"
 }
 
+func newDSHLayerSpec(path, exe string, withAuto bool) *harness.MarkedBlockSpec {
+	ops, _, _ := newCmdHarnessOps(false)
+	return &harness.MarkedBlockSpec{
+		HarnessName:      "deepseek",
+		Path:             path,
+		StartMarker:      dshBlockStart,
+		EndMarker:        dshBlockEnd,
+		MarkerSubject:    "cordis.patch.yml",
+		EmptyPlaceholder: "[]",
+		PlaceholderNote:  dshArrayNote,
+		HasEntry:         dshLayerHasEntry,
+		IndentFunc:       dshListIndent,
+		RespectDocEnd:    true,
+		DocEndLine: func(line string) bool {
+			return line == "..." || strings.HasPrefix(line, "... ") || strings.HasPrefix(line, "...\t")
+		},
+		BuildBlock: func(oldDoc string) (string, string) {
+			return dshKeepSwitches(oldDoc, dshPatchBlock(exe, withAuto))
+		},
+		ValidatePatched: func(p string, old []byte, patchedDoc string) error {
+			return yamlWriteBreaks(p, old, []byte(patchedDoc))
+		},
+		IsDisabled: dshAnyRowDisabled,
+		Ops:        ops,
+	}
+}
+
 // dshPatchWith returns the layer with deja's block present exactly once.
 func dshPatchWith(old, block string) (string, error) {
-	// One marker without the other means the block cannot be bounded. Skipping
-	// from the start marker to end of file deleted a patch the user had written
-	// below it; leaving an unmarked block in place installed deja twice, with
-	// the orphan invisible to every later run (#1701). The first line of the
-	// block says "safe to delete", which is an invitation to edit exactly this.
-	if err := checkDSHMarkers(old); err != nil {
-		return "", err
-	}
-	if dshHadArrayLine(old) || strings.Contains(old, dshArrayNote) {
-		block = strings.Replace(block, dshBlockStart+"\n", dshBlockStart+"\n"+dshArrayNote+"\n", 1)
-	}
-	// At the list's own indent: a column-0 row after `  - id: x` ends the
-	// list, and dsh refuses the file (#5181).
-	if pad := dshListIndent(old); pad != "" {
-		lines := strings.Split(block, "\n")
-		for i := range lines {
-			lines[i] = pad + lines[i]
-		}
-		block = strings.Join(lines, "\n")
-	}
-	// Where the block already stands, so a row the user wrote below it still
-	// comes after the insert it patches. dsh applies a layer in order and
-	// drops a patch whose id is not inserted yet: appending put the block under
-	// the user's `disabled: true` and deja ran again (#5180).
-	var out []string
-	at, skipping := -1, false
-	for line := range strings.SplitSeq(old, "\n") {
-		switch t := strings.TrimSpace(line); {
-		case strings.HasPrefix(t, dshBlockStart):
-			if at < 0 {
-				at = len(out)
-			}
-			skipping = true
-		case t == dshBlockEnd:
-			skipping = false
-		case skipping, t == "[]":
-		default:
-			out = append(out, line)
-		}
-	}
-	// A block an older install left after the closing `...` moves inside.
-	if end := dshDocumentEnd(out); at >= 0 && (end < 0 || at <= end) {
-		out = append(out[:at], append([]string{block}, out[at:]...)...)
-		return strings.TrimRight(strings.Join(out, "\n"), "\n") + "\n", nil
-	}
-	trimmed := strings.TrimRight(strings.Join(out, "\n"), "\n")
-	if trimmed == "" {
-		return block + "\n", nil
-	}
-	// Inside the document: after a closing `...` the block is a second
-	// document, and dsh takes exactly one (#5181).
-	if end := dshDocumentEnd(out); end >= 0 {
-		head := strings.TrimRight(strings.Join(out[:end], "\n"), "\n")
-		if head != "" {
-			head += "\n"
-		}
-		return head + block + "\n" + strings.TrimRight(strings.Join(out[end:], "\n"), "\n") + "\n", nil
-	}
-	return trimmed + "\n" + block + "\n", nil
+	return newDSHLayerSpec("", "", false).Patch(old, block)
 }
 
 // dshAnyRowDisabled reports whether dsh ends up with any of deja's rows off.
@@ -834,30 +997,7 @@ func dshDocumentEnd(lines []string) int {
 // Matching whole lines rather than substrings keeps a marker quoted inside a
 // value from counting.
 func checkDSHMarkers(doc string) error {
-	start, end := -1, -1
-	for i, line := range strings.Split(doc, "\n") {
-		switch t := strings.TrimSpace(line); {
-		case strings.HasPrefix(t, dshBlockStart):
-			if start < 0 {
-				start = i
-			}
-		case t == dshBlockEnd:
-			if end < 0 {
-				end = i
-			}
-		}
-	}
-	switch {
-	case start < 0 && end < 0:
-		return nil
-	case start < 0:
-		return errors.New("deja's block in cordis.patch.yml has no start marker — put it back, or delete the block entirely")
-	case end < 0:
-		return errors.New("deja's block in cordis.patch.yml has no end marker — put it back, or delete the block entirely")
-	case end < start:
-		return errors.New("deja's block in cordis.patch.yml has its end marker above its start marker — put them in order, or delete the block entirely")
-	}
-	return nil
+	return newDSHLayerSpec("", "", false).CheckMarkers(doc)
 }
 
 // stripDSHBlock removes deja's block and the empty-array literal a generated
@@ -925,43 +1065,20 @@ func installDeepSeekAuto(exe string, uninstall bool) (installResult, error) {
 
 func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error) {
 	path := filepath.Join(sources.DSHHome(), "cordis.patch.yml")
-	old, err := readConfig(path)
-	if err != nil {
-		return installResult{}, err
-	}
+	spec := newDSHLayerSpec(path, exe, withAuto)
 	if uninstall {
+		old, err := readConfig(path)
+		if err != nil {
+			return installResult{}, err
+		}
 		if len(old) == 0 || !strings.Contains(string(old), dshBlockStart) {
 			return installResult{Path: path, Action: "unchanged"}, nil
 		}
-		// The same check the install side makes: skipping from a start marker
-		// with no end runs to end of file and takes the user's own patch with
-		// it, and uninstall is exactly when someone with a hand-edited file
-		// needs their content left alone (#1701).
-		if cerr := checkDSHMarkers(lfText(old)); cerr != nil {
-			return installResult{}, cerr
+		_, next, _, uerr := spec.PlanUnwire()
+		if uerr != nil {
+			return installResult{}, uerr
 		}
-		rest := stripDSHBlock(lfText(old))
-		if !dshLayerHasEntry(rest) && (strings.TrimSpace(rest) == "" || strings.Contains(string(old), dshArrayNote)) {
-			// An empty layer is the empty array, not an empty file or a
-			// comment alone: dsh parses either as null and refuses to load
-			// the profile. The generated layer is a comment and `[]`; the
-			// install replaced the array and said so inside its block, so
-			// uninstall puts it back under the comment (#3271). A file that
-			// never held one is handed back as it was.
-			// Inside the document, as install placed the block.
-			lines := strings.Split(strings.TrimRight(rest, "\n"), "\n")
-			if end := dshDocumentEnd(lines); end >= 0 {
-				lines = append(lines[:end], append([]string{"[]"}, lines[end:]...)...)
-				rest = strings.Join(lines, "\n")
-			} else {
-				rest = strings.TrimRight(rest, "\n")
-				if rest != "" {
-					rest += "\n"
-				}
-				rest += "[]"
-			}
-		}
-		a, werr := writeIfChanged(path, old, []byte(rest+"\n"))
+		a, werr := writeIfChanged(path, old, next)
 		if werr != nil {
 			return installResult{}, werr
 		}
@@ -982,8 +1099,7 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 	}
 	// The layer is worked out before the plugins are written, so a layer deja
 	// cannot patch refuses the target with nothing written (#4555).
-	block, note := dshKeepSwitches(lfText(old), dshPatchBlock(exe, withAuto))
-	patched, perr := dshPatchWith(lfText(old), block)
+	old, next, note, perr := spec.PlanWire()
 	if perr != nil {
 		return installResult{}, perr
 	}
@@ -991,18 +1107,10 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 	// after three plugin directories, which doctor then called wired and
 	// uninstall, finding no block, left behind (#5182). A layer that already
 	// holds this block is not written at all, so the plugins still refresh.
-	if !bytes.Equal(matchFinalNewline(old, matchLineEndings(old, []byte(patched))), old) {
+	if !bytes.Equal(matchFinalNewline(old, matchLineEndings(old, next)), old) {
 		if cerr := configWritable(path); cerr != nil {
 			return installResult{}, cerr
 		}
-	}
-	// The note says deja stays off; a row of the user's below the block may
-	// turn it back on, and dsh applies that one last.
-	if note != "" && !dshAnyRowDisabled(patched) {
-		note = ""
-	}
-	if yerr := yamlWriteBreaks(path, old, []byte(patched)); yerr != nil {
-		return installResult{}, yerr
 	}
 	noteCreatedDirs(filepath.Dir(path))
 	if merr := os.MkdirAll(filepath.Dir(path), 0o755); merr != nil {
@@ -1058,7 +1166,7 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 	} else if rerr := removeDSHAutoParts(); rerr != nil {
 		return installResult{}, rerr
 	}
-	a, err := writeIfChanged(path, old, []byte(patched))
+	a, err := writeIfChanged(path, old, next)
 	if err != nil {
 		return installResult{}, err
 	}

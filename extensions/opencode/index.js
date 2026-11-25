@@ -24,6 +24,7 @@ import {
   contributions,
   createSessionStore,
   mcpWired,
+  parseHookExtEnvelope,
   recallArgv,
   recallSilence,
   rememberEntry,
@@ -122,6 +123,30 @@ async function run(bin, args, input, cwd, timeout = 20000) {
   }
 }
 
+async function runExt(bin, op, payload, cwd, timeout = 20000) {
+  let raw = ""
+  let timedOut = false
+  try {
+    const child = run_(bin, ["hook-ext", "--host", "opencode", "--op", op], {
+      windowsHide: true,
+      encoding: "utf8",
+      timeout,
+      cwd,
+      maxBuffer: 8 * 1024 * 1024,
+    })
+    if (payload !== undefined) {
+      child.child.stdin.on("error", () => {})
+      child.child.stdin.end(JSON.stringify(payload))
+    }
+    const { stdout } = await child
+    raw = stdout
+  } catch (err) {
+    timedOut = Boolean(err?.killed || err?.signal)
+    raw = typeof err?.stdout === "string" ? err.stdout : ""
+  }
+  return { env: parseHookExtEnvelope(raw), timedOut }
+}
+
 const NOTHING = "Nothing in this machine's history matches that."
 const MISSING =
   "deja is not installed on this machine, so there is no history to search. " +
@@ -154,6 +179,28 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
   const cwd = directory || process.cwd()
   // Every call runs in the session's own directory: deja ranks by project.
   const ask = (args, input, timeout) => run(bin, args, input, cwd, timeout)
+  let hookExt = null
+  const askExt = async (op, payload, timeout = 20000) => {
+    if (hookExt === false) return null
+    const { env, timedOut } = await runExt(bin, op, payload, cwd, timeout)
+    if (env) {
+      hookExt = true
+      return env
+    }
+    if (!timedOut) hookExt = false
+    return null
+  }
+  const intOpt = (v) => {
+    if (v === undefined || v === null) return undefined
+    const n = Math.trunc(Number(v))
+    return Number.isFinite(n) ? n : undefined
+  }
+  const extTool = async (toolName, toolInput, opts = {}) => {
+    const ext = await askExt("tool", { tool: toolName, tool_input: toolInput, cwd, ...opts })
+    if (!ext) return null
+    if (!ext.ok) return { ok: false, text: ext.error || NOTHING }
+    return { ok: true, text: ext.output || "" }
+  }
 
   // Whether the binary answers at all is asked once. Without it every tool
   // would report an empty history to someone who simply never installed deja,
@@ -199,7 +246,11 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
   // session ended, so without ending them here the stamp sat out its whole
   // window and the next session's MCP recall left a finished one out (#4546).
   const live = new Set()
-  const endSession = (id) => ask(["hook-session-end"], JSON.stringify({ session_id: id, cwd }), 5000)
+  const endSession = async (id) => {
+    const ext = await askExt("session-end", { session_id: id, cwd }, 5000)
+    if (ext) return ""
+    return ask(["hook-session-end"], JSON.stringify({ session_id: id, cwd }), 5000)
+  }
   // The session that spawned each one, asked of opencode once. A task
   // sub-agent's digest and recall led with its parent, which is live and
   // asking through it (#4548).
@@ -248,6 +299,12 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
       async execute(args) {
         // The page the MCP recall tool serves, framed and budgeted by deja.
         const call = recallArgv(args)
+        const ext = await extTool("deja_recall", { query: String(args?.query || "") }, {
+          query: String(args?.query || ""),
+          limit: intOpt(args?.limit),
+          offset: intOpt(args?.offset),
+        })
+        if (ext) return ext.ok ? ext.text || recallSilence(call) : ext.text
         const out = await ask(call)
         return answer(out || (installed ? recallSilence(call) : ""))
       },
@@ -259,6 +316,8 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         query: { type: "string", description: "A query, or a session id prefix returned by deja_recall." },
       },
       async execute(args) {
+        const ext = await extTool("deja_session", { query: String(args?.query || "") }, { query: String(args?.query || "") })
+        if (ext) return ext.ok ? ext.text || NOTHING : ext.text
         return answer(await ask(["--framed", ...argv("ctx", [], args.query)]))
       },
     },
@@ -269,6 +328,11 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         path: { type: "string", description: "Path to the file, absolute or relative to the project." },
       },
       async execute(args) {
+        const ext = await extTool("deja_blame", { path: String(args?.path || "") }, {
+          query: String(args?.path || ""),
+          mode: "json",
+        })
+        if (ext) return ext.ok ? ext.text || NOTHING : ext.text
         return answer(await ask(["--framed", ...argv("blame", ["--json"], args.path)]))
       },
     },
@@ -279,6 +343,8 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         error: { type: "string", description: "The failing output, copied as it was printed." },
       },
       async execute(args) {
+        const ext = await extTool("deja_fix", { error: String(args?.error || "") }, { query: String(args?.error || "") })
+        if (ext) return ext.ok ? ext.text || NOTHING : ext.text
         return answer(await ask(["--framed", ...argv("fix", [], args.error)]))
       },
     },
@@ -289,6 +355,8 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         what: { type: "string", description: "The thing to run: a tool, a task, a script name." },
       },
       async execute(args) {
+        const ext = await extTool("deja_how", { what: String(args?.what || "") }, { query: String(args?.what || "") })
+        if (ext) return ext.ok ? ext.text || NOTHING : ext.text
         return answer(await ask(["--framed", ...argv("how", [], args.what)]))
       },
     },
@@ -299,6 +367,8 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         text: { type: "string", description: "The decision, in one or two sentences, with the reason it was taken." },
       },
       async execute(args) {
+        const ext = await extTool("deja_remember", { text: String(args?.text || "") }, { content: String(args?.text || "") })
+        if (ext) return ext.text || "deja did not record that."
         const written = await ask(argv("remember", [], args.text))
         if (!installed) return MISSING
         return written || "deja did not record that."
@@ -339,7 +409,17 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         // never reads the digest cached for it (#4273). The parent rides
         // along so the digest leaves it out too.
         const payload = { session_id: input?.sessionID || "", parent_session_id: await parentOf(input?.sessionID), cwd }
-        const { context, receipt } = contextText(await ask(hook("hook-context"), JSON.stringify(payload), 30000))
+        const ext = await askExt("context", { ...payload, silent: !toasts }, 30000)
+        let context = ""
+        let receipt = ""
+        if (ext) {
+          if (ext.ok) {
+            context = ext.context || ""
+            receipt = ext.note || ""
+          }
+        } else {
+          ;({ context, receipt } = contextText(await ask(hook("hook-context"), JSON.stringify(payload), 30000)))
+        }
         let showReceipt = false
         snap = promptCache.write(scope, snap.epoch, (s) => {
           if (Object.hasOwn(s, "digest")) return
@@ -382,7 +462,8 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
       empties.set(key, asks)
       if (asks < emptyRetries) digests.delete(key)
       if (snap.session.told) return
-      const status = await ask(["warmup-status"], undefined, 5000)
+      const extStatus = await askExt("warmup-status", {}, 5000)
+      const status = extStatus ? (extStatus.ok ? extStatus.output || "" : "") : await ask(["warmup-status"], undefined, 5000)
       if (!status) return
       const post = promptCache.read(scope)
       promptCache.write(scope, post.epoch, (s) => {
@@ -439,9 +520,21 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         // blocks than the sessions people typed in (34 to 19 in 17 days).
         const parent = await parentOf(key)
         const prompt = parent ? "" : last.prompt
-        const raw = await ask(hook("hook-prompt"), JSON.stringify({ prompt, session_id: key, parent_session_id: parent, cwd }))
-        const reply = prompt && raw ? JSON.parse(raw) : {}
-        const extra = reply?.hookSpecificOutput?.additionalContext || ""
+        const payload = { prompt, session_id: key, parent_session_id: parent, cwd }
+        const ext = await askExt("prompt", { ...payload, silent: !toasts })
+        let extra = ""
+        let systemMessage = ""
+        if (ext) {
+          if (ext.ok && prompt) {
+            extra = ext.context || ""
+            systemMessage = ext.note || ""
+          }
+        } else {
+          const raw = await ask(hook("hook-prompt"), JSON.stringify(payload))
+          const reply = prompt && raw ? JSON.parse(raw) : {}
+          extra = reply?.hookSpecificOutput?.additionalContext || ""
+          systemMessage = reply?.systemMessage || ""
+        }
         let wrote = false
         snap = promptCache.write(scope, snap.epoch, (s) => {
           if (Object.hasOwn(s.recalled, last.key)) return
@@ -451,7 +544,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         // The "deja-vu — from Codex CLI, …" line is the person's, and what goes
         // into the message is the model's: without the toast it reached no one,
         // while deja counted it shown and held the next one back twenty minutes.
-        if (wrote && reply?.systemMessage) await toast(reply.systemMessage)
+        if (wrote && systemMessage) await toast(systemMessage)
       }
       // Every message gets back what it was given, in every call, the way
       // Claude Code keeps a prompt hook's text in its transcript. Once: the
@@ -474,7 +567,9 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
       const sessionID = input?.sessionID || ""
       if (sessionID) compacting.add(sessionID)
       promptCache.compact(scopeOf(sessionID))
-      await ask(["hook-precompact"], JSON.stringify({ session_id: sessionID, cwd, harness: "opencode" }), 60000)
+      const payload = { session_id: sessionID, cwd, harness: "opencode" }
+      const ext = await askExt("precompact", payload, 60000)
+      if (!ext) await ask(["hook-precompact"], JSON.stringify(payload), 60000)
     } catch {
       // memory is optional: never break a compaction over it
     }
@@ -496,9 +591,15 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         session_id: input.sessionID || "",
         cwd,
       }
-      const raw = await ask(["hook-tool"], JSON.stringify(payload))
-      if (!raw) return
-      const next = JSON.parse(raw)?.hookSpecificOutput?.updatedInput?.prompt
+      const ext = await askExt("tool-before", { ...payload, tool: "Task" })
+      let next = ""
+      if (ext) {
+        if (ext.ok) next = ext.updatedInput?.prompt || ""
+      } else {
+        const raw = await ask(["hook-tool"], JSON.stringify(payload))
+        if (!raw) return
+        next = JSON.parse(raw)?.hookSpecificOutput?.updatedInput?.prompt || ""
+      }
       if (next) args.prompt = next
     } catch {
       // memory is optional: never break a spawn over it
@@ -536,9 +637,15 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
           session_id: input.sessionID || "",
           cwd,
         }
-        const fraw = await ask(["hook-tool"], JSON.stringify(fpayload))
-        if (!fraw) return
-        const fextra = JSON.parse(fraw)?.hookSpecificOutput?.additionalContext
+        const fext = await askExt("tool-before", { ...fpayload, tool: input?.tool || "read" })
+        let fextra = ""
+        if (fext) {
+          if (fext.ok) fextra = fext.context || ""
+        } else {
+          const fraw = await ask(["hook-tool"], JSON.stringify(fpayload))
+          if (!fraw) return
+          fextra = JSON.parse(fraw)?.hookSpecificOutput?.additionalContext || ""
+        }
         if (fextra) output.output = ftext ? ftext + "\n\n" + fextra : fextra
         return
       }
@@ -553,9 +660,15 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         session_id: input.sessionID || "",
         cwd,
       }
-      const raw = await ask(["hook-tool-after"], JSON.stringify(payload))
-      if (!raw) return
-      const extra = JSON.parse(raw)?.hookSpecificOutput?.additionalContext
+      const ext = await askExt("tool-after", { ...payload, tool: "bash" })
+      let extra = ""
+      if (ext) {
+        if (ext.ok) extra = ext.context || ""
+      } else {
+        const raw = await ask(["hook-tool-after"], JSON.stringify(payload))
+        if (!raw) return
+        extra = JSON.parse(raw)?.hookSpecificOutput?.additionalContext || ""
+      }
       if (extra) output.output = text + "\n\n" + extra
     } catch {
       // memory is optional: never break a tool call over it

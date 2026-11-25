@@ -1654,8 +1654,11 @@ func TestInstallCodexHooksErrorsAndMissingUninstall(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if r.Path != filepath.Join(home, ".codex", "hooks.json") || r.Action != "created" {
+		if r.Path != filepath.Join(home, ".codex", "hooks.json") || r.Action != "unchanged" {
 			t.Fatalf("result = %#v", r)
+		}
+		if _, err := os.Stat(r.Path); !os.IsNotExist(err) {
+			t.Fatalf("missing hooks.json should not be created on uninstall; stat err = %v", err)
 		}
 	})
 }

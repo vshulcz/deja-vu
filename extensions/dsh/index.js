@@ -67,6 +67,19 @@ function dshScope(cwd, sid) {
 
 const HOOK_TIMEOUT_MS = 3000;
 const TOOL_TIMEOUT_MS = 20000;
+let hookExt = null;
+
+function parseHookExtEnvelope(raw) {
+  const text = String(raw || "").trim();
+  if (!text) return null;
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && typeof parsed.ok === "boolean") {
+      return parsed;
+    }
+  } catch {}
+  return null;
+}
 
 // run returns stdout, or "" when deja is missing or says nothing. Memory is
 // optional everywhere: a throw here would end the turn, and sync calls sit on
@@ -85,6 +98,84 @@ function run(args, input, cwd) {
   } catch {
     return "";
   }
+}
+
+function runExt(op, payload, cwd, timeoutMs = HOOK_TIMEOUT_MS) {
+  if (hookExt === false) return null;
+  const body = JSON.stringify(payload || {});
+  try {
+    const out = execFileSync(DEJA, ["hook-ext", "--host", "dsh", "--op", op], {
+      windowsHide: true,
+      cwd,
+      encoding: "utf8",
+      timeout: timeoutMs,
+      maxBuffer: 8 * 1024 * 1024,
+      input: body,
+      stdio: ["pipe", "pipe", "ignore"],
+    });
+    const parsed = parseHookExtEnvelope(out);
+    if (parsed !== null) {
+      hookExt = true;
+      return parsed;
+    }
+    hookExt = false;
+    return null;
+  } catch (err) {
+    const parsed = parseHookExtEnvelope(err && err.stdout);
+    if (parsed !== null) {
+      hookExt = true;
+      return parsed;
+    }
+    if (err && (err.killed || err.code === "ETIMEDOUT")) return null;
+    hookExt = false;
+    return null;
+  }
+}
+
+function runExtAsync(op, payload, cwd, timeoutMs = TOOL_TIMEOUT_MS) {
+  if (hookExt === false) return Promise.resolve(null);
+  const body = JSON.stringify(payload || {});
+  return new Promise((resolve) => {
+    try {
+      const child = execFile(
+        DEJA,
+        ["hook-ext", "--host", "dsh", "--op", op],
+        {
+          windowsHide: true,
+          cwd,
+          encoding: "utf8",
+          timeout: timeoutMs,
+          maxBuffer: 8 * 1024 * 1024,
+          stdio: ["pipe", "pipe", "ignore"],
+        },
+        (err, stdout) => {
+          const parsed = parseHookExtEnvelope(stdout);
+          if (parsed !== null) {
+            hookExt = true;
+            resolve(parsed);
+            return;
+          }
+          if (err && (err.killed || err.code === "ETIMEDOUT")) {
+            resolve(null);
+            return;
+          }
+          hookExt = false;
+          resolve(null);
+        },
+      );
+      child.on("error", () => {
+        hookExt = false;
+        resolve(null);
+      });
+      if (child.stdin) {
+        child.stdin.on("error", () => {});
+        child.stdin.end(body);
+      }
+    } catch {
+      hookExt = false;
+      resolve(null);
+    }
+  });
 }
 
 const NOTHING = "Nothing in this machine's history matches that.";
@@ -142,8 +233,14 @@ function tools(ctx) {
       // The page the MCP recall tool serves, framed and budgeted by deja. It
       // puts the project of its working directory first, so it runs in the
       // calling session's workspace rather than wherever dsh was launched.
+      const cwd = sessionCwd(exec && exec.agent);
+      const req = { tool: "deja_recall", query: String((args && args.query) || ""), cwd };
+      if (args && args.limit !== undefined) req.limit = args.limit;
+      if (args && args.offset !== undefined) req.offset = args.offset;
+      const ext = await runExtAsync("tool", req, cwd);
+      if (ext !== null) return ext.ok ? (ext.output || NOTHING) : (ext.error || NOTHING);
       const call = recallArgv(args);
-      const out = await runAsync(call, undefined, sessionCwd(exec && exec.agent));
+      const out = await runAsync(call, undefined, cwd);
       return answer(out || (INSTALLED ? recallSilence(call) : ""));
     },
   })));
@@ -161,6 +258,8 @@ function tools(ctx) {
     },
     output: TEXT_OUTPUT,
     async execute(args) {
+      const ext = await runExtAsync("tool", { tool: "deja_session", query: String((args && args.query) || "") });
+      if (ext !== null) return ext.ok ? (ext.output || NOTHING) : (ext.error || NOTHING);
       return answer(await runAsync(["--framed", ...argv("ctx", [], args.query)]));
     },
   })));
@@ -178,6 +277,9 @@ function tools(ctx) {
     },
     output: TEXT_OUTPUT,
     async execute(args) {
+      const p = String((args && args.path) || "");
+      const ext = await runExtAsync("tool", { tool: "deja_blame", mode: "json", query: p, tool_input: { path: p } });
+      if (ext !== null) return ext.ok ? (ext.output || NOTHING) : (ext.error || NOTHING);
       return answer(await runAsync(["--framed", ...argv("blame", ["--json"], args.path)]));
     },
   })));
@@ -195,6 +297,9 @@ function tools(ctx) {
     },
     output: TEXT_OUTPUT,
     async execute(args) {
+      const e = String((args && args.error) || "");
+      const ext = await runExtAsync("tool", { tool: "deja_fix", query: e, tool_input: { error: e } });
+      if (ext !== null) return ext.ok ? (ext.output || NOTHING) : (ext.error || NOTHING);
       return answer(await runAsync(["--framed", ...argv("fix", [], args.error)]));
     },
   })));
@@ -212,6 +317,8 @@ function tools(ctx) {
     },
     output: TEXT_OUTPUT,
     async execute(args) {
+      const ext = await runExtAsync("tool", { tool: "deja_how", query: String((args && args.what) || "") });
+      if (ext !== null) return ext.ok ? (ext.output || NOTHING) : (ext.error || NOTHING);
       return answer(await runAsync(["--framed", ...argv("how", [], args.what)]));
     },
   })));
@@ -229,6 +336,9 @@ function tools(ctx) {
     },
     output: TEXT_OUTPUT,
     async execute(args) {
+      const text = String((args && args.text) || "");
+      const ext = await runExtAsync("remember", { content: text });
+      if (ext !== null) return ext.ok ? (ext.output || "Recorded.") : (ext.error || "deja did not record that.");
       const written = await runAsync(argv("remember", [], args.text));
       if (!INSTALLED) return MISSING;
       return written || "deja did not record that.";
@@ -272,15 +382,28 @@ function command(ctx, board) {
       // dispatches a word that happens to be a command, so `/deja version`
       // printed a version number and `/deja index` rebuilt the index, and one
       // of the words people most want history about is `install`.
-      const out = await runAsync(argv("search", session ? ["--session", session] : [], query));
-      if (!INSTALLED) return { kind: "error", text: MISSING };
+      const slashRaw = session
+        ? (query.startsWith("-") ? `--session ${session} -- ${query}` : `--session ${session} ${query}`)
+        : (query.startsWith("-") ? `-- ${query}` : query);
+      let out;
+      const extSlash = await runExtAsync("slash", { args: slashRaw });
+      if (extSlash !== null) {
+        if (!extSlash.ok) return { kind: "error", text: extSlash.error || NOTHING };
+        out = extSlash.output || "";
+      } else {
+        out = await runAsync(argv("search", session ? ["--session", session] : [], query));
+        if (!INSTALLED) return { kind: "error", text: MISSING };
+      }
       // Outside dsh web a person sees nothing the hooks print — the digest
       // goes to the model — so the reply to /deja is where deja's own notes
       // reach them. In dsh web the session's lines may still be waiting on the
       // board for a page that has not asked; they go here, once, instead.
       const waiting = board ? board.take(sessionId(invocation && invocation.agent)) : [];
-      const notes = [...waiting, await runAsync(["hook-context", "--notes"])].filter(Boolean).join("\n");
-      return { kind: "success", text: notes ? answer(out) + "\n\n" + notes : answer(out) };
+      const extNotes = await runExtAsync("context", { notes_only: true }, undefined, HOOK_TIMEOUT_MS);
+      const liveNote = extNotes !== null ? (extNotes.ok ? (extNotes.note || extNotes.output || "") : "") : await runAsync(["hook-context", "--notes"]);
+      const notes = [...waiting, liveNote].filter(Boolean).join("\n");
+      const baseText = extSlash !== null ? (out || NOTHING) : answer(out);
+      return { kind: "success", text: notes ? baseText + "\n\n" + notes : baseText };
     },
   }));
 }
@@ -343,6 +466,7 @@ function autoDigest(ctx, board) {
           if (Object.hasOwn(snap.session, "digest")) return snap.session.digest;
         }
         const text = inert(askHook(
+          "context",
           ["hook-context", "--plain"],
           ["hook-context"],
           JSON.stringify({ session_id: sid, cwd: sessionCwd(agent), source: "startup", deja_once: true, harness: "deepseek" }),
@@ -405,8 +529,20 @@ function sessionCwd(agent) {
 // Anywhere else — tui, headless, sdk — it stays --plain. deja marks a note
 // shown when it prints it, so asking for notes nobody will read spends them,
 // and `/deja` and the next Claude Code session would not see them either.
-function askHook(plain, json, payload, sid, board) {
-  if (!board.hasReader()) return run(plain, payload);
+function askHook(op, plain, json, payload, sid, board) {
+  const wantNotes = board.hasReader();
+  let reqObj = {};
+  try {
+    reqObj = JSON.parse(payload);
+  } catch {}
+  if (reqObj.deja_once) reqObj.once = true;
+  const ext = runExt(op, { ...reqObj, plain: !wantNotes }, reqObj.cwd, HOOK_TIMEOUT_MS);
+  if (ext !== null) {
+    if (!ext.ok) return "";
+    if (wantNotes && ext.note) board.push(sid, ext.note);
+    return ext.context || "";
+  }
+  if (!wantNotes) return run(plain, payload);
   const reply = splitHookReply(run(json, payload));
   board.push(sid, reply.notes);
   return reply.context;
@@ -445,6 +581,7 @@ function autoRecall(ctx, board) {
           askedIn = cwd;
           askedBy = sid;
           recalled = inert(askHook(
+            "prompt",
             ["hook-prompt", "--plain"],
             ["hook-prompt"],
             JSON.stringify({ prompt, cwd, session_id: sid, harness: "deepseek" }),
@@ -519,9 +656,10 @@ function runAsync(args, input, cwd) {
         (err, stdout) => resolve(err ? "" : String(stdout || "").trim()),
       );
       child.on("error", () => resolve(""));
-      if (hasInput && child.stdin) {
+      if (child.stdin) {
         child.stdin.on("error", () => {});
-        child.stdin.end(input);
+        if (hasInput) child.stdin.end(input);
+        else child.stdin.end();
       }
     } catch {
       resolve("");
@@ -553,7 +691,9 @@ function watchCompaction(ctx, compacted) {
         try {
           if (c.sessions && typeof c.sessions.flush === "function") await c.sessions.flush(session);
         } catch {}
-        await runAsync(["hook-precompact"], JSON.stringify({ session_id: sid, cwd, harness: "deepseek" }));
+        if ((await runExtAsync("precompact", { session_id: sid, cwd, harness: "deepseek", source: "dsh" }, cwd)) === null) {
+          await runAsync(["hook-precompact"], JSON.stringify({ session_id: sid, cwd, harness: "deepseek" }));
+        }
         compacted.add(sid);
         const snap = promptCache.read(dshScope(cwd, sid));
         promptCache.write(dshScope(cwd, sid), snap.epoch, (s) => {
@@ -620,8 +760,13 @@ function sessionEnds(ctx) {
     if (!sid || !live.has(sid)) return;
     const cwd = live.get(sid);
     live.delete(sid);
-    if (sync) run(["hook-session-end"], JSON.stringify({ session_id: sid, cwd }));
-    else runAsync(["hook-session-end"], JSON.stringify({ session_id: sid, cwd }));
+    if (sync) {
+      if (runExt("session-end", { session_id: sid, cwd }, cwd, HOOK_TIMEOUT_MS) === null) run(["hook-session-end"], JSON.stringify({ session_id: sid, cwd }));
+    } else {
+      runExtAsync("session-end", { session_id: sid, cwd }, cwd, HOOK_TIMEOUT_MS).then((ext) => {
+        if (ext === null) return runAsync(["hook-session-end"], JSON.stringify({ session_id: sid, cwd }));
+      });
+    }
   };
   try {
     ctx.on("session/created", (session) => {
@@ -642,26 +787,29 @@ async function toolNote(exec, result) {
   if (args.old_string || args.old_str) editFields.old_string = String(args.old_string || args.old_str);
   if (args.new_string || args.new_str || args.content || args.file_text) editFields.new_string = String(args.new_string || args.new_str || args.content || args.file_text);
   if ((exec.name === "read" || exec.name === "edit" || exec.name === "write") && args.file_path) {
-    return runAsync(["hook-tool", "--plain"], JSON.stringify({
-      tool_name: exec.name,
-      tool_input: { file_path: String(args.file_path), ...editFields },
-      ...base,
-    }));
+    const req = { tool_name: exec.name, tool_input: { file_path: String(args.file_path), ...editFields }, plain: true, ...base };
+    const ext = await runExtAsync("tool-before", req, base.cwd);
+    if (ext !== null) return ext.ok ? (ext.context || "") : "";
+    return runAsync(["hook-tool", "--plain"], JSON.stringify({ tool_name: exec.name, tool_input: { file_path: String(args.file_path), ...editFields }, ...base }));
   }
   // The profile's other editor names the file "path"; view is its read.
   if (exec.name === "str_replace_editor" && args.path) {
-    return runAsync(["hook-tool", "--plain"], JSON.stringify({
-      tool_name: args.command === "view" ? "read" : "edit",
-      tool_input: { file_path: String(args.path), ...editFields },
-      ...base,
-    }));
+    const tName = args.command === "view" ? "read" : "edit";
+    const req = { tool_name: tName, tool_input: { file_path: String(args.path), ...editFields }, plain: true, ...base };
+    const ext = await runExtAsync("tool-before", req, base.cwd);
+    if (ext !== null) return ext.ok ? (ext.context || "") : "";
+    return runAsync(["hook-tool", "--plain"], JSON.stringify({ tool_name: tName, tool_input: { file_path: String(args.path), ...editFields }, ...base }));
   }
   // pwsh is the Windows shell, with the same markers.
   if (exec.name === "bash" || exec.name === "pwsh") {
     const status = exitStatus(resultText(result));
     if (!(result && result.isError) && !status.failed) return "";
+    const shellName = exec.name === "pwsh" ? "powershell" : "bash";
+    const req = { tool_name: shellName, tool_input: { command: String(args.command || "") }, tool_response: status.body, is_error: Boolean((result && result.isError) || status.failed), plain: true, ...base };
+    const ext = await runExtAsync("tool-after", req, base.cwd);
+    if (ext !== null) return ext.ok ? (ext.context || "") : "";
     return runAsync(["hook-tool-after", "--plain"], JSON.stringify({
-      tool_name: exec.name === "pwsh" ? "powershell" : "bash",
+      tool_name: shellName,
       tool_input: { command: String(args.command || "") },
       tool_response: status.body,
       ...base,
