@@ -31,6 +31,7 @@ import (
 //
 //	detached, off every blocking path
 //	  hook-refresh       0.42 to 0.74 s, by design (see runHookRefresh)
+//	  hook-embed         network-bound, detached from session-end (see runHookEmbed)
 //
 // The shape matters more than the numbers. A change that adds a read to a
 // per-action hook has to keep it behind the checks that decide there is nothing

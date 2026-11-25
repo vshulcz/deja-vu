@@ -386,7 +386,7 @@ _deja_completion() {
         help)
             COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
             ;;
-        aider|brief|check|ctx|embed|goose|hook-antigravity|hook-codewhale|hook-goose|hook-goose-prompt|hook-mcp-call|hook-plan|hook-precompact|hook-refresh|hook-stop|reasonix-ext|share|sources|statusline|version|warmup|warmup-status)
+        aider|brief|check|ctx|embed|goose|hook-antigravity|hook-codewhale|hook-embed|hook-goose|hook-goose-prompt|hook-mcp-call|hook-plan|hook-precompact|hook-refresh|hook-stop|reasonix-ext|share|sources|statusline|version|warmup|warmup-status)
             COMPREPLY=()
             ;;
         *)
@@ -646,7 +646,7 @@ _deja() {
     help)
       _describe -t commands 'deja command' commands
       ;;
-    aider|brief|check|ctx|embed|goose|hook-antigravity|hook-codewhale|hook-goose|hook-goose-prompt|hook-mcp-call|hook-plan|hook-precompact|hook-refresh|hook-stop|reasonix-ext|share|sources|statusline|version|warmup|warmup-status)
+    aider|brief|check|ctx|embed|goose|hook-antigravity|hook-codewhale|hook-embed|hook-goose|hook-goose-prompt|hook-mcp-call|hook-plan|hook-precompact|hook-refresh|hook-stop|reasonix-ext|share|sources|statusline|version|warmup|warmup-status)
       ;;
     *)
       _arguments '--json[print JSON]' '--re[interpret query as a regular expression]' '--all[include all results]' '--no-embed[skip semantic reranking]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(%ROLES%)' '--session=[only one session]:id:' '--rebuild[force a full rebuild]' '--limit=[max sessions to return (1-100)]:count:' '--sort=[order of the results]:order:(relevance date)'
@@ -1049,7 +1049,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 else { @('--context-search', '--http') }
             }
             'help' { $commands }
-            { $_ -in @('aider', 'brief', 'check', 'ctx', 'embed', 'goose', 'hook-antigravity', 'hook-codewhale', 'hook-goose', 'hook-goose-prompt', 'hook-mcp-call', 'hook-plan', 'hook-precompact', 'hook-refresh', 'hook-stop', 'reasonix-ext', 'share', 'sources', 'statusline', 'version', 'warmup', 'warmup-status') } { @() }
+            { $_ -in @('aider', 'brief', 'check', 'ctx', 'embed', 'goose', 'hook-antigravity', 'hook-codewhale', 'hook-embed', 'hook-goose', 'hook-goose-prompt', 'hook-mcp-call', 'hook-plan', 'hook-precompact', 'hook-refresh', 'hook-stop', 'reasonix-ext', 'share', 'sources', 'statusline', 'version', 'warmup', 'warmup-status') } { @() }
             default { if ($previous -eq '--harness') { $harnesses } elseif ($previous -eq '--role') { $roles } elseif ($previous -eq '--sort') { @('relevance', 'date') } elseif ($previous -in @('--project', '--since', '--session', '--limit')) { @() } else { $defaultOptions } }
         }
     }

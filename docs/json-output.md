@@ -654,6 +654,8 @@ Version `state` is `ok`, `update-available`, `ahead`, `dev`, `offline` (under
 `unreadable` (which adds an `error`); `activations` keys are `search`, `mcp` and
 `auto`, each with the rule in force and how many sessions it withheld;
 `ignored` and `inert` list policy lines that matched no harness or no import.
+`config` appears when the user-owned `config.toml` exists on disk, carrying
+`path`, `exists`, `valid`, and (omitted when empty) `keys` (key names only, never secret values), `unknown`, `warnings`, and `error`.
 Per-harness `ingest_health` may also carry `clipped_messages`, `failed_files`
 (how many of the store's files the last pass could not read at all) and
 `last_error`, which quotes one of that store's failures — the first failing path in order,

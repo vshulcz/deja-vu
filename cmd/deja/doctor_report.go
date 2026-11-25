@@ -22,6 +22,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/peers"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/sources"
+	"github.com/vshulcz/deja-vu/internal/userconfig"
 )
 
 type doctorStore struct {
@@ -149,6 +150,7 @@ type doctorReport struct {
 	// missing git (#2411).
 	Git     doctorComponent                `json:"git"`
 	Version doctorVersionReport            `json:"version"`
+	Config  *doctorConfigReport            `json:"config,omitempty"`
 	Embed   *doctorEmbedReport             `json:"embed,omitempty"`
 	Policy  doctorPolicyReport             `json:"policy"`
 	Ingest  map[string]index.HarnessIngest `json:"ingest_health,omitempty"`
@@ -274,6 +276,79 @@ func collectDoctorSync(dir string) doctorSyncReport {
 		out.Imported = append(out.Imported, doctorImportedReport{Machine: name, Sessions: from[name]})
 	}
 	return out
+}
+
+type doctorConfigReport struct {
+	Path     string   `json:"path"`
+	Exists   bool     `json:"exists"`
+	Valid    bool     `json:"valid"`
+	Error    string   `json:"error,omitempty"`
+	Unknown  []string `json:"unknown,omitempty"`
+	Warnings []string `json:"warnings,omitempty"`
+	Keys     []string `json:"keys,omitempty"`
+}
+
+var configEnvToKey = map[string]string{ //nolint:gosec // env var name to config key table, not credentials
+	"DEJA_EMBED_EVERY":           "embed.every",
+	"DEJA_EMBED_URL":             "embed.url",
+	"DEJA_EMBED_MODEL":           "embed.model",
+	"DEJA_EMBED_KEY":             "embed.api_key",
+	"DEJA_EMBED_BATCH":           "embed.batch",
+	"DEJA_EMBED_QUERY_PREFIX":    "embed.query_prefix",
+	"DEJA_EMBED_PASSAGE_PREFIX":  "embed.passage_prefix",
+	"DEJA_EMBED_OFF":             "embed.off",
+	"DEJA_RECALL":                "hooks.recall",
+	"DEJA_RECALL_GLOBAL":         "hooks.recall_global",
+	"DEJA_AUTORECALL_LOCAL_ONLY": "hooks.autorecall_local_only",
+	"DEJA_NO_SOURCE_HINTS":       "hooks.no_source_hints",
+	"DEJA_NO_AUTO_INDEX":         "hooks.no_auto_index",
+	"DEJA_INDEX_DIR":             "index.dir",
+	"DEJA_POLICY_FILE":           "index.policy_file",
+	"DEJA_NOTES_FILE":            "index.notes_file",
+	"DEJA_INCLUDE_SUBAGENTS":     "index.include_subagents",
+	"DEJA_INDEX_TOOL_OUTPUT":     "index.tool_output",
+	"DEJA_INDEX_PATHS":           "index.paths",
+	"DEJA_INDEX_EDITS":           "index.edits",
+	"DEJA_INDEX_WRITES":          "index.writes",
+	"DEJA_INDEX_COMMANDS":        "index.commands",
+	"DEJA_EXCLUDE_PROJECTS":      "index.exclude_projects",
+	"DEJA_EXCLUDE_HARNESSES":     "index.exclude_harnesses",
+	"DEJA_STORES":                "index.stores",
+	"DEJA_SEARCH_ONLY":           "index.search_only",
+}
+
+func configuredConfigKeys(cfg userconfig.Config) []string {
+	bindings := cfg.EnvBindings()
+	if len(bindings) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(bindings))
+	for _, b := range bindings {
+		if k, ok := configEnvToKey[b.Key]; ok {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func collectDoctorConfig() *doctorConfigReport {
+	diag := userconfig.Diagnose()
+	if !diag.Exists {
+		return nil
+	}
+	rep := &doctorConfigReport{
+		Path:     diag.Path,
+		Exists:   true,
+		Valid:    diag.Err == nil,
+		Unknown:  diag.Unknown,
+		Warnings: diag.Warnings,
+		Keys:     configuredConfigKeys(diag.Config),
+	}
+	if diag.Err != nil {
+		rep.Error = diag.Err.Error()
+	}
+	return rep
 }
 
 // doctorPolicyReport is the trust policy in the machine form. The text report
@@ -423,6 +498,7 @@ func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 		report.Git.State = "ok"
 	}
 	report.Policy = collectDoctorPolicy(dir)
+	report.Config = collectDoctorConfig()
 	report.Sync = collectDoctorSync(dir)
 	report.Version = collectDoctorVersion(lookup)
 	report.Embed = collectDoctorEmbed(dir)

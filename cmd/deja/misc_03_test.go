@@ -851,6 +851,7 @@ func hermeticEnv(t *testing.T) string {
 	t.Setenv("DEJA_ANTE_ROOT", "")
 	t.Setenv("DEJA_ANTE_ROOTS", "")
 	t.Setenv("DEJA_POLICY_FILE", "")
+	t.Setenv("DEJA_CONFIG_FILE", "")
 	t.Setenv("DEJA_VAULT_FILE", filepath.Join(tmp, "vault.json"))
 	t.Setenv("DEJA_VAULT_BACKEND", "passphrase")
 	t.Setenv("DEJA_VAULT_PASSPHRASE", "")

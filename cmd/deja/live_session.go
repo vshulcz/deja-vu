@@ -108,6 +108,7 @@ func runHookSessionEnd(dir string, stdin io.Reader) {
 	input.adopt()
 	endSessionLive(dir, input.SessionID)
 	refreshDigestAfterSession(dir, sessionEndProject(input))
+	requestPeriodicEmbed(dir)
 }
 
 // sessionEndProject is the project a SessionEnd payload is about: what it

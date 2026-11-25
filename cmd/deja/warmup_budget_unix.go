@@ -30,7 +30,7 @@ const warmupNice = 10
 // it has already exec'd, and a wrapper like `nice` is a binary this machine may
 // not have — `timeout` is missing here, which is how that lesson was learned.
 func takeWarmupBudget() {
-	if os.Getenv("DEJA_WARMUP_SENTINEL") == "" && os.Getenv("DEJA_HOOK_REFRESH") == "" {
+	if os.Getenv("DEJA_WARMUP_SENTINEL") == "" && os.Getenv("DEJA_HOOK_REFRESH") == "" && os.Getenv("DEJA_HOOK_EMBED") == "" {
 		return
 	}
 	// Half the cores, at least one, and never more than the eight a bucket

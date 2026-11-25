@@ -2580,7 +2580,7 @@ func TestCompletionsListEveryUserFacingCommand(t *testing.T) {
 	internal := map[string]bool{
 		"hook-context": true, "hook-ext": true, "hook-prompt": true, "hook-precompact": true,
 		"hook-antigravity": true, "hook-goose": true, "hook-goose-prompt": true,
-		"hook-refresh": true, "hook-session-end": true, "hook-mcp-call": true,
+		"hook-refresh": true, "hook-embed": true, "hook-session-end": true, "hook-mcp-call": true,
 		"hook-stop": true, "hook-plan": true, "hook-tool": true, "hook-tool-after": true, "hook-codewhale": true,
 		"warmup-status": true, "mcp": true, "reasonix-ext": true,
 	}
