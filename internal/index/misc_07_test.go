@@ -1410,7 +1410,7 @@ func TestMetaViewsFollowAnotherProcess(t *testing.T) {
 	}
 	sessions := maps.Clone(m.Sessions)
 	sessions["claude:s9"] = SessionMeta{ID: "s9", Harness: "claude", Ord: 99}
-	if _, err := writeGobAtomicStat(filepath.Join(dir, "sessions.gob"), sessions); err != nil {
+	if _, err := writeSessionsBinAtomicStat(filepath.Join(dir, "sessions.bin"), sessions); err != nil {
 		t.Fatal(err)
 	}
 	if got := sharedIDs(t, dir); got != "s1,s9" {

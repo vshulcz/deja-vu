@@ -575,7 +575,7 @@ func TestARoundTripOnACommentedConfigChangesNothing(t *testing.T) {
 // was forgotten stays forgotten, because the tombstones do not live in the
 // index. Nothing pinned either half.
 func TestADamagedIndexIsRebuiltAndKeepsItsTombstones(t *testing.T) {
-	for _, broken := range []string{"manifest.gob", "sessions.gob", "records.bin"} {
+	for _, broken := range []string{"manifest.gob", "sessions.bin", "records.bin"} {
 		t.Run(broken, func(t *testing.T) {
 			tmp := t.TempDir()
 			home := filepath.Join(tmp, "home")

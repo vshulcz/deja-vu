@@ -58,6 +58,8 @@ type FileState struct {
 	// file never changed still has new sessions in it (#5140).
 	WALSize     int64 `json:"wal_size,omitempty"`
 	WALMTime    int64 `json:"wal_mtime,omitempty"`
+	SHMSize     int64 `json:"shm_size,omitempty"`
+	SHMMTime    int64 `json:"shm_mtime,omitempty"`
 	LastUpdated int64 `json:"last_updated,omitempty"`
 	Redactions  int   `json:"redactions,omitempty"`
 	// Kept marks a transcript its agent deleted and the index kept on

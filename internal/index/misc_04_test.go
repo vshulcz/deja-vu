@@ -241,7 +241,7 @@ func TestDamageReasonNamesWhatBroke(t *testing.T) {
 		}, "manifest"},
 		{"a session table that will not decode", func(t *testing.T, dir string) {
 			t.Helper()
-			if err := os.WriteFile(filepath.Join(dir, "sessions.gob"), []byte("not a gob"), 0o644); err != nil {
+			if err := os.WriteFile(filepath.Join(dir, "sessions.bin"), []byte("not a gob"), 0o644); err != nil {
 				t.Fatal(err)
 			}
 		}, "session table"},

@@ -48,9 +48,14 @@ type FileKind struct {
 	// is part of the file state and a change re-reads the session (#4319,
 	// #4446). nil when the transcript holds it all.
 	Sidecar func(path string) (size, stamp int64)
+	// dbBacked marks SQLite-backed FileKinds for unified WAL/SHM watermarking.
+	dbBacked bool
 	// switched marks a Parse and ParseFrom the read switches wrap.
 	switched bool
 }
+
+// IsDBBacked reports whether k reads a SQLite database store.
+func (k FileKind) IsDBBacked() bool { return k.dbBacked }
 
 func sinceTime(nano int64) time.Time { return time.Unix(0, nano) }
 
@@ -201,6 +206,7 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 				},
 				{
 					Name:      "claude-mem",
+					dbBacked:  true,
 					Match:     func(p string) bool { return filepath.Base(p) == "claude-mem.db" || IsClaudeMemDB(p) },
 					Parse:     dbParse(ParseClaudeMemDB, ParseClaudeMemDBSince),
 					ParseFrom: dbParseFrom(ParseClaudeMemDB, ParseClaudeMemDBSince),
@@ -292,6 +298,7 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			Kinds: []FileKind{
 				{
 					Name:      "opencode",
+					dbBacked:  true,
 					Match:     func(p string) bool { return p == OpencodeDB() },
 					Parse:     dbParse(parseOpencodeStore, parseOpencodeStoreSince),
 					ParseFrom: dbParseFrom(parseOpencodeStore, parseOpencodeStoreSince),
@@ -355,6 +362,7 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			Kinds: []FileKind{
 				{
 					Name:      "cursor-db",
+					dbBacked:  true,
 					Match:     func(p string) bool { return hasBase(p, "state.vscdb") && strings.HasPrefix(p, CursorUserRoot()) },
 					Parse:     dbParse(ParseCursorDB, ParseCursorDBSince),
 					ParseFrom: dbParseFrom(ParseCursorDB, ParseCursorDBSince),
@@ -413,6 +421,7 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 				// The maintained CLI writes no session files at all: one
 				// SQLite store beside the config, like opencode's.
 				Name:      "grok",
+				dbBacked:  true,
 				Match:     func(p string) bool { return p == GrokDB() },
 				Parse:     dbParse(func(p string) ([]model.Session, error) { return ParseGrokDBSince(p, time.Time{}) }, ParseGrokDBSince),
 				ParseFrom: dbParseFrom(func(p string) ([]model.Session, error) { return ParseGrokDBSince(p, time.Time{}) }, ParseGrokDBSince),
@@ -421,7 +430,8 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 		{
 			Name: "hermes", Load: LoadHermes, Files: HermesSessionFiles,
 			Kinds: []FileKind{{
-				Name: "hermes",
+				Name:     "hermes",
+				dbBacked: true,
 				// Current Hermes uses ~/.hermes/state.db; older builds shard
 				// stores under ~/.hermes/profiles/<name>/state.db.
 				Match: func(p string) bool {
@@ -459,7 +469,8 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 				ParseFrom: offsetParse(ParseGooseFileFromOffset),
 				Resumes:   gooseExitResumes,
 			}, {
-				Name: "goose-db",
+				Name:     "goose-db",
+				dbBacked: true,
 				Match: func(p string) bool {
 					return slices.Contains(GooseDBs(), p)
 				},
@@ -635,6 +646,7 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 				// The CLI's database, in OpenCode's schema — the same pair Kilo
 				// has (#3675).
 				Name:      "zcode-db",
+				dbBacked:  true,
 				Match:     func(p string) bool { return p == ZCodeDB() },
 				Parse:     dbParse(ParseZCodeDB, ParseZCodeDBSince),
 				ParseFrom: dbParseFrom(ParseZCodeDB, ParseZCodeDBSince),
@@ -666,6 +678,7 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			}, {
 				// `kiro-cli chat --no-interactive` writes only here (#4300).
 				Name:      "kiro-db",
+				dbBacked:  true,
 				Match:     func(p string) bool { return p == KiroDB() },
 				Parse:     dbParse(ParseKiroDB, ParseKiroDBSince),
 				ParseFrom: dbParseFrom(ParseKiroDB, ParseKiroDBSince),
@@ -685,6 +698,7 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 				Sidecar: besideSidecar("history_item.json"),
 			}, {
 				Name:      "kilocode-db",
+				dbBacked:  true,
 				Match:     func(p string) bool { return p == KiloDB() },
 				Parse:     dbParse(ParseKiloDB, ParseKiloDBSince),
 				ParseFrom: dbParseFrom(ParseKiloDB, ParseKiloDBSince),
@@ -712,7 +726,8 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 		{
 			Name: "crush", Load: LoadCrush, Files: CrushDBs,
 			Kinds: []FileKind{{
-				Name: "crush",
+				Name:     "crush",
+				dbBacked: true,
 				Match: func(p string) bool {
 					if !hasBase(p, "crush.db") {
 						return false
@@ -774,7 +789,8 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			}, {
 				// The per-agent SQLite store the 2026.8 flip made canonical;
 				// the JSONL kind above is what older installs and archives hold.
-				Name: "openclaw-db",
+				Name:     "openclaw-db",
+				dbBacked: true,
 				Match: func(p string) bool {
 					return hasBase(p, "openclaw-agent.sqlite") && strings.HasPrefix(p, OpenClawRoot()+string(filepath.Separator))
 				},
@@ -865,6 +881,7 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			Name: "zed", Load: LoadZed, Files: func() []string { return []string{ZedDB()} },
 			Kinds: []FileKind{{
 				Name:      "zed",
+				dbBacked:  true,
 				Match:     func(p string) bool { return p == ZedDB() },
 				Parse:     dbParse(ParseZedDB, ParseZedDBSince),
 				ParseFrom: dbParseFrom(ParseZedDB, ParseZedDBSince),
@@ -880,6 +897,7 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			Name: "devin", Load: LoadDevin, Files: DevinFiles,
 			Kinds: []FileKind{{
 				Name:      "devin",
+				dbBacked:  true,
 				Match:     devinDBMatch,
 				Parse:     dbParse(ParseDevinDB, ParseDevinDBSince),
 				ParseFrom: dbParseFrom(ParseDevinDB, ParseDevinDBSince),
@@ -925,6 +943,7 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			Name: "mimo", Load: LoadMimo, Files: MimoSessionFiles,
 			Kinds: []FileKind{{
 				Name:      "mimo",
+				dbBacked:  true,
 				Match:     func(p string) bool { return p == MimoDB() },
 				Parse:     dbParse(ParseMimoDB, ParseMimoDBSince),
 				ParseFrom: dbParseFrom(ParseMimoDB, ParseMimoDBSince),
@@ -936,7 +955,8 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			// ~/.local/share/TeleAgent/users/<account>/teleagent.db.
 			Name: "teleagent", Load: LoadTeleAgent, Files: TeleAgentSessionFiles,
 			Kinds: []FileKind{{
-				Name: "teleagent",
+				Name:     "teleagent",
+				dbBacked: true,
 				Match: func(p string) bool {
 					return filepath.Base(p) == "teleagent.db" &&
 						strings.HasPrefix(filepath.Dir(p), TeleAgentUsersDir()+string(filepath.Separator))
@@ -950,6 +970,7 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			Name: "omnigent", Load: LoadOmnigent, Files: OmnigentFiles,
 			Kinds: []FileKind{{
 				Name:      "omnigent",
+				dbBacked:  true,
 				Match:     func(p string) bool { return p == OmnigentDB() },
 				Parse:     dbParse(ParseOmnigentDB, ParseOmnigentDBSince),
 				ParseFrom: dbParseFrom(ParseOmnigentDB, ParseOmnigentDBSince),
@@ -960,6 +981,7 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			Name: "orca", Load: LoadOrca, Files: OrcaFiles,
 			Kinds: []FileKind{{
 				Name:      "orca",
+				dbBacked:  true,
 				Match:     func(p string) bool { return p == OrcaDB() },
 				Parse:     dbParse(ParseOrcaDB, ParseOrcaDBSince),
 				ParseFrom: dbParseFrom(ParseOrcaDB, ParseOrcaDBSince),
@@ -1084,4 +1106,17 @@ func KindForPathKind(p string) (FileKind, bool) {
 		}
 	}
 	return FileKind{}, false
+}
+
+// KindForPathAll returns the matching FileKind and harness name across all
+// registered harnesses, ignoring DEJA_STORES narrowing.
+func KindForPathAll(p string) (FileKind, string, bool) {
+	for _, h := range allHarnesses() {
+		for _, k := range h.Kinds {
+			if k.Match(p) {
+				return k, h.Name, true
+			}
+		}
+	}
+	return FileKind{}, "", false
 }

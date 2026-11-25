@@ -3,6 +3,7 @@ package index
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -206,7 +207,7 @@ func HasManifest(dir string) bool {
 	}
 	// Plain stat: the wait above has already closed the window by the time
 	// this runs, and a call site that cannot be made to fail is not a fix.
-	_, err := os.Stat(filepath.Join(dir, "sessions.gob"))
+	_, err := statSessionsFile(dir)
 	return err == nil
 }
 
@@ -512,11 +513,11 @@ func readManifest(dir string) (Manifest, error) {
 	if err := readGob(filepath.Join(dir, "manifest.gob"), &core); err != nil {
 		return Manifest{}, err
 	}
-	m := manifestFromCore(core, map[string]SessionMeta{})
-	if err := readGob(filepath.Join(dir, "sessions.gob"), &m.Sessions); err != nil {
+	sessions, err := readSessionsCatalog(dir)
+	if err != nil {
 		return Manifest{}, err
 	}
-	return m, nil
+	return manifestFromCore(core, sessions), nil
 }
 
 // manifestFromCore is the Manifest that manifest.gob's core and sessions make.
@@ -589,7 +590,7 @@ func stampStore(dir string, core *manifestCore, m Manifest, wroteRecords bool) {
 	core.BucketFiles = max(countBucketFiles(filepath.Join(dir, "buckets"))-m.bucketsLeaving, 0)
 }
 
-// writeManifest commits the two-file manifest crash-safely. sessions.gob is
+// writeManifest commits the two-file manifest crash-safely. sessions.bin is
 // written (and renamed into place) before manifest.gob, and both go through a
 // temp file + rename. manifest.gob carries the version/file sizes that decide
 // whether the index is fresh, so it must land last: a crash between the two
@@ -620,11 +621,14 @@ func commitManifest(dir string, m Manifest, wroteRecords, share bool) error {
 	mergeIngestDiag(&m)
 	core := manifestCore{Version: m.Version, Format: m.Format, Files: m.Files, BuiltAt: m.BuiltAt, SourcesReadAt: m.SourcesReadAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ExportBoundary: m.ExportBoundary, RecordStrings: m.RecordStrings, DeadRecords: m.DeadRecords, DeadBytes: m.DeadBytes, IngestHealth: m.IngestHealth, IngestFiles: m.IngestFiles, ExcludeFingerprint: m.ExcludeFingerprint, AliasFingerprint: m.AliasFingerprint, ToolFingerprint: m.ToolFingerprint, Compactions: m.Compactions, KeptDated: m.KeptDated, ReadZone: m.ReadZone, Deferred: m.Deferred, PartialOf: m.PartialOf, SearchOnly: m.SearchOnly, Empty: m.Empty}
 	stampStore(dir, &core, m, wroteRecords)
-	sfi, err := writeGobAtomicStat(filepath.Join(dir, "sessions.gob"), m.Sessions)
+	sfi, err := writeSessionsBinAtomicStat(filepath.Join(dir, "sessions.bin"), m.Sessions)
 	if err != nil {
 		return err
 	}
 	mfi, err := writeGobAtomicStat(filepath.Join(dir, "manifest.gob"), core)
+	if err == nil {
+		_ = os.Remove(filepath.Join(dir, "sessions.gob"))
+	}
 	ensureSharedIndexPerms(dir)
 	// The cache this process holds is keyed on manifest.gob's mtime and size,
 	// and the comment there claimed the atomic swap always changes that pair.
@@ -1191,9 +1195,22 @@ func SessionCount(dir string) (int, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	m, err := readManifestCached(dir)
-	if err != nil {
+	if err := ensureVaultUnlocked(dir); err != nil {
 		return 0, err
+	}
+	if _, err := statIndexFile(filepath.Join(dir, "manifest.gob")); err != nil {
+		return 0, err
+	}
+	n, err := readSessionsBinCount(dir)
+	if err == nil {
+		return n, nil
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		return 0, err
+	}
+	m, mErr := readManifestCached(dir)
+	if mErr != nil {
+		return 0, mErr
 	}
 	return len(m.Sessions), nil
 }
@@ -1203,10 +1220,23 @@ func MetaForKey(dir, key string) (SessionMeta, bool) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	m, err := readManifestCached(dir)
-	if err != nil {
+	if ensureVaultUnlocked(dir) != nil {
 		return SessionMeta{}, false
 	}
-	meta, ok := m.Sessions[key]
-	return meta, ok
+	if _, err := statIndexFile(filepath.Join(dir, "manifest.gob")); err != nil {
+		return SessionMeta{}, false
+	}
+	meta, ok, err := readSessionsBinKey(dir, key)
+	if err == nil {
+		return meta, ok
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		return SessionMeta{}, false
+	}
+	m, mErr := readManifestCached(dir)
+	if mErr != nil {
+		return SessionMeta{}, false
+	}
+	legacyMeta, legacyOK := m.Sessions[key]
+	return legacyMeta, legacyOK
 }

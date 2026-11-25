@@ -2720,7 +2720,7 @@ func TestDeepVerifyFindsAZeroedRecord(t *testing.T) {
 func TestAManifestOnlyWriteKeepsAnUncommittedTailUncommitted(t *testing.T) {
 	h, dir := threeWordStore(t)
 	saved := map[string][]byte{}
-	for _, n := range []string{"manifest.gob", "sessions.gob"} {
+	for _, n := range []string{"manifest.gob", "sessions.bin"} {
 		b, err := os.ReadFile(filepath.Join(dir, n))
 		if err != nil {
 			t.Fatal(err)

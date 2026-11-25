@@ -538,14 +538,14 @@ func TestDamagedSessionsFileStillRebuildsThroughTheCache(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := os.WriteFile(filepath.Join(dir, "sessions.gob"), []byte("garbage"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "sessions.bin"), []byte("garbage"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := EnsureForSearch(dir, o, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := readManifest(dir); err != nil {
-		t.Errorf("sessions.gob is still damaged after a freshness check: %v", err)
+		t.Errorf("sessions.bin is still damaged after a freshness check: %v", err)
 	}
 }
 
