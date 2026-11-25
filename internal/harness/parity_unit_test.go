@@ -32,14 +32,14 @@ func TestJSONOpsHooksAndRepurposedAdoptedKey(t *testing.T) {
 			cmd, _ := m["command"].(string)
 			return cmd == "deja"
 		},
-		EditJSONC: func(data []byte, blockPath, id string, entry map[string]any, uninstall bool, dropFrom int) ([]byte, error) {
+		EditJSONC: func(data []byte, blockPath, id string, _ map[string]any, uninstall bool, _ int) ([]byte, error) {
 			editCalls = append(editCalls, strings.Join([]string{blockPath, id, boolWord(uninstall)}, ":"))
 			if uninstall {
 				return bytes.ReplaceAll(data, []byte("\""+id+"\":"), []byte("\""+id+"\": null, \"_drop_"+id+"\":")), nil
 			}
 			return append(bytes.Clone(data), []byte("// edited\n")...), nil
 		},
-		MarshalJSON: func(old []byte, root map[string]any) ([]byte, error) {
+		MarshalJSON: func(_ []byte, _ map[string]any) ([]byte, error) {
 			marshalCalled = true
 			return append([]byte("{\n  \"custom\": true\n}\n"), nil...), nil
 		},
@@ -81,8 +81,8 @@ func TestJSONOpsHooksAndRepurposedAdoptedKey(t *testing.T) {
 	// Rewrite valid JSON with nested block to verify custom EditJSONC Unwire multi-key collapse.
 	collapsePath := filepath.Join(dir, "collapse.jsonc")
 	collapseBody := "// keep\n{\n  \"a\": 1\n}\n"
-	if err := os.WriteFile(collapsePath, []byte(collapseBody), 0o600); err != nil {
-		t.Fatal(err)
+	if wErr := os.WriteFile(collapsePath, []byte(collapseBody), 0o600); wErr != nil {
+		t.Fatal(wErr)
 	}
 	added := map[string]bool{}
 	adopted := map[string][]string{}
@@ -93,7 +93,7 @@ func TestJSONOpsHooksAndRepurposedAdoptedKey(t *testing.T) {
 		RecordAdoptedKey:  func(p, b, k string) { adopted[p+"|"+b] = append(adopted[p+"|"+b], k) },
 		AdoptedKeys:       func(p, b string) []string { return adopted[p+"|"+b] },
 		ForgetAdoptedKeys: func(p, b string) { delete(adopted, p+"|"+b) },
-		EditJSONC: func(data []byte, blockPath, id string, entry map[string]any, uninstall bool, dropFrom int) ([]byte, error) {
+		EditJSONC: func(data []byte, _, _ string, _ map[string]any, uninstall bool, dropFrom int) ([]byte, error) {
 			if !uninstall {
 				return []byte("// c\n{\"mcp\": {\"servers\": {\"deja\": {\"command\": \"deja\", \"args\": [\"mcp\"]}, \"old\": {\"command\": \"deja\", \"args\": [\"mcp\"]}}}}\n"), nil
 			}
@@ -110,8 +110,8 @@ func TestJSONOpsHooksAndRepurposedAdoptedKey(t *testing.T) {
 		Entry:       map[string]any{"command": "deja", "args": []string{"mcp"}},
 		Ops:         hookOps,
 	}
-	if _, err := cspec.Wire(); err != nil {
-		t.Fatalf("hook Wire failed: %v", err)
+	if _, wErr := cspec.Wire(); wErr != nil {
+		t.Fatalf("hook Wire failed: %v", wErr)
 	}
 	hookOps.RecordAdoptedKey(collapsePath, "mcp.servers", "old")
 	ures, err := cspec.Unwire()
@@ -125,8 +125,8 @@ func TestJSONOpsHooksAndRepurposedAdoptedKey(t *testing.T) {
 	// Plain JSON merge + transport strip + MarshalJSON hook + repurposed adopted key kept.
 	plainPath := filepath.Join(dir, "plain.json")
 	plainBody := "{\n  \"mcpServers\": {\n    \"deja-vu\": {\n      \"command\": \"deja\",\n      \"args\": [\"mcp\"],\n      \"env\": {\"FOO\": \"bar\"},\n      \"timeout\": 15,\n      \"disabled\": true,\n      \"transport\": {\"command\": \"deja\"}\n    }\n  }\n}\n"
-	if err := os.WriteFile(plainPath, []byte(plainBody), 0o600); err != nil {
-		t.Fatal(err)
+	if wErr := os.WriteFile(plainPath, []byte(plainBody), 0o600); wErr != nil {
+		t.Fatal(wErr)
 	}
 	plainSpec := &harness.JSONMCPSpec{
 		HarnessName: "plain",
@@ -150,8 +150,8 @@ func TestJSONOpsHooksAndRepurposedAdoptedKey(t *testing.T) {
 
 	// Simulate user repurposing adopted key to a non-deja server before Unwire.
 	repurposed := "{\n  \"mcpServers\": {\n    \"deja-vu\": {\n      \"command\": \"npx\",\n      \"args\": [\"other\"]\n    }\n  }\n}\n"
-	if err := os.WriteFile(plainPath, []byte(repurposed), 0o600); err != nil {
-		t.Fatal(err)
+	if wErr := os.WriteFile(plainPath, []byte(repurposed), 0o600); wErr != nil {
+		t.Fatal(wErr)
 	}
 	pu, err := plainSpec.Unwire()
 	if err != nil {
@@ -189,8 +189,8 @@ func TestJSONEdgePathsPrimaryFirstAndErrors(t *testing.T) {
 
 	// IgnoreSwitchOff clears inherited disabled flags on plain JSON.
 	ignorePath := filepath.Join(dir, "ignore.json")
-	if err := os.WriteFile(ignorePath, []byte(`{"mcpServers":{"deja":{"command":"deja","args":["mcp"],"disabled":true,"enabled":false}}}`), 0o600); err != nil {
-		t.Fatal(err)
+	if wErr := os.WriteFile(ignorePath, []byte(`{"mcpServers":{"deja":{"command":"deja","args":["mcp"],"disabled":true,"enabled":false}}}`), 0o600); wErr != nil {
+		t.Fatal(wErr)
 	}
 	ispec := &harness.JSONMCPSpec{
 		Path:            ignorePath,
@@ -215,16 +215,16 @@ func TestJSONEdgePathsPrimaryFirstAndErrors(t *testing.T) {
 
 	// Escaped dot path amp\.mcpServers round-trip on JSONC + missing nested block creation.
 	ampPath := filepath.Join(dir, "amp.jsonc")
-	if err := os.WriteFile(ampPath, []byte("// amp settings\n{\n  \"other\": true\n}\n"), 0o600); err != nil {
-		t.Fatal(err)
+	if wErr := os.WriteFile(ampPath, []byte("// amp settings\n{\n  \"other\": true\n}\n"), 0o600); wErr != nil {
+		t.Fatal(wErr)
 	}
 	ampSpec := &harness.JSONMCPSpec{
 		Path:     ampPath,
 		BlockKey: `amp\.mcpServers.nested`,
 		Entry:    map[string]any{"command": "deja", "args": []string{"mcp"}},
 	}
-	if _, err := ampSpec.Wire(); err != nil {
-		t.Fatalf("escaped dot JSONC Wire failed: %v", err)
+	if _, wErr := ampSpec.Wire(); wErr != nil {
+		t.Fatalf("escaped dot JSONC Wire failed: %v", wErr)
 	}
 	aprobe, err := ampSpec.Probe()
 	if err != nil || !aprobe.Wired {
@@ -320,8 +320,8 @@ args = ["mcp"]`,
 
 	// IgnoreSwitchOff removes enabled/disabled flags on update.
 	tspec.IgnoreSwitchOff = true
-	if _, err := tspec.Wire(); err != nil {
-		t.Fatalf("TOML Wire IgnoreSwitchOff failed: %v", err)
+	if _, wErr := tspec.Wire(); wErr != nil {
+		t.Fatalf("TOML Wire IgnoreSwitchOff failed: %v", wErr)
 	}
 	noSwitch, err := os.ReadFile(tomlPath)
 	if err != nil {
@@ -342,8 +342,8 @@ disabled = true
 command = "deja"
 args = ["mcp"]
 `
-	if err := os.WriteFile(dupPath, []byte(dupBody), 0o600); err != nil {
-		t.Fatal(err)
+	if wErr := os.WriteFile(dupPath, []byte(dupBody), 0o600); wErr != nil {
+		t.Fatal(wErr)
 	}
 	dres, err := (&harness.TOMLMCPSpec{
 		Path:        dupPath,
@@ -367,8 +367,8 @@ url = "http://203.0.113.10:8080/mcp"
 args = ["deja", "mcp"]
 disabled = true
 `
-	if err := os.WriteFile(urlPath, []byte(urlBody), 0o600); err != nil {
-		t.Fatal(err)
+	if wErr := os.WriteFile(urlPath, []byte(urlBody), 0o600); wErr != nil {
+		t.Fatal(wErr)
 	}
 	ures, err := (&harness.TOMLMCPSpec{
 		Path:  urlPath,
@@ -392,8 +392,8 @@ args = ["other-mcp"]
 [mcp_servers.deja-vu.env]
 API_KEY = "secret"
 `
-	if err := os.WriteFile(keepPath, []byte(keepBody), 0o600); err != nil {
-		t.Fatal(err)
+	if wErr := os.WriteFile(keepPath, []byte(keepBody), 0o600); wErr != nil {
+		t.Fatal(wErr)
 	}
 	kres, err := (&harness.TOMLMCPSpec{
 		Path: keepPath,

@@ -82,7 +82,7 @@ func newCmdHarnessOps(openclaw bool) (*harness.Ops, *error, *[]byte) {
 			for i, a := range args {
 				anyArgs[i] = a
 			}
-			return commandIsDeja(cmd) || entryRunsDeja(map[string]any{"command": cmd, "args": anyArgs})
+			return commandIsDeja(cmd) || entryIsDejaServer(map[string]any{"command": cmd, "args": anyArgs})
 		},
 		IsDejaEntry:  entryRunsDeja,
 		IsDejaServer: entryIsDejaServer,
@@ -125,8 +125,15 @@ func newCmdHarnessOps(openclaw bool) (*harness.Ops, *error, *[]byte) {
 	return ops, &ioErr, &lastOld
 }
 
+func isQuotedTOMLKey(k string) bool {
+	if len(k) < 2 {
+		return false
+	}
+	return (k[0] == '"' && k[len(k)-1] == '"') || (k[0] == '\'' && k[len(k)-1] == '\'')
+}
+
 func quoteTOMLMCPKey(k string) string {
-	if strings.ContainsAny(k, ".[]") && !(len(k) >= 2 && ((k[0] == '"' && k[len(k)-1] == '"') || (k[0] == '\'' && k[len(k)-1] == '\''))) {
+	if strings.ContainsAny(k, ".[]") && !isQuotedTOMLKey(k) {
 		return strconv.Quote(k)
 	}
 	return k

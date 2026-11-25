@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-var _ HarnessSpec = (*TOMLMCPSpec)(nil)
+var _ Spec = (*TOMLMCPSpec)(nil)
 
 // TOMLMCPSpec manages a TOML MCP server table (such as [mcp_servers.deja])
 // including switched-off flag preservation and sub-table cleanup.
@@ -80,13 +80,10 @@ func (s *TOMLMCPSpec) Probe() (ProbeResult, error) {
 		return res, nil
 	}
 	targetSegs := s.targetSegments()
-	if err := validateTOMLForWire(norm, targetSegs); err != nil {
-		return ProbeResult{Path: s.Path, Present: true}, ops.formatErr(s.Path, err)
+	if verr := validateTOMLForWire(norm, targetSegs); verr != nil {
+		return ProbeResult{Path: s.Path, Present: true}, ops.formatErr(s.Path, verr)
 	}
-	blocks, err := parseTOMLBlocks(norm)
-	if err != nil {
-		return ProbeResult{Path: s.Path, Present: true}, ops.formatErr(s.Path, err)
-	}
+	blocks := parseTOMLBlocks(norm)
 	dejaBlocks := findTOMLProbeBlocks(ops, blocks, targetSegs)
 	for _, b := range dejaBlocks {
 		res.DejaKeys = append(res.DejaKeys, b.entryKey())
@@ -110,13 +107,10 @@ func (s *TOMLMCPSpec) Wire() (WireResult, error) {
 	}
 	norm := string(normalizeLF(old))
 	targetSegs := s.targetSegments()
-	if err := validateTOMLForWire(norm, targetSegs); err != nil {
-		return WireResult{}, ops.formatErr(s.Path, err)
+	if verr := validateTOMLForWire(norm, targetSegs); verr != nil {
+		return WireResult{}, ops.formatErr(s.Path, verr)
 	}
-	blocks, err := parseTOMLBlocks(norm)
-	if err != nil {
-		return WireResult{}, ops.formatErr(s.Path, err)
-	}
+	blocks := parseTOMLBlocks(norm)
 	prefixSegs := targetSegs[:len(targetSegs)-1]
 	prefixKey := strings.Join(prefixSegs, ".")
 	dejaBlocks := findTOMLDejaBlocks(ops, blocks, targetSegs)
@@ -194,13 +188,10 @@ func (s *TOMLMCPSpec) Unwire() (UnwireResult, error) {
 		return UnwireResult{Path: s.Path, Action: ActionUnchanged}, nil
 	}
 	targetSegs := s.targetSegments()
-	if err := validateTOMLSyntaxAndArrayConflict(norm, targetSegs); err != nil {
-		return UnwireResult{}, ops.formatErr(s.Path, err)
+	if verr := validateTOMLSyntaxAndArrayConflict(norm, targetSegs); verr != nil {
+		return UnwireResult{}, ops.formatErr(s.Path, verr)
 	}
-	blocks, err := parseTOMLBlocks(norm)
-	if err != nil {
-		return UnwireResult{}, ops.formatErr(s.Path, err)
-	}
+	blocks := parseTOMLBlocks(norm)
 	prefixSegs := targetSegs[:len(targetSegs)-1]
 	prefixKey := strings.Join(prefixSegs, ".")
 	primary := targetSegs[len(targetSegs)-1]

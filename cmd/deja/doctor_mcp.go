@@ -990,15 +990,6 @@ func doctorOpenClawWired(path string) bool {
 	return doctorJSONWiredIn(doctorMCPServersBlock)(path)
 }
 
-// doctorJSONBlock picks the server map out of a config that keeps it under one
-// top-level key.
-func doctorJSONBlock(key string) func(map[string]any) map[string]any {
-	return func(root map[string]any) map[string]any {
-		m, _ := root[key].(map[string]any)
-		return m
-	}
-}
-
 // doctorMCPServersBlock picks the nested `mcp.servers` map used by OpenClaw
 // and ZCode.
 func doctorMCPServersBlock(root map[string]any) map[string]any {

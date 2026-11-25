@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 )
 
-var _ HarnessSpec = (*FileAssetSpec)(nil)
+var _ Spec = (*FileAssetSpec)(nil)
 
 // FileAssetSpec manages a whole-file harness asset (such as SKILL.md or custom
 // instructions) with optional user-edit protection and retired-file cleanup.

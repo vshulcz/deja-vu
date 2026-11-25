@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-var _ HarnessSpec = (*JSONMCPSpec)(nil)
+var _ Spec = (*JSONMCPSpec)(nil)
 
 // JSONMCPSpec manages a JSON or JSONC MCP server entry inside a nested object
 // path (e.g. "mcpServers" or "mcp.servers").
@@ -175,8 +175,8 @@ func (s *JSONMCPSpec) Unwire() (UnwireResult, error) {
 		return UnwireResult{}, ops.formatErr(s.Path, err)
 	}
 	blockPath := s.blockPath()
-	block, chain, err := lookupJSONBlock(root, blockPath, false, !useJSONC, nil, s.Path)
-	if err != nil || block == nil {
+	block, chain, ok := lookupJSONBlockOptional(root, blockPath, !useJSONC, s.Path)
+	if !ok {
 		// Nothing of deja can sit inside a missing or non-object block.
 		return UnwireResult{Path: s.Path, Action: ActionUnchanged}, nil
 	}

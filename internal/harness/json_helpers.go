@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -72,6 +73,14 @@ func lookupJSONBlock(root map[string]any, blockPath string, create, allowNull bo
 	return cur, chain, nil
 }
 
+func lookupJSONBlockOptional(root map[string]any, blockPath string, allowNull bool, filePath string) (map[string]any, []jsonChainFrame, bool) {
+	block, chain, err := lookupJSONBlock(root, blockPath, false, allowNull, nil, filePath)
+	if err != nil || block == nil {
+		return nil, nil, false
+	}
+	return block, chain, true
+}
+
 func recordMissingJSONCBlocks(ops resolvedOps, filePath, blockPath string, have int) {
 	parts := splitDotPath(blockPath)
 	for i := have; i < len(parts); i++ {
@@ -126,8 +135,7 @@ func unwireJSONCWithHook(
 }
 
 func collapseAddedJSONChain(chain []jsonChainFrame, ops *resolvedOps, filePath string) {
-	for i := len(chain) - 1; i >= 0; i-- {
-		frame := chain[i]
+	for _, frame := range slices.Backward(chain) {
 		if len(frame.obj) > 0 || !ops.wasBlockAdded(filePath, frame.path) {
 			return
 		}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -57,8 +58,8 @@ type UnwireResult struct {
 	LeftKeys    []string
 }
 
-// HarnessSpec is the uniform lifecycle contract implemented by every harness adapter.
-type HarnessSpec interface {
+// Spec is the uniform lifecycle contract implemented by every harness adapter.
+type Spec interface {
 	Name() string
 	TargetPath() string
 	Detect() (DetectResult, error)
@@ -124,10 +125,8 @@ func (m *memoryState) recordAdopted(path, blockPath, key string) {
 		m.adopted = map[string][]string{}
 	}
 	k := path + "\x00" + blockPath
-	for _, existing := range m.adopted[k] {
-		if existing == key {
-			return
-		}
+	if slices.Contains(m.adopted[k], key) {
+		return
 	}
 	m.adopted[k] = append(m.adopted[k], key)
 }
@@ -374,10 +373,7 @@ func withBOM(b []byte) []byte {
 	if len(b) == 0 || bytes.HasPrefix(b, utf8BOM) {
 		return b
 	}
-	out := make([]byte, len(utf8BOM)+len(b))
-	copy(out, utf8BOM)
-	copy(out[len(utf8BOM):], b)
-	return out
+	return slices.Concat(utf8BOM, b)
 }
 
 func matchLineEndings(old, next []byte) []byte {
@@ -431,6 +427,18 @@ func detectPath(path string) (DetectResult, error) {
 		return DetectResult{Path: path, Present: true}, nil
 	}
 	if os.IsNotExist(err) {
+		for cur := filepath.Dir(path); cur != "" && cur != "." && filepath.Dir(cur) != cur; cur = filepath.Dir(cur) {
+			fi, serr := os.Stat(cur)
+			if serr == nil {
+				if !fi.IsDir() {
+					return DetectResult{Path: path}, fmt.Errorf("%s: not a directory", cur)
+				}
+				break
+			}
+			if !os.IsNotExist(serr) {
+				return DetectResult{Path: path}, serr
+			}
+		}
 		return DetectResult{Path: path, Present: false}, nil
 	}
 	return DetectResult{Path: path}, err

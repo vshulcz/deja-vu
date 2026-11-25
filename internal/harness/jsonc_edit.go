@@ -3,11 +3,12 @@ package harness
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 )
 
 func detectIndentUnit(s string) string {
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		if len(line) == 0 {
 			continue
 		}
@@ -54,9 +55,10 @@ func setJSONCEntry(raw []byte, blockPath, entryKey string, entry map[string]any,
 	parts := splitDotPath(blockPath)
 	curStart, curEnd := objStart, objEnd
 	var walked []string
+	var entries []jsoncEntry
 
 	for idx, part := range parts {
-		entries, err := parseObjectEntries(s, curStart, curEnd)
+		entries, err = parseObjectEntries(s, curStart, curEnd)
 		if err != nil {
 			return nil, err
 		}
@@ -75,8 +77,8 @@ func setJSONCEntry(raw []byte, blockPath, entryKey string, entry map[string]any,
 					recordAdded(joinDotPath(parts[:k+1]))
 				}
 			}
-			out, err := insertObjectEntry(s, curStart, curEnd, entries, part, nested, unit)
-			return []byte(out), err
+			out, iErr := insertObjectEntry(s, curStart, curEnd, entries, part, nested, unit)
+			return []byte(out), iErr
 		}
 		if s[found.valStart] != '{' {
 			return nil, fmt.Errorf("%s is not an object", joinDotPath(walked))
@@ -84,28 +86,28 @@ func setJSONCEntry(raw []byte, blockPath, entryKey string, entry map[string]any,
 		curStart, curEnd = found.valStart, found.valEnd
 	}
 
-	entries, err := parseObjectEntries(s, curStart, curEnd)
+	entries, err = parseObjectEntries(s, curStart, curEnd)
 	if err != nil {
 		return nil, err
 	}
 	for _, e := range entries {
 		if e.key == entryKey {
 			indent := lineIndentAt(s, e.keyStart)
-			rendered, err := formatValueAtIndent(entry, indent, unit)
-			if err != nil {
-				return nil, err
+			rendered, fErr := formatValueAtIndent(entry, indent, unit)
+			if fErr != nil {
+				return nil, fErr
 			}
 			return []byte(s[:e.valStart] + rendered + s[e.valEnd:]), nil
 		}
 	}
-	out, err := insertObjectEntry(s, curStart, curEnd, entries, entryKey, entry, unit)
-	return []byte(out), err
+	out, iErr := insertObjectEntry(s, curStart, curEnd, entries, entryKey, entry, unit)
+	return []byte(out), iErr
 }
 
 func buildNestedEntry(rem []string, entryKey string, entry map[string]any) map[string]any {
 	cur := map[string]any{entryKey: entry}
-	for i := len(rem) - 1; i >= 0; i-- {
-		cur = map[string]any{rem[i]: cur}
+	for _, seg := range slices.Backward(rem) {
+		cur = map[string]any{seg: cur}
 	}
 	return cur
 }
@@ -120,7 +122,10 @@ func insertObjectEntry(s string, objStart, objEnd int, entries []jsoncEntry, key
 	if err != nil {
 		return "", err
 	}
-	keyJSON, _ := json.Marshal(key)
+	keyJSON, err := json.Marshal(key)
+	if err != nil {
+		return "", err
+	}
 	pair := memberIndent + string(keyJSON) + ": " + rendered
 
 	if len(entries) == 0 {
@@ -148,16 +153,12 @@ func removeJSONCKeys(
 		return nil, nil, err
 	}
 	parts := splitDotPath(blockPath)
-	type parentFrame struct {
-		path string
-		key  string
-	}
-	var chain []parentFrame
+	var chain []jsoncParentFrame
 	curStart, curEnd := objStart, objEnd
 	for idx, part := range parts {
-		entries, err := parseObjectEntries(s, curStart, curEnd)
-		if err != nil {
-			return nil, nil, err
+		entries, pErr := parseObjectEntries(s, curStart, curEnd)
+		if pErr != nil {
+			return nil, nil, pErr
 		}
 		var found *jsoncEntry
 		for i := range entries {
@@ -169,7 +170,7 @@ func removeJSONCKeys(
 		if found == nil || s[found.valStart] != '{' {
 			return raw, nil, nil
 		}
-		chain = append(chain, parentFrame{path: joinDotPath(parts[:idx+1]), key: part})
+		chain = append(chain, jsoncParentFrame{path: joinDotPath(parts[:idx+1]), key: part})
 		curStart, curEnd = found.valStart, found.valEnd
 	}
 
@@ -181,9 +182,9 @@ func removeJSONCKeys(
 	}
 	var removed []string
 	for {
-		entries, err := parseObjectEntries(s, curStart, curEnd)
-		if err != nil {
-			return nil, nil, err
+		entries, pErr := parseObjectEntries(s, curStart, curEnd)
+		if pErr != nil {
+			return nil, nil, pErr
 		}
 		idx := -1
 		for i, e := range entries {
@@ -205,23 +206,40 @@ func removeJSONCKeys(
 		return raw, nil, nil
 	}
 
-	for depth := len(chain) - 1; depth >= 0; depth-- {
-		frame := chain[depth]
+	s = collapseEmptyJSONCParents(s, parts, chain, wasAdded, forgetAdded)
+	return []byte(s), removed, nil
+}
+
+type jsoncParentFrame struct {
+	path string
+	key  string
+}
+
+func collapseEmptyJSONCParents(
+	s string,
+	parts []string,
+	chain []jsoncParentFrame,
+	wasAdded func(string) bool,
+	forgetAdded func(string),
+) string {
+	if wasAdded == nil {
+		return s
+	}
+	for depth, frame := range slices.Backward(chain) {
 		cStart, cEnd, found := findNestedObjectSpan(s, parts[:depth+1])
 		if !found {
 			break
 		}
 		entries, err := parseObjectEntries(s, cStart, cEnd)
-		if err != nil || len(entries) > 0 || wasAdded == nil || !wasAdded(frame.path) {
+		if err != nil || len(entries) > 0 || !wasAdded(frame.path) {
 			break
 		}
-		parentParts := parts[:depth]
-		pStart, pEnd, ok := findNestedObjectSpan(s, parentParts)
+		pStart, pEnd, ok := findNestedObjectSpan(s, parts[:depth])
 		if !ok {
 			break
 		}
-		pEntries, err := parseObjectEntries(s, pStart, pEnd)
-		if err != nil {
+		pEntries, pErr := parseObjectEntries(s, pStart, pEnd)
+		if pErr != nil {
 			break
 		}
 		for i, e := range pEntries {
@@ -234,7 +252,7 @@ func removeJSONCKeys(
 			}
 		}
 	}
-	return []byte(s), removed, nil
+	return s
 }
 
 func findNestedObjectSpan(s string, parts []string) (int, int, bool) {

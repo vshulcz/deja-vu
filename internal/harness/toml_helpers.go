@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -82,9 +83,7 @@ func isTOMLBlockDeja(ops resolvedOps, body string) bool {
 		if ops.isDejaCommand(cmdStrings[0], append(cmdStrings[1:], argStrings...)) {
 			return true
 		}
-		if !hasArgs && ops.isDejaCommand(cmdStrings[0], []string{"mcp"}) {
-			return true
-		}
+		return !hasArgs && ops.isDejaCommand(cmdStrings[0], []string{"mcp"})
 	}
 	return ops.isDejaCommand("", argStrings)
 }
@@ -114,13 +113,7 @@ func isTOMLBlockForeign(ops resolvedOps, body string) bool {
 	kv := parseTOMLBlockKV(body)
 	hasCmd := kv["command"] != ""
 	hasURL := kv["url"] != ""
-	hasMCP := false
-	for _, tok := range append(parseTOMLValueStrings(kv["command"]), parseTOMLValueStrings(kv["args"])...) {
-		if tok == "mcp" {
-			hasMCP = true
-			break
-		}
-	}
+	hasMCP := slices.Contains(append(parseTOMLValueStrings(kv["command"]), parseTOMLValueStrings(kv["args"])...), "mcp")
 	return (hasURL && !hasCmd) || (hasCmd && !hasMCP)
 }
 
@@ -313,12 +306,16 @@ func replaceTOMLHeaderLine(block, newHeader string) string {
 	return newHeader + block[idx:]
 }
 
+func isTOMLBareKeyRune(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-'
+}
+
 func formatTOMLHeader(segs []string) string {
 	parts := make([]string, len(segs))
 	for i, s := range segs {
 		needQuote := s == ""
 		for _, r := range s {
-			if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-') {
+			if !isTOMLBareKeyRune(r) {
 				needQuote = true
 				break
 			}
@@ -334,19 +331,21 @@ func formatTOMLHeader(segs []string) string {
 
 func injectTOMLDisabledFlags(block string, flags []string) string {
 	kv := parseTOMLBlockKV(block)
-	out := strings.TrimRight(block, "\n")
+	var b strings.Builder
+	b.WriteString(strings.TrimRight(block, "\n"))
 	for _, f := range flags {
 		if _, exists := kv[f]; exists {
 			continue
 		}
 		switch f {
 		case "enabled":
-			out += "\nenabled = false"
+			b.WriteString("\nenabled = false")
 		case "disabled":
-			out += "\ndisabled = true"
+			b.WriteString("\ndisabled = true")
 		}
 	}
-	return out + "\n"
+	b.WriteByte('\n')
+	return b.String()
 }
 
 func ensureTrailingLF(s string) string {

@@ -39,10 +39,7 @@ func validateTOMLSyntaxAndArrayConflict(s string, targetSegs []string) error {
 	if err := checkTOMLHeadersClosed(s); err != nil {
 		return err
 	}
-	blocks, err := parseTOMLBlocks(s)
-	if err != nil {
-		return err
-	}
+	blocks := parseTOMLBlocks(s)
 	hdr := formatTOMLHeader(targetSegs)
 	for _, b := range blocks {
 		if b.arrayTable && tomlPathHasPrefix(targetSegs, b.headerPath) {
@@ -117,7 +114,7 @@ func checkTOMLInlineConflict(s string, targetSegs []string) error {
 	return nil
 }
 
-func parseTOMLBlocks(s string) ([]tomlBlock, error) {
+func parseTOMLBlocks(s string) []tomlBlock {
 	var out []tomlBlock
 	offset := 0
 	inStr := byte(0)
@@ -150,7 +147,7 @@ func parseTOMLBlocks(s string) ([]tomlBlock, error) {
 		out[len(out)-1].bodyEnd = len(s)
 		out[len(out)-1].body = s[out[len(out)-1].bodyStart:]
 	}
-	return out, nil
+	return out
 }
 
 func parseTOMLHeaderLine(trimmed string) ([]string, bool, bool) {
@@ -173,7 +170,7 @@ func parseTOMLDottedKey(raw string) []string {
 	var cur strings.Builder
 	inQuote := byte(0)
 	escaped := false
-	for i := 0; i < len(raw); i++ {
+	for i := range len(raw) {
 		c := raw[i]
 		if inQuote != 0 {
 			if inQuote == '"' && !escaped && c == '\\' {
@@ -317,7 +314,7 @@ func unquoteTOMLString(raw string) string {
 func splitTOMLKeyVal(clean string) (string, string, bool) {
 	inQuote := byte(0)
 	escaped := false
-	for i := 0; i < len(clean); i++ {
+	for i := range len(clean) {
 		c := clean[i]
 		if inQuote != 0 {
 			if inQuote == '"' && !escaped && c == '\\' {
@@ -344,7 +341,7 @@ func splitTOMLKeyVal(clean string) (string, string, bool) {
 func stripTOMLComment(line string) string {
 	inQuote := byte(0)
 	escaped := false
-	for i := 0; i < len(line); i++ {
+	for i := range len(line) {
 		c := line[i]
 		if inQuote != 0 {
 			if inQuote == '"' && !escaped && c == '\\' {
@@ -372,7 +369,7 @@ func bracketDepth(s string) int {
 	depth := 0
 	inQuote := byte(0)
 	escaped := false
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c := s[i]
 		if inQuote != 0 {
 			if inQuote == '"' && !escaped && c == '\\' {
@@ -389,9 +386,10 @@ func bracketDepth(s string) int {
 			inQuote = c
 			continue
 		}
-		if c == '[' {
+		switch c {
+		case '[':
 			depth++
-		} else if c == ']' {
+		case ']':
 			depth--
 		}
 	}

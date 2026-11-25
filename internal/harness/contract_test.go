@@ -11,10 +11,10 @@ import (
 	"github.com/vshulcz/deja-vu/internal/harness"
 )
 
-func allContractSpecs(t *testing.T) []harness.HarnessSpec {
+func allContractSpecs(t *testing.T) []harness.Spec {
 	t.Helper()
 	dir := t.TempDir()
-	return []harness.HarnessSpec{
+	return []harness.Spec{
 		&harness.JSONMCPSpec{
 			HarnessName: "claude",
 			Path:        filepath.Join(dir, "claude", "mcp.json"),
@@ -176,7 +176,7 @@ func TestJSONAndTOMLCorruptionMatrix(t *testing.T) {
 			if err := os.WriteFile(path, []byte(tc.content), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			var spec harness.HarnessSpec
+			var spec harness.Spec
 			if tc.kind == "json" {
 				spec = &harness.JSONMCPSpec{
 					HarnessName: "test-json",
@@ -260,8 +260,8 @@ func TestJSONCNestedCommentsTrailingCommasAndBOMCRLF(t *testing.T) {
 	if err != nil || !probe.Wired {
 		t.Fatalf("Probe(JSONC) = (%+v, %v), want Wired=true", probe, err)
 	}
-	if _, err := spec.Unwire(); err != nil {
-		t.Fatalf("Unwire(JSONC): %v", err)
+	if _, uErr := spec.Unwire(); uErr != nil {
+		t.Fatalf("Unwire(JSONC): %v", uErr)
 	}
 	after, err := os.ReadFile(path)
 	if err != nil {
@@ -313,8 +313,8 @@ func TestForeignDejaAdoptionNonDejaFilesystemAndDuplicates(t *testing.T) {
 		}
 		b, _ := os.ReadFile(path)
 		var parsed map[string]map[string]map[string]any
-		if err := json.Unmarshal(b, &parsed); err != nil {
-			t.Fatal(err)
+		if jErr := json.Unmarshal(b, &parsed); jErr != nil {
+			t.Fatal(jErr)
 		}
 		if _, ok := parsed["mcpServers"]["deja"]; ok {
 			t.Fatalf("unexpected duplicate deja key created alongside adopted deja-old: %v", parsed)
@@ -325,8 +325,8 @@ func TestForeignDejaAdoptionNonDejaFilesystemAndDuplicates(t *testing.T) {
 		// Add a second custom deja entry to verify LeftKeys reporting.
 		parsed["mcpServers"]["deja-custom"] = map[string]any{"command": "deja", "args": []string{"mcp"}}
 		b2, _ := json.MarshalIndent(parsed, "", "  ")
-		if err := os.WriteFile(path, b2, 0o600); err != nil {
-			t.Fatal(err)
+		if wErr := os.WriteFile(path, b2, 0o600); wErr != nil {
+			t.Fatal(wErr)
 		}
 		w2, err := spec.Wire()
 		if err != nil {

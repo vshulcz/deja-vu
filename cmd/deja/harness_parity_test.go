@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -24,7 +25,7 @@ func runUninstallStep(t *testing.T, fn func() (installResult, error)) installRes
 func TestHarnessParityJSONAndDoctor(t *testing.T) {
 	home := hermeticEnv(t)
 	cfgPath := filepath.Join(home, "client", "mcp.json")
-	exe := filepath.Join("/Users/alex", "bin", "deja")
+	exe := filepath.Join(home, "bin", "deja")
 	entry := map[string]any{"command": exe, "args": []string{"mcp"}}
 
 	res, err := installMCPJSONEntry(cfgPath, "mcpServers", entry, false)
@@ -66,7 +67,7 @@ func TestHarnessParityCopilotAndOpenClaw(t *testing.T) {
 	t.Setenv("COPILOT_HOME", filepath.Join(home, ".copilot"))
 	t.Setenv("OPENCLAW_STATE_DIR", filepath.Join(home, ".openclaw"))
 
-	exe := filepath.Join("/Users/alex", "bin", "deja")
+	exe := filepath.Join(home, "bin", "deja")
 	copRes, err := installCopilotMCP(exe, false)
 	if err != nil || copRes.Action != "created" {
 		t.Fatalf("installCopilotMCP = %+v, %v", copRes, err)
@@ -116,7 +117,7 @@ func TestHarnessParityCopilotAndOpenClaw(t *testing.T) {
 func TestHarnessParityJSONDisabledAndAdoption(t *testing.T) {
 	home := hermeticEnv(t)
 	cfgPath := filepath.Join(home, "disabled.json")
-	exe := filepath.Join("/Users/alex", "bin", "deja")
+	exe := filepath.Join(home, "bin", "deja")
 	entry := map[string]any{"command": exe, "args": []string{"mcp"}}
 
 	initial := `{
@@ -161,7 +162,7 @@ func TestHarnessParityJSONDisabledAndAdoption(t *testing.T) {
 	// Repurposed foreign key stays untouched on uninstall with a note.
 	other := `{
   "mcpServers": {
-    "deja": {"command": "` + exe + `", "args": ["mcp"]},
+    "deja": {"command": ` + strconv.Quote(exe) + `, "args": ["mcp"]},
     "other-deja": {"command": "/custom/deja", "args": ["mcp"]}
   }
 }
@@ -184,8 +185,8 @@ func TestHarnessParityJSONDisabledAndAdoption(t *testing.T) {
 func TestHarnessParityTOMLAndDoctor(t *testing.T) {
 	home := hermeticEnv(t)
 	cfgPath := filepath.Join(home, "config.toml")
-	exe := filepath.Join("/Users/alex", "bin", "deja")
-	block := "[mcp_servers.deja]\ncommand = \"" + exe + "\"\nargs = [\"mcp\"]\n"
+	exe := filepath.Join(home, "bin", "deja")
+	block := "[mcp_servers.deja]\ncommand = " + strconv.Quote(exe) + "\nargs = [\"mcp\"]\n"
 
 	seed := "model = \"o3\"\n\n[mcp_servers.\"deja.old\"]\ncommand = \"/old/deja\"\nargs = [\"mcp\"]\nenabled = false\n"
 	if err := os.WriteFile(cfgPath, []byte(seed), 0o600); err != nil {

@@ -25,7 +25,7 @@ func isJSONC(raw []byte) bool {
 	n := len(s)
 	inStr := false
 	escaped := false
-	for i := 0; i < n; i++ {
+	for i := range n {
 		c := s[i]
 		if inStr {
 			if escaped {
@@ -119,7 +119,7 @@ func stripTrailingCommas(raw []byte) []byte {
 	n := len(s)
 	inStr := false
 	escaped := false
-	for i := 0; i < n; i++ {
+	for i := range n {
 		c := s[i]
 		if inStr {
 			out.WriteByte(c)
@@ -254,9 +254,10 @@ func scanCompositeEnd(s string, start int, open, closeChar byte) (int, error) {
 				continue
 			}
 		}
-		if c == open {
+		switch c {
+		case open:
 			depth++
-		} else if c == closeChar {
+		case closeChar:
 			depth--
 			if depth == 0 {
 				return i + 1, nil
