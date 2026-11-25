@@ -171,8 +171,8 @@ func (s *MarkedBlockSpec) PlanWire() (old, next []byte, note string, err error) 
 	}
 	lfOld := string(normalizeLF(old))
 	if s.PreValidateWire != nil {
-		if err := s.PreValidateWire(lfOld); err != nil {
-			return nil, nil, "", ops.formatErr(s.Path, err)
+		if verr := s.PreValidateWire(lfOld); verr != nil {
+			return nil, nil, "", ops.formatErr(s.Path, verr)
 		}
 	}
 	block := s.Block
@@ -200,8 +200,8 @@ func (s *MarkedBlockSpec) PlanWire() (old, next []byte, note string, err error) 
 		patched = rest + block
 	}
 	if s.ValidatePatched != nil {
-		if err := s.ValidatePatched(s.Path, old, patched); err != nil {
-			return nil, nil, "", err
+		if verr := s.ValidatePatched(s.Path, old, patched); verr != nil {
+			return nil, nil, "", verr
 		}
 	}
 	return old, []byte(patched), note, nil
@@ -219,8 +219,8 @@ func (s *MarkedBlockSpec) PlanUnwire() (old, next []byte, changed bool, err erro
 		if len(old) == 0 || (!strings.Contains(lfOld, s.StartMarker) && !strings.Contains(lfOld, s.EndMarker)) {
 			return old, old, false, nil
 		}
-		if err := s.CheckMarkers(lfOld); err != nil {
-			return nil, nil, false, err
+		if merr := s.CheckMarkers(lfOld); merr != nil {
+			return nil, nil, false, merr
 		}
 		rest := s.stripPaired(lfOld)
 		rest = s.maybeRestorePlaceholder(lfOld, rest)
@@ -390,7 +390,7 @@ func (s *MarkedBlockSpec) maybeRestorePlaceholder(lfOld, rest string) string {
 	if s.EmptyPlaceholder == "" {
 		return rest
 	}
-	hasEntry := false
+	var hasEntry bool
 	if s.HasEntry != nil {
 		hasEntry = s.HasEntry(rest)
 	} else {

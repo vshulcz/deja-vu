@@ -1424,30 +1424,34 @@ func TestMetaViewsConcurrentReaders(t *testing.T) {
 	dir, add := metaViewsStore(t)
 	add("s1", "the hedge trimmer blade went dull")
 	var wg sync.WaitGroup
+	var stopOnce sync.Once
 	stop := make(chan struct{})
+	stopReaders := func() {
+		stopOnce.Do(func() { close(stop) })
+		wg.Wait()
+	}
+	t.Cleanup(stopReaders)
 	for range 8 {
 		wg.Go(func() {
 			for {
+				if _, err := AllMetaShared(dir); err == nil {
+					if m, merr := readManifestCached(dir); merr == nil {
+						v := viewsFor(m)
+						_ = v.metaByOrd()
+						_ = v.metasByID()
+					}
+				}
 				select {
 				case <-stop:
 					return
-				default:
-				}
-				if _, err := AllMetaShared(dir); err != nil {
-					continue
-				}
-				if m, err := readManifestCached(dir); err == nil {
-					v := viewsFor(m)
-					_ = v.metaByOrd()
-					_ = v.metasByID()
+				case <-time.After(2 * time.Millisecond):
 				}
 			}
 		})
 	}
 	add("s2", "the hedge along the lane needs a second cut")
 	add("s3", "a hedge sparrow nests in the trimmer box")
-	close(stop)
-	wg.Wait()
+	stopReaders()
 	if got := sharedIDs(t, dir); got != "s1,s2,s3" {
 		t.Fatalf("after concurrent reads the metas are %q", got)
 	}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/harness"
@@ -970,70 +969,6 @@ func dshListIndent(doc string) string {
 		}
 	}
 	return ""
-}
-
-// dshDocumentEnd is the index of the line that closes the document, `...`,
-// when only comments and blank lines follow it; -1 when there is none.
-func dshDocumentEnd(lines []string) int {
-	for i, line := range slices.Backward(lines) {
-		t := strings.TrimSpace(line)
-		switch {
-		case t == "" || strings.HasPrefix(t, "#"):
-		case line == "..." || strings.HasPrefix(line, "... ") || strings.HasPrefix(line, "...\t"):
-			return i
-		default:
-			return -1
-		}
-	}
-	return -1
-}
-
-// checkDSHMarkers reports whether deja's block can be bounded: both markers
-// present, each on a line of its own, the start before the end.
-//
-// One without the other, or the two in the wrong order, sends stripDSHBlock's
-// skip to the end of the file and deletes whatever the user wrote below —
-// which the block's own "safe to delete" invites them to have edited (#1701).
-// Matching whole lines rather than substrings keeps a marker quoted inside a
-// value from counting.
-func checkDSHMarkers(doc string) error {
-	return newDSHLayerSpec("", "", false).CheckMarkers(doc)
-}
-
-// stripDSHBlock removes deja's block and the empty-array literal a generated
-// layer starts with, leaving whatever the user wrote.
-func stripDSHBlock(s string) string {
-	var out []string
-	skipping := false
-	for line := range strings.SplitSeq(s, "\n") {
-		switch {
-		case strings.HasPrefix(strings.TrimSpace(line), dshBlockStart):
-			skipping = true
-			continue
-		case strings.TrimSpace(line) == dshBlockEnd:
-			skipping = false
-			continue
-		case skipping:
-			continue
-		case strings.TrimSpace(line) == "[]":
-			// The generated placeholder for "no entries"; a list entry cannot
-			// follow it.
-			continue
-		}
-		out = append(out, line)
-	}
-	return strings.TrimRight(strings.Join(out, "\n"), "\n")
-}
-
-// dshHadArrayLine reports whether the layer carries the `[]` placeholder on a
-// line of its own — the shape a generated layer has, and what install replaced.
-func dshHadArrayLine(doc string) bool {
-	for line := range strings.SplitSeq(doc, "\n") {
-		if strings.TrimSpace(line) == "[]" {
-			return true
-		}
-	}
-	return false
 }
 
 // dshLayerHasEntry reports whether a layer still carries anything YAML would

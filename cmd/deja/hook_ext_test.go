@@ -249,7 +249,8 @@ func TestHookExtHookOperations(t *testing.T) {
 	if !fin.Ok || fin.Kind != "hook" || fin.Decision != "allow" || fin.UpdatedInput == nil {
 		t.Fatalf("finalizeExtHookReply spawn = %+v", fin)
 	}
-	if !strings.Contains(fin.UpdatedInput["prompt"].(string), "<deja-recall>") || fin.UpdatedInput["subagent_type"] != "explore" {
+	promptVal, ok := fin.UpdatedInput["prompt"].(string)
+	if !ok || !strings.Contains(promptVal, "<deja-recall>") || fin.UpdatedInput["subagent_type"] != "explore" {
 		t.Fatalf("unexpected updated_input = %+v", fin.UpdatedInput)
 	}
 
@@ -332,9 +333,13 @@ func TestHookExtHookOperations(t *testing.T) {
 	if !preResp.Ok || len(preResp.Messages) != 1 || preResp.Dropped != 0 {
 		t.Fatalf("precompact resp = %+v", preResp)
 	}
-	msgMap := preResp.Messages[0].(map[string]any)
-	if len([]rune(msgMap["content"].(string))) != 4000 {
-		t.Fatalf("precompact rune length = %d, want 4000", len([]rune(msgMap["content"].(string))))
+	msgMap, ok := preResp.Messages[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected map message, got %T", preResp.Messages[0])
+	}
+	msgContent, ok := msgMap["content"].(string)
+	if !ok || len([]rune(msgContent)) != 4000 {
+		t.Fatalf("precompact content = %T (runes=%d), want 4000 runes", msgMap["content"], len([]rune(msgContent)))
 	}
 
 	// 6. session-end clears cleanly.

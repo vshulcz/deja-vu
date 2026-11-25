@@ -510,30 +510,3 @@ func removeHermesMCPBlock(s string) string {
 	}
 	return strings.Join(lines, "\n")
 }
-
-// hermesBlockIndent is the indent the servers under `mcp_servers:` are written
-// at, and whether there is a block to read one from. deja wrote its own entry
-// at two whatever the file used, so on a config indented at three or four the
-// entry landed shallower than its siblings — and the uninstall that reads
-// "indented further than deja's key" then took those siblings with it (#2730).
-func hermesBlockIndent(s string) (string, bool) {
-	lines := strings.Split(s, "\n")
-	for i, line := range lines {
-		if !yamlKeyLine(line, "mcp_servers:") || yamlIndentWidth(line) != 0 {
-			continue
-		}
-		for _, next := range lines[i+1:] {
-			// A comment sits at whatever indent its writer liked; the
-			// servers' own indent is the first entry's (#4289).
-			if strings.TrimSpace(next) == "" || strings.HasPrefix(strings.TrimSpace(next), "#") {
-				continue
-			}
-			if yamlIndentWidth(next) == 0 {
-				return "", false
-			}
-			return next[:len(next)-len(strings.TrimLeft(next, " \t"))], true
-		}
-		return "", false
-	}
-	return "", false
-}

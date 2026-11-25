@@ -21,11 +21,11 @@ func TestReadExtRequestBoundsAndEmpty(t *testing.T) {
 	}
 
 	oversize := bytes.Repeat([]byte("a"), MaxExtRequestBytes+1)
-	if _, err := ReadExtRequest(bytes.NewReader(oversize)); err == nil {
+	if _, rerr := ReadExtRequest(bytes.NewReader(oversize)); rerr == nil {
 		t.Fatal("expected size-cap error on oversize payload")
 	}
 
-	if _, err := ReadExtRequest(strings.NewReader("{bad")); err == nil {
+	if _, rerr := ReadExtRequest(strings.NewReader("{bad")); rerr == nil {
 		t.Fatal("expected JSON decode error")
 	}
 
@@ -37,7 +37,7 @@ func TestReadExtRequestBoundsAndEmpty(t *testing.T) {
 		IsError:   true,
 		Offset:    5,
 	}
-	raw, _ := json.Marshal(want)
+	raw := []byte(`{"session_id":"s1","query":"--no-verify","plain":true,"notes_only":true,"is_error":true,"offset":5}`)
 	got, err := ReadExtRequest(bytes.NewReader(raw))
 	if err != nil {
 		t.Fatalf("valid payload: %v", err)
@@ -170,12 +170,15 @@ func TestBoundPrecompactMessagesBudgetsAndUTF8(t *testing.T) {
 	if len(bounded) != 2 {
 		t.Fatalf("len(bounded) = %d, want 2", len(bounded))
 	}
-	first := bounded[0].(map[string]any)
-	if got := first["content"].(string); got != strings.Repeat("🚀", 10) || !utf8.ValidString(got) {
-		t.Fatalf("first bounded content = %q", got)
+	first, ok := bounded[0].(map[string]any)
+	if !ok {
+		t.Fatalf("bounded[0] type = %T", bounded[0])
 	}
-	if second := bounded[1].(map[string]any); second["content"] != "newest" {
-		t.Fatalf("second bounded content = %v, want newest", second["content"])
+	if got, ok := first["content"].(string); !ok || got != strings.Repeat("🚀", 10) || !utf8.ValidString(got) {
+		t.Fatalf("first bounded content = %v", first["content"])
+	}
+	if second, ok := bounded[1].(map[string]any); !ok || second["content"] != "newest" {
+		t.Fatalf("second bounded content = %+v, want newest", bounded[1])
 	}
 
 	// Byte limit drops oldest objects.
@@ -187,7 +190,7 @@ func TestBoundPrecompactMessagesBudgetsAndUTF8(t *testing.T) {
 	if droppedBytes != 1 || len(boundedBytes) != 1 {
 		t.Fatalf("byte limit: got (%d msgs, %d dropped)", len(boundedBytes), droppedBytes)
 	}
-	if boundedBytes[0].(map[string]any)["content"] != "ok" {
+	if kept0, ok := boundedBytes[0].(map[string]any); !ok || kept0["content"] != "ok" {
 		t.Fatalf("kept wrong message: %+v", boundedBytes[0])
 	}
 }

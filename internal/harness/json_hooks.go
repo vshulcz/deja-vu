@@ -122,7 +122,7 @@ func (s *JSONHooksSpec) entryIsAnyDeja(entry map[string]any) bool {
 			continue
 		}
 		cmd, _ := h["command"].(string)
-		if ok, _ := defaultMatchHookAnyDeja(cmd); ok {
+		if defaultMatchHookAnyDeja(cmd) {
 			return true
 		}
 	}
@@ -583,7 +583,7 @@ func (s *JSONHooksSpec) matchFlatItem(item map[string]any) (JSONHookRule, bool) 
 		if s.IsAnyDejaHook(wrapped) {
 			return JSONHookRule{Name: name, Event: trigger, Command: cmd}, true
 		}
-	} else if ok, _ := defaultMatchHookAnyDeja(cmd); ok {
+	} else if defaultMatchHookAnyDeja(cmd) {
 		return JSONHookRule{Name: name, Event: trigger, Command: cmd}, true
 	}
 	return JSONHookRule{}, false
@@ -621,21 +621,13 @@ func defaultMatchHookCommand(actual, wantCmd string) (bool, bool) {
 	return true, false
 }
 
-func defaultMatchHookAnyDeja(cmd string) (bool, bool) {
-	sub := hookCommandSubcommand(cmd)
-	if sub == "" {
-		return false, false
-	}
-	toks := splitShellWordsSimple(cmd)
-	if len(toks) > 0 && isDejaBinaryToken(toks[0]) {
-		return true, true
-	}
-	return true, false
+func defaultMatchHookAnyDeja(cmd string) bool {
+	return hookCommandSubcommand(cmd) != ""
 }
 
 func hookCommandSubcommand(cmd string) string {
 	toks := splitShellWordsSimple(cmd)
-	for i := 0; i < len(toks)-1; i++ {
+	for i := range len(toks) - 1 {
 		if isDejaBinaryToken(toks[i]) {
 			sub := strings.TrimRight(toks[i+1], ";&|")
 			if strings.HasPrefix(sub, "hook-") {
@@ -651,7 +643,7 @@ func splitShellWordsSimple(s string) []string {
 	var cur strings.Builder
 	quote := byte(0)
 	inWord := false
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c := s[i]
 		if quote != 0 {
 			if c == quote {

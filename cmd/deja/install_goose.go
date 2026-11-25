@@ -49,22 +49,6 @@ func inlineYAMLValue(doc, key string) string {
 	return ""
 }
 
-// yamlBlockIsSequence reports whether the block that follows a key opens with
-// a sequence item rather than a mapping entry, skipping blank lines and
-// comments. A block that is empty, or holds mapping entries, is not one.
-func yamlBlockIsSequence(block string) bool {
-	for line := range strings.SplitSeq(block, "\n") {
-		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
-			continue
-		}
-		if !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
-			return false
-		}
-		return strings.HasPrefix(strings.TrimSpace(line), "- ")
-	}
-	return false
-}
-
 // yamlEntrySwitchedOff reports whether the entry `name` under the top-level
 // key has been switched off the way goose reads it: `enabled: false`. The
 // writer below rebuilt deja's entry whole, and dropped the switch until it read

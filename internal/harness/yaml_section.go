@@ -145,13 +145,13 @@ func (s *YAMLSectionSpec) Wire() (WireResult, error) {
 	lfOld := string(normalizeLF(old))
 	secKey := s.sectionKey()
 
-	if _, err := yamlTopKeyEnd(ensureTrailingLF(lfOld), secKey); err != nil {
-		return WireResult{}, s.wrapYAMLErr(err)
+	if _, kerr := yamlTopKeyEnd(ensureTrailingLF(lfOld), secKey); kerr != nil {
+		return WireResult{}, s.wrapYAMLErr(kerr)
 	}
 	if s.EditExisting != nil {
-		updated, handled, disabled, baseNote, err := s.EditExisting(lfOld)
-		if err != nil {
-			return WireResult{}, s.wrapYAMLErr(err)
+		updated, handled, disabled, baseNote, eerr := s.EditExisting(lfOld)
+		if eerr != nil {
+			return WireResult{}, s.wrapYAMLErr(eerr)
 		}
 		if handled {
 			next := keepTrailingNewline(lfOld, updated)
@@ -166,8 +166,8 @@ func (s *YAMLSectionSpec) Wire() (WireResult, error) {
 	}
 
 	if s.CheckRemovable != nil {
-		if err := s.CheckRemovable(lfOld); err != nil {
-			return WireResult{}, s.wrapYAMLErr(err)
+		if rerr := s.CheckRemovable(lfOld); rerr != nil {
+			return WireResult{}, s.wrapYAMLErr(rerr)
 		}
 	}
 	preInfo := s.inspectDoc(lfOld)
@@ -229,8 +229,8 @@ func (s *YAMLSectionSpec) Unwire() (UnwireResult, error) {
 	}
 	lfOld := string(normalizeLF(old))
 	if s.CheckRemovable != nil {
-		if err := s.CheckRemovable(lfOld); err != nil {
-			return UnwireResult{}, s.wrapYAMLErr(err)
+		if rerr := s.CheckRemovable(lfOld); rerr != nil {
+			return UnwireResult{}, s.wrapYAMLErr(rerr)
 		}
 	}
 	secKey := s.sectionKey()

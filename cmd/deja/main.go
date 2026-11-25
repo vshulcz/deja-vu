@@ -425,18 +425,19 @@ func run(args []string) error {
 			return nil
 		}
 	}
-	if args[0] == "hook-ext" {
-		// hook-ext enforces per-op access internally so blocked hooks still emit {"ok":true}.
-	} else if strings.HasPrefix(args[0], "hook-") || args[0] == "statusline" || args[0] == "warmup-status" {
-		if dispatchKnows(args[0]) && !hookAccessAllowed(dir) {
-			if args[0] == "hook-session-end" && slices.Contains(args[1:], "--json") {
-				fmt.Println("{}")
+	// hook-ext enforces per-op access internally so blocked hooks still emit {"ok":true}.
+	if args[0] != "hook-ext" {
+		if strings.HasPrefix(args[0], "hook-") || args[0] == "statusline" || args[0] == "warmup-status" {
+			if dispatchKnows(args[0]) && !hookAccessAllowed(dir) {
+				if args[0] == "hook-session-end" && slices.Contains(args[1:], "--json") {
+					fmt.Println("{}")
+				}
+				return nil
 			}
-			return nil
-		}
-	} else if !accessExemptCommands[args[0]] {
-		if err := checkCLIAccess(dir, "read", ""); err != nil {
-			return err
+		} else if !accessExemptCommands[args[0]] {
+			if err := checkCLIAccess(dir, "read", ""); err != nil {
+				return err
+			}
 		}
 	}
 	switch args[0] {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -78,7 +79,7 @@ func runHookExt(dir string, args []string, stdin io.Reader, stdout io.Writer) er
 	case "remember":
 		resp = runHookExtRemember(dir, req)
 	case "slash":
-		resp = runHookExtSlash(dir, host, req)
+		resp = runHookExtSlash(dir, req)
 	case "status", "statusline":
 		var buf bytes.Buffer
 		payload := buildHookExtPayload(raw, req, nil)
@@ -383,11 +384,11 @@ func runHookExtTool(dir, host string, req hookengine.ExtRequest) hookengine.ExtR
 	case "deja_session", "ctx", "recall_context":
 		fn = cmdCtx
 	default:
-		return hookengine.ExtResponse{Ok: false, Kind: "error", Error: fmt.Sprintf("unknown tool %s", tool)}
+		return hookengine.ExtResponse{Ok: false, Kind: "error", Error: "unknown tool " + tool}
 	}
 	q := strings.TrimSpace(arg)
 	if q == "" {
-		return hookengine.ExtResponse{Ok: false, Kind: "error", Error: fmt.Sprintf("%s: missing query", strings.TrimPrefix(tool, "deja_"))}
+		return hookengine.ExtResponse{Ok: false, Kind: "error", Error: strings.TrimPrefix(tool, "deja_") + ": missing query"}
 	}
 	args := hookengine.BuildQueryArgs("", flags, q)
 	var out string
@@ -440,7 +441,7 @@ func runHookExtRemember(dir string, req hookengine.ExtRequest) hookengine.ExtRes
 	return hookengine.ExtResponse{Ok: true, Kind: "success", Output: strings.TrimSpace(out)}
 }
 
-func runHookExtSlash(dir, host string, req hookengine.ExtRequest) hookengine.ExtResponse {
+func runHookExtSlash(dir string, req hookengine.ExtRequest) hookengine.ExtResponse {
 	raw := firstNonEmptyString(req.Args, req.Query, req.Text)
 	sess, q, _, errMsg := hookengine.ParseDSHSlashInput(raw)
 	if errMsg != "" {
@@ -484,11 +485,12 @@ func runHookExtSettle(host string, req hookengine.ExtRequest) hookengine.ExtResp
 
 func finalizeExtHookReply(host string, req hookengine.ExtRequest, rawOut string) hookengine.ExtResponse {
 	var ctxText, notes string
-	if req.Plain {
+	switch {
+	case req.Plain:
 		ctxText = strings.TrimSpace(rawOut)
-	} else if host == "openclaw" {
+	case host == "openclaw":
 		ctxText, notes = hookengine.SplitHookReplyKeepSurrounding(rawOut)
-	} else {
+	default:
 		ctxText, notes = hookengine.SplitHookReply(rawOut)
 	}
 	if req.Neutralize || host == "dsh" {
@@ -517,8 +519,8 @@ func extractExtHookDecisionAndInput(rawOut string) (map[string]any, string) {
 		return nil, ""
 	}
 	lines := strings.Split(trimmed, "\n")
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(lines[i])
+	for _, rawLine := range slices.Backward(lines) {
+		line := strings.TrimSpace(rawLine)
 		if !strings.HasPrefix(line, "{") {
 			continue
 		}

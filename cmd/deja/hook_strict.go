@@ -24,12 +24,6 @@ import (
 // config a user reads.
 var strictHookOutput bool
 
-// emitHookResponse writes the session-start response, minus anything a strict
-// host would reject.
-func emitHookResponse(resp sessionStartHookResponse) {
-	emitHookResponseTo(os.Stdout, resp)
-}
-
 func emitHookResponseTo(w io.Writer, resp sessionStartHookResponse) {
 	if w == nil {
 		w = os.Stdout

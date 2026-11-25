@@ -143,7 +143,7 @@ func TestYAMLSectionSpecValidationAndFeatures(t *testing.T) {
 			t.Fatal(err)
 		}
 		wiredDoc, _ := os.ReadFile(p2)
-		if strings.Index(string(wiredDoc), "mcp_servers:") > strings.Index(string(wiredDoc), "...") {
+		if bytes.Index(wiredDoc, []byte("mcp_servers:")) > bytes.Index(wiredDoc, []byte("...")) {
 			t.Fatalf("mcp_servers written after ...:\n%s", wiredDoc)
 		}
 		if _, err := spec2.Unwire(); err != nil {
@@ -189,7 +189,7 @@ func TestYAMLSectionSpecValidationAndFeatures(t *testing.T) {
 			SectionKey:         "extensions:",
 			DropEmptySection:   true,
 			ContainsExactEntry: true,
-			BuildEntry: func(indent string, disabled bool) string {
+			BuildEntry: func(indent string, _ bool) string {
 				return indent + "deja:\n" + indent + "  enabled: true\n"
 			},
 			EditExisting: func(doc string) (string, bool, bool, string, error) {
@@ -199,8 +199,8 @@ func TestYAMLSectionSpecValidationAndFeatures(t *testing.T) {
 				}
 				return "", false, false, "", nil
 			},
-			OtherDejaNames: func(doc string) []string { return []string{"legacy-deja"} },
-			FormatNote: func(base string, dis bool, others []string) string {
+			OtherDejaNames: func(_ string) []string { return []string{"legacy-deja"} },
+			FormatNote: func(_ string, _ bool, others []string) string {
 				return "others=" + strings.Join(others, ",")
 			},
 		}
@@ -213,8 +213,8 @@ func TestYAMLSectionSpecValidationAndFeatures(t *testing.T) {
 			t.Fatalf("editedCalls = %d, want 1", editedCalls)
 		}
 		// Trigger EditExisting handled branch and keep BOM+CRLF.
-		if err := os.WriteFile(p, append([]byte{0xEF, 0xBB, 0xBF}, []byte("other: trigger-edit\r\n")...), 0o644); err != nil {
-			t.Fatal(err)
+		if werr := os.WriteFile(p, append([]byte{0xEF, 0xBB, 0xBF}, []byte("other: trigger-edit\r\n")...), 0o644); werr != nil {
+			t.Fatal(werr)
 		}
 		w2, err := spec.Wire()
 		if err != nil || w2.Action != harness.ActionUpdated || w2.Note != "others=legacy-deja" {
@@ -227,12 +227,12 @@ func TestYAMLSectionSpecValidationAndFeatures(t *testing.T) {
 
 		// CheckRemovable blocks both Wire fallback and Unwire.
 		spec.EditExisting = nil
-		spec.CheckRemovable = func(doc string) error { return errors.New("cannot remove custom") }
-		if _, err := spec.Wire(); err == nil || !strings.Contains(err.Error(), "cannot remove custom") {
-			t.Fatalf("Wire CheckRemovable err = %v", err)
+		spec.CheckRemovable = func(_ string) error { return errors.New("cannot remove custom") }
+		if _, werr := spec.Wire(); werr == nil || !strings.Contains(werr.Error(), "cannot remove custom") {
+			t.Fatalf("Wire CheckRemovable err = %v", werr)
 		}
-		if _, err := spec.Unwire(); err == nil || !strings.Contains(err.Error(), "cannot remove custom") {
-			t.Fatalf("Unwire CheckRemovable err = %v", err)
+		if _, uerr := spec.Unwire(); uerr == nil || !strings.Contains(uerr.Error(), "cannot remove custom") {
+			t.Fatalf("Unwire CheckRemovable err = %v", uerr)
 		}
 	})
 }
@@ -284,52 +284,71 @@ func TestJSONHooksSpecModesAndGuards(t *testing.T) {
 		}
 		data, _ := os.ReadFile(p)
 		var root map[string]any
-		if err := json.Unmarshal(data, &root); err != nil {
-			t.Fatal(err)
+		if uerr := json.Unmarshal(data, &root); uerr != nil {
+			t.Fatal(uerr)
 		}
-		hooks := root["hooks"].(map[string]any)
-		if _, ok := hooks["BeforeAgent"]; ok {
+		hooks, ok := root["hooks"].(map[string]any)
+		if !ok {
+			t.Fatalf("hooks type = %T", root["hooks"])
+		}
+		if _, exists := hooks["BeforeAgent"]; exists {
 			t.Fatalf("retired BeforeAgent left behind: %v", hooks)
 		}
-		oldCmd := hooks["OldCmd"].([]any)
+		oldCmd, ok := hooks["OldCmd"].([]any)
+		if !ok {
+			t.Fatalf("OldCmd type = %T", hooks["OldCmd"])
+		}
 		if len(oldCmd) != 1 {
 			t.Fatalf("expected non-deja OldCmd survivor kept, got %v", oldCmd)
 		}
-		ss := hooks["SessionStart"].([]any)
+		ss, ok := hooks["SessionStart"].([]any)
+		if !ok {
+			t.Fatalf("SessionStart type = %T", hooks["SessionStart"])
+		}
 		if len(ss) != 2 { // first adopted, second deduplicated, third non-matching prompt kept
 			t.Fatalf("SessionStart len = %d, want 2: %v", len(ss), ss)
 		}
-		first := ss[0].(map[string]any)
+		first, ok := ss[0].(map[string]any)
+		if !ok {
+			t.Fatalf("SessionStart[0] type = %T", ss[0])
+		}
 		if first["matcher"] != "startup|resume" {
 			t.Fatalf("matcher = %v, want startup|resume", first["matcher"])
 		}
-		h0 := first["hooks"].([]any)[0].(map[string]any)
+		firstHooks, ok := first["hooks"].([]any)
+		if !ok || len(firstHooks) == 0 {
+			t.Fatalf("first hooks = %T", first["hooks"])
+		}
+		h0, ok := firstHooks[0].(map[string]any)
+		if !ok {
+			t.Fatalf("h0 type = %T", firstHooks[0])
+		}
 		if h0["timeout"] != float64(15) || h0["statusMessage"] != "loading context" {
 			t.Fatalf("adopted hook = %v", h0)
 		}
 
 		// JSONC with no changes returns ActionUnchanged.
 		jsoncUnchanged := "{\n  // user comment\n  \"theme\": \"dark\",\n  \"hooks\": {\n    \"SessionStart\": [\n      {\"matcher\": \"startup|resume\", \"hooks\": [{\"type\": \"command\", \"command\": \"/usr/local/bin/deja hook-context\", \"timeout\": 15, \"statusMessage\": \"loading context\"}]}\n    ]\n  }\n}\n"
-		if err := os.WriteFile(p, []byte(jsoncUnchanged), 0o644); err != nil {
-			t.Fatal(err)
+		if werr := os.WriteFile(p, []byte(jsoncUnchanged), 0o644); werr != nil {
+			t.Fatal(werr)
 		}
 		wc, err := spec.Wire()
 		if err != nil || wc.Action != harness.ActionUnchanged {
 			t.Fatalf("Wire(JSONC noop) = (%+v, %v), want unchanged", wc, err)
 		}
 		// JSONC where Unwire needs edit returns refusal without losing comments.
-		if _, err := spec.Unwire(); err == nil || !strings.Contains(err.Error(), "carries comments") {
-			t.Fatalf("Unwire(JSONC edit) err = %v, want comment refusal", err)
+		if _, uerr := spec.Unwire(); uerr == nil || !strings.Contains(uerr.Error(), "carries comments") {
+			t.Fatalf("Unwire(JSONC edit) err = %v, want comment refusal", uerr)
 		}
 		// JSONC where Wire needs edit returns refusal.
-		if err := os.WriteFile(p, []byte("{\n  // user comment\n  \"theme\": \"dark\"\n}\n"), 0o644); err != nil {
-			t.Fatal(err)
+		if werr := os.WriteFile(p, []byte("{\n  // user comment\n  \"theme\": \"dark\"\n}\n"), 0o644); werr != nil {
+			t.Fatal(werr)
 		}
-		if _, err := spec.Wire(); err == nil || !strings.Contains(err.Error(), "carries comments") {
-			t.Fatalf("Wire(JSONC edit) err = %v, want comment refusal", err)
+		if _, werr := spec.Wire(); werr == nil || !strings.Contains(werr.Error(), "carries comments") {
+			t.Fatalf("Wire(JSONC edit) err = %v, want comment refusal", werr)
 		}
-		if uc, err := spec.Unwire(); err != nil || uc.Action != harness.ActionUnchanged {
-			t.Fatalf("Unwire(JSONC noop) = (%+v, %v)", uc, err)
+		if uc, uerr := spec.Unwire(); uerr != nil || uc.Action != harness.ActionUnchanged {
+			t.Fatalf("Unwire(JSONC noop) = (%+v, %v)", uc, uerr)
 		}
 	})
 
@@ -364,12 +383,29 @@ func TestJSONHooksSpecModesAndGuards(t *testing.T) {
 		raw, _ := os.ReadFile(p)
 		var root map[string]any
 		_ = json.Unmarshal(raw, &root)
-		list := root["hooks"].(map[string]any)["SessionEnd"].([]any)
-		entry := list[0].(map[string]any)
+		hooksMap, ok := root["hooks"].(map[string]any)
+		if !ok {
+			t.Fatalf("hooks type = %T", root["hooks"])
+		}
+		list, ok := hooksMap["SessionEnd"].([]any)
+		if !ok || len(list) == 0 {
+			t.Fatalf("SessionEnd list = %T", hooksMap["SessionEnd"])
+		}
+		entry, ok := list[0].(map[string]any)
+		if !ok {
+			t.Fatalf("SessionEnd[0] type = %T", list[0])
+		}
 		if _, hasMatcher := entry["matcher"]; hasMatcher {
 			t.Fatalf("expected matcher deleted when rule.Matcher empty: %v", entry)
 		}
-		h0 := entry["hooks"].([]any)[0].(map[string]any)
+		entryHooks, ok := entry["hooks"].([]any)
+		if !ok || len(entryHooks) == 0 {
+			t.Fatalf("entry hooks = %T", entry["hooks"])
+		}
+		h0, ok := entryHooks[0].(map[string]any)
+		if !ok {
+			t.Fatalf("h0 type = %T", entryHooks[0])
+		}
 		if h0["timeout"] != float64(3) {
 			t.Fatalf("timeout = %v, want capped 3", h0["timeout"])
 		}
@@ -405,7 +441,7 @@ func TestJSONHooksSpecModesAndGuards(t *testing.T) {
 			ForeignNote:       "not owned",
 			RemoveWhenEmpty:   true,
 			PruneEmptyParents: 1,
-			AfterRemove: func(path string) error {
+			AfterRemove: func(_ string) error {
 				afterRemoved = true
 				return nil
 			},
@@ -430,8 +466,8 @@ func TestJSONHooksSpecModesAndGuards(t *testing.T) {
 
 		// Owned file with extra user hook keeps user hook on Unwire.
 		ownedPlusUser := `{"version":"v1","hooks":[{"name":"deja-digest","trigger":"SessionStart","action":{"type":"command","command":"/usr/local/bin/deja hook-context --plain"}},{"name":"mine","trigger":"Stop","action":{"type":"command","command":"echo bye"}}]}`
-		if err := os.WriteFile(p, []byte(ownedPlusUser), 0o644); err != nil {
-			t.Fatal(err)
+		if werr := os.WriteFile(p, []byte(ownedPlusUser), 0o644); werr != nil {
+			t.Fatal(werr)
 		}
 		up, err := spec.Unwire()
 		if err != nil || up.Action != harness.ActionUpdated {
@@ -441,11 +477,11 @@ func TestJSONHooksSpecModesAndGuards(t *testing.T) {
 			t.Fatal("AfterRemove called when user hook remained")
 		}
 		// Wire adds deja-digest back alongside user hook, then remove user hook & verify full cleanup.
-		if _, err := spec.Wire(); err != nil {
-			t.Fatal(err)
+		if _, werr := spec.Wire(); werr != nil {
+			t.Fatal(werr)
 		}
-		if err := os.WriteFile(p, []byte(`{"version":"v1","hooks":[{"name":"deja-digest","trigger":"SessionStart","action":{"type":"command","command":"/usr/local/bin/deja hook-context --plain"}}]}`), 0o644); err != nil {
-			t.Fatal(err)
+		if werr := os.WriteFile(p, []byte(`{"version":"v1","hooks":[{"name":"deja-digest","trigger":"SessionStart","action":{"type":"command","command":"/usr/local/bin/deja hook-context --plain"}}]}`), 0o644); werr != nil {
+			t.Fatal(werr)
 		}
 		ur, err := spec.Unwire()
 		if err != nil || ur.Action != harness.ActionRemoved || !afterRemoved {
@@ -478,7 +514,7 @@ func TestMarkedBlockSpecPairedAndLineModes(t *testing.T) {
 				}
 				return ""
 			},
-			BuildBlock: func(oldDoc string) (string, string) {
+			BuildBlock: func(_ string) (string, string) {
 				return start + "\n- id: mcp-deja\n" + end, "disabled note"
 			},
 			IsDisabled: func(patched string) bool {
@@ -521,7 +557,7 @@ func TestMarkedBlockSpecPairedAndLineModes(t *testing.T) {
 			t.Fatalf("Wire([]) = (%+v, %v)", w, err)
 		}
 		wired, _ := os.ReadFile(p)
-		if !strings.Contains(string(wired), arrNote) || strings.Index(string(wired), start) > strings.Index(string(wired), "...") {
+		if !bytes.Contains(wired, []byte(arrNote)) || bytes.Index(wired, []byte(start)) > bytes.Index(wired, []byte("...")) {
 			t.Fatalf("unexpected wired [] doc:\n%s", wired)
 		}
 		u, err := spec.Unwire()
@@ -534,18 +570,18 @@ func TestMarkedBlockSpecPairedAndLineModes(t *testing.T) {
 		}
 
 		// Relocates legacy block after ..., keeps indent and ValidatePatched blocks bad edits.
-		if err := os.WriteFile(p, []byte("  - id: user\n...\n"+start+"\n- id: old\n"+end+"\n"), 0o644); err != nil {
-			t.Fatal(err)
+		if werr := os.WriteFile(p, []byte("  - id: user\n...\n"+start+"\n- id: old\n"+end+"\n"), 0o644); werr != nil {
+			t.Fatal(werr)
 		}
-		if _, err := spec.Wire(); err != nil {
-			t.Fatal(err)
+		if _, werr := spec.Wire(); werr != nil {
+			t.Fatal(werr)
 		}
 		moved, _ := os.ReadFile(p)
-		if !strings.Contains(string(moved), "  - id: mcp-deja") || strings.Index(string(moved), start) > strings.Index(string(moved), "...") {
+		if !bytes.Contains(moved, []byte("  - id: mcp-deja")) || bytes.Index(moved, []byte(start)) > bytes.Index(moved, []byte("...")) {
 			t.Fatalf("expected indented block relocated before ...:\n%s", moved)
 		}
 
-		spec.ValidatePatched = func(path string, old []byte, patched string) error {
+		spec.ValidatePatched = func(_ string, _ []byte, _ string) error {
 			return errors.New("yaml write broke")
 		}
 		if _, err := spec.Wire(); err == nil || !strings.Contains(err.Error(), "yaml write broke") {
@@ -633,7 +669,7 @@ func TestStage3CoverageEdgeBranches(t *testing.T) {
 			DefaultIndent:      "    ",
 			PadAppendedSection: true,
 			RespectDocEnd:      false,
-			Inspect: func(doc string) harness.YAMLProbeInfo {
+			Inspect: func(_ string) harness.YAMLProbeInfo {
 				customInspectCalled = true
 				return harness.YAMLProbeInfo{DejaKeys: []string{"deja"}, Disabled: true, DisabledFor: []string{"enabled"}}
 			},
@@ -676,8 +712,8 @@ func TestStage3CoverageEdgeBranches(t *testing.T) {
 			t.Fatalf("Probe(builtin) = (%+v, %v)", pr, err)
 		}
 		// Unwire removes deja, then second Unwire is unchanged with LeftKeys=nil.
-		if _, err := builtin.Unwire(); err != nil {
-			t.Fatal(err)
+		if _, uerr := builtin.Unwire(); uerr != nil {
+			t.Fatal(uerr)
 		}
 		u2, err := builtin.Unwire()
 		if err != nil || u2.Action != harness.ActionUnchanged {
@@ -704,7 +740,7 @@ func TestStage3CoverageEdgeBranches(t *testing.T) {
 		if w, err := ap.Wire(); err != nil || w.Note != "handled note" {
 			t.Fatalf("Wire EditExisting baseNote = (%+v, %v)", w, err)
 		}
-		ap.EditExisting = func(doc string) (string, bool, bool, string, error) {
+		ap.EditExisting = func(_ string) (string, bool, bool, string, error) {
 			return "", false, false, "", errors.New("edit boom")
 		}
 		if _, err := ap.Wire(); err == nil || !strings.Contains(err.Error(), "edit boom") {
@@ -768,9 +804,18 @@ func TestStage3CoverageEdgeBranches(t *testing.T) {
 			Version:        "v2",
 			OwnedMarker:    `"deja"`,
 			ForeignNote:    "foreign",
-			IsCommandMatch: func(actual, want string) (bool, bool) { return strings.Contains(actual, "deja"), true },
+			IsCommandMatch: func(actual, _ string) (bool, bool) { return strings.Contains(actual, "deja"), true },
 			IsAnyDejaHook: func(entry map[string]any) bool {
-				return strings.Contains(entry["hooks"].([]any)[0].(map[string]any)["command"].(string), "legacy-deja")
+				hs, ok := entry["hooks"].([]any)
+				if !ok || len(hs) == 0 {
+					return false
+				}
+				first, ok := hs[0].(map[string]any)
+				if !ok {
+					return false
+				}
+				cmd, _ := first["command"].(string)
+				return strings.Contains(cmd, "legacy-deja")
 			},
 			Rules: []harness.JSONHookRule{{
 				Name:    "",
@@ -792,12 +837,12 @@ func TestStage3CoverageEdgeBranches(t *testing.T) {
 		if err != nil || !pr.Wired {
 			t.Fatalf("Probe(flat custom) = (%+v, %v)", pr, err)
 		}
-		if _, err := customSpec.Wire(); err != nil {
-			t.Fatal(err)
+		if _, werr := customSpec.Wire(); werr != nil {
+			t.Fatal(werr)
 		}
 		// Unwire when non-deja survives with OwnedMarker triggers no-op (len(removed)==0).
-		if err := os.WriteFile(p, []byte(`{"version":"v2","hooks":[null,{"name":"other","trigger":"Stop","action":{"command":"echo"}}],"note":"deja"}`), 0o644); err != nil {
-			t.Fatal(err)
+		if werr := os.WriteFile(p, []byte(`{"version":"v2","hooks":[null,{"name":"other","trigger":"Stop","action":{"command":"echo"}}],"note":"deja"}`), 0o644); werr != nil {
+			t.Fatal(werr)
 		}
 		ur, err := customSpec.Unwire()
 		if err != nil || ur.Action != harness.ActionUnchanged {
@@ -815,8 +860,8 @@ func TestStage3CoverageEdgeBranches(t *testing.T) {
 				Timeout: 10,
 			}},
 		}
-		if err := os.WriteFile(pMap, []byte(`{"hooks":{"SessionStart":[null,{"hooks":[null,{"type":"http"},{"type":"command","command":"'/usr/local/bin/deja' \"hook-context\" arg\\ 1"}]}]}}`), 0o644); err != nil {
-			t.Fatal(err)
+		if werr := os.WriteFile(pMap, []byte(`{"hooks":{"SessionStart":[null,{"hooks":[null,{"type":"http"},{"type":"command","command":"'/usr/local/bin/deja' \"hook-context\" arg\\ 1"}]}]}}`), 0o644); werr != nil {
+			t.Fatal(werr)
 		}
 		mp, err := mapSpec.Probe()
 		if err != nil || !mp.Wired {
@@ -905,7 +950,7 @@ func TestStage3CoverageEdgeBranches(t *testing.T) {
 			DocEndLine:       func(line string) bool { return strings.TrimSpace(line) == "END" },
 			HasEntry:         func(doc string) bool { return strings.Contains(doc, "keep-me") },
 			IsWired:          func(doc string) bool { return strings.Contains(doc, start) },
-			IsDisabled:       func(doc string) bool { return true },
+			IsDisabled:       func(_ string) bool { return true },
 			BuildBlock:       func(string) (string, string) { return start + "\n- id: d\n" + end, "" },
 		}
 		// Doc starts with YAML headers and [] without END line -> restores [] at tail on Unwire when RespectDocEnd has no match.

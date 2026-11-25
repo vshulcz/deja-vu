@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"regexp"
 	"slices"
 	"strconv"
@@ -150,7 +151,7 @@ func NeutralizeHostTemplates(s string) string {
 	}
 	var b strings.Builder
 	b.Grow(len(s) + 8)
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c := s[i]
 		if c == '{' && i+1 < len(s) && s[i+1] == '{' {
 			b.WriteString("{ ")
@@ -199,15 +200,13 @@ func BoundPrecompactMessages(messages []any, maxBytes, maxContentRunes, maxMessa
 	}
 	kept := make([]any, 0, min(len(messages), maxMessages))
 	size := 0
-	for i := len(messages) - 1; i >= 0; i-- {
-		m, ok := messages[i].(map[string]any)
+	for _, msgAny := range slices.Backward(messages) {
+		m, ok := msgAny.(map[string]any)
 		if !ok || m == nil {
 			continue
 		}
 		cp := make(map[string]any, len(m))
-		for k, v := range m {
-			cp[k] = v
-		}
+		maps.Copy(cp, m)
 		if content, ok := cp["content"].(string); ok && utf8.RuneCountInString(content) > maxContentRunes {
 			cp["content"] = ClampToolWindow(content, maxContentRunes, false)
 		}
@@ -295,8 +294,8 @@ func splitHookReply(stdout string, keepSurrounding bool) (context, notes string)
 		return "", ""
 	}
 	lines := strings.Split(trimmed, "\n")
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(lines[i])
+	for i, rawLine := range slices.Backward(lines) {
+		line := strings.TrimSpace(rawLine)
 		if !strings.HasPrefix(line, "{") {
 			continue
 		}
@@ -432,7 +431,7 @@ func FormatHermesIndicatorLabel(notes []string) string {
 			if trimmed == "" {
 				continue
 			}
-			if loc := hermesBrandRE.FindStringIndex(trimmed); loc != nil && loc[0] == 0 {
+			if loc := hermesBrandRE.FindStringIndex(trimmed); len(loc) >= 2 && loc[0] == 0 {
 				trimmed = trimmed[loc[1]:]
 			}
 			trimmed = strings.ReplaceAll(trimmed, "via: ", "via ")

@@ -223,7 +223,7 @@ func TestHookExtLiveMultiRuntimeRoundTrip(t *testing.T) {
 		exeName = "deja.exe"
 	}
 	exe := filepath.Join(t.TempDir(), exeName)
-	buildCmd := exec.Command("go", "build", "-o", exe, ".")
+	buildCmd := exec.CommandContext(t.Context(), "go", "build", "-o", exe, ".")
 	if out, err := buildCmd.CombinedOutput(); err != nil {
 		t.Fatalf("go build deja: %v\n%s", err, out)
 	}
@@ -242,7 +242,7 @@ func TestHookExtLiveMultiRuntimeRoundTrip(t *testing.T) {
 		if lerr != nil {
 			t.Skip("node not installed; skipping JS live runtime check")
 		}
-		cmd := exec.Command(nodeBin, "--input-type=module", "-e", script)
+		cmd := exec.CommandContext(t.Context(), nodeBin, "--input-type=module", "-e", script)
 		cmd.Dir = repo
 		env := make([]string, 0, len(os.Environ())+len(extraEnv))
 		for _, kv := range os.Environ() {
@@ -533,7 +533,7 @@ assert.equal(promptOut, "");
 			if err != nil {
 				continue
 			}
-			if exec.Command(p, "-c", "import sys; raise SystemExit(0 if sys.version_info[0] >= 3 else 1)").Run() == nil {
+			if exec.CommandContext(t.Context(), p, "-c", "import sys; raise SystemExit(0 if sys.version_info[0] >= 3 else 1)").Run() == nil {
 				pyBin = p
 				break
 			}
@@ -542,7 +542,7 @@ assert.equal(promptOut, "");
 			t.Skip("working python 3 not installed; skipping Hermes live runtime check")
 		}
 		scriptPath := filepath.Join(repoRoot, "scripts", "test-hermes-extension.py")
-		cmd := exec.Command(pyBin, scriptPath)
+		cmd := exec.CommandContext(t.Context(), pyBin, scriptPath)
 		cmd.Dir = repoRoot
 		cmd.Env = append([]string{}, os.Environ()...)
 		cmd.Env = append(cmd.Env, "DEJA_BIN="+exe)

@@ -449,22 +449,3 @@ func runJSONHooksSpec(spec *harness.JSONHooksSpec, uninstall bool) (installResul
 	}
 	return installResult{Path: spec.Path, Action: wres.Action, Note: wres.Note}, nil
 }
-
-func runMarkedBlockSpec(spec *harness.MarkedBlockSpec, uninstall bool) (installResult, error) {
-	if spec.Ops == nil {
-		ops, _, _ := newCmdHarnessOps(false)
-		spec.Ops = ops
-	}
-	if uninstall {
-		ures, err := spec.Unwire()
-		if err != nil {
-			return installResult{}, err
-		}
-		return installResult{Path: spec.Path, Action: ures.Action, Note: ures.Note}, nil
-	}
-	wres, err := spec.Wire()
-	if err != nil {
-		return installResult{}, err
-	}
-	return installResult{Path: spec.Path, Action: wres.Action, Note: wres.Note}, nil
-}
