@@ -386,16 +386,6 @@ func holdsForeignTOMLDejaEntry(s string) bool {
 	return false
 }
 
-// tomlBlockHasKey reports whether the table sets key itself.
-func tomlBlockHasKey(lines []string, b tomlMCPBlock, key string) bool {
-	for i := b.start + 1; i < b.end; i++ {
-		if k, _, ok := tomlLineKeyValue(lines[i]); ok && k == key {
-			return true
-		}
-	}
-	return false
-}
-
 // tomlBlockIsForeign is foreignEntry for one table: a url and no command, or a
 // command that never runs `mcp`.
 func tomlBlockIsForeign(lines []string, b tomlMCPBlock) bool {

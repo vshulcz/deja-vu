@@ -990,15 +990,6 @@ func doctorOpenClawWired(path string) bool {
 	return doctorJSONWiredIn(doctorMCPServersBlock)(path)
 }
 
-// doctorJSONBlock picks the server map out of a config that keeps it under one
-// top-level key.
-func doctorJSONBlock(key string) func(map[string]any) map[string]any {
-	return func(root map[string]any) map[string]any {
-		m, _ := root[key].(map[string]any)
-		return m
-	}
-}
-
 // doctorMCPServersBlock picks the nested `mcp.servers` map used by OpenClaw
 // and ZCode.
 func doctorMCPServersBlock(root map[string]any) map[string]any {
@@ -1041,7 +1032,7 @@ func doctorMuseServers(root map[string]any) map[string]any {
 }
 
 func doctorJSONWired(key string) func(string) bool {
-	return doctorJSONWiredIn(doctorJSONBlock(key))
+	return func(path string) bool { return probeDoctorJSONWired(path, key) }
 }
 
 func doctorJSONWiredIn(pick func(map[string]any) map[string]any) func(string) bool {
@@ -1078,7 +1069,7 @@ func doctorJSONWiredIn(pick func(map[string]any) map[string]any) func(string) bo
 // will not parse — the substring fallback above can say "wired", but it
 // cannot count.
 func doctorJSONDejaKeys(key string) func(string) []string {
-	return doctorJSONDejaKeysIn(doctorJSONBlock(key))
+	return func(path string) []string { return probeDoctorJSONKeys(path, key) }
 }
 
 func doctorJSONDejaKeysIn(pick func(map[string]any) map[string]any) func(string) []string {
@@ -1136,7 +1127,7 @@ func commandIsDeja(cmd string) bool {
 }
 
 func doctorTOMLWired(path string) bool {
-	return len(doctorTOMLDejaKeys(path)) > 0
+	return probeDoctorTOMLWired(path)
 }
 
 // doctorTOMLDejaKeys is the TOML side of the same count: every
@@ -1148,44 +1139,5 @@ func doctorTOMLWired(path string) bool {
 // say — is not MCP wiring; and args count as well as command, since Windows
 // wiring runs deja behind a `cmd /c` shim.
 func doctorTOMLDejaKeys(path string) []string {
-	b, err := readConfig(path)
-	if err != nil {
-		return nil
-	}
-	found := map[string]bool{}
-	current := ""
-	for _, line := range tomlCodeLines(string(b)) {
-		if key, ok := tomlMCPHeader(line); ok {
-			current = key
-			if key == "deja" {
-				found[key] = true
-			}
-			continue
-		}
-		if strings.HasPrefix(strings.TrimSpace(line), "[") {
-			current = ""
-			continue
-		}
-		if current == "" || found[current] {
-			continue
-		}
-		key, value, ok := tomlLineKeyValue(line)
-		if !ok || (key != "command" && key != "args") {
-			continue
-		}
-		if slices.ContainsFunc(tomlStringValues(value), commandIsDeja) {
-			found[current] = true
-		}
-	}
-	var out []string
-	if found["deja"] {
-		out = append(out, "deja")
-		delete(found, "deja")
-	}
-	rest := make([]string, 0, len(found))
-	for key := range found {
-		rest = append(rest, key)
-	}
-	sort.Strings(rest)
-	return append(out, rest...)
+	return probeDoctorTOMLKeys(path)
 }
