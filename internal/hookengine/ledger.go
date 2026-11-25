@@ -416,7 +416,7 @@ func (tx *SeenTx) rewriteOmitting(sids, appendLines []string) {
 	if tx == nil || tx.ledger == nil || tx.ledger.path == "" {
 		return
 	}
-	keys := make(map[string]bool, len(sids)*3)
+	keys := make(map[string]bool)
 	for _, sid := range sids {
 		if sid == "" {
 			continue
@@ -490,10 +490,7 @@ func RotateFile(path, sid string) {
 	if len(packets) > CompactionMarksKept {
 		packets = packets[len(packets)-CompactionMarksKept:]
 	}
-	outLines := make([]string, 0, len(packets)+len(mine)+len(keep))
-	outLines = append(outLines, packets...)
-	outLines = append(outLines, mine...)
-	outLines = append(outLines, keep...)
+	outLines := slices.Concat(packets, mine, keep)
 	_ = atomicfile.Write(path, []byte(strings.Join(outLines, "\n")+"\n"), 0o600)
 }
 
