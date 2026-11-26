@@ -159,6 +159,10 @@ func applyOpenClawSpawns(ss []model.Session, parents map[string]string) {
 // that spawned it. The entry's spawnedBySessionId is exact; without it the
 // requester key resolves to the window it had when the child was created.
 func openclawDBSpawns(db string) map[string]string {
+	return openclawDBSpawnsWhere(db, "")
+}
+
+func openclawDBSpawnsWhere(db, extraWhere string) map[string]string {
 	cols, err := sqliteOutput(db, `select m.name || '.' || p.name from sqlite_master m, pragma_table_info(m.name) p `+
 		`where m.type='table' and m.name in ('session_windows','session_nodes') `+
 		`and p.name in ('parent_session_key','spawned_by','current_session_id','entry_json')`)
@@ -183,7 +187,7 @@ func openclawDBSpawns(db string) map[string]string {
 	q := `select json_object('id', w.session_id, 'parent', coalesce(` + byID + `, ` +
 		`(select p.session_id from session_windows p where p.session_key = ` + key +
 		` and p.created_at <= w.created_at order by p.created_at desc limit 1))) ` +
-		`from ` + from + ` where ` + key + ` is not null`
+		`from ` + from + ` where ` + key + ` is not null` + extraWhere
 	raw, err := sqliteOutput(db, q)
 	if err != nil {
 		return nil

@@ -56,12 +56,13 @@ type FileState struct {
 	// WALSize and WALMTime are a SQLite store's <db>-wal: writes land there
 	// and reach the database file only at a checkpoint, so a store whose
 	// file never changed still has new sessions in it (#5140).
-	WALSize     int64 `json:"wal_size,omitempty"`
-	WALMTime    int64 `json:"wal_mtime,omitempty"`
-	SHMSize     int64 `json:"shm_size,omitempty"`
-	SHMMTime    int64 `json:"shm_mtime,omitempty"`
-	LastUpdated int64 `json:"last_updated,omitempty"`
-	Redactions  int   `json:"redactions,omitempty"`
+	WALSize     int64  `json:"wal_size,omitempty"`
+	WALMTime    int64  `json:"wal_mtime,omitempty"`
+	SHMSize     int64  `json:"shm_size,omitempty"`
+	SHMMTime    int64  `json:"shm_mtime,omitempty"`
+	LastUpdated int64  `json:"last_updated,omitempty"`
+	DBCursor    string `json:"db_cursor,omitempty"`
+	Redactions  int    `json:"redactions,omitempty"`
 	// Kept marks a transcript its agent deleted and the index kept on
 	// purpose. Without it the listing came up one short on every run, the
 	// index never read as fresh, and every search served stale while a

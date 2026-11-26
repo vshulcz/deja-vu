@@ -59,6 +59,11 @@ func ParseZCodeDBSince(db string, t time.Time) ([]model.Session, error) {
 	return parseOpencodeSchemaDBSince("zcode", db, t)
 }
 
+// ParseZCodeDBDelta reads ZCode sessions touched after (t, cursor) and returns the next cursor token.
+func ParseZCodeDBDelta(db string, t time.Time, cursor string) ([]model.Session, string, error) {
+	return parseOpencodeSchemaDBDelta("zcode", db, t, cursor)
+}
+
 // ZCodeSessionFiles lists the transcripts, the legacy snapshots (#4432), and
 // the database when it holds anything — the same pair Kilo has, and one more.
 func ZCodeSessionFiles() []string {

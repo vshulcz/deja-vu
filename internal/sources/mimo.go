@@ -86,6 +86,11 @@ func ParseMimoDBSince(db string, t time.Time) ([]model.Session, error) {
 	return parseOpencodeSchemaDBSince("mimo", db, t)
 }
 
+// ParseMimoDBDelta reads MiMo-Code sessions touched after (t, cursor) and returns the next cursor token.
+func ParseMimoDBDelta(db string, t time.Time, cursor string) ([]model.Session, string, error) {
+	return parseOpencodeSchemaDBDelta("mimo", db, t, cursor)
+}
+
 // MimoSessionFiles lists the MiMo-Code database when it exists and is non-empty.
 func MimoSessionFiles() []string {
 	if fi, err := os.Stat(MimoDB()); err == nil && fi.Size() > 0 {

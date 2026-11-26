@@ -153,14 +153,13 @@ func parseOpencodeSet(harness, db, where1, set string) ([]model.Session, error) 
 		}
 		return parseOpencodeLayouts(harness, db, where1, where, 0, "")
 	}
-	if len(ids) == 0 && where1 == "" {
+	if len(ids) == 0 && (where1 == "" || where1 == " and 1=0") {
 		return nil, nil
 	}
-	quoted := make([]string, len(ids))
-	for i, id := range ids {
-		quoted[i] = "'" + sqlEscape(id) + "'"
+	if len(ids) == 0 {
+		return parseOpencodeLayouts(harness, db, where1, " and 1=0", 0, "")
 	}
-	only := "in (" + strings.Join(quoted, ",") + ")"
+	only := "in (" + sqlInValues(ids) + ")"
 	where := " and s.id " + only
 	if where1 == "" {
 		where1 = where
@@ -171,17 +170,20 @@ func parseOpencodeSet(harness, db, where1, set string) ([]model.Session, error) 
 // opencodeIDs runs set, a query of session ids, and returns them; false when
 // the read fails or there are more than opencodeSetCap.
 func opencodeIDs(db, set string) ([]string, bool) {
-	b, err := sqliteOutput(db, fmt.Sprintf("select id from (%s) limit %d", set, opencodeSetCap+1))
-	if err != nil {
-		return nil, false
+	return sqliteBoundedIDs(db, set, opencodeSetCap)
+}
+
+// opencodeCursorSpecs returns the table cursor specs present in an OpenCode store.
+func opencodeCursorSpecs(db string) []sqliteTableSpec {
+	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
+		return nil
 	}
-	var ids []string
-	for ln := range strings.SplitSeq(strings.TrimSpace(string(b)), "\n") {
-		if ln = strings.TrimSpace(ln); ln != "" {
-			ids = append(ids, ln)
-		}
-	}
-	return ids, len(ids) <= opencodeSetCap
+	return opencodeSchemaOf(db).tables
+}
+
+// CaptureOpencodeDBCursor snapshots rowid anchors for an OpenCode-schema SQLite store.
+func CaptureOpencodeDBCursor(db string) string {
+	return captureSQLiteTableCursor(db, opencodeCursorSpecs(db))
 }
 
 // OpencodeStoreLacks reports whether the store a CLI session of this harness
@@ -238,6 +240,131 @@ func ParseOpencodeDBSince(db string, t time.Time) ([]model.Session, error) {
 	return parseOpencodeSchemaDBSince("opencode", db, t)
 }
 
+// ParseOpencodeDBDelta reads OpenCode sessions touched after (t, cursor) and returns the next cursor token.
+func ParseOpencodeDBDelta(db string, t time.Time, cursor string) ([]model.Session, string, error) {
+	return parseOpencodeSchemaDBDelta("opencode", db, t, cursor)
+}
+
+// parseOpencodeSchemaDBDelta resumes an OpenCode-schema store from (t, cursor)
+// via rowid seeks plus timestamp overlap, falling back to full or since reads
+// when anchors cannot be validated.
+func parseOpencodeSchemaDBDelta(harness, db string, t time.Time, cursor string) ([]model.Session, string, error) {
+	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
+		return nil, "", nil //nolint:nilerr // a missing or empty store holds no sessions
+	}
+	specs := opencodeCursorSpecs(db)
+	if len(specs) == 0 {
+		if t.IsZero() {
+			ss, err := parseOpencodeSchemaDB(harness, db, "", 0)
+			return ss, "", err
+		}
+		ss, err := parseOpencodeSchemaDBSince(harness, db, t)
+		return ss, "", err
+	}
+	prev, nextCursor, canDelta := prepareSQLiteDelta(db, cursor, specs)
+	if !canDelta || t.IsZero() {
+		var ss []model.Session
+		var err error
+		if t.IsZero() {
+			ss, err = parseOpencodeSchemaDB(harness, db, "", 0)
+		} else {
+			ss, err = parseOpencodeSchemaDBSince(harness, db, t)
+		}
+		if err != nil {
+			return nil, "", err
+		}
+		return ss, nextCursor, nil
+	}
+	t = t.Add(-opencodeSinceSlack)
+	schema := opencodeSchemaOf(db)
+	var ss []model.Session
+	var err error
+	switch {
+	case schema.mixed:
+		touched := opencodeV1DeltaTouched(schema, prev, t) + " union " + opencodeV2DeltaTouched(schema, prev, t)
+		set := opencodeDeltaTouchedSet("session", prev.Tables["session"].MaxRowID, t, touched)
+		ss, err = parseOpencodeSet(harness, db, "", set)
+	case schema.v2:
+		where1 := ""
+		if schema.legacy {
+			set1 := opencodeDeltaTouchedSet("session", prev.Tables["session"].MaxRowID, t, opencodeV1DeltaTouched(schema, prev, t))
+			if ids1, ok := sqliteBoundedIDs(db, set1, opencodeSetCap); ok {
+				if len(ids1) > 0 {
+					where1 = " and s.id in (" + sqlInValues(ids1) + ")"
+				} else {
+					where1 = " and 1=0"
+				}
+			} else {
+				where1 = " and s.id in (" + set1 + ")"
+			}
+		}
+		set2 := opencodeDeltaTouchedSet(schema.sessionTable, prev.Tables[schema.sessionTable].MaxRowID, t, opencodeV2DeltaTouched(schema, prev, t))
+		ss, err = parseOpencodeSet(harness, db, where1, set2)
+	default:
+		set1 := opencodeDeltaTouchedSet("session", prev.Tables["session"].MaxRowID, t, opencodeV1DeltaTouched(schema, prev, t))
+		ss, err = parseOpencodeSet(harness, db, "", set1)
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	return ss, nextCursor, nil
+}
+
+func opencodeDeltaTouchedSet(table string, prevMax int64, t time.Time, touched string) string {
+	rfc := sqlEscape(t.UTC().Format(time.RFC3339Nano))
+	return fmt.Sprintf(
+		"select id from %s where rowid > %d union select id from %s where %s or time_updated > '%s' union %s",
+		table, prevMax, table, newerThanEpoch("time_updated", t), rfc, touched)
+}
+
+func opencodeV1DeltaTouched(schema opencodeSchema, prev dbCursorState, t time.Time) string {
+	cand := opencodeCandidateSessions("session", t)
+	msgMax := prev.Tables["message"].MaxRowID
+	partMax := prev.Tables["part"].MaxRowID
+	if schema.rowsStamped {
+		return fmt.Sprintf(
+			"select session_id from message where rowid > %d "+
+				"union select session_id from message where session_id in (%s) and (%s or %s) "+
+				"union select session_id from part where rowid > %d "+
+				"union select session_id from part where session_id in (%s) and (%s)",
+			msgMax,
+			cand, newerThanEpoch("time_created", t), newerThanEpoch("time_updated", t),
+			partMax,
+			cand, newerThanEpoch("time_updated", t))
+	}
+	rfc := sqlEscape(t.UTC().Format(time.RFC3339Nano))
+	return fmt.Sprintf(
+		"select session_id from message where rowid > %d "+
+			"union select m.session_id from part p join message m on m.id=p.message_id where p.rowid > %d "+
+			"union select m2.session_id from message m2 join part p2 on p2.message_id=m2.id "+
+			"where m2.session_id in (%s) and (%s or m2.time_created > '%s' or %s or json_extract(p2.data,'$.time.start') > '%s')",
+		msgMax, partMax, cand,
+		newerThanEpoch("m2.time_created", t), rfc,
+		newerThanEpoch("json_extract(p2.data,'$.time.start')", t), rfc)
+}
+
+func opencodeV2DeltaTouched(schema opencodeSchema, prev dbCursorState, t time.Time) string {
+	smMax := prev.Tables["session_message"].MaxRowID
+	cand := opencodeCandidateSessions(schema.sessionTable, t)
+	if schema.turnsStamped {
+		return fmt.Sprintf(
+			"select session_id from session_message where rowid > %d "+
+				"union select session_id from session_message where session_id in (%s) and (%s or %s)",
+			smMax, cand, newerThanEpoch("time_created", t), newerThanEpoch("time_updated", t))
+	}
+	rfc := sqlEscape(t.UTC().Format(time.RFC3339Nano))
+	partAt := "coalesce(json_extract(j.value,'$.time.start'),json_extract(j.value,'$.time.created'))"
+	return fmt.Sprintf(
+		"select session_id from session_message where rowid > %d "+
+			"union select session_id from session_message where session_id in (%s) and ("+
+			"%s or time_created > '%s' or %s or json_extract(data,'$.time.created') > '%s' "+
+			"or (json_type(data,'$.content')='array' and exists (select 1 from json_each(data,'$.content') j where %s or %s > '%s')))",
+		smMax, cand,
+		newerThanEpoch("time_created", t), rfc,
+		newerThanEpoch("json_extract(data,'$.time.created')", t), rfc,
+		newerThanEpoch(partAt, t), partAt, rfc)
+}
+
 // parseOpencodeSchemaDBSince is the since read for every store in this schema.
 // Each layout is bounded by its own columns, and a store holding both reads
 // both.
@@ -260,11 +387,9 @@ func parseOpencodeSchemaDBSince(harness, db string, t time.Time) ([]model.Sessio
 		if opencodeSchemaOf(db).legacy {
 			if ids1, ok := opencodeIDs(db, opencodeTouchedSet("session", t, opencodeV1Touched(db, t))); ok {
 				if len(ids1) > 0 {
-					quoted := make([]string, len(ids1))
-					for i, id := range ids1 {
-						quoted[i] = "'" + sqlEscape(id) + "'"
-					}
-					where1 = " and s.id in (" + strings.Join(quoted, ",") + ")"
+					where1 = " and s.id in (" + sqlInValues(ids1) + ")"
+				} else {
+					where1 = " and 1=0"
 				}
 			} else {
 				where1 = opencodeSinceWhere(db, t)
@@ -272,7 +397,7 @@ func parseOpencodeSchemaDBSince(harness, db string, t time.Time) ([]model.Sessio
 		}
 		return parseOpencodeSet(harness, db, where1, opencodeV2SinceSet(db, t))
 	}
-	return parseOpencodeLayouts(harness, db, opencodeSinceWhere(db, t), opencodeV2SinceWhere(db, t), 0, "")
+	return parseOpencodeSet(harness, db, "", opencodeTouchedSet("session", t, opencodeV1Touched(db, t)))
 }
 
 // opencodeSinceSlack is how far before the watermark a since read starts.
@@ -366,7 +491,7 @@ func parseOpencodeLayouts(harness, db, where1, where2 string, limit int, only2 s
 	schema := opencodeSchemaOf(db)
 	by := map[string]*model.Session{}
 	rows := 0
-	if !schema.v2 || schema.legacy || schema.mixed {
+	if (!schema.v2 || schema.legacy || schema.mixed) && where1 != " and 1=0" {
 		w := where1
 		if schema.legacy {
 			w = opencodeNotMoved + w
@@ -384,7 +509,7 @@ func parseOpencodeLayouts(harness, db, where1, where2 string, limit int, only2 s
 			v1Turns[id] = len(s.Messages)
 		}
 	}
-	if schema.v2 {
+	if schema.v2 && where2 != " and 1=0" {
 		n, err := readOpencodeRows(harness, db, opencodeV2Query(schema.sessionTable, where2, limit, only2), by)
 		if err != nil {
 			return nil, err
@@ -401,26 +526,33 @@ func parseOpencodeLayouts(harness, db, where1, where2 string, limit int, only2 s
 	if rows == 0 {
 		return nil, nil
 	}
-	var out []model.Session
+	out := make([]model.Session, 0, len(by))
 	for _, s := range by {
 		resolveHomeOrEmptyProject(s)
 		out = append(out, *s)
+	}
+	metaWhere := ""
+	if (where1 != "" || where2 != "" || only2 != "" || limit > 0) && len(out) <= opencodeSetCap {
+		ids := make([]string, len(out))
+		for i := range out {
+			ids[i] = out[i].ID
+		}
+		metaWhere = " and id in (" + sqlInValues(ids) + ")"
 	}
 	// A subagent run is its own session with parent_id naming the spawner —
 	// 922 of 1472 on one store; read without it, every child listed as a
 	// person's own session (#3301). Read beside the rows, best effort: a store
 	// from before the column keeps its sessions standalone.
-	if parents := opencodeParents(db); len(parents) > 0 {
-		for i := range out {
-			if p := parents[out[i].ID]; p != "" {
-				out[i].Kind = "subagent"
-				out[i].Parent = p
-				if isHomeOrEmptyProject(out[i].Project) {
-					if ps := by[p]; ps != nil && !isHomeOrEmptyProject(ps.Project) {
-						out[i].Project = ps.Project
-					}
-				}
-			}
+	if parents := opencodeParentsWhere(db, metaWhere); len(parents) > 0 {
+		applyOpencodeSubagents(db, out, by, parents)
+	}
+	// A session without a directory column (for example an orphan subagent or
+	// top-level session with directory='') still needs a non-empty SourcePath so
+	// replacing incremental passes do not drop its records; attribution treats
+	// the database path itself as belonging to this store.
+	for i := range out {
+		if out[i].Path == "" {
+			out[i].Path = db
 		}
 	}
 	// opencode names every session, and for the 922 subagent runs of one real
@@ -428,14 +560,14 @@ func parseOpencodeLayouts(harness, db, where1, where2 string, limit int, only2 s
 	// there is the whole brief (#3315). Read beside the rows, not in the main
 	// projection: a store from before the column would fail the whole query
 	// and take the harness with it.
-	if titles := opencodeTitles(db); len(titles) > 0 {
+	if titles := opencodeTitlesWhere(db, metaWhere); len(titles) > 0 {
 		for i := range out {
 			if t := titles[out[i].ID]; t != "" {
 				out[i].Title = t
 			}
 		}
 	}
-	if models := opencodeSessionModels(db); len(models) > 0 {
+	if models := opencodeSessionModelsWhere(db, metaWhere); len(models) > 0 {
 		for i := range out {
 			if m, ok := models[out[i].ID]; ok && out[i].Model == nil {
 				out[i].SetModel(m.Provider, m.ID)
@@ -629,7 +761,7 @@ func readOpencodeRows(harness, db, q string, by map[string]*model.Session) (int,
 	seenMsg := map[string]bool{}
 	for dec.More() {
 		var r map[string]any
-		if err := dec.Decode(&r); err != nil {
+		if err := sqliteDecodeRow(dec, &r); err != nil {
 			_ = cmd.Wait()
 			return rows, fmt.Errorf("bad sqlite json: %w", err)
 		}
@@ -827,14 +959,63 @@ func kiloNotebookPath(harness, path, dir string) string {
 	return resolveToolPath(path, dir)
 }
 
-// opencodeParents maps a session id to its parent's, for the sessions that
-// have one. The column arrived with subagents; a query that fails is a store
-// without it, and nothing is stamped.
-func opencodeParents(db string) map[string]string {
+// applyOpencodeSubagents tags subagent sessions and inherits parent directory
+// and project metadata, fetching missing parent directories when absent from out.
+func applyOpencodeSubagents(db string, out []model.Session, by map[string]*model.Session, parents map[string]string) {
+	var needParents []string
+	seenNeed := map[string]bool{}
+	for i := range out {
+		p := parents[out[i].ID]
+		if p == "" {
+			continue
+		}
+		out[i].Kind = "subagent"
+		out[i].Parent = p
+		if !isHomeOrEmptyProject(out[i].Project) && out[i].Path != "" {
+			continue
+		}
+		if ps := by[p]; ps != nil {
+			if out[i].Path == "" && ps.Path != "" {
+				out[i].Path = ps.Path
+			}
+			if isHomeOrEmptyProject(out[i].Project) && !isHomeOrEmptyProject(ps.Project) {
+				out[i].Project = ps.Project
+			}
+			continue
+		}
+		if !seenNeed[p] {
+			seenNeed[p] = true
+			needParents = append(needParents, p)
+		}
+	}
+	if len(needParents) == 0 {
+		return
+	}
+	pdirs := opencodeParentDirs(db, needParents)
+	if len(pdirs) == 0 {
+		return
+	}
+	for i := range out {
+		dir := pdirs[out[i].Parent]
+		if out[i].Parent == "" || dir == "" {
+			continue
+		}
+		if out[i].Path == "" {
+			out[i].Path = dir
+		}
+		if isHomeOrEmptyProject(out[i].Project) {
+			if proj := projectName(dir); !isHomeOrEmptyProject(proj) {
+				out[i].Project = proj
+			}
+		}
+	}
+}
+
+func opencodeParentsWhere(db, where string) map[string]string {
 	var m map[string]string
 	for _, table := range opencodeSessionTables(db) {
 		cmd, stopRead := sqliteReadCmd(db, `select json_object('id',id,'parent_id',parent_id) from `+
-			table+` where parent_id is not null and parent_id <> ''`)
+			table+` where parent_id is not null and parent_id <> ''`+where)
 		b, err := cmd.Output()
 		stopRead()
 		if err != nil || len(b) == 0 {
@@ -857,6 +1038,38 @@ func opencodeParents(db string) map[string]string {
 		}
 	}
 	return m
+}
+
+func opencodeParentDirs(db string, ids []string) map[string]string {
+	if len(ids) == 0 {
+		return nil
+	}
+	var out map[string]string
+	inClause := " where id in (" + sqlInValues(ids) + ") and directory is not null and directory <> ''"
+	for _, table := range opencodeSessionTables(db) {
+		cmd, stopRead := sqliteReadCmd(db, `select json_object('id',cast(id as text),'directory',cast(directory as text)) from `+table+inClause)
+		b, err := cmd.Output()
+		stopRead()
+		if err != nil || len(b) == 0 {
+			continue
+		}
+		rows, err := sqliteObjects[struct {
+			ID        string `json:"id"`
+			Directory string `json:"directory"`
+		}](b)
+		if err != nil {
+			continue
+		}
+		if out == nil {
+			out = make(map[string]string, len(rows))
+		}
+		for _, r := range rows {
+			if r.ID != "" && r.Directory != "" {
+				out[r.ID] = r.Directory
+			}
+		}
+	}
+	return out
 }
 
 // OpencodeCounts reports how many sessions and text parts the OpenCode store holds.
@@ -1012,10 +1225,14 @@ func opencodeSynthetic(v any) bool {
 // opencodeTitles maps a session id to the name opencode gave it, for the names
 // worth having. A store without the column stamps nothing.
 func opencodeTitles(db string) map[string]string {
+	return opencodeTitlesWhere(db, "")
+}
+
+func opencodeTitlesWhere(db, where string) map[string]string {
 	var out map[string]string
 	for _, table := range opencodeSessionTables(db) {
 		cmd, stopRead := sqliteReadCmd(db, `select json_object('id',id,'title',title) from `+
-			table+` where title is not null and title <> ''`)
+			table+` where title is not null and title <> ''`+where)
 		b, err := cmd.Output()
 		stopRead()
 		if err != nil || len(b) == 0 {
@@ -1135,13 +1352,11 @@ func patchSpans(patch string) []string {
 // 49 MB of bash output on a 1150-session store.
 func IndexToolOutput() bool { return os.Getenv("DEJA_INDEX_TOOL_OUTPUT") != "0" }
 
-// opencodeSessionModels reads the optional model column from session / session_v2
-// for stores that record the model on the session row itself.
-func opencodeSessionModels(db string) map[string]model.Model {
+func opencodeSessionModelsWhere(db, where string) map[string]model.Model {
 	var out map[string]model.Model
 	for _, table := range opencodeSessionTables(db) {
 		cmd, stopRead := sqliteReadCmd(db, `select json_object('id',id,'model',model) from `+
-			table+` where model is not null and model <> ''`)
+			table+` where model is not null and model <> ''`+where)
 		b, err := cmd.Output()
 		stopRead()
 		if err != nil || len(b) == 0 {

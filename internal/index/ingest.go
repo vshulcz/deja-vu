@@ -293,6 +293,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	}
 	ss = append(ss, sources.FilterSessions(unreadStoresCarry(dir, harness, unread, ss))...)
 	forgetUnreadStores(files)
+	captureDatabaseStoreCursors(files)
 	// Imported sessions are filtered too: excluding a project must also drop
 	// what a peer already pushed, not only what arrives next.
 	ss = append(ss, sources.FilterSessions(imported.sessions)...)
@@ -461,6 +462,9 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	}
 	// Before the swap: whatever is left in tmp ships inside the index.
 	sp.cleanup()
+	if m.PartialOf == 0 {
+		captureDatabaseStoreCursors(m.Files)
+	}
 	setDatabaseStoreWatermarks(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
 	if err := writeManifest(tmp, m); err != nil {
@@ -1130,6 +1134,9 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	}
 	// Before the swap: whatever is left in tmp ships inside the index.
 	sp.cleanup()
+	if m.PartialOf == 0 {
+		captureDatabaseStoreCursors(m.Files)
+	}
 	setDatabaseStoreWatermarks(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
 	if err := writeManifest(tmp, m); err != nil {

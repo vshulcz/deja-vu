@@ -108,6 +108,11 @@ func ParseKiloDBSince(db string, t time.Time) ([]model.Session, error) {
 	return parseOpencodeSchemaDBSince("kilocode", db, t)
 }
 
+// ParseKiloDBDelta reads Kilo sessions touched after (t, cursor) and returns the next cursor token.
+func ParseKiloDBDelta(db string, t time.Time, cursor string) ([]model.Session, string, error) {
+	return parseOpencodeSchemaDBDelta("kilocode", db, t, cursor)
+}
+
 // KiloSessionFiles lists what a Kilo install has on disk: the task transcripts
 // and the database when it holds anything.
 func KiloSessionFiles() []string {

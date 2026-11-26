@@ -116,7 +116,7 @@ func prepareSplit(harness string, old Manifest, appendable, rest map[string]File
 	ready := &splitReads{restFiles: map[string]splitRead{}}
 	before := sources.DiagSave()
 	for p, f := range rest {
-		ss, at, again, err := readSettled(p, f, func() ([]model.Session, error) { return parseChangedFile(harness, p, old.Files[p]) })
+		ss, at, again, err := readSettledDelta(harness, p, f, old.Files[p])
 		ready.restFiles[p] = splitRead{sessions: ss, at: at, again: again, err: err}
 	}
 	if len(ready.restFiles) == 0 {

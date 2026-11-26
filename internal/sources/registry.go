@@ -38,6 +38,13 @@ type FileKind struct {
 	// ParseFrom resumes an incremental parse: offset for append-only text logs,
 	// sinceNano for db-backed kinds. nil means the kind is not incremental.
 	ParseFrom func(path string, offset, sinceNano int64) ([]model.Session, error)
+	// ParseDBDelta resumes an incremental parse of a db-backed kind using its
+	// time watermark and persisted cursor, returning updated sessions and the
+	// next cursor token to persist on success.
+	ParseDBDelta func(path string, sinceNano int64, cursor string) ([]model.Session, string, error)
+	// CaptureDBCursor snapshots a db-backed store's cursor after a full build so
+	// the next incremental pass starts from a rowid anchor rather than rescanning.
+	CaptureDBCursor func(path string) string
 	// Resumes reports whether the bytes from offset can be read on their own
 	// and added to what is stored. nil means always. A kind whose new lines can
 	// rewrite a record already stored says no, and the file is read whole.
@@ -90,6 +97,17 @@ func dbParse(full func(string) ([]model.Session, error), since func(string, time
 func dbParseFrom(full func(string) ([]model.Session, error), since func(string, time.Time) ([]model.Session, error)) func(string, int64, int64) ([]model.Session, error) {
 	parse := dbParse(full, since)
 	return func(p string, _ int64, nano int64) ([]model.Session, error) { return parse(p, nano) }
+}
+
+func dbParseDelta(delta func(string, time.Time, string) ([]model.Session, string, error)) func(string, int64, string) ([]model.Session, string, error) {
+	return func(p string, nano int64, cursor string) ([]model.Session, string, error) {
+		var since time.Time
+		if nano > 0 {
+			since = sinceTime(nano)
+		}
+		ss, next, err := delta(p, since, cursor)
+		return dbRead(p, ss, err), next, err
+	}
 }
 
 // resumesUnlessAnswering is the Resumes of a format that files a tool call and
@@ -297,11 +315,13 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			},
 			Kinds: []FileKind{
 				{
-					Name:      "opencode",
-					dbBacked:  true,
-					Match:     func(p string) bool { return p == OpencodeDB() },
-					Parse:     dbParse(parseOpencodeStore, parseOpencodeStoreSince),
-					ParseFrom: dbParseFrom(parseOpencodeStore, parseOpencodeStoreSince),
+					Name:            "opencode",
+					dbBacked:        true,
+					Match:           func(p string) bool { return p == OpencodeDB() },
+					Parse:           dbParse(parseOpencodeStore, parseOpencodeStoreSince),
+					ParseFrom:       dbParseFrom(parseOpencodeStore, parseOpencodeStoreSince),
+					ParseDBDelta:    dbParseDelta(parseOpencodeStoreDelta),
+					CaptureDBCursor: CaptureOpencodeDBCursor,
 				},
 				{
 					// The per-session diff store beside the database: for most
@@ -361,11 +381,13 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			Files: func() []string { return append(append([]string{}, CursorDBs()...), CursorTranscripts()...) },
 			Kinds: []FileKind{
 				{
-					Name:      "cursor-db",
-					dbBacked:  true,
-					Match:     func(p string) bool { return hasBase(p, "state.vscdb") && strings.HasPrefix(p, CursorUserRoot()) },
-					Parse:     dbParse(ParseCursorDB, ParseCursorDBSince),
-					ParseFrom: dbParseFrom(ParseCursorDB, ParseCursorDBSince),
+					Name:            "cursor-db",
+					dbBacked:        true,
+					Match:           func(p string) bool { return hasBase(p, "state.vscdb") && strings.HasPrefix(p, CursorUserRoot()) },
+					Parse:           dbParse(ParseCursorDB, ParseCursorDBSince),
+					ParseFrom:       dbParseFrom(ParseCursorDB, ParseCursorDBSince),
+					ParseDBDelta:    dbParseDelta(ParseCursorDBDelta),
+					CaptureDBCursor: CaptureCursorDBCursor,
 				},
 				{
 					Name: "cursor",
@@ -438,8 +460,10 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 					return p == filepath.Join(HermesHome(), "state.db") ||
 						(filepath.Base(p) == "state.db" && strings.HasPrefix(p, HermesProfilesRoot()+string(filepath.Separator)))
 				},
-				Parse:     dbParse(ParseHermesDB, ParseHermesDBSince),
-				ParseFrom: dbParseFrom(ParseHermesDB, ParseHermesDBSince),
+				Parse:           dbParse(ParseHermesDB, ParseHermesDBSince),
+				ParseFrom:       dbParseFrom(ParseHermesDB, ParseHermesDBSince),
+				ParseDBDelta:    dbParseDelta(ParseHermesDBDelta),
+				CaptureDBCursor: CaptureHermesDBCursor,
 			}, {
 				// The Postgres store is a DSN, not a file; the index matches its
 				// token and re-reads by timestamp watermark like the other
@@ -474,8 +498,10 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 				Match: func(p string) bool {
 					return slices.Contains(GooseDBs(), p)
 				},
-				Parse:     dbParse(ParseGooseDB, ParseGooseDBSince),
-				ParseFrom: dbParseFrom(ParseGooseDB, ParseGooseDBSince),
+				Parse:           dbParse(ParseGooseDB, ParseGooseDBSince),
+				ParseFrom:       dbParseFrom(ParseGooseDB, ParseGooseDBSince),
+				ParseDBDelta:    dbParseDelta(ParseGooseDBDelta),
+				CaptureDBCursor: CaptureGooseDBCursor,
 			}},
 		},
 		{
@@ -657,11 +683,13 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			}, {
 				// The CLI's database, in OpenCode's schema — the same pair Kilo
 				// has (#3675).
-				Name:      "zcode-db",
-				dbBacked:  true,
-				Match:     func(p string) bool { return p == ZCodeDB() },
-				Parse:     dbParse(ParseZCodeDB, ParseZCodeDBSince),
-				ParseFrom: dbParseFrom(ParseZCodeDB, ParseZCodeDBSince),
+				Name:            "zcode-db",
+				dbBacked:        true,
+				Match:           func(p string) bool { return p == ZCodeDB() },
+				Parse:           dbParse(ParseZCodeDB, ParseZCodeDBSince),
+				ParseFrom:       dbParseFrom(ParseZCodeDB, ParseZCodeDBSince),
+				ParseDBDelta:    dbParseDelta(ParseZCodeDBDelta),
+				CaptureDBCursor: CaptureOpencodeDBCursor,
 			}, {
 				// The snapshots an older ZCode kept, one JSON file a
 				// conversation, read whole (#4432).
@@ -709,11 +737,13 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 				Parse:   fullParse(ParseKiloTask),
 				Sidecar: besideSidecar("history_item.json"),
 			}, {
-				Name:      "kilocode-db",
-				dbBacked:  true,
-				Match:     func(p string) bool { return p == KiloDB() },
-				Parse:     dbParse(ParseKiloDB, ParseKiloDBSince),
-				ParseFrom: dbParseFrom(ParseKiloDB, ParseKiloDBSince),
+				Name:            "kilocode-db",
+				dbBacked:        true,
+				Match:           func(p string) bool { return p == KiloDB() },
+				Parse:           dbParse(ParseKiloDB, ParseKiloDBSince),
+				ParseFrom:       dbParseFrom(ParseKiloDB, ParseKiloDBSince),
+				ParseDBDelta:    dbParseDelta(ParseKiloDBDelta),
+				CaptureDBCursor: CaptureOpencodeDBCursor,
 			}},
 		},
 		{
@@ -806,8 +836,10 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 				Match: func(p string) bool {
 					return hasBase(p, "openclaw-agent.sqlite") && strings.HasPrefix(p, OpenClawRoot()+string(filepath.Separator))
 				},
-				Parse:     dbParse(ParseOpenClawDB, ParseOpenClawDBSince),
-				ParseFrom: dbParseFrom(ParseOpenClawDB, ParseOpenClawDBSince),
+				Parse:           dbParse(ParseOpenClawDB, ParseOpenClawDBSince),
+				ParseFrom:       dbParseFrom(ParseOpenClawDB, ParseOpenClawDBSince),
+				ParseDBDelta:    dbParseDelta(ParseOpenClawDBDelta),
+				CaptureDBCursor: CaptureOpenClawDBCursor,
 			}},
 		},
 		{
@@ -954,11 +986,13 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			// sessions in mimocode.db under OpenCode's schema.
 			Name: "mimo", Load: LoadMimo, Files: MimoSessionFiles,
 			Kinds: []FileKind{{
-				Name:      "mimo",
-				dbBacked:  true,
-				Match:     func(p string) bool { return p == MimoDB() },
-				Parse:     dbParse(ParseMimoDB, ParseMimoDBSince),
-				ParseFrom: dbParseFrom(ParseMimoDB, ParseMimoDBSince),
+				Name:            "mimo",
+				dbBacked:        true,
+				Match:           func(p string) bool { return p == MimoDB() },
+				Parse:           dbParse(ParseMimoDB, ParseMimoDBSince),
+				ParseFrom:       dbParseFrom(ParseMimoDB, ParseMimoDBSince),
+				ParseDBDelta:    dbParseDelta(ParseMimoDBDelta),
+				CaptureDBCursor: CaptureOpencodeDBCursor,
 			}},
 		},
 		{
@@ -973,8 +1007,10 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 					return filepath.Base(p) == "teleagent.db" &&
 						strings.HasPrefix(filepath.Dir(p), TeleAgentUsersDir()+string(filepath.Separator))
 				},
-				Parse:     dbParse(ParseTeleagentDB, ParseTeleagentDBSince),
-				ParseFrom: dbParseFrom(ParseTeleagentDB, ParseTeleagentDBSince),
+				Parse:           dbParse(ParseTeleagentDB, ParseTeleagentDBSince),
+				ParseFrom:       dbParseFrom(ParseTeleagentDB, ParseTeleagentDBSince),
+				ParseDBDelta:    dbParseDelta(ParseTeleagentDBDelta),
+				CaptureDBCursor: CaptureOpencodeDBCursor,
 			}},
 		},
 		{

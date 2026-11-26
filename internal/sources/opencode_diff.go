@@ -255,3 +255,11 @@ func parseOpencodeStoreSince(db string, t time.Time) ([]model.Session, error) {
 	ss, err := ParseOpencodeDBSince(db, t)
 	return withOpencodeDiffsFor(ss), err
 }
+
+func parseOpencodeStoreDelta(db string, t time.Time, cursor string) ([]model.Session, string, error) {
+	ss, next, err := ParseOpencodeDBDelta(db, t, cursor)
+	if err != nil {
+		return nil, "", err
+	}
+	return withOpencodeDiffsFor(ss), next, nil
+}

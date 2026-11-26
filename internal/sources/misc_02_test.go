@@ -3015,28 +3015,41 @@ func TestGooseSinceFilterBoundsWhatItReturns(t *testing.T) {
 	db := seedDB(t, "sessions.db", `
 CREATE TABLE sessions (id TEXT PRIMARY KEY, name TEXT, description TEXT, working_dir TEXT, created_at TEXT, updated_at TEXT, session_type TEXT);
 CREATE TABLE messages (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT, role TEXT, content_json TEXT, created_timestamp INTEGER);
+INSERT INTO sessions VALUES ('s0','old','old','/w','2026-01-01T00:00:00Z','2026-01-01T00:00:10Z','user');
+INSERT INTO messages VALUES (1,'s0','user','[{"type":"text","text":"UNTOUCHED"}]',1767225500);
 INSERT INTO sessions VALUES ('s1','n','desc','/w','2026-01-01T00:00:00Z','2026-01-01T00:00:10Z','user');
-INSERT INTO messages VALUES (1,'s1','user','[{"type":"text","text":"OLDMESSAGE"}]',1767225600);
-INSERT INTO messages VALUES (2,'s1','user','[{"type":"text","text":"NEWMESSAGE"}]',1798761600);
+INSERT INTO messages VALUES (2,'s1','user','[{"type":"text","text":"OLDMESSAGE"}]',1767225600);
+INSERT INTO messages VALUES (3,'s1','user','[{"type":"text","text":"NEWMESSAGE"}]',1798761600);
 `)
 	all, err := ParseGooseDBSince(db, time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(all) != 1 || len(all[0].Messages) != 2 {
-		t.Fatalf("zero time should return everything, got %+v", all)
+	if len(all) != 2 {
+		t.Fatalf("zero time should return all sessions, got %+v", all)
 	}
 	cut := time.Unix(1790000000, 0)
 	since, err := ParseGooseDBSince(db, cut)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, s := range since {
-		for _, m := range s.Messages {
-			if m.Text == "OLDMESSAGE" {
-				t.Fatalf("since filter returned a message from before the cut: %+v", s.Messages)
-			}
+	if len(since) != 1 || len(since[0].Messages) != 2 {
+		t.Fatalf("since filter should omit untouched s0 and return touched s1 whole, got %+v", since)
+	}
+	var sawOld, sawNew bool
+	for _, m := range since[0].Messages {
+		if m.Text == "UNTOUCHED" {
+			t.Fatalf("since filter returned untouched session message: %+v", since[0].Messages)
 		}
+		if m.Text == "OLDMESSAGE" {
+			sawOld = true
+		}
+		if m.Text == "NEWMESSAGE" {
+			sawNew = true
+		}
+	}
+	if !sawOld || !sawNew {
+		t.Fatalf("expected full touched session s1 (old+new), got %+v", since[0].Messages)
 	}
 }
 
