@@ -2069,7 +2069,7 @@ func TestFormatRegistryConformance(t *testing.T) {
 		"DEJA_ZED_ROOT", "DEJA_ZED_DB", "FLATPAK_XDG_DATA_HOME",
 		"DEJA_REASONIX_ROOT", "REASONIX_HOME", "REASONIX_STATE_HOME",
 		"DEJA_MUSE_ROOTS",
-		"DEJA_CODEBUDDY_ROOTS", "CODEBUDDY_CONFIG_DIR", "WORKBUDDY_CONFIG_DIR",
+		"DEJA_CODEBUDDY_ROOTS", "DEJA_CODEBUDDY_LEGACY_ROOTS", "CODEBUDDY_CONFIG_DIR", "WORKBUDDY_CONFIG_DIR",
 		"DEJA_NOTES_FILE",
 		"DEJA_JUNIE_ROOT", "JUNIE_HOME", "DEJA_JETBRAINS_ROOT",
 		"DEJA_WINDSURF_ROOT", "DEJA_MCODE_ROOT",
@@ -2223,7 +2223,13 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 	case "mcode":
 		sessions, err = ParseMcodeFile(path)
 	case "codebuddy":
-		sessions, err = ParseCodeBuddyFile(path)
+		// The CLI's transcripts, and a conversation the IDE before 5.x kept
+		// in its own directory, read from its index.json.
+		if filepath.Base(path) == "index.json" {
+			sessions, err = ParseCodeBuddyIDE4File(path)
+		} else {
+			sessions, err = ParseCodeBuddyFile(path)
+		}
 	case "codearts":
 		sessions, err = ParseCodeArtsFile(path)
 	case "doubao":

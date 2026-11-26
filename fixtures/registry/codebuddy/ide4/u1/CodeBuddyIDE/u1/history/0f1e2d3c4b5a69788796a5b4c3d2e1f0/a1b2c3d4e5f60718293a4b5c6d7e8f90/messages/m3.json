@@ -1,0 +1,7 @@
+{
+  "id": "m3",
+  "role": "tool",
+  "message": "{\"role\":\"tool\",\"content\":[{\"type\":\"tool-result\",\"toolCallId\":\"call_read\",\"toolName\":\"read_file\",\"result\":{\"status\":\"success\",\"success\":true,\"result\":{\"type\":\"read_file_result\",\"path\":\"/workspace/registry-demo/main.go\",\"content\":\"     1://go:build demo\\n     2:package main\\n\"}},\"isError\":false},{\"type\":\"tool-result\",\"toolCallId\":\"call_build\",\"toolName\":\"execute_command\",\"result\":{\"status\":\"error\",\"success\":false,\"result\":{\"type\":\"execute_command_result\",\"stdout\":\"main.go:1:1: build constraints exclude all Go files\",\"stderr\":\"\",\"exitCode\":1},\"errorMessage\":\"build constraints exclude all Go files\"},\"isError\":true}]}",
+  "extra": "{\"requestId\":\"r1\",\"modelId\":\"glm-5.2\",\"modelName\":\"GLM-5.2\",\"isHelperMessage\":false}",
+  "createdAt": "2026-05-01T10:00:06.000Z"
+}

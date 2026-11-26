@@ -1,0 +1,7 @@
+{
+  "id": "m4",
+  "role": "assistant",
+  "message": "{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Drop the demo build tag or build with -tags demo.\"}]}",
+  "extra": "{\"requestId\":\"r1\",\"modelId\":\"glm-5.2\",\"modelName\":\"GLM-5.2\",\"isHelperMessage\":false,\"lastStepInputTokens\":640,\"lastStepOutputTokens\":40}",
+  "createdAt": "2026-05-01T10:00:09.000Z"
+}

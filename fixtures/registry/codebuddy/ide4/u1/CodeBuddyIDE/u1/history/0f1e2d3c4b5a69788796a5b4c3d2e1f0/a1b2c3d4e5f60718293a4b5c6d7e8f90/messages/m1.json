@@ -1,0 +1,7 @@
+{
+  "id": "m1",
+  "role": "user",
+  "message": "{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"<user_info>\\nOS Version: linux\\nShell: bash\\nWorkspace Folder: /workspace/registry-demo\\nNote: Prefer using absolute paths over relative paths as tool call args when possible.\\n</user_info>\\n\\n<additional_data>\\ncurrent_date: Friday, May 1, 2026\\n</additional_data>\\n\\n<user_query>\\nwhy does the registry demo fail to build?\\n</user_query>\"}]}",
+  "extra": "{\"requestId\":\"r1\",\"modelId\":\"glm-5.2\",\"modelName\":\"GLM-5.2\",\"isHelperMessage\":false,\"inputPhrase\":[{\"type\":\"normal\",\"content\":\"why does the registry demo fail to build?\",\"expandContent\":\"why does the registry demo fail to build?\"}],\"command\":\"\"}",
+  "createdAt": "2026-05-01T10:00:00.000Z"
+}

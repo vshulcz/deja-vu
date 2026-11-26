@@ -188,6 +188,13 @@ func (r *doctorStoreRows) filesSkippingIn(name, loc string, roots []string, pres
 		unread += u
 		byRule += b
 	}
+	detail = doctorFileRowDetail(detail, seen, unread, byRule)
+	r.row(name, loc, present, detail)
+}
+
+// doctorFileRowDetail is the note a file-count row adds about sub-agent runs
+// it skipped and files it did not recognise.
+func doctorFileRowDetail(detail string, seen []string, unread, byRule int) string {
 	if byRule > 0 {
 		// The variable named the way it was read as the cause of the
 		// skip — "skipped (DEJA_INCLUDE_SUBAGENTS=1)" — so somebody who
@@ -202,7 +209,37 @@ func (r *doctorStoreRows) filesSkippingIn(name, loc string, roots []string, pres
 	if unread > 0 {
 		detail += fmt.Sprintf(", %d not recognised here", unread)
 	}
-	r.row(name, loc, present, detail)
+	return detail
+}
+
+// codeBuddyRow is the one row for both CodeBuddy stores: the CLI transcripts
+// under CodeBuddyRoots, and the IDE 4.x conversation indexes under their own
+// roots. The 4.x store keeps many .json files beside each index that are its
+// message bodies and bookkeeping; walking them as unplaced transcripts would
+// print thousands of files deja knows it does not read. They are named beside
+// the count instead, like ZCode's legacy snapshots.
+func (r *doctorStoreRows) codeBuddyRow(loc string, cliRoots, legacyRoots, seen, beside []string, legacy int) {
+	placed := append(append([]string{}, seen...), beside...)
+	unread, byRule := 0, 0
+	for _, root := range outermostRoots(cliRoots) {
+		u, b := unplacedFilesIn(root, placed, sources.CodeBuddySubagentFile, false)
+		unread += u
+		byRule += b
+	}
+	// Asked of every file under the 4.x roots, tens of thousands of message
+	// bodies on a large store, so the roots are resolved once here.
+	bookkeeping := func(p string) bool { return sources.CodeBuddyIDE4BookkeepingFile(p, legacyRoots) }
+	for _, root := range outermostRoots(legacyRoots) {
+		u, _ := unplacedFilesIn(root, placed, bookkeeping, false)
+		unread += u
+	}
+	detail := doctorCount(len(seen), "file")
+	if legacy > 0 {
+		detail += ", " + doctorCount(legacy, "IDE 4.x conversation")
+	}
+	detail = doctorFileRowDetail(detail, seen, unread, byRule)
+	// A CLI transcript sits under a CLI root, so a root that holds one exists.
+	r.row("codebuddy", loc, doctorAnyExists(cliRoots) || legacy > 0, detail)
 }
 
 // filesSkipping is its one-root form.

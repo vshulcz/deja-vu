@@ -1771,8 +1771,8 @@ func TestDoctorJSONGolden(t *testing.T) {
 	// VS Code's User folder: ~/Library/Application Support/Code on macOS and
 	// %APPDATA%/Code on Windows both normalise to the posix ~/.config/Code the
 	// golden stores.
-	got = strings.ReplaceAll(got, "<tmp>/home/Library/Application Support/Code", "<tmp>/home/.config/Code")
-	got = strings.ReplaceAll(got, "<tmp>/home/AppData/Roaming/Code", "<tmp>/home/.config/Code")
+	got = strings.ReplaceAll(got, "<tmp>/home/Library/Application Support/Code/", "<tmp>/home/.config/Code/")
+	got = strings.ReplaceAll(got, "<tmp>/home/AppData/Roaming/Code/", "<tmp>/home/.config/Code/")
 	// Cherry Studio's app data, the same three homes.
 	got = strings.ReplaceAll(got, "<tmp>/home/Library/Application Support/CherryStudio", "<tmp>/home/.config/CherryStudio")
 	got = strings.ReplaceAll(got, "<tmp>/home/AppData/Roaming/CherryStudio", "<tmp>/home/.config/CherryStudio")
@@ -1793,6 +1793,15 @@ func TestDoctorJSONGolden(t *testing.T) {
 	// Doubao Desktop's user data directory normalises across macOS and Windows to ~/.config/Doubao.
 	got = strings.ReplaceAll(got, "<tmp>/home/Library/Application Support/Doubao", "<tmp>/home/.config/Doubao")
 	got = strings.ReplaceAll(got, "<tmp>/home/AppData/Local/Doubao/User Data", "<tmp>/home/.config/Doubao")
+	// The 4.x store's platform-specific data directory is normalised to the
+	// Linux spelling the golden keeps. On Windows Roaming is a second root.
+	for _, platform := range []string{
+		"<tmp>/home/Library/Application Support/CodeBuddyExtension/Data",
+		"<tmp>/home/AppData/Local/CodeBuddyExtension/Data",
+		"<tmp>/home/AppData/Roaming/CodeBuddyExtension/Data",
+	} {
+		got = strings.ReplaceAll(got, platform, "<tmp>/home/.local/share/CodeBuddyExtension/Data")
+	}
 	wantRaw, err := os.ReadFile(filepath.Join("testdata", "doctor.json"))
 	if err != nil {
 		t.Fatal(err)

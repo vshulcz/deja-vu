@@ -134,6 +134,18 @@ func attributeSession(held SessionMeta, s model.Session) (owns, collided bool) {
 			return !newIsSnap, false
 		}
 	}
+	// The 5.x CodeBuddy IDE converts a 4.x conversation into a CodeBuddy
+	// Code transcript under the same id. Only the transcript the converter's
+	// marker names for this 4.x index is that conversation's newer copy; an
+	// unrelated CLI session that happens to share the id is an ordinary
+	// clash, and both conversations keep their turns (#4432 is the same
+	// handover for a ZCode snapshot restored into the database).
+	if s.Harness == "codebuddy" {
+		if legacy, jsonl, ok := codeBuddyIDE4ConversionPair(held.Path, s.Path, sources.CodeBuddyIDE4Roots()); ok &&
+			sources.CodeBuddyIDE4ConvertedTranscript(legacy) == jsonl {
+			return s.Path == jsonl, false
+		}
+	}
 	return s.Path < held.Path, true
 }
 
@@ -338,6 +350,25 @@ func dropShadowedPrompts(ss []model.Session, held map[string]SessionMeta) []mode
 // transcripts end in .jsonl.
 func isZCodeSnapshot(path string) bool {
 	return strings.EqualFold(filepath.Ext(path), ".json")
+}
+
+// codeBuddyIDE4ConversionPair names the 4.x index and the CodeBuddy Code
+// transcript of a pair that may be one converted conversation. Either file
+// can arrive first, so the paths are returned in their roles rather than in
+// the order they were read. The 4.x index is told by its path
+// (sources.CodeBuddyIDE4IndexPath): a row an earlier pass held may name a
+// file that is gone.
+func codeBuddyIDE4ConversionPair(a, b string, roots []string) (legacy, jsonl string, ok bool) {
+	aIs4, bIs4 := sources.CodeBuddyIDE4IndexPath(a, roots), sources.CodeBuddyIDE4IndexPath(b, roots)
+	switch {
+	case aIs4 && !bIs4:
+		legacy, jsonl = a, b
+	case bIs4 && !aIs4:
+		legacy, jsonl = b, a
+	default:
+		return "", "", false
+	}
+	return legacy, jsonl, filepath.Ext(jsonl) == ".jsonl"
 }
 
 // isOpencodeDiff reports whether a path is one of opencode's per-session diff

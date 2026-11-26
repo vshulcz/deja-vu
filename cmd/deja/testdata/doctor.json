@@ -144,7 +144,8 @@
       "name": "codebuddy",
       "state": "missing",
       "paths": [
-        "<tmp>/home/.codebuddy/projects"
+        "<tmp>/home/.codebuddy/projects",
+        "<tmp>/home/.local/share/CodeBuddyExtension/Data"
       ],
       "files": 0,
       "indexed_sessions": 0

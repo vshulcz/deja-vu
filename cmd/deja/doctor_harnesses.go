@@ -158,11 +158,18 @@ func doctorHarnessStoresReport(w io.Writer, dir string, all bool, rep *doctorRep
 	// store, and sub-agent turns are flagged inside them.
 	rows.filesBeside("qoder", qoderRoot, doctorExists(qoderRoot), sources.QoderSessionFiles())
 
-	// CodeBuddy's tree is Claude Code's: sub-agents under the session that
+	// CodeBuddy's CLI tree is Claude Code's: sub-agents under the session that
 	// spawned them, a meta file per session and a memory/ directory beside.
+	// The IDE before 5.x kept its own store, one directory per conversation,
+	// read as the same harness; the row counts its conversation indexes and
+	// names its root on a machine that has them. A conversation the store
+	// holds in two workspace directories is read from one, and the other
+	// copy is placed beside it, not reported as a file deja could not read.
 	cbRoots := sources.CodeBuddyRoots()
-	rows.filesSkippingIn("codebuddy", strings.Join(cbRoots, string(os.PathListSeparator)), cbRoots, doctorAnyExists(cbRoots),
-		sources.CodeBuddySessionFiles(), sources.CodeBuddySubagentFile, sources.CodeBuddySidecarFiles()...)
+	cbLegacyFiles, cbLegacyCopies := sources.CodeBuddyIDE4SessionFilesAndCopies()
+	cbFiles := append(sources.CodeBuddySessionFiles(), cbLegacyFiles...)
+	rows.codeBuddyRow(codeBuddyDoctorLocation(cbRoots, cbLegacyFiles), cbRoots, sources.CodeBuddyIDE4Roots(), cbFiles,
+		append(sources.CodeBuddySidecarFiles(), cbLegacyCopies...), len(cbLegacyFiles))
 
 	kimiRoot := filepath.Join(sources.KimiRoot(), "sessions")
 	rows.filesSkippingIn("kimi", kimiRoot, []string{kimiRoot}, doctorExists(kimiRoot),

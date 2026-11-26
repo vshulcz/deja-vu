@@ -335,6 +335,38 @@ var subagentNotReopened = map[string]bool{
 	"kimi": true, "qwen": true, "gigacode": true, "muse": true, "codebuddy": true, "devin": true, "gemini": true, "cursor": true,
 }
 
+// resumeCodeBuddySession reopens a CodeBuddy Code session. `codebuddy -r <id>`
+// looks the id up under the folder of the directory it runs in and answers
+// "No conversation found" from any other, like qwen (#4707).
+func resumeCodeBuddySession(s model.Session) (string, string, error) {
+	short := digest.Short(s.ID)
+	// The IDE before 5.x kept its history in its own store, which the CLI's
+	// -r cannot open. Opening a conversation in IDE 5.x converts it into a
+	// transcript under the same id; an index row that still names the 4.x
+	// index.json resumes from that transcript.
+	if sources.IsCodeBuddyIDE4Session(s.Path) {
+		converted := sources.CodeBuddyIDE4ConvertedTranscript(s.Path)
+		if converted == "" {
+			return "", "", fmt.Errorf("codebuddy session %s is a CodeBuddy IDE 4.x conversation, which `codebuddy -r` cannot open — opening it in CodeBuddy IDE 5.x converts it to a transcript deja reads, after which `deja resume` works — `deja show %s` has the conversation", short, short)
+		}
+		s.Path = converted
+	}
+	if sources.IsWorkBuddyTranscript(s.Path) {
+		return "", "", fmt.Errorf("session %s is WorkBuddy's, and deja knows no command that reopens one — `deja show %s` has the conversation", short, short)
+	}
+	dir := sources.CodeBuddySessionDir(s.Path)
+	if dir == "" {
+		return "", "", fmt.Errorf("codebuddy session %s records no directory, and `codebuddy -r` finds a session only from the one it ran in — `deja show %s` has the conversation", short, short)
+	}
+	if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+		return "", "", fmt.Errorf("codebuddy session %s ran in %s, which is gone, and `codebuddy -r` finds a session only from there — `deja show %s` has the conversation", short, dir, short)
+	}
+	// -c too: CodeBuddy gives SessionStart context to the model on a resume
+	// only with `continue` set, and the -r id still picks the session.
+	// Without it the recall was logged and never arrived (#4718).
+	return dir, "codebuddy -c -r " + s.ID, nil
+}
+
 func resumeQwenFamilySession(s model.Session, bin string, sessionDir func(string) (string, bool)) (string, string, error) {
 	// qwen/gigacode key sessions by the directory they ran in: run anywhere
 	// else, `<bin> -r <id>` answers "No saved session found".
@@ -712,24 +744,7 @@ func resumeHarnessCommand(s model.Session) (string, string, error) {
 		}
 		return "", "reasonix --resume " + s.Path, nil
 	case "codebuddy":
-		// `codebuddy -r <id>` looks the id up under the folder of the
-		// directory it runs in and answers "No conversation found" from any
-		// other, like qwen (#4707).
-		short := digest.Short(s.ID)
-		if sources.IsWorkBuddyTranscript(s.Path) {
-			return "", "", fmt.Errorf("session %s is WorkBuddy's, and deja knows no command that reopens one — `deja show %s` has the conversation", short, short)
-		}
-		dir := sources.CodeBuddySessionDir(s.Path)
-		if dir == "" {
-			return "", "", fmt.Errorf("codebuddy session %s records no directory, and `codebuddy -r` finds a session only from the one it ran in — `deja show %s` has the conversation", short, short)
-		}
-		if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
-			return "", "", fmt.Errorf("codebuddy session %s ran in %s, which is gone, and `codebuddy -r` finds a session only from there — `deja show %s` has the conversation", short, dir, short)
-		}
-		// -c too: CodeBuddy gives SessionStart context to the model on a
-		// resume only with `continue` set, and the -r id still picks the
-		// session. Without it the recall was logged and never arrived (#4718).
-		return dir, "codebuddy -c -r " + s.ID, nil
+		return resumeCodeBuddySession(s)
 	case "qwen":
 		return resumeQwenFamilySession(s, "qwen", sources.QwenSessionDir)
 	case "gigacode":
