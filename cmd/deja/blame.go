@@ -126,7 +126,16 @@ func runBlame(dir string, args []string) error {
 	if herr := checkHarness(&o.Harness); herr != nil {
 		return herr
 	}
-	target, err := search.ResolveBlamePath(path)
+	projDir := howCwd()
+	if strings.TrimSpace(o.Project) != "" {
+		if ps, psErr := resolveQueryScope(QueryScopeInput{CWD: projDir, Project: o.Project, Activation: policy.ActivationSearch}); psErr == nil {
+			o.Projects = ps.Projects
+			if ps.ProjectDir != "" {
+				projDir = ps.ProjectDir
+			}
+		}
+	}
+	target, err := search.ResolveBlamePathIn(projDir, path)
 	if err != nil {
 		return err
 	}
@@ -152,7 +161,7 @@ func runBlame(dir string, args []string) error {
 	// A path names a file in this checkout. Other repos have their own
 	// internal/pool/pool.go, and their sessions are about that file, not this
 	// one; they were listed in among this project's.
-	scope := blameScope(howCwd(), target, o.Project, mode.AllProjects)
+	scope := blameScope(projDir, target, o.Project, mode.AllProjects)
 	wantAll := o.All
 	if len(scope) > 0 {
 		o.All = true
@@ -282,7 +291,7 @@ func findBlameHitsStale(dir string, target search.BlameTarget, o search.BlameOpt
 }
 
 func blameHits(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer, stale bool) ([]search.BlameHit, int, int, bool, error) {
-	query := search.Options{Query: target.Stem, Harness: o.Harness, Project: o.Project, Since: o.Since, All: true}
+	query := search.Options{Query: target.Stem, Harness: o.Harness, Project: o.Project, Projects: o.Projects, Since: o.Since, All: true}
 	refreshing := false
 	if stale {
 		var err error

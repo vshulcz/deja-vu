@@ -110,14 +110,24 @@ func runRecall(dir string, args []string, stdout io.Writer) error {
 		_, err := fmt.Fprintln(stdout, frameRecall(line))
 		return err
 	}
-	brief := liveRecallBriefScoped(dir, howCwd(), project, offset, q)
+	brief, blameHead := recallHeaderBlocks(dir, harness, project, offset, q)
 	budget := recallMCPBudget - recallFrameOverhead
 	if brief != "" {
 		budget -= len(brief) + 2
 	}
+	if blameHead != "" {
+		budget -= len(blameHead) + 2
+	}
 	text, sessions, raw, ids, projects, err := recallTextResultIn(dir, q, harness, project, limit, offset, budget)
 	if err != nil {
 		return err
+	}
+	if blameHead != "" {
+		if strings.TrimSpace(text) != "" {
+			text = blameHead + "\n\n" + text
+		} else {
+			text = blameHead
+		}
 	}
 	if brief != "" {
 		text = brief + "\n\n" + text

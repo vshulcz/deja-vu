@@ -527,27 +527,7 @@ func workspaceFromConversation(transcriptPath, conversationID string) string {
 }
 
 func stripAntigravityToolHeader(body string) string {
-	lines := strings.Split(body, "\n")
-	i := 0
-	for i < len(lines) {
-		trimmed := strings.TrimSpace(lines[i])
-		if trimmed == "" || strings.HasPrefix(trimmed, "Created At:") || strings.HasPrefix(trimmed, "Completed At:") {
-			i++
-			continue
-		}
-		if strings.HasPrefix(trimmed, "[") {
-			if closeIdx := strings.Index(trimmed, "]"); closeIdx > 0 && strings.Contains(trimmed[:closeIdx], "| exit=") {
-				rest := strings.TrimSpace(trimmed[closeIdx+1:])
-				if rest == "" {
-					i++
-					continue
-				}
-				lines[i] = rest
-			}
-		}
-		break
-	}
-	return strings.TrimSpace(strings.Join(lines[i:], "\n"))
+	return strings.TrimSpace(sources.UnwrapMCPCommandHeader(body))
 }
 
 func latestToolFailureFromSteps(steps []transcriptStep) string {

@@ -206,6 +206,34 @@ func collectRepoCandidates(dir, root string, since time.Duration, limit int) ([]
 	if err := sessionRepoCandidates(dir, root, inScope, allowed, add); err != nil {
 		return nil, err
 	}
+	haveCand := make(map[string]bool, len(out)*2)
+	for _, existing := range out {
+		if existing.ID != "" {
+			haveCand[existing.ID] = true
+		}
+		if tkey := sources.RepoEntryID("", existing.Text); tkey != "" {
+			haveCand[tkey] = true
+		}
+	}
+	for _, rc := range readRememberCandidates(dir) {
+		if !inScope(rc.Project) || !allowed("", rc.Project) {
+			continue
+		}
+		if haveCand[rc.ID] || haveCand[sources.RepoEntryID("", rc.Text)] {
+			continue
+		}
+		add(repoCandidate{
+			Kind:     rc.Kind,
+			Text:     rc.Text,
+			Files:    rc.Files,
+			Sessions: rc.Sessions,
+			From:     rc.From,
+			Source:   rc.Source,
+			Session:  rc.Session,
+			tier:     1,
+			at:       rc.At,
+		})
+	}
 	for _, pair := range orientCoChangePairs(dir, names, root, orientFiles(dir, names, root), policy.ActivationAuto) {
 		parts := strings.SplitN(pair, " (", 2)
 		if len(parts) != 2 {

@@ -522,6 +522,44 @@ func qwenText(v any) string {
 	return b.String()
 }
 
+// UnwrapMCPCommandHeader strips leading harness/MCP wrapper lines (pre-tool
+// argument notices, timestamps, and `[runner | exit=N]` brackets) from s so
+// failure signature matching sees the first line of the command's own output.
+func UnwrapMCPCommandHeader(s string) string {
+	lines := strings.Split(s, "\n")
+	i := 0
+	stripped := false
+	for i < len(lines) {
+		trimmed := strings.TrimSpace(lines[i])
+		if trimmed == "" ||
+			strings.HasPrefix(trimmed, "A pre-tool hook changed ") ||
+			strings.HasPrefix(trimmed, "Created At:") ||
+			strings.HasPrefix(trimmed, "Completed At:") {
+			if trimmed != "" {
+				stripped = true
+			}
+			i++
+			continue
+		}
+		if strings.HasPrefix(trimmed, "[") {
+			if closeIdx := strings.Index(trimmed, "]"); closeIdx > 0 && strings.Contains(trimmed[:closeIdx], "| exit=") {
+				stripped = true
+				rest := strings.TrimSpace(trimmed[closeIdx+1:])
+				if rest == "" {
+					i++
+					continue
+				}
+				lines[i] = rest
+			}
+		}
+		break
+	}
+	if !stripped {
+		return s
+	}
+	return strings.TrimSpace(strings.Join(lines[i:], "\n"))
+}
+
 // UnwrapShellReport strips the frame gemini and qwen put around a command's
 // output before handing it to the model. Gemini fences it in
 // <untrusted_context> with an "Output:" marker; qwen writes a labelled report —
@@ -532,6 +570,7 @@ func qwenText(v any) string {
 // index and the failure hook both read it through here, so the error a pair is
 // stored under is the one the hook looks up (#4256).
 func UnwrapShellReport(s string) string {
+	s = UnwrapMCPCommandHeader(s)
 	if !strings.Contains(s, "Output:") {
 		return s
 	}

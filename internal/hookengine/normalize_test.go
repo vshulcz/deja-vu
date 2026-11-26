@@ -353,3 +353,72 @@ func TestHelpersProjectPathMapStringAndToolPredicates(t *testing.T) {
 		t.Fatalf("IsCommandTool(mcp_fs_exec) = false, want true")
 	}
 }
+
+func TestExternalMCPAndProjectPathAndToolInputCWD(t *testing.T) {
+	for _, tool := range []string{"mcp_fs_replace", "mcp__srv__edit_file"} {
+		if !IsExternalMCPSearchReplaceTool(tool) {
+			t.Fatalf("IsExternalMCPSearchReplaceTool(%q) = false, want true", tool)
+		}
+	}
+	for _, tool := range []string{"mcp_fs_patch", "mcp__deja__recall", "Edit"} {
+		if IsExternalMCPSearchReplaceTool(tool) {
+			t.Fatalf("IsExternalMCPSearchReplaceTool(%q) = true, want false", tool)
+		}
+	}
+	if !IsExternalMCPCommandTool("mcp_runner_run") || !IsExternalMCPCommandTool("mcp__box__bash") {
+		t.Fatalf("IsExternalMCPCommandTool missed _run/_bash suffixes")
+	}
+	if !IsExternalMCPEditTool("mcp_fs_patch") || !IsExternalMCPEditTool("mcp_fs_replace") {
+		t.Fatalf("IsExternalMCPEditTool missed _patch/_replace suffixes")
+	}
+	if !IsExternalMCPReadTool("mcp_fs_open") || !IsExternalMCPReadTool("mcp_fs_cat") {
+		t.Fatalf("IsExternalMCPReadTool missed _open/_cat suffixes")
+	}
+
+	tmp := t.TempDir()
+	home := filepath.Join(tmp, "home")
+	repoDir := filepath.Join(tmp, "work", "app")
+	plainDir := filepath.Join(tmp, "plain")
+	for _, d := range []string{home, filepath.Join(repoDir, ".git"), plainDir} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	env := GrokEnvelope{
+		ConversationIDCamel: "conv-1",
+		WorkspacePaths:      []string{" ", home, repoDir},
+	}
+	sid, _, ws := env.AdoptCommon("", "", "", nil)
+	if sid != "conv-1" || len(ws) != 2 || ws[0] != home || ws[1] != repoDir {
+		t.Fatalf("AdoptCommon = (%q, %v), want conv-1 and workspacePaths", sid, ws)
+	}
+
+	if got := ProjectPath("", []string{plainDir, repoDir}); got != repoDir {
+		t.Fatalf("ProjectPath(empty cwd, roots) = %q, want %q", got, repoDir)
+	}
+	if got := ProjectPath(home, []string{home, repoDir}); got != repoDir {
+		t.Fatalf("ProjectPath(HOME cwd, roots) = %q, want %q", got, repoDir)
+	}
+	if got := ProjectPath(plainDir, []string{repoDir}); got != plainDir {
+		t.Fatalf("ProjectPath(explicit non-home cwd) = %q, want %q", got, plainDir)
+	}
+	if got := ProjectPath("", []string{" ", plainDir}); got != plainDir {
+		t.Fatalf("ProjectPath(empty cwd, non-git root) = %q, want %q", got, plainDir)
+	}
+	if got := ProjectPath("", nil); got != "" {
+		t.Fatalf("ProjectPath(empty, nil) = %q, want empty", got)
+	}
+
+	ev, ok := NormalizeToolEvent([]byte(`{"tool_name":"mcp_runner_run","cwd":` + `"` + filepath.ToSlash(plainDir) + `"` + `,"tool_input":{"command":"go test ./...","cwd":` + `"` + filepath.ToSlash(repoDir) + `"` + `}}`))
+	if !ok || filepath.ToSlash(ev.CWD) != filepath.ToSlash(repoDir) {
+		t.Fatalf("NormalizeToolEvent tool_input.cwd ok=%v cwd=%q, want %q", ok, ev.CWD, repoDir)
+	}
+
+	evNested, ok := NormalizeToolEvent([]byte(`{"tool_name":"mcp_runner_run","cwd":` + `"` + filepath.ToSlash(plainDir) + `"` + `,"toolArgs":{"command":"go test ./...","working_directory":` + `"` + filepath.ToSlash(repoDir) + `"` + `}}`))
+	if !ok || filepath.ToSlash(evNested.CWD) != filepath.ToSlash(repoDir) {
+		t.Fatalf("NormalizeToolEvent toolArgs.working_directory ok=%v cwd=%q, want %q", ok, evNested.CWD, repoDir)
+	}
+}
