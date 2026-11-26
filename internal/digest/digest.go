@@ -848,7 +848,7 @@ func IsAgentArtifact(text string) bool {
 	// the first few hundred bytes — listings and tables sit far below prose.
 	if len(trimmed) > 400 {
 		letters, others := 0, 0
-		for _, r := range trimmed[:400] {
+		for _, r := range UTF8SafeCut(trimmed, 400) {
 			switch {
 			case r == ' ':
 			case unicode.IsLetter(r):

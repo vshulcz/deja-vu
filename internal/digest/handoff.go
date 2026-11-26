@@ -41,10 +41,7 @@ func IsCompactionSummary(t string) bool {
 	if strings.HasPrefix(t, "This session is being continued from a previous conversation") {
 		return true
 	}
-	head := t
-	if len(head) > 300 {
-		head = head[:300]
-	}
+	head := UTF8SafeCut(t, 300)
 	return strings.HasPrefix(t, "Summary:") && compactionOutlineRE.MatchString(head)
 }
 
@@ -116,7 +113,7 @@ func compactionIntent(summary string) string {
 	}
 	out := strings.TrimSpace(strings.Join(kept, "\n"))
 	if len(out) > compactionIntentBytes {
-		out = strings.TrimSpace(out[:compactionIntentBytes]) + cutMark
+		out = strings.TrimSpace(UTF8SafeCut(out, compactionIntentBytes)) + cutMark
 	}
 	return out
 }
