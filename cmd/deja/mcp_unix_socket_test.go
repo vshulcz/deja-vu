@@ -90,8 +90,8 @@ func startTestUnixSocketServer(t *testing.T, dir, sockPath string, contextOnly b
 		time.Sleep(15 * time.Millisecond)
 	}
 	close(stopCh)
-	_ = <-doneCh
-	t.Fatalf("timed out waiting for unix socket server %s", sockPath)
+	serr := <-doneCh
+	t.Fatalf("timed out waiting for unix socket server %s (err: %v)", sockPath, serr)
 	return nil
 }
 
