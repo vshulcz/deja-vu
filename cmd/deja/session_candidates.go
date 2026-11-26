@@ -223,7 +223,7 @@ func confirmedFixCandidate(
 	if errLine == "" {
 		return storedRememberCandidate{}, false
 	}
-	rawText := fmt.Sprintf("When encountering %q, resolve with `%s`", errLine, cleanCmd)
+	rawText := fmt.Sprintf("When encountering %q, resolve with %#q", errLine, cleanCmd)
 	safe, _, err := repoSafeText(rawText)
 	if err != nil || !usableRepoCandidateLine(safe) {
 		return storedRememberCandidate{}, false

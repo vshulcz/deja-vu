@@ -647,10 +647,6 @@ func candidatePathWithoutLine(s string) string {
 	return cur
 }
 
-func looksLikeExistingFileForBlame(subj string) bool {
-	return looksLikeExistingFileForBlameIn(howCwd(), subj)
-}
-
 func looksLikeExistingFileForBlameIn(cwd, subj string) bool {
 	if strings.ContainsAny(subj, "\r\n") {
 		return false

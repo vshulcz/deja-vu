@@ -108,8 +108,8 @@ func TestMCPProjectPathNormalization(t *testing.T) {
 	}
 
 	// remember normalizes filesystem path project to canonical ClaudeProjectName.
-	if _, err := callMCPTool(dir, "remember", json.RawMessage(`{"text":"Always pin backoff seed in tests","project":`+strconv.Quote(repoAlpha)+`}`)); err != nil {
-		t.Fatalf("remember with abs project path failed: %v", err)
+	if _, remErr := callMCPTool(dir, "remember", json.RawMessage(`{"text":"Always pin backoff seed in tests","project":`+strconv.Quote(repoAlpha)+`}`)); remErr != nil {
+		t.Fatalf("remember with abs project path failed: %v", remErr)
 	}
 	wantProject := sources.ClaudeProjectName(repoAlpha)
 	notes := sources.LoadNotes()

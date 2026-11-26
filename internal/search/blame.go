@@ -277,6 +277,22 @@ func mistypedLineNote(name string) string {
 	return fmt.Sprintf("%q is not a line number", tail)
 }
 
+// blameSessionInScope reports whether session passes harness, project scope,
+// and cutoff filters for Blame.
+func blameSessionInScope(s model.Session, o BlameOptions, cut time.Time) bool {
+	if o.Harness != "" && s.Harness != o.Harness {
+		return false
+	}
+	if len(o.Projects) > 0 {
+		if !query.ProjectAnyMatches(s.Project, s.From, o.Projects) {
+			return false
+		}
+	} else if !query.ProjectMatches(s.Project, s.From, o.Project) {
+		return false
+	}
+	return cut.IsZero() || !s.Updated.Before(cut)
+}
+
 // Blame ranks every session that carries evidence for the file, in full. The
 // listing cut lives in CapBlame.
 func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
@@ -308,17 +324,7 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 	mentionsBySession := make(map[string][]blameMention)
 	hits := make([]BlameHit, 0)
 	for _, session := range mergeSessions(ss) {
-		if o.Harness != "" && session.Harness != o.Harness {
-			continue
-		}
-		if len(o.Projects) > 0 {
-			if !query.ProjectAnyMatches(session.Project, session.From, o.Projects) {
-				continue
-			}
-		} else if !query.ProjectMatches(session.Project, session.From, o.Project) {
-			continue
-		}
-		if !cut.IsZero() && session.Updated.Before(cut) {
+		if !blameSessionInScope(session, o, cut) {
 			continue
 		}
 		hit := BlameHit{Session: session, Title: sessionTitle(session), Tier: TierExact}
