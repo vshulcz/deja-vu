@@ -226,6 +226,60 @@ func encodeRecordOffsets(covered, records int64, fp [sha256.Size]byte, byKey map
 
 var errNoRecordOffsets = errors.New("no record offsets")
 
+// recordOffsetsDataStart validates the table key count against b and returns
+// the key count, directory offset, and variable-length data offset.
+func recordOffsetsDataStart(b []byte) (nkeys, dirStart, dataStart int, ok bool) {
+	if len(b) < recordOffsetsHeaderSize {
+		return 0, 0, 0, false
+	}
+	dirStart = recordOffsetsHeaderSize
+	nkeysU := binary.LittleEndian.Uint32(b[24+sha256.Size:])
+	if uint64(nkeysU) > uint64(len(b)-dirStart)/16 { //nolint:gosec // checked len(b) >= dirStart above
+		return 0, 0, 0, false
+	}
+	nkeys = int(nkeysU)
+	dataStart = dirStart + 16*nkeys
+	return nkeys, dirStart, dataStart, true
+}
+
+// recordOffsetEntryAt reads entry i from the sorted directory and rejects any
+// offset that exceeds the remaining data payload.
+func recordOffsetEntryAt(b []byte, dirStart, dataStart, i int) (uint64, int) {
+	p := dirStart + 16*i
+	if i < 0 || p < dirStart || p+16 > dataStart || dataStart > len(b) {
+		return 0, -1
+	}
+	rawOff := binary.LittleEndian.Uint64(b[p+8:])
+	if rawOff > uint64(len(b)-dataStart) { //nolint:gosec // checked dataStart <= len(b) above
+		return binary.LittleEndian.Uint64(b[p:]), -1
+	}
+	return binary.LittleEndian.Uint64(b[p:]), int(rawOff) //nolint:gosec // bounded to remaining payload length above
+}
+
+// decodeRecordOffsetList decodes a count-prefixed delta-uvarint offset list at p.
+func decodeRecordOffsetList(b []byte, p int) ([]int64, bool) {
+	if p < 0 || p >= len(b) {
+		return nil, false
+	}
+	cnt, n := binary.Uvarint(b[p:])
+	if n <= 0 || cnt > uint64(len(b)-p-n) { //nolint:gosec // n bytes were read from b[p:]
+		return nil, false
+	}
+	p += n
+	offs := make([]int64, 0, cnt)
+	prev := int64(0)
+	for range cnt {
+		d, n := binary.Uvarint(b[p:])
+		if n <= 0 {
+			return nil, false
+		}
+		p += n
+		prev += int64(d) //nolint:gosec // deltas of ascending offsets
+		offs = append(offs, prev)
+	}
+	return offs, true
+}
+
 // recordOffsetsCover reads only the table's header and reports how much of
 // the open log f it covers, when it still fits f.
 func recordOffsetsCover(dir string, f *os.File) (int64, bool) {
@@ -264,10 +318,8 @@ func readRecordOffsetsFor(dir string, f *os.File, keys map[string]bool) (recordO
 	records := int64(binary.LittleEndian.Uint64(b[16:])) //nolint:gosec // written from a non-negative count
 	var fp [sha256.Size]byte
 	copy(fp[:], b[24:24+sha256.Size])
-	nkeys := int(binary.LittleEndian.Uint32(b[24+sha256.Size:]))
-	dirStart := recordOffsetsHeaderSize
-	dataStart := dirStart + 16*nkeys
-	if nkeys < 0 || dataStart > len(b) {
+	nkeys, dirStart, dataStart, ok := recordOffsetsDataStart(b)
+	if !ok {
 		return recordOffsets{}, errNoRecordOffsets
 	}
 	fi, err := f.Stat()
@@ -279,8 +331,7 @@ func readRecordOffsetsFor(dir string, f *os.File, keys map[string]bool) (recordO
 	}
 	out := recordOffsets{covered: covered, logSize: fi.Size(), records: records, byKey: map[string][]int64{}}
 	entryAt := func(i int) (uint64, int) {
-		p := dirStart + 16*i
-		return binary.LittleEndian.Uint64(b[p:]), int(binary.LittleEndian.Uint64(b[p+8:])) //nolint:gosec // written from a non-negative offset
+		return recordOffsetEntryAt(b, dirStart, dataStart, i)
 	}
 	decode := func(at int, want string) bool {
 		p := dataStart + at
@@ -297,21 +348,9 @@ func readRecordOffsetsFor(dir string, f *os.File, keys map[string]bool) (recordO
 		if want != "" && key != want {
 			return true
 		}
-		cnt, n := binary.Uvarint(b[p:])
-		if n <= 0 {
+		offs, ok := decodeRecordOffsetList(b, p)
+		if !ok {
 			return false
-		}
-		p += n
-		offs := make([]int64, 0, cnt)
-		prev := int64(0)
-		for range cnt {
-			d, n := binary.Uvarint(b[p:])
-			if n <= 0 {
-				return false
-			}
-			p += n
-			prev += int64(d) //nolint:gosec // deltas of ascending offsets
-			offs = append(offs, prev)
 		}
 		out.byKey[key] = offs
 		return true
