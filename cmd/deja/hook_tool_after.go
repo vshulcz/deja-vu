@@ -55,14 +55,19 @@ type toolAfterInput struct {
 	// TRAE IDE's name for the same field (#4731).
 	LLMToolName string `json:"llm_tool_name"`
 	ToolInput   struct {
-		Command       string          `json:"command"`
-		CommandLine   string          `json:"CommandLine"`
-		CmdLine       string          `json:"command_line"`
-		Cmd           string          `json:"cmd"`
-		Script        string          `json:"script"`
-		Args          any             `json:"args"`
-		ToolArgs      json.RawMessage `json:"toolArgs"`
-		ToolArgsSnake json.RawMessage `json:"tool_args"`
+		Command          string          `json:"command"`
+		CommandLine      string          `json:"CommandLine"`
+		CmdLine          string          `json:"command_line"`
+		Cmd              string          `json:"cmd"`
+		Script           string          `json:"script"`
+		Args             any             `json:"args"`
+		CWD              string          `json:"cwd"`
+		CwdCamel         string          `json:"CWD"`
+		Workdir          string          `json:"workdir"`
+		WorkingDirectory string          `json:"working_directory"`
+		WorkingDir       string          `json:"workingDir"`
+		ToolArgs         json.RawMessage `json:"toolArgs"`
+		ToolArgsSnake    json.RawMessage `json:"tool_args"`
 	} `json:"tool_input"`
 	// Harnesses disagree about where a command's output lives, and about
 	// whether the exit code is reported at all, so every shape is read and the
@@ -108,15 +113,28 @@ func (i *toolAfterInput) adopt() {
 		i.ToolInput.Cmd,
 		i.ToolInput.Script,
 	)
+	toolCWD := firstNonEmpty(
+		i.ToolInput.CWD,
+		i.ToolInput.CwdCamel,
+		i.ToolInput.Workdir,
+		i.ToolInput.WorkingDirectory,
+		i.ToolInput.WorkingDir,
+	)
 	for _, rawArgs := range []json.RawMessage{i.ToolInput.ToolArgs, i.ToolInput.ToolArgsSnake, i.ToolArgs, i.ToolArgsSnake} {
 		if args := copilotToolArgs(rawArgs); args != nil {
 			if cmd == "" {
 				cmd = mapString(args, "command", "CommandLine", "command_line", "cmd", "script")
 			}
+			if toolCWD == "" {
+				toolCWD = mapString(args, "cwd", "CWD", "workdir", "working_directory", "workingDir")
+			}
 			if i.ToolInput.Args == nil && args["args"] != nil {
 				i.ToolInput.Args = args["args"]
 			}
 		}
+	}
+	if strings.TrimSpace(toolCWD) != "" {
+		i.CWD = strings.TrimSpace(toolCWD)
 	}
 	if cmd != "" && i.ToolInput.Args != nil {
 		cmd += sources.CommandArgs(i.ToolInput.Args)
@@ -200,7 +218,7 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 		// `pytest -v` whose log runs past a megabyte (#1716). What arrived is
 		// still worth reading: pull the output back out of the cut JSON rather
 		// than throwing away a megabyte that begins with the error.
-		out = sources.UnwrapShellReport(salvageFromPayload(string(raw)))
+		out = sources.UnwrapMCPCommandHeader(sources.UnwrapShellReport(salvageFromPayload(string(raw))))
 	}
 	// Out of the raw bytes for a cut payload, the way the tool name is: the
 	// line keeps to the project it names, and the harness sends cwd and session
@@ -322,13 +340,22 @@ func toolResponseText(raw json.RawMessage) string {
 				return text
 			}
 		}
-		return clampOutput(sources.UnwrapShellReport(s))
+		return clampOutput(sources.UnwrapMCPCommandHeader(sources.UnwrapShellReport(s)))
 	}
 	var obj map[string]any
 	if json.Unmarshal(raw, &obj) != nil {
 		return ""
 	}
 	var b strings.Builder
+	appendPart := func(v string) {
+		if strings.TrimSpace(v) == "" {
+			return
+		}
+		if b.Len() > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(v)
+	}
 	// stderr first: the signature is far more often there, and the scan is
 	// capped, so a long stdout must not push it out of reach.
 	// llmContent is gemini's: the text it puts in front of the model, which for
@@ -338,16 +365,43 @@ func toolResponseText(raw json.RawMessage) string {
 	// textResultForLlm is Copilot CLI's: the output as its model gets it.
 	// message is Kimi's: a failed tool's `error` is {code, message, ...}.
 	for _, key := range []string{"stderr", "error", "output", "stdout", "content", "result", "llmContent", "output_for_prompt", "textResultForLlm", "message"} {
-		v, ok := obj[key].(string)
-		if !ok || strings.TrimSpace(v) == "" {
+		if v, ok := obj[key].(string); ok {
+			appendPart(v)
+			continue
+		}
+		if key == "content" || key == "llmContent" {
+			appendPart(mcpContentArrayText(obj[key]))
+		}
+	}
+	return clampOutput(sources.UnwrapMCPCommandHeader(sources.UnwrapShellReport(b.String())))
+}
+
+// mcpContentArrayText extracts text segments from an MCP CallToolResult content
+// array such as `[{"type":"text","text":"..."}]`.
+func mcpContentArrayText(v any) string {
+	items, ok := v.([]any)
+	if !ok {
+		return ""
+	}
+	var b strings.Builder
+	for _, item := range items {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if typ, _ := m["type"].(string); typ != "" && typ != "text" {
+			continue
+		}
+		text, _ := m["text"].(string)
+		if strings.TrimSpace(text) == "" {
 			continue
 		}
 		if b.Len() > 0 {
 			b.WriteByte('\n')
 		}
-		b.WriteString(v)
+		b.WriteString(text)
 	}
-	return clampOutput(sources.UnwrapShellReport(b.String()))
+	return b.String()
 }
 
 // after returns what follows key where it is used as one, or "" when the key is

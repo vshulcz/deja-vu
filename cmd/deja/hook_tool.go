@@ -132,6 +132,7 @@ func (i *toolHookInput) adopt() {
 	ev.Normalize()
 	i.SessionID = ev.SessionID
 	i.TranscriptPath = ev.TranscriptPath
+	i.CWD = ev.CWD
 	i.WorkspaceRoots = ev.WorkspaceRoots
 	i.ToolName = ev.ToolName
 	i.ToolInput = ev.ToolInput
@@ -481,7 +482,15 @@ func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string
 		}
 		return fileLineFor(dir, cwd, input)
 	default:
-		if isExternalMCPEditTool(input.ToolName) || isExternalMCPReadTool(input.ToolName) {
+		if isExternalMCPEditTool(input.ToolName) {
+			if strings.TrimSpace(input.ToolInput.FilePath) == "" {
+				if patch := strings.TrimSpace(firstNonEmpty(input.ToolInput.PatchText, input.ToolInput.Patch, input.ToolInput.Command)); patch != "" {
+					return applyPatchLine(dir, cwd, patch, askerSkip(dir, input))
+				}
+			}
+			return fileLineFor(dir, cwd, input)
+		}
+		if isExternalMCPReadTool(input.ToolName) {
 			return fileLineFor(dir, cwd, input)
 		}
 	}
@@ -638,7 +647,7 @@ func isSearchReplaceEditTool(toolName string) bool {
 		"replace_string_in_file", "str_replace", "str_replace_editor", "str_replace_based_edit_tool":
 		return true
 	}
-	return false
+	return hookengine.IsExternalMCPSearchReplaceTool(toolName)
 }
 
 // editTargetMismatchLine returns a single-line hint with the closest disk lines when oldStr is not verbatim on disk.
@@ -1395,10 +1404,13 @@ var genericCommandMultiplexers = map[string]bool{
 
 func repoMemoryDecisionForCommand(cwd, cmd string, pol policy.Policy) string {
 	root := sources.RepoRoot(cwd)
+	if root == "" {
+		root = cwd
+	}
 	if root == "" || !pol.Allows(policy.ActivationAuto, sources.RepoMemoryProject(root)) {
 		return ""
 	}
-	entries, _, err := sources.ReadRepoMemory(sources.RepoMemoryPath(root))
+	entries, _, err := readRepoMemoryAndNotes(root)
 	if err != nil || len(entries) == 0 {
 		return ""
 	}

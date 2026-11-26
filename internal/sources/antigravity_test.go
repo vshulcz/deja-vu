@@ -1242,3 +1242,40 @@ func TestAntigravityExternalMCPFiltersDejaAndExtractsSlicesChunksAndCommands(t *
 		t.Fatalf("AntigravityCommandCalls() = %q, want %q", gotCmds, wantCmds)
 	}
 }
+
+func TestUnwrapMCPCommandHeaderAndExtendedMCPTools(t *testing.T) {
+	plain := "exit status 1\nfatal: nope"
+	if got := UnwrapMCPCommandHeader(plain); got != plain {
+		t.Fatalf("UnwrapMCPCommandHeader(plain) = %q, want %q", got, plain)
+	}
+	if got := UnwrapMCPCommandHeader("[cmd direct | exit=1 | 12ms] err: boom"); got != "err: boom" {
+		t.Fatalf("UnwrapMCPCommandHeader(inline) = %q, want %q", got, "err: boom")
+	}
+	multiline := "A pre-tool hook changed params.\n\nCreated At: 2026-11-26T10:00:00Z\nCompleted At: 2026-11-26T10:00:02Z\n[cmd direct | exit=1 | 12ms]\nactual error\nsecond line"
+	if got := UnwrapMCPCommandHeader(multiline); got != "actual error\nsecond line" {
+		t.Fatalf("UnwrapMCPCommandHeader(multiline) = %q, want %q", got, "actual error\nsecond line")
+	}
+
+	toolCalls := []any{
+		map[string]any{"name": "mcp_fs_open", "args": map[string]any{"path": "/work/app/open.go"}},
+		map[string]any{"name": "mcp_fs_replace", "args": map[string]any{"file_path": "/work/app/rep.go", "old_string": "a", "new_string": "b"}},
+		map[string]any{"name": "mcp_fs_patch", "args": map[string]any{"file_path": "/work/app/patch.go"}},
+	}
+	wantEdits := []EditCall{
+		{ToolName: "mcp_fs_open", FilePath: "/work/app/open.go"},
+		{ToolName: "mcp_fs_replace", FilePath: "/work/app/rep.go", OldString: "a", NewString: "b"},
+		{ToolName: "mcp_fs_patch", FilePath: "/work/app/patch.go"},
+	}
+	if got := AntigravityEditCalls(toolCalls); !slices.Equal(got, wantEdits) {
+		t.Fatalf("AntigravityEditCalls extended = %+v, want %+v", got, wantEdits)
+	}
+
+	cmdCalls := []any{
+		map[string]any{"name": "mcp_runner_run", "args": map[string]any{"command": "go test ./pkg"}},
+		map[string]any{"name": "mcp_box_bash", "args": map[string]any{"script": "make check"}},
+	}
+	wantCmds := []string{"go test ./pkg", "make check"}
+	if got := AntigravityCommandCalls(cmdCalls); !slices.Equal(got, wantCmds) {
+		t.Fatalf("AntigravityCommandCalls extended = %q, want %q", got, wantCmds)
+	}
+}

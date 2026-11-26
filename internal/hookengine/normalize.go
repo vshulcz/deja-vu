@@ -20,11 +20,12 @@ const (
 // GrokEnvelope holds camelCase fields emitted by Grok Build across hook
 // events so common callers can adopt them without duplicating alias logic.
 type GrokEnvelope struct {
-	SessionID           string `json:"sessionId"`
-	ConversationIDCamel string `json:"conversationId"`
-	WorkspaceRoot       string `json:"workspaceRoot"`
-	TranscriptPath      string `json:"transcriptPath"`
-	ToolName            string `json:"toolName"`
+	SessionID           string   `json:"sessionId"`
+	ConversationIDCamel string   `json:"conversationId"`
+	WorkspaceRoot       string   `json:"workspaceRoot"`
+	WorkspacePaths      []string `json:"workspacePaths"`
+	TranscriptPath      string   `json:"transcriptPath"`
+	ToolName            string   `json:"toolName"`
 	ToolInput           struct {
 		Command  string `json:"command"`
 		FilePath string `json:"file_path"`
@@ -38,6 +39,13 @@ func (e GrokEnvelope) AdoptCommon(sessionID, conversationID, transcriptPath stri
 	sid := AdoptValue(AdoptValue(AdoptValue(sessionID, e.SessionID), conversationID), e.ConversationIDCamel)
 	tp := AdoptValue(transcriptPath, e.TranscriptPath)
 	ws := AdoptRoots(roots, e.WorkspaceRoot)
+	if len(ws) == 0 && len(e.WorkspacePaths) > 0 {
+		for _, wp := range e.WorkspacePaths {
+			if trimmed := strings.TrimSpace(wp); trimmed != "" {
+				ws = append(ws, trimmed)
+			}
+		}
+	}
 	return sid, tp, ws
 }
 
@@ -59,13 +67,36 @@ func AdoptRoots(common []string, fallback string) []string {
 }
 
 // ProjectPath returns the effective project directory for a hook payload.
+// When cwd is unset, or points at the user's home directory while a git
+// repository appears in roots (as Antigravity Stop/SessionEnd sends), that
+// repository root wins over non-repository entries.
 func ProjectPath(cwd string, roots []string) string {
-	if strings.TrimSpace(cwd) != "" {
-		return cwd
+	trimmedCWD := strings.TrimSpace(cwd)
+	repoInRoots := func() string {
+		for _, r := range roots {
+			if s := strings.TrimSpace(r); s != "" && sources.RepoRoot(s) != "" {
+				return s
+			}
+		}
+		return ""
+	}
+	if trimmedCWD != "" {
+		if sources.RepoRoot(trimmedCWD) != "" || len(roots) == 0 {
+			return trimmedCWD
+		}
+		if home, err := os.UserHomeDir(); err == nil && home != "" && filepath.Clean(trimmedCWD) == filepath.Clean(home) {
+			if r := repoInRoots(); r != "" {
+				return r
+			}
+		}
+		return trimmedCWD
+	}
+	if r := repoInRoots(); r != "" {
+		return r
 	}
 	for _, r := range roots {
-		if strings.TrimSpace(r) != "" {
-			return r
+		if s := strings.TrimSpace(r); s != "" {
+			return s
 		}
 	}
 	return ""
@@ -226,6 +257,11 @@ type ToolInput struct {
 	Path               string          `json:"path"`
 	TargetFile         string          `json:"target_file"`
 	Args               any             `json:"args"`
+	CWD                string          `json:"cwd"`
+	CwdCamel           string          `json:"CWD"`
+	Workdir            string          `json:"workdir"`
+	WorkingDirectory   string          `json:"working_directory"`
+	WorkingDir         string          `json:"workingDir"`
 	FilePathCamel      string          `json:"filePath"`
 	PatchText          string          `json:"patchText"`
 	Patch              string          `json:"patch"`
@@ -316,6 +352,13 @@ func (ev *ToolEvent) Normalize() {
 	if ev.ToolInput.FilePath == "" {
 		ev.ToolInput.FilePath = FirstNonScratchPath(ev.ToolInput.PathsUpper...)
 	}
+	toolCWD := FirstNonEmpty(
+		ev.ToolInput.CWD,
+		ev.ToolInput.CwdCamel,
+		ev.ToolInput.Workdir,
+		ev.ToolInput.WorkingDirectory,
+		ev.ToolInput.WorkingDir,
+	)
 	for _, rawArgs := range []json.RawMessage{
 		ev.ToolArgs, ev.ToolArgsSnake, ev.ToolInput.NestedToolArgs, ev.ToolInput.NestedToolArgsSnk,
 	} {
@@ -335,6 +378,12 @@ func (ev *ToolEvent) Normalize() {
 		if ev.ToolInput.FilePath == "" {
 			ev.ToolInput.FilePath = FirstNonScratchSliceFromAny(args["Paths"])
 		}
+		if toolCWD == "" {
+			toolCWD = MapString(args, "cwd", "CWD", "workdir", "working_directory", "workingDir")
+		}
+	}
+	if strings.TrimSpace(toolCWD) != "" {
+		ev.CWD = strings.TrimSpace(toolCWD)
 	}
 	ev.ToolInput.FilePath = CleanFilePath(ev.ToolInput.FilePath)
 	if ev.ToolInput.Args == nil {
@@ -546,17 +595,23 @@ func IsExternalMCPToolWithSuffix(name string, suffixes ...string) bool {
 
 // IsExternalMCPCommandTool reports whether name is a non-deja MCP command tool.
 func IsExternalMCPCommandTool(name string) bool {
-	return IsExternalMCPToolWithSuffix(name, "_cmd", "_exec", "_shell", "_command")
+	return IsExternalMCPToolWithSuffix(name, "_cmd", "_exec", "_shell", "_command", "_run", "_run_command", "_execute", "_bash", "_terminal")
 }
 
 // IsExternalMCPEditTool reports whether name is a non-deja MCP file-edit tool.
 func IsExternalMCPEditTool(name string) bool {
-	return IsExternalMCPToolWithSuffix(name, "_write", "_edit", "_create_file", "_write_file", "_edit_file")
+	return IsExternalMCPToolWithSuffix(name, "_write", "_edit", "_create_file", "_write_file", "_edit_file", "_replace", "_str_replace", "_patch", "_apply_patch", "_modify_file", "_update_file")
+}
+
+// IsExternalMCPSearchReplaceTool reports whether name is a non-deja MCP
+// search-and-replace edit tool whose arguments contain old/new strings.
+func IsExternalMCPSearchReplaceTool(name string) bool {
+	return IsExternalMCPToolWithSuffix(name, "_edit", "_edit_file", "_replace", "_str_replace", "_modify_file", "_update_file")
 }
 
 // IsExternalMCPReadTool reports whether name is a non-deja MCP file-read tool.
 func IsExternalMCPReadTool(name string) bool {
-	return IsExternalMCPToolWithSuffix(name, "_read", "_read_file", "_view_file")
+	return IsExternalMCPToolWithSuffix(name, "_read", "_read_file", "_view_file", "_open", "_open_file", "_cat", "_get_file")
 }
 
 // IsCommandTool reports whether name invokes a shell or command runner tool.

@@ -990,7 +990,7 @@ func isAntigravityTrackedFileTool(name string) bool {
 	case "replace_file_content", "multi_replace_file_content", "write_to_file", "edit_file", "write_file", "read_file", "view_file", "read_many_files":
 		return true
 	}
-	return isAntigravityExternalMCPTool(name, "_read", "_read_file", "_view_file", "_edit", "_edit_file", "_write", "_write_file", "_create_file")
+	return isAntigravityExternalMCPTool(name, "_read", "_read_file", "_view_file", "_open", "_open_file", "_cat", "_get_file", "_edit", "_edit_file", "_write", "_write_file", "_create_file", "_replace", "_str_replace", "_patch", "_apply_patch", "_modify_file", "_update_file")
 }
 
 func antigravityStringSliceArg(args map[string]any, keys ...string) []string {
@@ -1105,7 +1105,7 @@ func AntigravityCommandCalls(toolCalls any) []string {
 			continue
 		}
 		name := str(call["name"])
-		if name != "run_command" && !isAntigravityExternalMCPTool(name, "_cmd", "_exec", "_shell", "_command") {
+		if name != "run_command" && !isAntigravityExternalMCPTool(name, "_cmd", "_exec", "_shell", "_command", "_run", "_run_command", "_execute", "_bash", "_terminal") {
 			continue
 		}
 		cmd := firstNonEmpty(

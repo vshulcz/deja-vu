@@ -607,11 +607,31 @@ func liveRecallBriefScoped(dir, cwd, project string, offset int, query string) s
 	if cwd == "" || query == "" || looksLikeSessionID(query) || !cwdMatchesRecallProject(cwd, project) {
 		return ""
 	}
+	ps, _ := resolveQueryScope(QueryScopeInput{
+		IndexDir:           dir,
+		CWD:                cwd,
+		Project:            project,
+		IncludeLiveLineage: true,
+		Activation:         policy.ActivationMCP,
+	})
+	if ps.ProjectDir != "" {
+		cwd = ps.ProjectDir
+	}
+	var self func(index.SessionMeta, string) bool
+	if len(ps.ExcludeIDs) > 0 || len(ps.ExcludeUpTo) > 0 {
+		self = func(meta index.SessionMeta, _ string) bool {
+			if ps.ExcludeIDs[meta.ID] {
+				return true
+			}
+			cut, ok := ps.ExcludeUpTo[meta.ID]
+			return ok && !meta.Updated.After(cut)
+		}
+	}
 	pol := policy.Load()
 	var parts []string
 	var causal string
 	if cp := resolveRecallCausalPath(cwd, query); cp != "" {
-		if line := fileHookLineOutsideWithMode(dir, cwd, cp, "", true, nil); line != "" {
+		if line := fileHookLineOutsideWithMode(dir, cwd, cp, "", true, self); line != "" {
 			causal = capRecallCausalLine(line, 320)
 		}
 	}
@@ -727,6 +747,14 @@ func cwdMatchesRecallProject(cwd, project string) bool {
 			return true
 		}
 		if root := safeScanRoot(cwd); root != "" && strings.EqualFold(filepath.Base(filepath.Clean(root)), project) {
+			return true
+		}
+	}
+	if ps, err := resolveQueryScope(QueryScopeInput{CWD: cwd, Project: project, Activation: policy.ActivationMCP}); err == nil && len(ps.Projects) > 0 {
+		if ps.MatchesProject(cwd) {
+			return true
+		}
+		if ps.ProjectDir != "" && (index.ProjectInScopeStrict(cwd, ps.ProjectDir) || index.ProjectInScopeStrict(ps.ProjectDir, cwd)) {
 			return true
 		}
 	}

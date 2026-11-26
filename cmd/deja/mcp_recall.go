@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -641,10 +639,17 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 	// machine scopes the way the cwd does: every worktree of the repo, matched
 	// by the rule the hooks use.
 	var pathScope []string
-	if p := strings.TrimSpace(project); filepath.IsAbs(p) {
-		if st, statErr := os.Stat(p); statErr == nil && st.IsDir() {
-			dirScope, _ := resolveQueryScope(QueryScopeInput{CWD: p, Activation: policy.ActivationMCP})
-			pathScope = dirScope.Projects
+	var explicitScope QueryScope
+	if strings.TrimSpace(project) != "" {
+		explicitScope, _ = resolveQueryScope(QueryScopeInput{
+			IndexDir:           dir,
+			CWD:                howCwd(),
+			Project:            project,
+			IncludeLiveLineage: true,
+			Activation:         policy.ActivationMCP,
+		})
+		if explicitScope.ProjectDir != "" {
+			pathScope = explicitScope.Projects
 		}
 	}
 	var live map[string]bool
@@ -652,23 +657,11 @@ func rankRecall(dir, q, harness, project string, window int) (rankedRecall, erro
 	added := ""
 	switch {
 	case len(pathScope) > 0:
-		baseScope, _ := resolveQueryScope(QueryScopeInput{
-			IndexDir:           dir,
-			IncludeLiveLineage: true,
-			Activation:         policy.ActivationMCP,
-		})
-		baseScope.ApplyToSearch(&o)
-		live = baseScope.ExcludeIDs
-		o.Projects = pathScope
+		explicitScope.ApplyToSearch(&o)
+		live = explicitScope.ExcludeIDs
 	case strings.TrimSpace(project) != "":
 		// Named by the caller: a filter, the way the tool describes it. It was
 		// accepted and then ignored.
-		explicitScope, _ := resolveQueryScope(QueryScopeInput{
-			IndexDir:           dir,
-			Project:            project,
-			IncludeLiveLineage: true,
-			Activation:         policy.ActivationMCP,
-		})
 		explicitScope.ApplyToSearch(&o)
 		live = explicitScope.ExcludeIDs
 	default:

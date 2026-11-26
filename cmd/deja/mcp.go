@@ -648,6 +648,10 @@ func candidatePathWithoutLine(s string) string {
 }
 
 func looksLikeExistingFileForBlame(subj string) bool {
+	return looksLikeExistingFileForBlameIn(howCwd(), subj)
+}
+
+func looksLikeExistingFileForBlameIn(cwd, subj string) bool {
 	if strings.ContainsAny(subj, "\r\n") {
 		return false
 	}
@@ -657,7 +661,9 @@ func looksLikeExistingFileForBlame(subj string) bool {
 	}
 	p := cand
 	if !filepath.IsAbs(p) {
-		cwd := howCwd()
+		if cwd == "" {
+			cwd = howCwd()
+		}
 		if cwd == "" {
 			return false
 		}
@@ -689,7 +695,16 @@ func inferAutoMCPMode(raw json.RawMessage) string {
 	if subj == "" {
 		return "orient"
 	}
-	if looksLikeExistingFileForBlame(subj) {
+	checkCWD := howCwd()
+	if projRaw, ok := args["project"]; ok && nonEmptyJSONValue(projRaw) {
+		var proj string
+		if json.Unmarshal(projRaw, &proj) == nil && strings.TrimSpace(proj) != "" {
+			if ps, err := resolveQueryScope(QueryScopeInput{CWD: checkCWD, Project: proj, Activation: policy.ActivationMCP}); err == nil && ps.ProjectDir != "" {
+				checkCWD = ps.ProjectDir
+			}
+		}
+	}
+	if looksLikeExistingFileForBlameIn(checkCWD, subj) {
 		return "blame"
 	}
 	if _, ok := index.FrictionLine(subj); ok {
@@ -742,13 +757,23 @@ func callMCPRecall(dir string, raw json.RawMessage, served *int) (string, error)
 	if line := manualIndexLine(dir); line != "" {
 		dated = line + "\n\n"
 	}
-	brief := liveRecallBriefScoped(dir, howCwd(), a.Project, int(a.Offset), a.Query)
+	brief, blameHead := recallHeaderBlocks(dir, a.Harness, a.Project, int(a.Offset), a.Query)
 	budget := recallMCPBudget - recallFrameOverhead - len(env) - len(dated)
 	if brief != "" {
 		budget -= len(brief) + 2
 	}
+	if blameHead != "" {
+		budget -= len(blameHead) + 2
+	}
 	text, sessions, rawBytes, ids, projects, err := recallTextResultIn(dir, a.Query, a.Harness, a.Project, int(a.Limit), int(a.Offset), budget)
 	if err == nil {
+		if blameHead != "" {
+			if strings.TrimSpace(text) != "" {
+				text = blameHead + "\n\n" + text
+			} else {
+				text = blameHead
+			}
+		}
 		if brief != "" {
 			text = brief + "\n\n" + text
 		}
@@ -906,6 +931,8 @@ func callMCPToolRaw(dir, name string, raw json.RawMessage, served *int) (string,
 					targetProject = p
 				}
 			}
+		} else {
+			targetProject = normalizeProjectName(targetProject, howCwd())
 		}
 		if err := checkMCPAccess(dir, "write", targetProject); err != nil {
 			return "", err
@@ -934,6 +961,8 @@ func callMCPToolRaw(dir, name string, raw json.RawMessage, served *int) (string,
 					a.Project = p
 				}
 			}
+		} else {
+			a.Project = targetProject
 		}
 		switch err := sources.AppendNoteTagged(a.Project, a.Text, a.Tags, time.Now()); {
 		case errors.Is(err, sources.ErrNoteExists):
@@ -982,9 +1011,121 @@ func callMCPToolRaw(dir, name string, raw json.RawMessage, served *int) (string,
 	}
 }
 
+const mcpRecallBlameBudget = 480
+
+// recallHeaderBlocks computes the optional live repository brief and causal file
+// blame header shared by CLI and MCP recall on the first page.
+func recallHeaderBlocks(dir, harness, project string, offset int, query string) (string, string) {
+	checkCWD := howCwd()
+	var blameHead string
+	if offset == 0 {
+		ps, _ := resolveQueryScope(QueryScopeInput{
+			IndexDir:           dir,
+			CWD:                checkCWD,
+			Project:            project,
+			IncludeLiveLineage: true,
+			Activation:         policy.ActivationMCP,
+		})
+		if ps.ProjectDir != "" {
+			checkCWD = ps.ProjectDir
+		}
+		if looksLikeExistingFileForBlameIn(checkCWD, query) {
+			blameHead = recallFileBlameSummary(dir, harness, project, ps, checkCWD, query)
+		}
+	}
+	brief := liveRecallBriefScoped(dir, checkCWD, project, offset, query)
+	return brief, blameHead
+}
+
+// recallFileBlameSummary returns a bounded causal blame block for a file query.
+func recallFileBlameSummary(dir, harness, project string, ps QueryScope, cwd, rawPath string) string {
+	target, err := search.ResolveBlamePathIn(cwd, rawPath)
+	if err != nil {
+		return ""
+	}
+	o := search.BlameOptions{
+		Harness:  harness,
+		Project:  project,
+		Projects: ps.Projects,
+	}
+	if strings.TrimSpace(project) == "" {
+		o.Projects = nil
+	}
+	hits, _, _, _, err := findBlameHitsStale(dir, target, o, policy.ActivationMCP, io.Discard)
+	if err != nil || len(hits) == 0 {
+		return ""
+	}
+	if len(ps.ExcludeIDs) > 0 || len(ps.ExcludeUpTo) > 0 {
+		filtered := hits[:0]
+		for _, h := range hits {
+			if ps.ExcludeIDs[h.Session.ID] {
+				continue
+			}
+			if cut, ok := ps.ExcludeUpTo[h.Session.ID]; ok && !h.Session.Updated.After(cut) {
+				continue
+			}
+			filtered = append(filtered, h)
+		}
+		hits = filtered
+	}
+	if len(hits) == 0 {
+		return ""
+	}
+	if strings.TrimSpace(project) == "" && len(ps.Projects) > 0 {
+		var inScope []search.BlameHit
+		for _, h := range hits {
+			if howProjectMatches(h.Session.Project, ps.Projects) {
+				inScope = append(inScope, h)
+			}
+		}
+		if len(inScope) > 0 {
+			hits = inScope
+		}
+	}
+	sort.SliceStable(hits, func(i, j int) bool {
+		return (hits[i].Lifecycle != "") && (hits[j].Lifecycle == "")
+	})
+	var b strings.Builder
+	fmt.Fprintf(&b, "Causal blame for %s (%d session%s):", search.SafePath(target.Base), len(hits), pluralS(len(hits)))
+	for i, h := range hits {
+		if i >= 3 {
+			break
+		}
+		title := search.SafeLine(truncateRunes(firstNonEmpty(h.Title, h.Session.ID), 56))
+		row := fmt.Sprintf("\n- [%s] %s · %s", h.Session.Harness, search.SafeLine(h.Session.ID), title)
+		if h.Lifecycle != "" {
+			note := search.SafeLine(truncateRunes(h.LifecycleNote, 80))
+			if note != "" {
+				row += fmt.Sprintf(" [%s: %s]", search.SafeLine(h.Lifecycle), note)
+			} else {
+				row += " [" + search.SafeLine(h.Lifecycle) + "]"
+			}
+		} else if len(h.Snippets) > 0 {
+			row += " — " + search.SafeLine(truncateRunes(h.Snippets[0], 90))
+		}
+		if b.Len()+len(row) > mcpRecallBlameBudget {
+			if i == 0 {
+				b.WriteString(truncateUTF8Bytes(row, mcpRecallBlameBudget-b.Len()))
+			}
+			break
+		}
+		b.WriteString(row)
+	}
+	return truncateUTF8Bytes(b.String(), mcpRecallBlameBudget)
+}
+
 // blameTextResult returns the answer and how many sessions it names.
 func blameTextResult(dir string, o search.BlameOptions, path string, limit int) (string, int, error) {
-	target, err := search.ResolveBlamePath(path)
+	checkCWD := howCwd()
+	if strings.TrimSpace(o.Project) != "" {
+		if ps, err := resolveQueryScope(QueryScopeInput{CWD: checkCWD, Project: o.Project, Activation: policy.ActivationMCP}); err == nil {
+			o.Projects = ps.Projects
+			if ps.ProjectDir != "" {
+				checkCWD = ps.ProjectDir
+			}
+		}
+	}
+	target, err := search.ResolveBlamePathIn(checkCWD, path)
 	if err != nil {
 		return "", 0, asArgError(err)
 	}

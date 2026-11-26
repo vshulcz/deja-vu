@@ -17,6 +17,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/digest"
+	"github.com/vshulcz/deja-vu/internal/hookengine"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -146,15 +147,7 @@ func notesStamp() string {
 // 2026.09.02), so a hook reading cwd alone fell back to whatever directory the
 // harness happened to spawn it in — which is not the project on every host.
 func hookProjectPath(cwd string, roots []string) string {
-	if strings.TrimSpace(cwd) != "" {
-		return cwd
-	}
-	for _, r := range roots {
-		if strings.TrimSpace(r) != "" {
-			return r
-		}
-	}
-	return ""
+	return hookengine.ProjectPath(cwd, roots)
 }
 
 // hookCWD is where the hook is standing: what the payload says, else the
@@ -316,6 +309,7 @@ func runHookRefresh(dir string) {
 	if err := index.Ensure(dir, "", false, nil); err != nil {
 		return
 	}
+	captureSessionEndCandidates(dir, cwd)
 	autoEvolveRepoMemory(dir, cwd)
 	writeHookCacheEntry(dir, cwd, hookDigestEntryFor(dir, ""))
 	_ = os.Remove(hookCachePath(dir, cwd) + ".refreshing")

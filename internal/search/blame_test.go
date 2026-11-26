@@ -1541,3 +1541,46 @@ func TestBlameListsTheWriterAboveASessionThatNamedTheFile(t *testing.T) {
 		t.Errorf("two writers: order %v, want the newer x2 first", got)
 	}
 }
+
+func TestResolveBlamePathInAndMultiProjectOptions(t *testing.T) {
+	if _, err := ResolveBlamePathIn("", "   "); err == nil {
+		t.Fatalf("ResolveBlamePathIn blank path = nil error, want error")
+	}
+	repoDir := filepath.Join(t.TempDir(), "work", "org", "alpha")
+	filePath := filepath.Join(repoDir, "pkg", "pool.go")
+	target, err := ResolveBlamePathIn(repoDir, "pkg/pool.go:10-20")
+	if err != nil {
+		t.Fatalf("ResolveBlamePathIn failed: %v", err)
+	}
+	if target.FullPath != filePath || target.Line != 10 || target.EndLine != 20 || target.Base != "pool.go" {
+		t.Fatalf("ResolveBlamePathIn = %+v, want FullPath=%q Line=10 EndLine=20", target, filePath)
+	}
+
+	now := time.Now().UTC()
+	sessions := []model.Session{
+		{
+			Harness: "claude",
+			ID:      "sess-alpha",
+			Project: "org/alpha",
+			Updated: now,
+			Messages: []model.Message{
+				{Role: "user", Text: "update pkg/pool.go", Time: now},
+				{Role: sources.RoleEdit, Text: filePath + "\npkg/pool.go edit", Time: now},
+			},
+		},
+		{
+			Harness: "claude",
+			ID:      "sess-beta",
+			Project: "org/beta",
+			Updated: now,
+			Messages: []model.Message{
+				{Role: "user", Text: "update pkg/pool.go", Time: now},
+				{Role: sources.RoleEdit, Text: filepath.Join(filepath.Dir(repoDir), "beta", "pkg", "pool.go") + "\nbeta edit", Time: now},
+			},
+		},
+	}
+	hits := Blame(sessions, target, BlameOptions{Projects: []string{"org/alpha"}})
+	if len(hits) != 1 || hits[0].Session.ID != "sess-alpha" {
+		t.Fatalf("Blame with Projects=[org/alpha] = %+v, want only sess-alpha", hits)
+	}
+}
