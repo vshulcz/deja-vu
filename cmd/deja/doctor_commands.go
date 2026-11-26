@@ -163,5 +163,5 @@ func commandSkillPath(harness string) string {
 // drift from the other.
 func skillIsTheCommandHarnesses() []string {
 	return []string{"ante", "antigravity", "codex", "copilot", "gemini", "grok",
-		"kimi", "openclaw", "qwen", "trae", "muse", "zed"}
+		"kimi", "openclaw", "qwen", "gigacode", "trae", "muse", "zed"}
 }

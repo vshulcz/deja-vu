@@ -2,7 +2,7 @@
 
 [English](../README.md) | 简体中文 | [繁體中文](zh-TW.md) | [日本語](ja.md) | [한국어](ko.md) | [Español](es.md) | [Português](pt.md) | [Français](fr.md) | [Deutsch](de.md) | [Русский](ru.md) | [Türkçe](tr.md) | [हिन्दी](hi.md)
 
-面向 CodeWhale 的 Claude 兼容插件包——在对话会话中直接提供 `deja` MCP 服务（包含 `recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff` 八个工具）、`deja-history` 技能指引以及 `/deja` 斜杠命令，检索范围覆盖五十二个编程工具（包含本机其他五十一个智能体已经写入磁盘的历史会话）。
+面向 CodeWhale 的 Claude 兼容插件包——在对话会话中直接提供 `deja` MCP 服务（包含 `recall`、`fix`、`blame`、`how`、`orient`、`context`、`remember`、`handoff` 八个工具）、`deja-history` 技能指引以及 `/deja` 斜杠命令，检索范围覆盖五十三个编程工具（包含本机其他五十二个智能体已经写入磁盘的历史会话）。
 
 ![deja-vu 演示](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -29,7 +29,7 @@ deja install codewhale-auto
 
 | 召回率 | Token 用量 | 索引与检索耗时 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 52 个编程智能体的检索仅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 题清洗后测得 88.9% hit@1） | **token 减少 58%**（同一仓储重复任务） | **13.6 秒**索引 19,195 个历史会话 / 跨越 53 个编程智能体的检索仅 **0.7 ms** |
 
 ## 仓库记忆与跨智能体接力
 

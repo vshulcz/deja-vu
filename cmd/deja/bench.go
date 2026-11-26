@@ -314,6 +314,7 @@ func isolateBenchEnv(root, claudeRoot, indexDir string) func() {
 		"DEJA_GEMINI_ROOT": filepath.Join(root, "gemini"), "DEJA_CURSOR_ROOT": filepath.Join(root, "cursor"),
 		"DEJA_CURSOR_CLI_ROOT": filepath.Join(root, "cursor-cli"), "DEJA_ANTIGRAVITY_ROOT": filepath.Join(root, "antigravity"),
 		"DEJA_GROK_ROOT": filepath.Join(root, "grok"), "DEJA_QWEN_ROOT": filepath.Join(root, "qwen"),
+		"DEJA_GIGACODE_ROOT": filepath.Join(root, "gigacode"), "GIGACODE_HOME": filepath.Join(root, "gigacode-home"),
 		"DEJA_NOTES_FILE": filepath.Join(root, "notes.jsonl"), "CLAUDE_CONFIG_DIR": filepath.Join(root, "claude-config"),
 		"CODEX_HOME": filepath.Join(root, "codex-home"), "GEMINI_CLI_HOME": filepath.Join(root, "gemini-home"),
 		"CURSOR_CONFIG_DIR": filepath.Join(root, "cursor-config"), "GROK_HOME": filepath.Join(root, "grok-home"),

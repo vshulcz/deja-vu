@@ -377,9 +377,7 @@ func (r *piReader) toolResult(msg map[string]any, t time.Time) {
 		if strings.TrimSpace(span) == "" {
 			return
 		}
-		if len(span) > editSpanMax {
-			span = span[:editSpanMax]
-		}
+		span = capEditSpan(span)
 		r.add(RoleEdit, path+"\n"+span, t)
 	}
 }

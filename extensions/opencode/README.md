@@ -6,7 +6,7 @@ English | [简体中文](https://github.com/vshulcz/deja-vu/blob/main/extensions
 
 Part of **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** on LongMemEval-S) · [Documentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Live demo](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-opencode remembers its own sessions. When you switch between coding tools or reopen a repo months later, this plugin answers the other question: what you did in the fifty-one other coding agents on this machine — Claude Code, Codex, Cursor, Gemini, Hermes, and Zed among them — including transcripts recorded before `deja` was installed.
+opencode remembers its own sessions. When you switch between coding tools or reopen a repo months later, this plugin answers the other question: what you did in the fifty-two other coding agents on this machine — Claude Code, Codex, Cursor, Gemini, Hermes, and Zed among them — including transcripts recorded before `deja` was installed.
 
 It runs [deja](https://github.com/vshulcz/deja-vu), a single local Go binary with a local BM25 index: no LLM, no embeddings required, and no network path besides an optional daily release check that `DEJA_OFFLINE=1` turns off.
 
@@ -100,7 +100,7 @@ only then the copy npm installed with this package. Your own `deja update` or
 Without deja anywhere, the tools say so instead of reporting an empty history,
 and the hooks stay quiet.
 
-For full MCP tools (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) across all 52 coding tools when switching agents on one project, run `deja install --auto` (see [Switch Agents Without Losing Context](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)).
+For full MCP tools (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) across all 53 coding tools when switching agents on one project, run `deja install --auto` (see [Switch Agents Without Losing Context](https://vshulcz.github.io/deja-vu/guide/switch-agents-without-losing-context.html)).
 
 ## Privacy
 
@@ -110,7 +110,7 @@ For full MCP tools (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remem
 
 | Recall | Tokens | Index & lookup |
 |---|---|---|
-| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 52 coding agents |
+| **97.2% R@5** on LongMemEval-S (88.9% hit@1, 470 questions) | **58% fewer tokens** (on repeated repo tasks) | **13.6 s** to index 19,195 sessions / **0.7 ms** lookup across 53 coding agents |
 
 ## Repository memory & handoff
 

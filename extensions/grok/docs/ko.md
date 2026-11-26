@@ -8,7 +8,7 @@
 
 ![deja-vu 데모](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Claude Code, Codex, Cursor, opencode, Zed 등 47개 추가 코딩 에이전트 세션 기록에서 가져온 로컬 영구 메모리입니다. 단일 Go 바이너리 `deja`로 로컬에서 동작하며 `DEJA_OFFLINE=1`로 일일 확인도 끌 수 있습니다.
+Claude Code, Codex, Cursor, opencode, Zed 등 48개 추가 코딩 에이전트 세션 기록에서 가져온 로컬 영구 메모리입니다. 단일 Go 바이너리 `deja`로 로컬에서 동작하며 `DEJA_OFFLINE=1`로 일일 확인도 끌 수 있습니다.
 
 ## 설치
 
@@ -51,7 +51,7 @@ grok plugin install deja
 
 | 재현율 (Recall) | 토큰 사용량 | 인덱싱 & 조회 속도 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1) | **토큰 58% 절감** (반복 저장소 작업) | 19,195개 세션 **13.6초** 인덱싱 / 52개 코딩 에이전트 통합 **0.7 ms** 조회 |
+| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1) | **토큰 58% 절감** (반복 저장소 작업) | 19,195개 세션 **13.6초** 인덱싱 / 53개 코딩 에이전트 통합 **0.7 ms** 조회 |
 
 ## 저장소 메모리 및 에이전트 간 핸드오프
 

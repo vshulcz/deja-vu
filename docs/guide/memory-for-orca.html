@@ -5,11 +5,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Add memory to Orca: every agent's sessions — deja-vu</title>
-<meta name="description" content="Give Orca recall over all fifty-two agents via the extensions/orca plugin or deja install orca-auto — MCP, skill, /deja, hooks, and status line.">
+<meta name="description" content="Give Orca recall over all fifty-three agents via the extensions/orca plugin or deja install orca-auto — MCP, skill, /deja, hooks, and status line.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-orca.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Add memory to Orca: every agent's sessions">
-<meta property="og:description" content="Give Orca recall over all fifty-two agents via the extensions/orca plugin or deja install orca-auto — MCP, skill, /deja, hooks, and status line.">
+<meta property="og:description" content="Give Orca recall over all fifty-three agents via the extensions/orca plugin or deja install orca-auto — MCP, skill, /deja, hooks, and status line.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-orca.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -25,13 +25,13 @@
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
 <meta name="twitter:title" content="Add memory to Orca: every agent's sessions">
-<meta name="twitter:description" content="Give Orca recall over all fifty-two agents via the extensions/orca plugin or deja install orca-auto — MCP, skill, /deja, hooks, and status line.">
+<meta name="twitter:description" content="Give Orca recall over all fifty-three agents via the extensions/orca plugin or deja install orca-auto — MCP, skill, /deja, hooks, and status line.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Orca", "description": "Give Orca recall over all fifty-two agents via the extensions/orca plugin or deja install orca-auto — MCP, skill, /deja, hooks, and status line.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-orca.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-orca.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-12", "dateModified": "2026-11-16"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Orca", "description": "Give Orca recall over all fifty-three agents via the extensions/orca plugin or deja install orca-auto — MCP, skill, /deja, hooks, and status line.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-orca.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-orca.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-11-12", "dateModified": "2026-11-16"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Memory for Orca","item":"https://vshulcz.github.io/deja-vu/guide/memory-for-orca.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Where does Orca store its session journal?","acceptedAnswer":{"@type":"Answer","text":"In agent-session-journal.db under Orca's userData directory (~/Library/Application Support/orca on macOS, ~/.config/orca on Linux, %APPDATA%/orca on Windows)."}},{"@type":"Question","name":"What does the extensions/orca trusted-worker plugin add to Orca?","acceptedAnswer":{"@type":"Answer","text":"Installed via Orca -> Plugins -> extensions/orca, the v2 trusted-worker plugin wires agent.prompt.before and agent.tool.before (for Agent/Task subagent prompts), registers deja.orient and deja.recall commands, and stands down automatically if native UserPromptSubmit hooks from deja install orca-auto are active."}},{"@type":"Question","name":"How do I add native MCP and PostToolUse fix capture to Orca?","acceptedAnswer":{"@type":"Answer","text":"Run deja install orca for mcp.json, the deja-history skill, and /deja, or deja install orca-auto to add the six settings.json lifecycle hooks (including PostToolUse failed-command fix capture) and statusLine."}}]}</script>
 </head>
@@ -45,6 +45,7 @@
 <a href="agents.html">Agents &amp; MCP</a>
 <a href="search.html">Search</a>
 <a href="commands.html">CLI reference</a>
+<a href="configuration.html">Configuration</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
 <details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
@@ -219,7 +220,7 @@
 <p>Everything above, plus six lifecycle hooks (<code>SessionStart</code>, <code>UserPromptSubmit</code>, <code>PreToolUse</code>, <code>PostToolUse</code> for failed-command fixes, <code>PreCompact</code>, <code>SessionEnd</code>) and <code>statusLine</code> in <code>settings.json</code>.</p>
 
 <h2>The part that is not about this harness</h2>
-<p>The local BM25 index (<code>~/.cache/deja/index.db</code>) covers every agent's transcripts on the machine — fifty-two of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so work recorded in Orca's journal is searchable from Claude Code, Codex, Cursor or opencode, and the reverse. <a href="privacy.html">Indexing and search stay local</a>, and credentials are stripped as the index is built.</p>
+<p>The local BM25 index (<code>~/.cache/deja/index.db</code>) covers every agent's transcripts on the machine — fifty-three of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so work recorded in Orca's journal is searchable from Claude Code, Codex, Cursor or opencode, and the reverse. <a href="privacy.html">Indexing and search stay local</a>, and credentials are stripped as the index is built.</p>
 
 <h2>Repository memory &amp; handoff</h2>
 <p>Share vetted project decisions and dead ends through git in <code>.deja/memory.jsonl</code> (<code>deja repo candidates</code>, <code>deja repo add &lt;id&gt;</code>). Entries are redacted on write, stored sorted with <code>merge=union</code> so parallel branches merge cleanly, and loaded for any teammate who clones the repository (<code>{"activations":{"auto":{"repo":false}}}</code> in the trust policy keeps them out of hooks). See <a href="repo-memory.html">repo memory</a>.</p>

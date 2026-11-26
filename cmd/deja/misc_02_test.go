@@ -2578,9 +2578,9 @@ func TestARecordedExitStatusIsNotOverwritten(t *testing.T) {
 func TestCompletionsListEveryUserFacingCommand(t *testing.T) {
 	// Hooks are invoked by agents, not typed; warmup-status is internal.
 	internal := map[string]bool{
-		"hook-context": true, "hook-prompt": true, "hook-precompact": true,
+		"hook-context": true, "hook-ext": true, "hook-prompt": true, "hook-precompact": true,
 		"hook-antigravity": true, "hook-goose": true, "hook-goose-prompt": true,
-		"hook-refresh": true, "hook-session-end": true, "hook-mcp-call": true,
+		"hook-refresh": true, "hook-embed": true, "hook-session-end": true, "hook-mcp-call": true,
 		"hook-stop": true, "hook-plan": true, "hook-tool": true, "hook-tool-after": true, "hook-codewhale": true,
 		"warmup-status": true, "mcp": true, "reasonix-ext": true,
 	}
@@ -3128,22 +3128,22 @@ func TestCompletionOffersEveryRole(t *testing.T) {
 func TestCompletionOffersHookFlags(t *testing.T) {
 	want := map[string][]string{
 		"bash": {
-			`hook-prompt)` + "\n            COMPREPLY=( $(compgen -W \"--plain --copilot --strict --mcode\"",
+			`hook-prompt)` + "\n            COMPREPLY=( $(compgen -W \"--plain --copilot --strict --junie --mcode\"",
 			`hook-tool-after)` + "\n            COMPREPLY=( $(compgen -W \"--plain --copilot --mcode\"",
 			`hook-session-end)` + "\n            COMPREPLY=( $(compgen -W \"--json\"",
 		},
 		"zsh": {
-			`hook-prompt)` + "\n      _arguments '--plain[omit formatting]' '--copilot[answer in the Copilot CLI hook shape]' '--strict[skip low-confidence sessions]' '--mcode[answer in the MCode hook shape]'",
+			`hook-prompt)` + "\n      _arguments '--plain[omit formatting]' '--copilot[answer in the Copilot CLI hook shape]' '--strict[skip low-confidence sessions]' '--junie[answer in the Junie hook shape]' '--mcode[answer in the MCode hook shape]'",
 			`hook-tool-after)` + "\n      _arguments '--plain[omit formatting]' '--copilot[answer in the Copilot CLI hook shape]' '--mcode[answer in the MCode hook shape]'",
 			`hook-session-end)` + "\n      _arguments '--json[print JSON]'",
 		},
 		"fish": {
-			`__fish_seen_subcommand_from hook-prompt' -l plain`, `__fish_seen_subcommand_from hook-prompt' -l copilot`, `__fish_seen_subcommand_from hook-prompt' -l strict`, `__fish_seen_subcommand_from hook-prompt' -l mcode`,
+			`__fish_seen_subcommand_from hook-prompt' -l plain`, `__fish_seen_subcommand_from hook-prompt' -l copilot`, `__fish_seen_subcommand_from hook-prompt' -l strict`, `__fish_seen_subcommand_from hook-prompt' -l junie`, `__fish_seen_subcommand_from hook-prompt' -l mcode`,
 			`__fish_seen_subcommand_from hook-tool-after' -l plain`, `__fish_seen_subcommand_from hook-tool-after' -l copilot`, `__fish_seen_subcommand_from hook-tool-after' -l mcode`,
 			`__fish_seen_subcommand_from hook-session-end' -l json`,
 		},
 		"powershell": {
-			`'hook-prompt' { @('--plain', '--copilot', '--strict', '--mcode') }`,
+			`'hook-prompt' { @('--plain', '--copilot', '--strict', '--junie', '--mcode') }`,
 			`'hook-tool-after' { @('--plain', '--copilot', '--mcode') }`,
 			`'hook-session-end' { @('--json') }`,
 		},
@@ -3529,8 +3529,7 @@ func TestEveryHelpEntryFlagIsOfferedByCompletion(t *testing.T) {
 		scripts[shell] = emittedCompletion(t, shell)
 	}
 	for _, entry := range helpEntries {
-		if entry.toolHelp ||
-			(strings.HasPrefix(entry.name, "hook-") && entry.name != "hook-context") {
+		if entry.toolHelp {
 			continue
 		}
 		usageText := strings.Join(entry.usage, " ")
@@ -3568,62 +3567,30 @@ func TestEveryValueFlagIsGuardedInEveryShell(t *testing.T) {
 		scripts[shell] = emittedCompletion(t, shell)
 	}
 
-	valueFlagsByCmd := []struct {
-		cmd   string
-		flags []string
-	}{
-		{"blame", []string{"--harness", "--project", "--since"}},
-		{"origin", []string{"--harness", "--project", "--limit"}},
-		{"review", []string{"--harness", "--project", "--limit"}},
-		{"bench", []string{"--seed"}},
-		{"shell", []string{"-c"}},
-		{"forget", []string{"--session", "--project", "--before", "--unforget"}},
-		{"handoff", []string{"--to", "--project", "--harness"}},
-		{"status", []string{"--harness"}},
-		{"trail", []string{"--project", "--harness", "--limit"}},
-		{"last", []string{"--from", "--harness", "--project", "--since", "--role"}},
-		{"recall", []string{"--project", "--harness", "--limit", "--offset"}},
-		{"remember", []string{"--project", "--tag"}},
-		{"repo", []string{"--limit", "--since", "--kind"}},
-		{"rules", []string{"--limit", "--since", "--project"}},
-		{"restore", []string{"--span", "-o", "--out"}},
-		{"secrets", []string{"--limit"}},
-		{"stats", []string{"--html", "--card", "--harness", "--project", "--since", "--role"}},
-		{"sync", []string{"--peer"}},
-		{"show", []string{"--harness", "--offset", "--limit"}},
-		{"view", []string{"--out"}},
-		{"recap", []string{"--since", "--limit"}},
-		{"files", []string{"--project", "--limit"}},
-		{"how", []string{"--project", "--limit"}},
-		{"promote", []string{"--state", "--note", "--tag", "--to"}},
-		{"friction", []string{"--limit", "--settle", "--unsettle"}},
-		{"fix", []string{"--limit"}},
-		{"tests", []string{"--limit"}},
-		{"init", []string{"--auto-lock"}},
-		{"mcp", []string{"--http"}},
-		{"search", []string{"--harness", "--project", "--since", "--role", "--session", "--limit", "--sort"}},
-	}
-
-	for _, tc := range valueFlagsByCmd {
+	for _, spec := range commandSpecs {
+		flags := spec.ValueFlagNames()
+		if len(flags) == 0 {
+			continue
+		}
 		for _, shell := range completionTestShells {
-			block := shellCommandBlock(shell, scripts[shell], tc.cmd)
-			for _, flag := range tc.flags {
+			block := shellCommandBlock(shell, scripts[shell], spec.Name)
+			for _, flag := range flags {
 				switch shell {
 				case "bash":
 					// Value-taking flags must either be guarded in a `$prev` branch or,
 					// for stats --html/--card, remain guarded by _arguments in zsh/fish.
-					if tc.cmd == "stats" && (flag == "--html" || flag == "--card") {
+					if spec.Name == "stats" && (flag == "--html" || flag == "--card") {
 						continue
 					}
 					if !strings.Contains(block, `"`+flag+`"`) {
-						t.Errorf("bash %s block does not guard value flag %s in $prev check:\n%s", tc.cmd, flag, block)
+						t.Errorf("bash %s block does not guard value flag %s in $prev check:\n%s", spec.Name, flag, block)
 					}
 				case "powershell":
-					if tc.cmd == "stats" && (flag == "--html" || flag == "--card") {
+					if spec.Name == "stats" && (flag == "--html" || flag == "--card") {
 						continue
 					}
 					if !strings.Contains(block, "$previous") || !strings.Contains(block, "'"+flag+"'") {
-						t.Errorf("powershell %s block does not guard value flag %s in $previous check:\n%s", tc.cmd, flag, block)
+						t.Errorf("powershell %s block does not guard value flag %s in $previous check:\n%s", spec.Name, flag, block)
 					}
 				case "zsh":
 					want := flag + "="
@@ -3631,10 +3598,10 @@ func TestEveryValueFlagIsGuardedInEveryShell(t *testing.T) {
 						want = "-c["
 					}
 					if !strings.Contains(block, want) {
-						t.Errorf("zsh %s block does not declare value spec %s:\n%s", tc.cmd, want, block)
+						t.Errorf("zsh %s block does not declare value spec %s:\n%s", spec.Name, want, block)
 					}
 				case "fish":
-					raw := fishLinesFor(scripts["fish"], tc.cmd)
+					raw := fishLinesFor(scripts["fish"], spec.Name)
 					fishFlag := "-l " + strings.TrimPrefix(flag, "--")
 					switch flag {
 					case "-c":
@@ -3650,7 +3617,7 @@ func TestEveryValueFlagIsGuardedInEveryShell(t *testing.T) {
 						}
 					}
 					if !matched {
-						t.Errorf("fish %s block does not mark %s with -r or -x:\n%s", tc.cmd, flag, raw)
+						t.Errorf("fish %s block does not mark %s with -r or -x:\n%s", spec.Name, flag, raw)
 					}
 				}
 			}

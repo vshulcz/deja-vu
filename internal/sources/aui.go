@@ -137,9 +137,7 @@ func (s *auiStep) records(cwd string) []model.Message {
 			files = append(files, p)
 			old, written := changedLines(auiContent(m["beforeContent"]), auiContent(m["afterContent"]))
 			if old != "" {
-				if len(old) > editSpanMax {
-					old = old[:editSpanMax]
-				}
+				old = capEditSpan(old)
 				spans = append(spans, p+"\n"+old)
 			}
 			if rec := WroteRecord(p, written); rec != "" {

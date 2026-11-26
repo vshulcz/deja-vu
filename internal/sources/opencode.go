@@ -776,10 +776,7 @@ func opencodeToolRow(harness string, s *model.Session, r map[string]any) bool {
 		path := kiloNotebookPath(harness, str(r["editpath"]), s.Path)
 		t := partTime(r)
 		if path != "" && old != "" && IndexEdits() {
-			span := old
-			if len(span) > editSpanMax {
-				span = span[:editSpanMax]
-			}
+			span := capEditSpan(old)
 			s.Touch(t)
 			s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: path + "\n" + span, Time: t})
 		}
@@ -1109,10 +1106,7 @@ func patchSpans(patch string) []string {
 	var removed []string
 	flush := func() {
 		if path != "" && len(removed) > 0 {
-			span := strings.Join(removed, "\n")
-			if len(span) > editSpanMax {
-				span = span[:editSpanMax]
-			}
+			span := capEditSpan(strings.Join(removed, "\n"))
 			out = append(out, path+"\n"+span)
 		}
 		removed = nil

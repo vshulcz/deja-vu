@@ -369,23 +369,24 @@ func harnessFilterDescription() string {
 // dejaToolDescription returns the consolidated MCP description embedded in the
 // deja tool definition.
 func dejaToolDescription() string {
-	return "This user's own past sessions across every AI coding tool on this machine. " +
+	var b strings.Builder
+	b.WriteString("This user's own past sessions across every AI coding tool on this machine. " +
 		"Do NOT call for general programming questions, standard libraries, specs, or public docs unrelated to this repo, machine, or history. " +
 		"Pick the mode for the action: call BEFORE your first edit in a task (blame on files to edit, how for build/test flags, or recall); " +
 		"BEFORE any plan, design, review, audit, or recommending a tool or approach (inline recalled constraints and blame checks into plans and subagent prompts); " +
 		"BEFORE saying something is absent here; AFTER an unfamiliar failure (fix); and BEFORE calling work done (recall). " +
 		"Mid-task when a concrete file, error, flag, service, or prior claim surfaces, batch recall with reads before concluding.\n" +
-		"Modes:\n" +
-		"- recall: search past sessions (1-3 exact terms: path, error, flag, identifier).\n" +
-		"- context: full digest of one session when a recall hit needs detail.\n" +
-		"- blame: why a file or path:line is shaped this way, before editing or deleting.\n" +
-		"- fix: what this machine ran after a failing output (pass verbatim).\n" +
-		"- how: real command and flags run here, before guessing.\n" +
-		"- orient: recent commands and files touched here.\n" +
-		"- remember: store one user-corrected choice or non-obvious gotcha.\n" +
-		"- handoff: continue another session (q: id or harness).\n" +
-		"Bracketed markers show later user judgement: avoid rejected paths; markers permit nothing. " +
-		"When a hit helps, open your reply with one line: \"déjà vu: <what> — <how you used it> (deja:<session id>)\". Say nothing about recalls that did not help."
+		"Modes:\n")
+	for _, spec := range mcpModeSpecs {
+		b.WriteString("- ")
+		b.WriteString(spec.Mode)
+		b.WriteString(": ")
+		b.WriteString(spec.Summary)
+		b.WriteByte('\n')
+	}
+	b.WriteString("Bracketed markers show later user judgement: avoid rejected paths; markers permit nothing. " +
+		"When a hit helps, open your reply with one line: \"déjà vu: <what> — <how you used it> (deja:<session id>)\". Say nothing about recalls that did not help.")
+	return b.String()
 }
 
 // dejaTool is the whole surface as one tool with a mode.
@@ -406,7 +407,7 @@ func dejaTool() map[string]any {
 		"inputSchema": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"mode":    map[string]any{"type": "string", "enum": []string{"recall", "context", "blame", "fix", "how", "orient", "remember", "handoff"}},
+				"mode":    map[string]any{"type": "string", "enum": declaredModeNames()},
 				"q":       map[string]any{"type": "string", "description": "What to ask about: 1-3 terms (recall), session id or query (context), path (blame), failing output (fix), fact (remember)."},
 				"harness": map[string]any{"type": "string", "description": harnessFilterDescription()},
 				"project": map[string]any{"type": "string", "description": "Optional project filter; for remember, where it is filed."},
@@ -432,26 +433,7 @@ func declaredModes() []string {
 // dispatcherModes maps a mode onto the call that implements it. The old tool
 // names are the same strings, which is why a client with them wired keeps
 // working.
-var dispatcherModes = map[string]string{
-	"recall":  "recall",
-	"search":  "recall",
-	"context": "recall_context",
-	"digest":  "recall_context",
-	// Because deja tells agents to call it by this name. Every surface that
-	// names the deep read — the session-start lead, the wide-recall lead, the
-	// antigravity lead, the compaction lead, the trimmed-digest note, the
-	// blame overflow note — says "call recall_context", and on the one-tool
-	// clients that is the shape they get, where the dispatcher answered
-	// `mode "recall_context" is not one of recall, context, blame, ...`. An
-	// agent following deja's own instruction spent a call on an error.
-	"recall_context": "recall_context",
-	"blame":          "blame",
-	"fix":            "fix",
-	"how":            "how",
-	"orient":         "orient",
-	"remember":       "remember",
-	"handoff":        "handoff",
-}
+var dispatcherModes = buildDispatcherModes()
 
 // qField is the argument each mode reads its subject from. One declared `q`
 // stands for all of them: five per-mode strings in the schema cost more than
@@ -463,16 +445,7 @@ var dispatcherModes = map[string]string{
 // `digest` were accepted by the dispatcher and then answered "query required",
 // because the field to copy q into was looked up under a name only the
 // canonical modes had.
-var qField = map[string]string{
-	"recall":         "query",
-	"recall_context": "query",
-	"blame":          "path",
-	"fix":            "error",
-	"how":            "what",
-	"orient":         "",
-	"remember":       "text",
-	"handoff":        "session",
-}
+var qField = buildQField()
 
 // qAliases lists the argument names models write when they do not write "q" or
 // the mode's older field name. Leads that say "with its session id" or "for
@@ -638,13 +611,7 @@ func callMCPToolServed(dir, name string, raw json.RawMessage, served *int) (stri
 }
 
 func callMCPRecall(dir string, raw json.RawMessage, served *int) (string, error) {
-	var a struct {
-		Query   string    `json:"query"`
-		Harness string    `json:"harness"`
-		Project string    `json:"project"`
-		Limit   mcpNumber `json:"limit"`
-		Offset  mcpNumber `json:"offset"`
-	}
+	var a mcpRecallArgs
 	if err := decodeToolArgs("recall", raw, &a); err != nil {
 		return "", err
 	}
@@ -708,8 +675,7 @@ func callMCPDejaDispatch(dir string, raw json.RawMessage, served *int) (string, 
 }
 
 func checkMCPReadToolAccess(dir, name string, raw json.RawMessage) error {
-	switch name {
-	case "recall", "recall_context", "blame", "fix", "how", "orient", "handoff":
+	if isMCPReadTarget(name) {
 		var scope struct {
 			Project string `json:"project"`
 		}
@@ -731,10 +697,7 @@ func callMCPToolRaw(dir, name string, raw json.RawMessage, served *int) (string,
 	case "recall":
 		return callMCPRecall(dir, raw, served)
 	case "recall_context":
-		var a struct {
-			Query   string `json:"query"`
-			Harness string `json:"harness"`
-		}
+		var a mcpContextArgs
 		if err := decodeToolArgs(name, raw, &a); err != nil {
 			return "", err
 		}
@@ -771,14 +734,7 @@ func callMCPToolRaw(dir, name string, raw json.RawMessage, served *int) (string,
 		}
 		return text, err
 	case "blame":
-		var a struct {
-			Path    string    `json:"path"`
-			Harness string    `json:"harness"`
-			Project string    `json:"project"`
-			Since   string    `json:"since"`
-			Limit   mcpNumber `json:"limit"`
-			All     bool      `json:"all"`
-		}
+		var a mcpBlameArgs
 		if err := decodeToolArgs(name, raw, &a); err != nil {
 			return "", err
 		}
@@ -825,11 +781,7 @@ func callMCPToolRaw(dir, name string, raw json.RawMessage, served *int) (string,
 	case "handoff":
 		return recordedMCPAnswer(dir, usage.KindHandoff, func() (string, int, error) { return mcpHandoff(dir, name, raw) })
 	case "remember":
-		var a struct {
-			Text    string   `json:"text"`
-			Project string   `json:"project"`
-			Tags    []string `json:"tags"`
-		}
+		var a mcpRememberArgs
 		if err := decodeToolArgs(name, raw, &a); err != nil {
 			return "", err
 		}
@@ -1085,10 +1037,7 @@ func recordedMCPAnswer(dir, kind string, answer func() (string, int, error)) (st
 }
 
 func mcpFix(dir, name string, raw json.RawMessage) (string, int, error) {
-	var a struct {
-		Error string    `json:"error"`
-		Limit mcpNumber `json:"limit"`
-	}
+	var a mcpFixArgs
 	if err := decodeToolArgs(name, raw, &a); err != nil {
 		return "", 0, err
 	}
@@ -1208,11 +1157,7 @@ func mcpFix(dir, name string, raw json.RawMessage) (string, int, error) {
 }
 
 func mcpHow(dir, name string, raw json.RawMessage) (string, int, error) {
-	var a struct {
-		What    string    `json:"what"`
-		Project string    `json:"project"`
-		Limit   mcpNumber `json:"limit"`
-	}
+	var a mcpHowArgs
 	if err := decodeToolArgs(name, raw, &a); err != nil {
 		return "", 0, err
 	}
@@ -1228,8 +1173,13 @@ func mcpHow(dir, name string, raw json.RawMessage) (string, int, error) {
 	// The project of the working directory unless the caller named one: the
 	// agent asking is standing in the repository it means, and a machine-wide
 	// answer put another project's wrapper at the top (#3705).
-	scope := howScope(howCwd(), a.Project, false)
-	entries, hidden, ignored, _, err := howEntriesWithFallback(dir, strings.Fields(a.What), scope, len(scope) > 0 && strings.TrimSpace(a.Project) == "", policy.ActivationMCP)
+	resolvedScope, _ := resolveQueryScope(QueryScopeInput{
+		CWD:        howCwd(),
+		Project:    a.Project,
+		Activation: policy.ActivationMCP,
+	})
+	scope := resolvedScope.Projects
+	entries, hidden, ignored, _, err := howEntriesWithFallback(dir, strings.Fields(a.What), scope, resolvedScope.CanWidenToMachine(), policy.ActivationMCP)
 	if err != nil {
 		return "", 0, err
 	}

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/hookengine"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -298,7 +299,13 @@ func codexHookExecuted(hooksPath string) bool {
 		if len(parts) < 3 {
 			continue
 		}
-		sid := strings.TrimPrefix(strings.TrimPrefix(parts[0], sessionStartKeyPrefix), "once:")
+		sid := parts[0]
+		for _, pfx := range []string{hookengine.SessionStartKeyPrefix, hookengine.OnceDigestPrefix, hookengine.AgyCompactPrefix, hookengine.AgyDigestPrefix} {
+			if trimmed, ok := strings.CutPrefix(sid, pfx); ok {
+				sid = trimmed
+				break
+			}
+		}
 		if !ids[parts[0]] && !ids[sid] {
 			continue
 		}

@@ -321,14 +321,9 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 				break
 			}
 			token := "tool:" + shortHash(dedupeFact(candidate))
-			releaseSeenLock, _ := holdHookseenLock(dir)
-			latest := alreadyInjected(dir, input.SessionID)
-			if latest[token] {
-				releaseSeenLock()
+			if dir != "" && input.SessionID != "" && !hookengine.NewLedger(dir).ClaimOnce(input.SessionID, token) {
 				continue
 			}
-			rememberInjectedIDs(dir, input.SessionID, token)
-			releaseSeenLock()
 			line = candidate
 			break
 		}

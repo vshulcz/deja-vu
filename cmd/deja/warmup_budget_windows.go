@@ -14,7 +14,7 @@ import (
 // carry — the cap is what keeps the rebuild off every core, and that is the
 // half that was measured (#3500).
 func takeWarmupBudget() {
-	if os.Getenv("DEJA_WARMUP_SENTINEL") == "" && os.Getenv("DEJA_HOOK_REFRESH") == "" {
+	if os.Getenv("DEJA_WARMUP_SENTINEL") == "" && os.Getenv("DEJA_HOOK_REFRESH") == "" && os.Getenv("DEJA_HOOK_EMBED") == "" {
 		return
 	}
 	if os.Getenv("GOMAXPROCS") != "" {

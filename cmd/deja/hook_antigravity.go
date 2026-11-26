@@ -208,39 +208,19 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	return nil
 }
 
-func isSingleRecallFrame(msg string) bool {
-	return hookengine.IsSingleRecallFrame(msg)
-}
-
-func appendUnwrappedRecallParts(dst []string, msg string, seen map[string]bool) []string {
-	return hookengine.AppendUnwrappedRecallParts(dst, msg, seen)
-}
-
 // coalesceAntigravitySteps merges multiple hook messages (recovery packet,
 // edit/command file lines, fix pairs, digest, and prompt recall) into a single
 // framed EphemeralMessage so trust headers appear once per invocation.
 func coalesceAntigravitySteps(steps []antigravityInjectStep) []antigravityInjectStep {
-	var nonEmpty []antigravityInjectStep
+	msgs := make([]string, 0, len(steps))
 	for _, s := range steps {
-		if strings.TrimSpace(s.EphemeralMessage) != "" {
-			nonEmpty = append(nonEmpty, s)
-		}
+		msgs = append(msgs, s.EphemeralMessage)
 	}
-	if len(nonEmpty) == 0 {
+	merged := hookengine.CoalesceRecallMessages(msgs)
+	if merged == "" {
 		return nil
 	}
-	if len(nonEmpty) == 1 && (isSingleRecallFrame(nonEmpty[0].EphemeralMessage) || !strings.Contains(nonEmpty[0].EphemeralMessage, "<deja-recall>")) {
-		return nonEmpty
-	}
-	seen := make(map[string]bool, len(nonEmpty))
-	var parts []string
-	for _, s := range nonEmpty {
-		parts = appendUnwrappedRecallParts(parts, s.EphemeralMessage, seen)
-	}
-	if len(parts) == 0 {
-		return nil
-	}
-	return []antigravityInjectStep{{EphemeralMessage: frameRecall(strings.Join(parts, "\n\n"))}}
+	return []antigravityInjectStep{{EphemeralMessage: merged}}
 }
 
 // antigravityCompactionPacket captures a compaction the transcript shows and

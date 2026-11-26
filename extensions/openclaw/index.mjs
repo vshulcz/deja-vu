@@ -100,6 +100,42 @@ async function run(bin, args, input, cwd, timeout = 20000) {
   }
 }
 
+function parseHookExtEnvelope(raw) {
+  const s = String(raw || "").trim()
+  if (!s.startsWith("{")) return null
+  try {
+    const parsed = JSON.parse(s)
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && typeof parsed.ok === "boolean") {
+      return parsed
+    }
+  } catch {}
+  return null
+}
+
+async function runExt(bin, op, payload, cwd, timeout = 20000) {
+  let raw = ""
+  let timedOut = false
+  try {
+    const child = run_(bin, ["hook-ext", "--host", "openclaw", "--op", op], {
+      windowsHide: true,
+      encoding: "utf8",
+      timeout,
+      cwd,
+      maxBuffer: 8 * 1024 * 1024,
+    })
+    if (payload !== undefined) {
+      child.child.stdin.on("error", () => {})
+      child.child.stdin.end(JSON.stringify(payload))
+    }
+    const { stdout } = await child
+    raw = stdout
+  } catch (err) {
+    timedOut = Boolean(err?.killed || err?.signal)
+    raw = typeof err?.stdout === "string" ? err.stdout : ""
+  }
+  return { env: parseHookExtEnvelope(raw), timedOut }
+}
+
 // installerWiring reads what `deja install` left for OpenClaw: the MCP server
 // in openclaw.json and the plugin `--auto` writes. A read that fails means
 // "not wired": the worst case is doing the work twice, not skipping it.
@@ -154,11 +190,40 @@ export default {
       const out = await run(bin, args, input, cwd, timeout)
       return out
     }
+    const workspace = (ctx) => (ctx && ctx.workspaceDir) || process.cwd()
+    let hookExt = null
+    const hookCwd = (dir) => (dir && existsSync(dir) ? dir : process.cwd())
+    const askExt = async (op, payload, timeout = 20000, cwd = process.cwd()) => {
+      if (hookExt === false) return null
+      const { env, timedOut } = await runExt(bin, op, payload, hookCwd(cwd), timeout)
+      if (env) {
+        hookExt = true
+        return env
+      }
+      if (!timedOut) hookExt = false
+      return null
+    }
+    const intOpt = (v) => {
+      if (v === undefined || v === null) return undefined
+      const n = Math.trunc(Number(v))
+      return Number.isFinite(n) ? n : undefined
+    }
+    const extTool = async (toolName, toolInput, dir, opts = {}) => {
+      const resolved = dir || process.cwd()
+      if (hookExt === false) return null
+      const { env, timedOut } = await runExt(bin, "tool", { tool: toolName, tool_input: toolInput, cwd: resolved, ...opts }, resolved, 120000)
+      if (env) {
+        hookExt = true
+        if (!env.ok) return { ok: false, text: env.error || NOTHING }
+        return { ok: true, text: env.output || "" }
+      }
+      if (!timedOut) hookExt = false
+      return null
+    }
     // deja recall ranks the project of its working directory first, and the
     // plugin process runs wherever the gateway was started. A tool registered
     // as a factory is built for each run with that run's context, whose
     // workspaceDir is the session's workspace (#5580).
-    const workspace = (ctx) => (ctx && ctx.workspaceDir) || process.cwd()
     const answer = (out) => text(out || (installed ? NOTHING : MISSING))
 
     // --framed: fix and blame print for a person, and what a tool returns goes
@@ -174,8 +239,16 @@ export default {
           parameters: RECALL_SCHEMA,
           async execute(_id, params) {
             // The page the MCP recall tool serves, framed and budgeted by deja.
+            const dir = workspace(ctx)
+            const rawLimit = intOpt(params && params.limit)
+            const rawOffset = intOpt(params && params.offset)
+            const opts = {}
+            if (rawLimit !== undefined) opts.limit = Math.min(20, Math.max(1, rawLimit))
+            if (rawOffset !== undefined && rawOffset > 0) opts.offset = Math.min(1e9, rawOffset)
+            const ext = await extTool("deja_recall", { query: params && params.query }, dir, opts)
+            if (ext !== null) return text(ext.text || NOTHING)
             const call = recallArgv(params)
-            const out = await ask(call, undefined, 120000, workspace(ctx))
+            const out = await ask(call, undefined, 120000, dir)
             return answer(out || (installed ? recallSilence(call) : ""))
           },
         }),
@@ -188,7 +261,10 @@ export default {
             "Call after an unfamiliar command, test, or CI failure: what this machine ran after that same error before, in sessions where it did not come back. Paste failing output verbatim rather than paraphrasing.",
           parameters: FIX_SCHEMA,
           async execute(_id, params) {
-            return answer(await ask(["--framed", ...argv("fix", [], params.error)], undefined, 120000, workspace(ctx)))
+            const dir = workspace(ctx)
+            const ext = await extTool("deja_fix", { error: params && params.error }, dir)
+            if (ext !== null) return text(ext.text || NOTHING)
+            return answer(await ask(["--framed", ...argv("fix", [], params.error)], undefined, 120000, dir))
           },
         }),
         { name: "deja_fix" },
@@ -200,7 +276,10 @@ export default {
             "Call before editing, refactoring, or deleting a file: the past sessions that discussed it, so you know why it is shaped the way it is (inline checks into plans and subagent prompts). Session history, not git authorship.",
           parameters: BLAME_SCHEMA,
           async execute(_id, params) {
-            return answer(await ask(["--framed", ...argv("blame", [], params.path)], undefined, 120000, workspace(ctx)))
+            const dir = workspace(ctx)
+            const ext = await extTool("deja_blame", { path: params && params.path }, dir)
+            if (ext !== null) return text(ext.text || NOTHING)
+            return answer(await ask(["--framed", ...argv("blame", [], params.path)], undefined, 120000, dir))
           },
         }),
         { name: "deja_blame" },
@@ -249,13 +328,12 @@ export default {
       }
       // Both seams below fire once per agent run, so deja_once is what keeps
       // the digest to the first of them.
-      const digest = (event, ctx) => {
+      const digest = async (event, ctx) => {
         const at = where(seen, event, ctx, process.cwd())
-        return ask(
-          ["hook-context", "--plain"],
-          JSON.stringify({ session_id: at.id, cwd: at.cwd, source: "startup", deja_once: true, deja_prompt_stamps: true }),
-          10000,
-        )
+        const payload = { session_id: at.id, cwd: at.cwd, source: "startup", deja_once: true, deja_prompt_stamps: true }
+        const ext = await askExt("context", { ...payload, plain: true, once: true }, 10000, at.cwd)
+        if (ext !== null) return ext.ok ? ext.context || "" : ""
+        return ask(["hook-context", "--plain"], JSON.stringify(payload), 10000)
       }
       // agent:bootstrap puts the digest in the Project Context. As a plugin
       // hook it is not behind allowConversationAccess, which OpenClaw 2026.8.1+
@@ -326,19 +404,33 @@ export default {
           const channel = turnChannel(ctx)
           const turn = key ? turns.get(key) : undefined
           if (key) turns.delete(key)
-          const payload = JSON.stringify({ prompt, session_id: at.id, cwd: at.cwd })
+          const payload = { prompt, session_id: at.id, cwd: at.cwd }
+          const wantReceipt = receipts && receiptAllowed(turn, ctx, channel, api.config)
           // One spawn either way. Where the receipt can be shown, deja is asked
           // for its JSON reply: additionalContext, the text --plain prints, goes
           // to the model and the receipt waits for the reply. Anywhere else it
           // stays --plain, and deja keeps the receipt unspent.
           let recall
-          if (receipts && receiptAllowed(turn, ctx, channel, api.config)) {
-            const reply = splitHookReply(await ask(["hook-prompt"], payload, 10000))
+          const ext = await askExt(
+            "prompt",
+            wantReceipt ? { ...payload, plain: false, silent: false } : { ...payload, plain: true },
+            10000,
+            at.cwd,
+          )
+          if (ext !== null) {
+            if (!ext.ok) return
+            if (wantReceipt) {
+              const line = ext.receipt || receiptLine(ext.note)
+              if (line) keep(board, key, { ...turn, runId: ctx.runId, line })
+            }
+            recall = ext.context || ""
+          } else if (wantReceipt) {
+            const reply = splitHookReply(await ask(["hook-prompt"], JSON.stringify(payload), 10000))
             const line = receiptLine(reply.notes)
             if (line) keep(board, key, { ...turn, runId: ctx.runId, line })
             recall = reply.context
           } else {
-            recall = await ask(["hook-prompt", "--plain"], payload, 10000)
+            recall = await ask(["hook-prompt", "--plain"], JSON.stringify(payload), 10000)
           }
           // Silence is the common case — the hook speaks only when the user's
           // own history answers what they just asked.
@@ -369,16 +461,16 @@ export default {
         "before_compaction",
         async (event, ctx) => {
           const at = where(seen, event, ctx, process.cwd())
-          await ask(
-            ["hook-precompact"],
-            JSON.stringify({
-              session_id: at.id,
-              transcript_path: (event && event.sessionFile) || "",
-              cwd: at.cwd,
-              harness: "openclaw",
-            }),
-            10000,
-          )
+          const payload = {
+            session_id: at.id,
+            transcript_path: (event && event.sessionFile) || "",
+            cwd: at.cwd,
+            harness: "openclaw",
+          }
+          const ext = await askExt("precompact", { ...payload, source: "openclaw" }, 10000, at.cwd)
+          if (ext === null) {
+            await ask(["hook-precompact"], JSON.stringify(payload), 10000)
+          }
           promptCache.compact(scopeOf(at), false)
         },
         { timeoutMs: 15000 },
@@ -394,7 +486,10 @@ export default {
           // Read, not where(): the end must not file its id under the key.
           const last = (ctx && ctx.sessionKey && seen.get(ctx.sessionKey)) || {}
           const cwd = (ctx && ctx.workspaceDir) || last.dir || process.cwd()
-          await ask(["hook-session-end"], JSON.stringify({ session_id: id, cwd }), 5000)
+          const ext = await askExt("session-end", { session_id: id, cwd }, 5000, cwd)
+          if (ext === null) {
+            await ask(["hook-session-end"], JSON.stringify({ session_id: id, cwd }), 5000)
+          }
         },
         { timeoutMs: 10000 },
       )
@@ -409,7 +504,9 @@ export default {
               if (ctx && ctx.trigger === "heartbeat") return
               const call = toolCall(event, where(seen, event, ctx, process.cwd()))
               if (!call) return
-              const line = await ask(call.args, JSON.stringify(call.payload), 5000)
+              const op = call.args[0] === "hook-tool-after" ? "tool-after" : "tool-before"
+              const ext = await askExt(op, { ...call.payload, tool: call.payload.tool_name, plain: true }, 5000, call.payload.cwd)
+              const line = ext !== null ? (ext.ok ? ext.context || "" : "") : await ask(call.args, JSON.stringify(call.payload), 5000)
               if (!line) return
               const content = Array.isArray(event.result && event.result.content) ? event.result.content : []
               return { result: { ...event.result, content: [...content, { type: "text", text: line }] } }
@@ -432,11 +529,20 @@ export default {
           async handler(ctx) {
             const query = String((ctx && ctx.args) || "").trim()
             if (!query) return { text: "Say what to look for: /deja <error, file, or decision>" }
-            const out = await ask(argv("search", [], query), undefined, 120000)
-            // Asked here rather than read from installed: the startup check may
-            // not have answered yet, and an empty search reads as no history.
-            if (!out && !(await run(bin, ["--version"]))) return { text: MISSING }
-            const notes = [await ask(["hook-context", "--notes"], undefined, 10000), access].filter(Boolean).join("\n")
+            let out
+            const extSearch = await askExt("slash", { args: query }, 120000)
+            if (extSearch !== null) {
+              if (!extSearch.ok) return { text: extSearch.error || NOTHING }
+              out = extSearch.output || ""
+            } else {
+              out = await ask(argv("search", [], query), undefined, 120000)
+              // Asked here rather than read from installed: the startup check may
+              // not have answered yet, and an empty search reads as no history.
+              if (!out && !(await run(bin, ["--version"]))) return { text: MISSING }
+            }
+            const extNotes = await askExt("context", { notes_only: true }, 10000)
+            const rawNotes = extNotes !== null ? (extNotes.ok ? extNotes.note || extNotes.output || "" : "") : await ask(["hook-context", "--notes"], undefined, 10000)
+            const notes = [rawNotes, access].filter(Boolean).join("\n")
             return { text: notes ? (out || NOTHING) + "\n\n" + notes : out || NOTHING }
           },
         })

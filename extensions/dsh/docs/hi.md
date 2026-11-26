@@ -8,7 +8,7 @@
 
 ![deja-vu डेमो](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-DeepSeek Harness (`dsh`) और DSH Desktop (`anywhere-labs/dsh-desktop`) के लिए `session-query` प्लगइन। DSH संवादों के साथ-साथ यह एकल Go बाइनरी `deja` और स्थानीय BM25 इंडेक्स से आपके कंप्यूटर पर मौजूद 51 अन्य कोडिंग एजेंट्स (Claude Code, Codex, Cursor, Gemini, Hermes आदि) का इतिहास भी खोजता है (`DEJA_OFFLINE=1` दैनिक अपडेट जाँच बंद करता है)।
+DeepSeek Harness (`dsh`) और DSH Desktop (`anywhere-labs/dsh-desktop`) के लिए `session-query` प्लगइन। DSH संवादों के साथ-साथ यह एकल Go बाइनरी `deja` और स्थानीय BM25 इंडेक्स से आपके कंप्यूटर पर मौजूद 52 अन्य कोडिंग एजेंट्स (Claude Code, Codex, Cursor, Gemini, Hermes आदि) का इतिहास भी खोजता है (`DEJA_OFFLINE=1` दैनिक अपडेट जाँच बंद करता है)।
 
 ## इंस्टॉलेशन
 
@@ -20,7 +20,7 @@ dsh plugin --profile web add dsh-deja
 dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
 ```
 
-यदि `deja` सिस्टम में पहले से नहीं है, तो `DEJA_BIN` सेट करें या सभी 52 एजेंट्स और `$DSH_HOME/plugins/deja/` को एक साथ सेटअप करें:
+यदि `deja` सिस्टम में पहले से नहीं है, तो `DEJA_BIN` सेट करें या सभी 53 एजेंट्स और `$DSH_HOME/plugins/deja/` को एक साथ सेटअप करें:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -75,7 +75,7 @@ node --test extensions/dsh/test/*.test.js
 
 | रिकॉल (Recall) | टोकन | इंडेक्सिंग और खोज |
 |---|---|---|
-| LongMemEval-S पर **97.2% R@5** (470 प्रश्नों पर 88.9% hit@1) | **58% कम टोकन** (दोहराए गए रेपो कार्य पर) | 19,195 सेशन इंडेक्स करने में **13.6 s** / 52 कोडिंग एजेंट्स में **0.7 ms** खोज समय |
+| LongMemEval-S पर **97.2% R@5** (470 प्रश्नों पर 88.9% hit@1) | **58% कम टोकन** (दोहराए गए रेपो कार्य पर) | 19,195 सेशन इंडेक्स करने में **13.6 s** / 53 कोडिंग एजेंट्स में **0.7 ms** खोज समय |
 
 ## रेपो मेमोरी और एजेंट हैंडऑफ़
 

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/harness"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -417,19 +418,35 @@ func jsonEmptyValue(v any) bool {
 
 func installKiroGlobalHooks(exe string, uninstall bool) (installResult, error) {
 	path := kiroGlobalHooksPath()
-	if b, err := os.ReadFile(path); err == nil && !strings.Contains(string(b), `"deja-digest"`) {
-		r := installResult{Path: path, Action: "unchanged"}
-		if !uninstall {
-			r.Note = reportPath(path) + " is a hook file deja did not write, so it was left as it is"
-		}
-		return r, nil
-	}
 	hookExe := hookExeFor(exe, uninstall)
 	body, err := kiroGlobalHooksJSON(hookExe)
 	if err != nil {
 		return installResult{}, err
 	}
-	return installTextFile(path, body, hookExe, uninstall)
+	spec := &harness.JSONHooksSpec{
+		HarnessName:       "kiro-hooks",
+		Path:              path,
+		Mode:              harness.JSONHooksFlatList,
+		Version:           "v1",
+		OwnedMarker:       `"deja-digest"`,
+		ForeignNote:       reportPath(path) + " is a hook file deja did not write, so it was left as it is",
+		RemoveWhenEmpty:   true,
+		PruneEmptyParents: 1,
+		IsCommandMatch:    matchDejaHookCmd,
+		IsAnyDejaHook:     dejaHookEntry,
+		AfterRemove: func(p string) error {
+			_, rerr := restoreReplacedFile(p, func(b []byte) bool {
+				return sameTextExceptExe(body, string(b), hookExe)
+			})
+			return rerr
+		},
+		Rules: []harness.JSONHookRule{
+			{Name: "deja-digest", Event: "SessionStart", Command: hookRun(hookExe, "hook-context", "--plain")},
+			{Name: "deja-recall", Event: "UserPromptSubmit", Command: hookRun(hookExe, "hook-prompt", "--plain")},
+			{Name: "deja-end", Event: "SessionEnd", Command: hookRun(hookExe, "hook-session-end")},
+		},
+	}
+	return runJSONHooksSpec(spec, uninstall)
 }
 
 // kiroSettingsPath is kiro-cli's own settings file, where

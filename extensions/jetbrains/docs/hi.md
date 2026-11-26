@@ -5,7 +5,7 @@
 
 IntelliJ IDEA, GoLand, PyCharm, WebStorm, RustRover, CLion, PhpStorm और Rider (`2024.2+`) के लिए लोकल क्रॉस-एजेंट सेशन सर्च, AI लाइन ब्लेम और हैंडऑफ़ प्लगइन।
 
-[deja-vu](https://github.com/vshulcz/deja-vu) डिस्क पर Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf और 43 अन्य कोडिंग एजेंट्स द्वारा लिखे गए सेशन ट्रांसक्रिप्ट को लोकल BM25 इंडेक्स में इंडेक्स करता है—आउटपुट से पहले सीक्रेट्स हटाता है और बिना किसी क्लाउड सेवा के काम करता है।
+[deja-vu](https://github.com/vshulcz/deja-vu) डिस्क पर Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Junie, GitHub Copilot, Aider, Windsurf और 44 अन्य कोडिंग एजेंट्स द्वारा लिखे गए सेशन ट्रांसक्रिप्ट को लोकल BM25 इंडेक्स में इंडेक्स करता है—आउटपुट से पहले सीक्रेट्स हटाता है और बिना किसी क्लाउड सेवा के काम करता है।
 
 **[दस्तावेज़](https://vshulcz.github.io/deja-vu/guide/getting-started.html)** · **[बेंचमार्क](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)**
 
@@ -14,7 +14,7 @@ IntelliJ IDEA, GoLand, PyCharm, WebStorm, RustRover, CLion, PhpStorm और Ride
 ## मुख्य सुविधाएँ
 
 - **स्टेटस बार विजेट**: सक्रिय प्रोजेक्ट के लिए लाइव `deja statusline` आँकड़े IDE स्टेटस बार के दाईं ओर दिखाता है। क्लिक करने पर `deja-vu` एक्शन पॉपअप खुलता है।
-- **AI सेशन खोजें (`Tools → deja-vu → Search AI Sessions...`)**: सभी 52 समर्थित कोडिंग एजेंट्स के लोकल सेशन में खोजता है (`deja search --json`) और चुना गया ट्रांसक्रिप्ट रीड-ओनली Markdown एडिटर टैब में खोलता है।
+- **AI सेशन खोजें (`Tools → deja-vu → Search AI Sessions...`)**: सभी 53 समर्थित कोडिंग एजेंट्स के लोकल सेशन में खोजता है (`deja search --json`) और चुना गया ट्रांसक्रिप्ट रीड-ओनली Markdown एडिटर टैब में खोलता है।
 - **हाल के AI सेशन (`Tools → deja-vu → Recent AI Sessions`)**: तेज़ फ़िल्टरिंग के साथ मशीन के सबसे हालिया 50 सेशन (`deja last 50 --json`) सूचीबद्ध करता है।
 - **मौजूदा लाइन का AI ब्लेम (एडिटर कॉन्टेक्स्ट मेन्यू / `Tools → deja-vu → AI Blame Current Line`)**: `deja blame <file>:<line> --json` (लाइन न मिलने पर `<file>` फ़ॉलबैक) चलाकर वह AI सेशन खोलता है जिसने कर्सर की लाइन लिखी या बदली थी।
 - **क्रॉस-एजेंट हैंडऑफ़ कॉपी करें (`Tools → deja-vu → Copy Cross-Agent Handoff`)**: प्रोजेक्ट रूट में `deja handoff` चलाता है, सारांश को क्लिपबोर्ड पर कॉपी करता है और रीड-ओनली Markdown टैब में खोलता है।
@@ -54,7 +54,7 @@ cd extensions/jetbrains
 
 | रिकॉल (Recall) | टोकन | इंडेक्सिंग और खोज |
 |---|---|---|
-| LongMemEval-S पर **97.2% R@5** (470 प्रश्नों पर 88.9% hit@1) | **58% कम टोकन** (दोहराए गए रेपो कार्य पर) | 19,195 सेशन इंडेक्स करने में **13.6 s** / 52 कोडिंग एजेंट्स में **0.7 ms** खोज समय |
+| LongMemEval-S पर **97.2% R@5** (470 प्रश्नों पर 88.9% hit@1) | **58% कम टोकन** (दोहराए गए रेपो कार्य पर) | 19,195 सेशन इंडेक्स करने में **13.6 s** / 53 कोडिंग एजेंट्स में **0.7 ms** खोज समय |
 
 ## रेपो मेमोरी और एजेंट हैंडऑफ़
 

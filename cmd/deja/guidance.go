@@ -92,7 +92,7 @@ var sharedSkillHarnesses = map[string]bool{
 	// <agent>/skills ✗ ~/.agents/skills (skipped)`, which is proof it scans the
 	// shared directory (#3670).
 	"senpi":  true,
-	"cursor": true, "gemini": true, "kimi": true, "qwen": true,
+	"cursor": true, "gemini": true, "kimi": true, "qwen": true, "gigacode": true,
 	"roo": true, "codex": true, "goose": true, "openclaw": true,
 	"omp": true, "deepseek": true, "zed": true, "amp": true, "prime": true,
 	// Crush's own config source lists ~/.agents/skills among the directories it

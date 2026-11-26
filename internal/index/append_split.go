@@ -125,8 +125,17 @@ func prepareSplit(harness string, old Manifest, appendable, rest map[string]File
 	ready.diag = sources.DiagSave()
 	sources.DiagRestore(before)
 	ready.appendFiles = make(map[string]splitRead, len(appendable))
+	held := heldSessionPaths(old)
 	for p, f := range appendable {
-		ss, err := parseAppendedFile(harness, p, old.Files[p], false)
+		var (
+			ss  []model.Session
+			err error
+		)
+		if needsWholeFromPreamble(p, old.Files[p], held) {
+			ss, err = parseAppendedFile(harness, p, FileState{}, true)
+		} else {
+			ss, err = parseAppendedFile(harness, p, old.Files[p], false)
+		}
 		if err == nil && !readAsWalked(p, f) {
 			err = errChangedWhileRead
 		}

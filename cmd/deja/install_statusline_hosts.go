@@ -440,8 +440,17 @@ func installCopilotStatusline(exe string, uninstall bool) (installResult, error)
 // installQwenStatusline: Qwen Code 0.20 reads ui.statusLine and pipes the
 // session id and workspace, no transcript path. refreshInterval is seconds.
 func installQwenStatusline(exe string, uninstall bool) (installResult, error) {
+	return installQwenFamilyStatusline(sources.QwenConfigDir(), exe, uninstall)
+}
+
+// installGigaCodeStatusline wires ui.statusLine in $GIGACODE_HOME/settings.json.
+func installGigaCodeStatusline(exe string, uninstall bool) (installResult, error) {
+	return installQwenFamilyStatusline(sources.GigaCodeConfigDir(), exe, uninstall)
+}
+
+func installQwenFamilyStatusline(configDir, exe string, uninstall bool) (installResult, error) {
 	cmd := hostStatuslineCommand(exe, uninstall)
-	return installJSONStatusline(filepath.Join(sources.QwenConfigDir(), "settings.json"), []string{"ui", "statusLine"},
+	return installJSONStatusline(filepath.Join(configDir, "settings.json"), []string{"ui", "statusLine"},
 		map[string]any{"type": "command", "command": cmd, "refreshInterval": 1}, uninstall)
 }
 

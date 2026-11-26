@@ -998,6 +998,35 @@ func TestDeepVerifyFlagsSessionMissingFromIndex(t *testing.T) {
 	}
 }
 
+func TestDeepVerifyIgnoresForgottenAndEmptySessions(t *testing.T) {
+	dir, src := deepFixture(t)
+	emptyPath := filepath.Join(filepath.Dir(src), "sempty.jsonl")
+	emptyLine := `{"type":"user","sessionId":"sempty","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"   "}}` + "\n"
+	if err := os.WriteFile(emptyPath, []byte(emptyLine), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	r, err := DeepVerify(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.Clean() {
+		t.Fatalf("empty transcript must not report parse-drift, got %#v", r.Findings)
+	}
+	if _, ferr := Forget(dir, ForgetOptions{Session: "s1"}); ferr != nil {
+		t.Fatal(ferr)
+	}
+	r, err = DeepVerify(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !r.Clean() {
+		t.Fatalf("forgotten session must not report parse-drift, got %#v", r.Findings)
+	}
+}
+
 func TestDeepVerifyFlagsTruncatedRecords(t *testing.T) {
 	dir, _ := deepFixture(t)
 	if err := os.Truncate(recordsPath(dir), 3); err != nil {

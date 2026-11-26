@@ -7,9 +7,9 @@
   </a>
 </p>
 
-<p align="center"><b>52 のコーディングエージェントをまたぐローカル共有メモリ、エージェント間ハンドオフ、コード復元。</b></p>
+<p align="center"><b>53 のコーディングエージェントをまたぐローカル共有メモリ、エージェント間ハンドオフ、コード復元。</b></p>
 
-<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes をはじめとする 52 のエージェントは、すべてのセッションをすでにディスクに保存しています。<br>
+<p align="center">Claude Code、Codex、Cursor、OpenClaw、Gemini CLI、OpenCode、Hermes をはじめとする 53 のエージェントは、すべてのセッションをすでにディスクに保存しています。<br>
 deja はそれをローカルでインデックス化し、<code>/compact</code> をまたいだ文脈維持、<code>deja handoff</code> による作業引き継ぎ、<code>deja restore</code> による上書きコードの復元を可能にします——LLM 不要、単一の Go バイナリ。</p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | 日本語 | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
@@ -145,7 +145,7 @@ aider の読み取り専用コンテキストファイル、Windows の `cmd /c 
 
 ## できること
 
-**Codex で解決して、Claude が覚えている。** 52 のコーディングエージェントはすべての会話を
+**Codex で解決して、Claude が覚えている。** 53 のコーディングエージェントはすべての会話を
 ローカルファイルに書き出しています。deja はそれらのファイルを、全エージェントが読めるひとつの記憶レイヤーに変えます。
 
 | | |
@@ -326,7 +326,7 @@ $ deja "jwt refresh token"
 [自動コンパクション復旧](../../docs/compaction.md)を参照してください。
 
 <!-- matrix:start -->
-aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Claw Code &middot; Cline &middot; CodeArts Desktop &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qoder &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; Devin CLI &middot; CodeWhale &middot; Junie &middot; JetBrains AI Assistant &middot; Windsurf / Devin Desktop &middot; CodeBuddy Code &middot; Reasonix &middot; TRAE CLI &middot; Muse Code &middot; MiniMax Code &middot; MiMo-Code &middot; Omnigent &middot; Orca &middot; Ante.
+aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Claw Code &middot; Cline &middot; CodeArts Desktop &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qoder &middot; Qwen Code &middot; GigaCode CLI &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; Devin CLI &middot; CodeWhale &middot; Junie &middot; JetBrains AI Assistant &middot; Windsurf / Devin Desktop &middot; CodeBuddy Code &middot; Reasonix &middot; TRAE CLI &middot; Muse Code &middot; MiniMax Code &middot; MiMo-Code &middot; Omnigent &middot; Orca &middot; Ante.
 
 <details>
 <summary>各ハーネスの対応状況</summary>
@@ -359,6 +359,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Claw Code 
 | prime-agent (PrimeIntellect) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Qoder | ⚠ | ⚠ | ⚠ | ⚠ | ✕ | 貼り付け | — |
 | Qwen Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| GigaCode CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Cherry Studio | ✅ | ✅ | ✅ | ✕ | ✕ | 貼り付け | 設定 -> MCP でサーバーを一度インポートし、エージェントでスキルを有効化 |
 | Senpi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | なし |
 | gajae-code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | なし |

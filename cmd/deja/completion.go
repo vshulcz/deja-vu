@@ -163,10 +163,20 @@ _deja_completion() {
             COMPREPLY=( $(compgen -W "--plain --once --strict --copilot --notes --junie --mcode" -- "$cur") )
             ;;
         hook-prompt)
-            COMPREPLY=( $(compgen -W "--plain --copilot --strict --mcode" -- "$cur") )
+            COMPREPLY=( $(compgen -W "--plain --copilot --strict --junie --mcode" -- "$cur") )
+            ;;
+        hook-tool)
+            COMPREPLY=( $(compgen -W "--plain --copilot --crush --junie --mcode" -- "$cur") )
             ;;
         hook-tool-after)
             COMPREPLY=( $(compgen -W "--plain --copilot --mcode" -- "$cur") )
+            ;;
+        hook-ext)
+            if [[ "$prev" == "--host" || "$prev" == "--op" ]]; then
+                COMPREPLY=()
+            else
+                COMPREPLY=( $(compgen -W "--host --op" -- "$cur") )
+            fi
             ;;
         hook-session-end)
             COMPREPLY=( $(compgen -W "--json" -- "$cur") )
@@ -373,7 +383,10 @@ _deja_completion() {
                 COMPREPLY=( $(compgen -W "--context-search --http" -- "$cur") )
             fi
             ;;
-        brief|check|ctx|embed|hook-precompact|share|sources|statusline|version|warmup)
+        help)
+            COMPREPLY=( $(compgen -W "$commands" -- "$cur") )
+            ;;
+        aider|brief|check|ctx|embed|goose|hook-antigravity|hook-codewhale|hook-embed|hook-goose|hook-goose-prompt|hook-mcp-call|hook-plan|hook-precompact|hook-refresh|hook-stop|reasonix-ext|share|sources|statusline|version|warmup|warmup-status)
             COMPREPLY=()
             ;;
         *)
@@ -506,10 +519,16 @@ _deja() {
       _arguments '--plain[omit formatting]' '--once[one digest per session]' '--strict[skip low-confidence sessions]' '--copilot[answer in the Copilot CLI hook shape]' '--notes[only the notes meant for the person]' '--junie[answer in the Junie hook shape]' '--mcode[answer in the MCode hook shape]'
       ;;
     hook-prompt)
-      _arguments '--plain[omit formatting]' '--copilot[answer in the Copilot CLI hook shape]' '--strict[skip low-confidence sessions]' '--mcode[answer in the MCode hook shape]'
+      _arguments '--plain[omit formatting]' '--copilot[answer in the Copilot CLI hook shape]' '--strict[skip low-confidence sessions]' '--junie[answer in the Junie hook shape]' '--mcode[answer in the MCode hook shape]'
+      ;;
+    hook-tool)
+      _arguments '--plain[omit formatting]' '--copilot[answer in the Copilot CLI hook shape]' '--crush[answer in the Crush hook shape]' '--junie[answer in the Junie hook shape]' '--mcode[answer in the MCode hook shape]'
       ;;
     hook-tool-after)
       _arguments '--plain[omit formatting]' '--copilot[answer in the Copilot CLI hook shape]' '--mcode[answer in the MCode hook shape]'
+      ;;
+    hook-ext)
+      _arguments '--host=[target extension host]:host:' '--op=[hook operation]:op:'
       ;;
     hook-session-end)
       _arguments '--json[print JSON]'
@@ -624,7 +643,10 @@ _deja() {
     mcp)
       _arguments '--context-search[serve only context_search]' '--http=[listen on Streamable HTTP address]:address:'
       ;;
-    brief|check|ctx|embed|hook-precompact|share|sources|statusline|version|warmup)
+    help)
+      _describe -t commands 'deja command' commands
+      ;;
+    aider|brief|check|ctx|embed|goose|hook-antigravity|hook-codewhale|hook-embed|hook-goose|hook-goose-prompt|hook-mcp-call|hook-plan|hook-precompact|hook-refresh|hook-stop|reasonix-ext|share|sources|statusline|version|warmup|warmup-status)
       ;;
     *)
       _arguments '--json[print JSON]' '--re[interpret query as a regular expression]' '--all[include all results]' '--no-embed[skip semantic reranking]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(%ROLES%)' '--session=[only one session]:id:' '--rebuild[force a full rebuild]' '--limit=[max sessions to return (1-100)]:count:' '--sort=[order of the results]:order:(relevance date)'
@@ -721,11 +743,20 @@ complete -c deja -n '__fish_seen_subcommand_from hook-context' -l mcode
 complete -c deja -n '__fish_seen_subcommand_from hook-prompt' -l plain
 complete -c deja -n '__fish_seen_subcommand_from hook-prompt' -l copilot
 complete -c deja -n '__fish_seen_subcommand_from hook-prompt' -l strict
+complete -c deja -n '__fish_seen_subcommand_from hook-prompt' -l junie
 complete -c deja -n '__fish_seen_subcommand_from hook-prompt' -l mcode
+complete -c deja -n '__fish_seen_subcommand_from hook-tool' -l plain
+complete -c deja -n '__fish_seen_subcommand_from hook-tool' -l copilot
+complete -c deja -n '__fish_seen_subcommand_from hook-tool' -l crush
+complete -c deja -n '__fish_seen_subcommand_from hook-tool' -l junie
+complete -c deja -n '__fish_seen_subcommand_from hook-tool' -l mcode
 complete -c deja -n '__fish_seen_subcommand_from hook-tool-after' -l plain
 complete -c deja -n '__fish_seen_subcommand_from hook-tool-after' -l copilot
 complete -c deja -n '__fish_seen_subcommand_from hook-tool-after' -l mcode
+complete -c deja -n '__fish_seen_subcommand_from hook-ext' -l host -x
+complete -c deja -n '__fish_seen_subcommand_from hook-ext' -l op -x
 complete -c deja -n '__fish_seen_subcommand_from hook-session-end' -l json
+complete -c deja -n '__fish_seen_subcommand_from help' -a '%COMMANDS%'
 complete -c deja -n '__fish_seen_subcommand_from index' -l rebuild
 complete -c deja -n '__fish_seen_subcommand_from index' -l quiet -d 'Say nothing when it worked'
 complete -c deja -n '__fish_seen_subcommand_from install uninstall' -a '%INSTALL_TARGETS% --all --auto'
@@ -907,8 +938,13 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 else { @('--harness', '--json') }
             }
             'hook-context' { @('--plain', '--once', '--strict', '--copilot', '--notes', '--junie', '--mcode') }
-            'hook-prompt' { @('--plain', '--copilot', '--strict', '--mcode') }
+            'hook-prompt' { @('--plain', '--copilot', '--strict', '--junie', '--mcode') }
+            'hook-tool' { @('--plain', '--copilot', '--crush', '--junie', '--mcode') }
             'hook-tool-after' { @('--plain', '--copilot', '--mcode') }
+            'hook-ext' {
+                if ($previous -in @('--host', '--op')) { @() }
+                else { @('--host', '--op') }
+            }
             'hook-session-end' { @('--json') }
             'index' { @('--rebuild', '-rebuild', '--quiet', '-quiet') }
             'install' { $installTargets + @('--no-guidance', '--no-index', '--no-mcp', '--force') }
@@ -1012,7 +1048,8 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 if ($previous -eq '--http') { @() }
                 else { @('--context-search', '--http') }
             }
-            { $_ -in @('brief', 'check', 'ctx', 'embed', 'hook-precompact', 'share', 'sources', 'statusline', 'version', 'warmup') } { @() }
+            'help' { $commands }
+            { $_ -in @('aider', 'brief', 'check', 'ctx', 'embed', 'goose', 'hook-antigravity', 'hook-codewhale', 'hook-embed', 'hook-goose', 'hook-goose-prompt', 'hook-mcp-call', 'hook-plan', 'hook-precompact', 'hook-refresh', 'hook-stop', 'reasonix-ext', 'share', 'sources', 'statusline', 'version', 'warmup', 'warmup-status') } { @() }
             default { if ($previous -eq '--harness') { $harnesses } elseif ($previous -eq '--role') { $roles } elseif ($previous -eq '--sort') { @('relevance', 'date') } elseif ($previous -in @('--project', '--since', '--session', '--limit')) { @() } else { $defaultOptions } }
         }
     }
@@ -1034,18 +1071,6 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
 // per shell: `deja recap` and `deja tests` shipped in 0.21.0 and bash and fish
 // had never heard of either, while the PowerShell array had grown three
 // overlapping copies of itself from merges landing beside each other.
-//
-// Written out rather than read from the command table, because that table holds
-// this function and Go will not have the cycle. What keeps the two in step is
-// TestEveryCommandIsOfferedByEveryShell, which fails the moment a command is
-// added to one and not the other.
 func completionCommands() []string {
-	return []string{
-		"audit", "bench", "blame", "brief", "check", "completion", "ctx", "delete", "doctor", "embed",
-		"files", "fix", "forget", "friction", "handoff", "help", "how", "index",
-		"init", "install", "last", "lock", "log", "mcp", "origin", "promote", "recall", "recap", "remember", "repo", "restore",
-		"resume", "review", "rules", "search", "secrets", "share", "shell", "show", "sources", "stats",
-		"status", "statusline", "sync", "tests", "trail", "uninstall", "unlock", "update", "version", "view",
-		"warmup", "wip",
-	}
+	return registryCompletionCommands()
 }

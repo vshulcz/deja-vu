@@ -491,6 +491,18 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 			}},
 		},
 		{
+			Name: "gigacode", Load: LoadGigaCode, Files: GigaCodeSessionFiles,
+			Kinds: []FileKind{{
+				Name: "gigacode",
+				Match: func(p string) bool {
+					return strings.HasSuffix(p, ".jsonl") && gigaCodeUnderProjects(p)
+				},
+				Parse:     fullParse(ParseGigaCodeFile),
+				ParseFrom: offsetParse(ParseGigaCodeFileFromOffset),
+				Resumes:   qwenExitResumes,
+			}},
+		},
+		{
 			// Qoder CLI (Alibaba's AI IDE/CLI) writes Claude Code-shaped
 			// transcripts under ~/.qoder/projects; the Claude decoder reads
 			// them and only the harness attribution differs.

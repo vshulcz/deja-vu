@@ -1,6 +1,6 @@
 // Package harness defines declarative specs for detecting, probing, wiring,
-// and unwiring AI coding harness integrations (JSON/JSONC MCP, TOML MCP, and
-// managed skill or asset files).
+// and unwiring AI coding harness integrations (JSON/JSONC MCP, TOML MCP, JSON
+// hooks, YAML sections, marked blocks, and managed skill or asset files).
 package harness
 
 import (
@@ -48,6 +48,9 @@ type WireResult struct {
 	DisabledFor       []string
 	EditedByUser      bool
 	PrevEntry         any
+	Note              string
+	BeforeRoot        map[string]any
+	AfterRoot         map[string]any
 }
 
 // UnwireResult reports the outcome of removing deja wiring from a target.
@@ -56,6 +59,9 @@ type UnwireResult struct {
 	Action      string
 	RemovedKeys []string
 	LeftKeys    []string
+	Note        string
+	BeforeRoot  map[string]any
+	AfterRoot   map[string]any
 }
 
 // Spec is the uniform lifecycle contract implemented by every harness adapter.

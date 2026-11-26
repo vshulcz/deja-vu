@@ -258,6 +258,8 @@ var hookNames = map[string]bool{
 	"hook-antigravity":  true,
 	"hook-codewhale":    true,
 	"hook-context":      true,
+	"hook-embed":        true,
+	"hook-ext":          true,
 	"hook-goose":        true,
 	"hook-goose-prompt": true,
 	"hook-mcp-call":     true,

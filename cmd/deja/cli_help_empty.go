@@ -96,18 +96,18 @@ func parseSearch(args []string) (search.Options, error) {
 				o.Since = d
 			}
 		default:
+			// A flag deja takes elsewhere is not a typo — check exact flags of
+			// other commands before edit-distance guesses so short flags like
+			// --op or --to name their real command instead of suggesting --re (#2249).
+			if cmd := flagsOfOtherCommands[flagName(a)]; cmd != "" {
+				return o, fmt.Errorf("%s is a flag of `deja %s`, not of search — put it after `--` to search for the text", flagName(a), cmd)
+			}
 			// A query may legitimately start with a dash — `deja search
 			// "--retry budget"` is a real search. A token one edit away from a
 			// real flag is not: folding `--limti` into the query turned a
 			// working search into "you have no such memory" (#755).
 			if nearestSearchFlag(a) != "" {
 				return o, unknownFlag("search", a, searchFlags)
-			}
-			// A flag deja takes elsewhere is not a typo and is nowhere near a
-			// search flag by edit distance, so it went into the query and the
-			// search that would have found everything reported nothing (#2249).
-			if cmd := flagsOfOtherCommands[flagName(a)]; cmd != "" {
-				return o, fmt.Errorf("%s is a flag of `deja %s`, not of search — put it after `--` to search for the text", flagName(a), cmd)
 			}
 			// A --word after the query is a flag deja does not have. Taken as
 			// a query term it turned `deja goroutines --bogus` into a search
@@ -152,63 +152,7 @@ func flagShaped(a string) bool {
 // flagsOfOtherCommands names the command each flag belongs to, for the tokens
 // that are real deja flags somewhere but not here. Only exact matches: a query
 // may legitimately start with a dash, and `--` still ends option parsing.
-var flagsOfOtherCommands = map[string]string{
-	"--offset":           "show",
-	"--span":             "restore",
-	"--out":              "restore",
-	"--force":            "restore",
-	"--tag":              "remember",
-	"--repo":             "remember",
-	"--deep":             "doctor",
-	"--offline":          "doctor",
-	"--dry-run":          "forget",
-	"--all-matches":      "forget",
-	"--list":             "forget",
-	"--unforget":         "forget",
-	"--before":           "forget",
-	"--to":               "handoff",
-	"--exec":             "resume",
-	"--write-back":       "resume",
-	"--app":              "resume",
-	"--plain":            "hook-prompt",
-	"--crush":            "hook-tool",
-	"--junie":            "hook-prompt",
-	"--no-open":          "view",
-	"--full":             "sync export",
-	"--include-imported": "sync export",
-	"--peer":             "sync export",
-	"--pull":             "sync ssh",
-	"--both":             "sync ssh",
-	"--from":             "last",
-	"--last":             "log",
-	"--jsonl":            "log",
-	"--seed":             "bench",
-	"--delivery":         "bench live",
-	"--settle":           "friction",
-	"--unsettle":         "friction",
-	"--state":            "promote",
-	"--note":             "promote",
-	"--html":             "stats",
-	"--redaction":        "stats",
-	"--impact":           "stats",
-	"--card":             "stats",
-	"--year":             "stats",
-	"--no-index":         "stats",
-	"--attribution":      "blame",
-	"--git-note":         "blame",
-	"--all-projects":     "how",
-	"--scrub":            "secrets",
-	"--kind":             "repo add",
-	"--yes":              "delete",
-	"--quiet":            "index",
-	"--context-search":   "mcp",
-	"--http":             "mcp",
-	"--secrets":          "audit",
-	"--fail-on-secrets":  "audit",
-	"--encrypted":        "init",
-	"--passphrase-stdin": "unlock",
-	"--auto-lock":        "init",
-}
+var flagsOfOtherCommands = buildFlagsOfOtherCommands()
 
 // searchFlags is every flag the bare search form accepts, for the typo check.
 // The flags each converted command takes, in the order its own parser lists
@@ -840,10 +784,7 @@ func indexLooksUnmounted(dir string) (string, bool) {
 // searchValueFlags take a value, so "--flag=value" has to become two arguments
 // before the parser sees it. Anything else keeps its equals sign: a query may
 // legitimately contain one.
-var searchValueFlags = map[string]bool{
-	"--harness": true, "--project": true, "--since": true,
-	"--role": true, "--limit": true, "--session": true, "--sort": true,
-}
+var searchValueFlags = buildSearchValueFlags()
 
 func splitEqualsForms(args []string) []string {
 	out := make([]string, 0, len(args))

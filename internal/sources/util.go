@@ -43,6 +43,60 @@ func capParsedMessage(s string) string {
 	return s[:cut]
 }
 
+// capEditSpan bounds an edit span to editSpanMax bytes on a UTF-8 rune
+// boundary and repairs any invalid UTF-8 sequences.
+func capEditSpan(s string) string {
+	res := s
+	if len(res) > editSpanMax {
+		cut := editSpanMax
+		for cut > 0 && !utf8.RuneStart(res[cut]) {
+			cut--
+		}
+		res = res[:cut]
+	}
+	if utf8.ValidString(res) {
+		return res
+	}
+	return strings.ToValidUTF8(res, "\uFFFD")
+}
+
+// readAlignedWindowFrom reads at most callWindow bytes ending at offset from f.
+// When offset exceeds callWindow, bytes before the first newline in the window
+// are dropped so callers only see whole JSONL lines; if the window holds no
+// newline at all, it returns nil.
+func readAlignedWindowFrom(f *os.File, offset int64) []byte {
+	if offset <= 0 {
+		return nil
+	}
+	start := max(0, offset-callWindow)
+	buf := make([]byte, offset-start)
+	n, err := f.ReadAt(buf, start)
+	if n == 0 || (err != nil && !errors.Is(err, io.EOF)) {
+		return nil
+	}
+	buf = buf[:n]
+	if start > 0 {
+		nl := bytes.IndexByte(buf, '\n')
+		if nl < 0 {
+			return nil
+		}
+		buf = buf[nl+1:]
+	}
+	return buf
+}
+
+func readAlignedWindowBefore(path string, offset int64) []byte {
+	if offset <= 0 {
+		return nil
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer func() { _ = f.Close() }()
+	return readAlignedWindowFrom(f, offset)
+}
+
 // Source is a named harness root.
 type Source struct{ Name, Root string }
 

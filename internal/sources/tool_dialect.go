@@ -249,9 +249,7 @@ func editSpansIn(v any, d toolDialect) []string {
 			if span == "" {
 				continue
 			}
-			if len(span) > editSpanMax {
-				span = span[:editSpanMax]
-			}
+			span = capEditSpan(span)
 			out = append(out, path+"\n"+span)
 		}
 	}

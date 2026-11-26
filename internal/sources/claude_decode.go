@@ -127,9 +127,44 @@ type claudeUsage struct {
 }
 
 func parseClaudeTypedFromOffset(path string, offset int64) ([]model.Session, error) {
-	return parseClaudeTypedWithScanner(path, func(fn func([]byte)) error {
+	return parseClaudeTypedWithOptions(path, func(fn func([]byte)) error {
 		return scanJSONLBytes(path, offset, fn)
+	}, claudeParseOptions{
+		Harness:    "claude",
+		priorUsage: seedClaudeUsageBefore(path, offset),
 	})
+}
+
+func seedClaudeUsageBefore(path string, offset int64) map[string]model.Tokens {
+	buf := readAlignedWindowBefore(path, offset)
+	if len(buf) == 0 {
+		return nil
+	}
+	var out map[string]model.Tokens
+	for raw := range bytes.SplitSeq(buf, []byte("\n")) {
+		if !bytes.Contains(raw, []byte(`"usage"`)) {
+			continue
+		}
+		var v claudeLine
+		if json.Unmarshal(trimJSONSpace(raw), &v) != nil || (v.Type != "assistant" && v.Type != "user") || v.Message == nil || v.Message.Usage == nil {
+			continue
+		}
+		key := claudeCallIdentity(v)
+		if key == "" {
+			continue
+		}
+		if out == nil {
+			out = map[string]model.Tokens{}
+		}
+		u := v.Message.Usage
+		cur := out[key]
+		cur.Input = max(cur.Input, u.InputTokens)
+		cur.Output = max(cur.Output, u.OutputTokens)
+		cur.Reasoning = max(cur.Reasoning, u.OutputTokensDetails.ThinkingTokens)
+		cur.CacheRead = max(cur.CacheRead, u.CacheReadInputTokens)
+		out[key] = cur
+	}
+	return out
 }
 
 // parseClaudeTypedWithScanner keeps normalization independent from where a
@@ -148,6 +183,9 @@ type claudeParseOptions struct {
 	// CollapseSnapshots keeps one record per API call where the store appends a
 	// snapshot per stream chunk, as Cherry Studio does (#3644).
 	CollapseSnapshots bool
+	// priorUsage seeds max per-call token totals seen before an append offset so
+	// trailing content blocks contribute only deltas above prior totals.
+	priorUsage map[string]model.Tokens
 }
 
 func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
@@ -220,6 +258,9 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 				cur, ok := usageByCall[key]
 				if !ok {
 					usageOrder = append(usageOrder, key)
+					if prior, hasPrior := opts.priorUsage[key]; hasPrior {
+						cur = prior
+					}
 				}
 				cur.Input = max(cur.Input, u.InputTokens)
 				cur.Output = max(cur.Output, u.OutputTokens)
@@ -284,7 +325,8 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 	})
 	for _, k := range usageOrder {
 		u := usageByCall[k]
-		s.AddTokens(u.Input, u.Output, u.Reasoning, u.CacheRead)
+		prior := opts.priorUsage[k]
+		s.AddTokens(u.Input-prior.Input, u.Output-prior.Output, u.Reasoning-prior.Reasoning, u.CacheRead-prior.CacheRead)
 	}
 	if len(s.Messages) == 0 {
 		return nil, err
@@ -883,9 +925,7 @@ func claudeEditSpansIn(c *claudeContent) []string {
 			if span == "" {
 				continue
 			}
-			if len(span) > editSpanMax {
-				span = span[:editSpanMax]
-			}
+			span = capEditSpan(span)
 			out = append(out, path+"\n"+span)
 		}
 	}

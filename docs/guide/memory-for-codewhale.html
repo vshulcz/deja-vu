@@ -46,6 +46,7 @@
 <a href="agents.html">Agents &amp; MCP</a>
 <a href="search.html">Search</a>
 <a href="commands.html">CLI reference</a>
+<a href="configuration.html">Configuration</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
 <details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
@@ -220,7 +221,7 @@
 <p>CodeWhale's native hooks run in the interactive TUI (<code>codewhale exec</code> and headless servers fire none), and its footer takes only built-in items so there is no deja status line.</p>
 
 <h2>The part that is not about CodeWhale</h2>
-<p>The index covers every agent's transcripts on the machine — fifty-two of them, each in its own format — so a fix found in Claude Code answers a question asked in CodeWhale, including sessions from before any of this was installed. A transcript a client later deletes stays searchable; only <code>deja forget</code> drops one on purpose. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+<p>The index covers every agent's transcripts on the machine — fifty-three of them, each in its own format — so a fix found in Claude Code answers a question asked in CodeWhale, including sessions from before any of this was installed. A transcript a client later deletes stays searchable; only <code>deja forget</code> drops one on purpose. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
 
 <h2>Repository memory &amp; handoff</h2>
 <p>Share vetted project decisions and dead ends through git in <code>.deja/memory.jsonl</code> (<code>deja repo candidates</code>, <code>deja repo add &lt;id&gt;</code>). Entries are redacted on write, stored sorted with <code>merge=union</code> so parallel branches merge cleanly, and loaded for any teammate who clones the repository (<code>{"activations":{"auto":{"repo":false}}}</code> in the trust policy keeps them out of hooks). See <a href="repo-memory.html">repo memory</a>.</p>

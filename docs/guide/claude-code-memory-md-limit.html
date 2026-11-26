@@ -48,6 +48,7 @@
 <a href="agents.html">Agents &amp; MCP</a>
 <a href="search.html">Search</a>
 <a href="commands.html">CLI reference</a>
+<a href="configuration.html">Configuration</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
 <details class="grpfold" open><summary>Why agents forget <span class="n">17</span></summary>
@@ -198,7 +199,7 @@
 
 <p>Claude Code's auto-memory loads <code>MEMORY.md</code> at the start of every session and truncates the entrypoint after 200 lines or 25 KB. Even below the cutoff, copying build notes, bug postmortems, and debugging history into <code>MEMORY.md</code> or <code>CLAUDE.md</code> taxes every single prompt with stale text.</p>
 
-<div class="save-first"><b>Offload history out of MEMORY.md:</b> <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> indexes the JSONL transcripts Claude Code and 51 other agents already write to disk, injecting matched snippets up to 1,536 bytes per prompt only when the current turn hits past work.<div class="save-actions"><div class="save-cmd"><span class="p">$</span><code>brew install deja-vu &amp;&amp; deja install claude-auto</code><button type="button">copy</button></div><div class="save-cmd"><span class="p">$</span><code>npx @vshulcz/deja-vu install claude-auto</code><button type="button">copy</button></div><a class="save-btn" href="https://github.com/vshulcz/deja-vu">deja-vu on GitHub</a><a class="save-demo" href="getting-started.html">Quick start &rarr;</a></div></div>
+<div class="save-first"><b>Offload history out of MEMORY.md:</b> <a href="https://github.com/vshulcz/deja-vu">deja-vu</a> indexes the JSONL transcripts Claude Code and 52 other agents already write to disk, injecting matched snippets up to 1,536 bytes per prompt only when the current turn hits past work.<div class="save-actions"><div class="save-cmd"><span class="p">$</span><code>brew install deja-vu &amp;&amp; deja install claude-auto</code><button type="button">copy</button></div><div class="save-cmd"><span class="p">$</span><code>npx @vshulcz/deja-vu install claude-auto</code><button type="button">copy</button></div><a class="save-btn" href="https://github.com/vshulcz/deja-vu">deja-vu on GitHub</a><a class="save-demo" href="getting-started.html">Quick start &rarr;</a></div></div>
 
 <h2>Why always-loaded memory files break down</h2>
 <p>Three failure modes appear once <code>MEMORY.md</code> passes its first sprint:</p>
@@ -214,7 +215,7 @@
 <tbody>
 <tr><td><code>CLAUDE.md</code> / <code>.claude/rules/*.md</code></td><td>Repo build commands, architecture boundaries, non-negotiable conventions (&lt; 100 lines)</td><td>Claude Code on every session start</td></tr>
 <tr><td><code>.deja/memory.jsonl</code></td><td>Curated repo gotchas, settled choices, and dead ends promoted via <code>deja repo candidates</code> and <code>deja repo add &lt;id&gt; --kind gotcha</code></td><td>Any teammate or agent via hooks or MCP</td></tr>
-<tr><td><code>~/.deja/deja.db</code></td><td>Full transcripts across 52 coding agents from before and after install (secret-redacted SQLite + FTS5)</td><td>Queried in 0.7 to 0.8 ms by hooks (1,536 bytes per prompt, about 4 KB per tool call) and the <code>deja</code> MCP tool</td></tr>
+<tr><td><code>~/.deja/deja.db</code></td><td>Full transcripts across 53 coding agents from before and after install (secret-redacted SQLite + FTS5)</td><td>Queried in 0.7 to 0.8 ms by hooks (1,536 bytes per prompt, about 4 KB per tool call) and the <code>deja</code> MCP tool</td></tr>
 </tbody>
 </table>
 

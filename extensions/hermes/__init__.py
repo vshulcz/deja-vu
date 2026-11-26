@@ -121,23 +121,54 @@ def _cwd(**kwargs):
     return os.getcwd()
 
 
+_HOOK_EXT = None
+
+
+def _run_deja(args, payload="", timeout=10, cwd=None):
+    return subprocess.run(
+        [DEJA, *args],
+        input=payload,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=timeout,
+        cwd=cwd or _cwd(),
+        creationflags=_NO_WINDOW,
+    )
+
+
 def _deja(args, payload="", timeout=10, cwd=None):
     """Never let memory break a turn: a failure here returns nothing."""
     try:
-        done = subprocess.run(
-            [DEJA, *args],
-            input=payload,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout,
-            cwd=cwd or _cwd(),
-            creationflags=_NO_WINDOW,
-        )
-        return done.stdout.strip()
+        return _run_deja(args, payload, timeout=timeout, cwd=cwd).stdout.strip()
     except Exception:
         return ""
+
+
+def _deja_ext(op, payload=None, timeout=10, cwd=None):
+    # Call the JSON envelope endpoint for op; return parsed dict or None to fall back.
+    global _HOOK_EXT
+    if _HOOK_EXT is False:
+        return None
+    body = json.dumps({} if payload is None else payload, default=str)
+    try:
+        done = _run_deja(["hook-ext", "--host", "hermes", "--op", op], body, timeout=timeout, cwd=cwd)
+    except subprocess.TimeoutExpired:
+        return None
+    except Exception:
+        _HOOK_EXT = False
+        return None
+    raw = (done.stdout or "").strip()
+    try:
+        parsed = json.loads(raw) if raw else None
+    except Exception:
+        parsed = None
+    if isinstance(parsed, dict) and isinstance(parsed.get("ok"), bool):
+        _HOOK_EXT = True
+        return parsed
+    _HOOK_EXT = False
+    return None
 
 
 def _bounded_messages(messages, limit=768 * 1024):
@@ -263,6 +294,7 @@ class DejaMemoryProvider(MemoryProvider):
         self._last_count = 0
         self._last_notes = []
         self._held_notes = []
+        self._indicator_label = ""
 
     @property
     def name(self) -> str:
@@ -333,26 +365,51 @@ class DejaMemoryProvider(MemoryProvider):
         # Hermes prints the indicator only after a prefetch that returned
         # text. A note that came without any waits for the next one, except
         # build progress, which is stale by then.
-        lines = [line for note in notes for line in note.splitlines() if line.strip()]
-        if text:
-            self._last_notes, self._held_notes = (self._held_notes + lines)[-8:], []
+        settle = _deja_ext("settle", {"text": text, "notes": notes, "held_notes": self._held_notes}, cwd=cwd)
+        if settle is not None and settle.get("ok"):
+            note_text = settle.get("note") or ""
+            self._last_notes = [line for line in note_text.splitlines() if line.strip()]
+            self._held_notes = list(settle.get("held_notes") or [])
+            self._indicator_label = (settle.get("indicator_label") or "").strip()
         else:
-            fresh = [line for line in lines if not _PROGRESS.search(line)]
-            self._last_notes, self._held_notes = [], (self._held_notes + fresh)[-8:]
+            self._indicator_label = ""
+            lines = [line for note in notes for line in note.splitlines() if line.strip()]
+            if text:
+                self._last_notes, self._held_notes = (self._held_notes + lines)[-8:], []
+            else:
+                fresh = [line for line in lines if not _PROGRESS.search(line)]
+                self._last_notes, self._held_notes = [], (self._held_notes + fresh)[-8:]
         return text
 
     def _hook(self, command, payload, timeout, cwd=None):
         """One deja run: the model's text, and deja's line for the person
         when this Hermes will print a recall indicator to show it on."""
-        if (RecallStatus is None or getattr(self, "_platform", "") not in _SHOWS_LINE
-                or not _status_prints(getattr(self, "_status_callback", None))):
+        plain = (RecallStatus is None or getattr(self, "_platform", "") not in _SHOWS_LINE
+                 or not _status_prints(getattr(self, "_status_callback", None)))
+        op = "context" if command == "hook-context" else ("prompt" if command == "hook-prompt" else "")
+        if op:
+            try:
+                req_obj = json.loads(payload) if payload else {}
+            except Exception:
+                req_obj = {}
+            if isinstance(req_obj, dict):
+                req_obj["plain"] = plain
+                if op == "context":
+                    req_obj["once"] = True
+                ext = _deja_ext(op, req_obj, timeout=timeout, cwd=cwd)
+                if ext is not None:
+                    if not ext.get("ok"):
+                        return "", ""
+                    return (ext.get("context") or "").strip(), ("" if plain else (ext.get("note") or "").strip())
+        if plain:
             return _deja([command, "--plain"], payload, timeout=timeout, cwd=cwd), ""
         return _split_reply(_deja([command], payload, timeout=timeout, cwd=cwd))
 
     def recall_status(self):
         if RecallStatus is None or not self._last_text:
             return None
-        return RecallStatus(provider_label=_indicator_label(self._last_notes), count=self._last_count)
+        label = getattr(self, "_indicator_label", "") or _indicator_label(self._last_notes)
+        return RecallStatus(provider_label=label, count=self._last_count)
 
     def sync_turn(self, user_content: str, assistant_content: str, *, session_id: str = "", messages=None) -> None:
         # Hermes writes the session to its own store; deja indexes that store
@@ -368,7 +425,8 @@ class DejaMemoryProvider(MemoryProvider):
         sid = getattr(self, "_session_id", "")
         cwd = getattr(self, "_cwd", None) or _cwd()
         if sid:
-            _deja(["hook-session-end"], json.dumps({"session_id": sid, "cwd": cwd}), timeout=3, cwd=cwd)
+            if _deja_ext("session-end", {"session_id": sid, "cwd": cwd}, timeout=3, cwd=cwd) is None:
+                _deja(["hook-session-end"], json.dumps({"session_id": sid, "cwd": cwd}), timeout=3, cwd=cwd)
 
     def on_pre_compress(self, messages) -> str:
         # Held until the compression commits: Hermes can still abandon it, and
@@ -392,19 +450,22 @@ class DejaMemoryProvider(MemoryProvider):
         # conversation, and its lines.
         if kwargs.get("reason") != "compression":
             self._held_notes, self._last_notes = [], []
+            self._indicator_label = ""
         # The compression committed. deja builds the recovery packet from the
         # turns that were summarised, under the id the next turn will ask
         # with, and hands it back on that turn.
         compressed, self._compressing = getattr(self, "_compressing", None), None
         if kwargs.get("reason") == "compression" and compressed and new_session_id:
             cwd = getattr(self, "_cwd", None) or _cwd()
-            payload = json.dumps({
+            req_obj = {
                 "session_id": new_session_id,
                 "cwd": cwd,
                 "harness": "hermes",
+                "source": "hermes",
                 "messages": _bounded_messages(compressed),
-            }, default=str)
-            _deja(["hook-precompact"], payload, timeout=10, cwd=cwd)
+            }
+            if _deja_ext("precompact", req_obj, timeout=10, cwd=cwd) is None:
+                _deja(["hook-precompact"], json.dumps(req_obj, default=str), timeout=10, cwd=cwd)
 
     def on_memory_write(self, action: str, target: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> None:
         # A MEMORY.md / USER.md entry is a decision worth outranking the noisy
@@ -412,7 +473,10 @@ class DejaMemoryProvider(MemoryProvider):
         # "--" because an entry may start with a dash ("- user prefers X").
         if action == "add" and content and content.strip():
             cwd = getattr(self, "_cwd", None) or _cwd()
-            _deja(["remember", "--tag", "hermes-%s" % (target or "memory"), "--", content.strip()], cwd=cwd)
+            text = content.strip()
+            tag = "hermes-%s" % (target or "memory")
+            if _deja_ext("remember", {"content": text, "text": text, "tags": [tag]}, cwd=cwd) is None:
+                _deja(["remember", "--tag", tag, "--", text], cwd=cwd)
 
     def get_tool_schemas(self) -> List[Dict[str, Any]]:
         return [RECALL_SCHEMA, FIX_SCHEMA, BLAME_SCHEMA]
@@ -424,16 +488,41 @@ class DejaMemoryProvider(MemoryProvider):
         # it inside deja's untrusted-data frame; recall frames its own page.
         cwd = _cwd(**kwargs) if any(kwargs.get(k) for k in ("cwd", "workspace", "workspace_dir")) else (getattr(self, "_cwd", None) or _cwd())
         if tool_name == "deja_recall":
-            call = _recall_args(args)
-            text = _deja(call, timeout=120, cwd=cwd)
-            if not text and "--offset" in call:
-                # recall always prints a line; silence past the first page is
-                # a deja older than --offset refusing the flag.
-                text = "This deja cannot page recall. Run deja update, then ask again with the same offset."
+            query = str(args.get("query") or "").strip()
+            try:
+                offset = max(0, min(int(args.get("offset") or 0), 10**9))
+            except (TypeError, ValueError, OverflowError):
+                offset = 0
+            ext = _deja_ext("tool", {"tool": "deja_recall", "query": query, "offset": offset}, timeout=120, cwd=cwd)
+            if ext is not None:
+                if not ext.get("ok"):
+                    return json.dumps({"error": ext.get("error") or "deja error"})
+                text = (ext.get("output") or "").strip()
+            else:
+                call = _recall_args(args)
+                text = _deja(call, timeout=120, cwd=cwd)
+                if not text and "--offset" in call:
+                    # recall always prints a line; silence past the first page is
+                    # a deja older than --offset refusing the flag.
+                    text = "This deja cannot page recall. Run deja update, then ask again with the same offset."
         elif tool_name == "deja_fix":
-            text = _deja(["--framed"] + _query_args("fix", args.get("error", "")), timeout=120, cwd=cwd)
+            err_text = str(args.get("error") or "").strip()
+            ext = _deja_ext("tool", {"tool": "deja_fix", "query": err_text, "tool_input": {"error": err_text}}, timeout=120, cwd=cwd)
+            if ext is not None:
+                if not ext.get("ok"):
+                    return json.dumps({"error": ext.get("error") or "deja error"})
+                text = (ext.get("output") or "").strip()
+            else:
+                text = _deja(["--framed"] + _query_args("fix", args.get("error", "")), timeout=120, cwd=cwd)
         elif tool_name == "deja_blame":
-            text = _deja(["--framed"] + _query_args("blame", args.get("path", "")), timeout=120, cwd=cwd)
+            path_text = str(args.get("path") or "").strip()
+            ext = _deja_ext("tool", {"tool": "deja_blame", "query": path_text, "tool_input": {"path": path_text}}, timeout=120, cwd=cwd)
+            if ext is not None:
+                if not ext.get("ok"):
+                    return json.dumps({"error": ext.get("error") or "deja error"})
+                text = (ext.get("output") or "").strip()
+            else:
+                text = _deja(["--framed"] + _query_args("blame", args.get("path", "")), timeout=120, cwd=cwd)
         else:
             return json.dumps({"error": "unknown tool %s" % tool_name})
         return json.dumps({"result": text or "nothing in this machine's history matches"})

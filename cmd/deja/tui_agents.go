@@ -15,7 +15,7 @@ var agentNames = map[string]string{
 	"cursor": "Cursor", "deepseek": "DeepSeek Harness", "gemini": "Gemini CLI", "goose": "Goose",
 	"grok": "Grok Build", "hermes": "Hermes", "kimi": "Kimi Code", "omp": "omp (Oh My Pi)",
 	"openclaw": "OpenClaw", "opencode": "opencode", "continue": "Continue", "crush": "Crush",
-	"pi": "pi", "prime": "prime-agent (PrimeIntellect)", "qoder": "Qoder", "qwen": "Qwen Code", "cherrystudio": "Cherry Studio",
+	"pi": "pi", "prime": "prime-agent (PrimeIntellect)", "qoder": "Qoder", "qwen": "Qwen Code", "gigacode": "GigaCode CLI", "cherrystudio": "Cherry Studio",
 	"senpi": "Senpi", "gjc": "gajae-code", "kimchi": "Kimchi Coding", "commandcode": "Command Code", "clawcode": "Claw Code",
 	"zcode": "ZCode", "kiro": "Kiro", "kilocode": "Kilo Code", "roo": "Roo Code", "zed": "Zed",
 	"devin": "Devin CLI", "codewhale": "CodeWhale", "junie": "Junie", "jetbrains": "JetBrains AI Assistant",

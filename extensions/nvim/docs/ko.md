@@ -5,7 +5,7 @@
 
 **[deja-vu](https://github.com/vshulcz/deja-vu)** 확장 (**< 1 ms** SQLite FTS5 검색 · **~4%** 인덱스 크기 · 수집 시 LLM 토큰 **0**) · [문서](https://vshulcz.github.io/deja-vu/) · [브라우저 데모](https://vshulcz.github.io/deja-vu/view/) · [벤치마크](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-Neovim 안에서 Claude Code, Codex CLI, Cursor, opencode, Gemini CLI 및 47개 추가 하네스의 과거 코딩 에이전트 기록을 검색하고, 줄 단위 AI 세션 Blame을 실행하며, 오류 해결 내역을 찾고 에이전트 간 핸드오프 요약을 생성하세요.
+Neovim 안에서 Claude Code, Codex CLI, Cursor, opencode, Gemini CLI 및 48개 추가 하네스의 과거 코딩 에이전트 기록을 검색하고, 줄 단위 AI 세션 Blame을 실행하며, 오류 해결 내역을 찾고 에이전트 간 핸드오프 요약을 생성하세요.
 
 ![deja-vu 데모](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -78,7 +78,7 @@ Neovim에서 `:checkhealth deja`를 실행하면 바이너리 탐색과 활성 �
 
 | 재현율 (Recall) | 토큰 사용량 | 인덱싱 & 조회 속도 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1) | **토큰 58% 절감** (반복 저장소 작업) | 19,195개 세션 **13.6초** 인덱싱 / 52개 코딩 에이전트 통합 **0.7 ms** 조회 |
+| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1) | **토큰 58% 절감** (반복 저장소 작업) | 19,195개 세션 **13.6초** 인덱싱 / 53개 코딩 에이전트 통합 **0.7 ms** 조회 |
 
 ## 저장소 메모리 및 에이전트 간 핸드오프
 

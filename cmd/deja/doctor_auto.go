@@ -63,6 +63,7 @@ func autoWirings() []autoWiring {
 		{"cursor", func() string { return filepath.Join(sources.CursorCLIHome(), "hooks.json") }, "hook-context", ""},
 		{"gemini", geminiHooksPath, "hook-context", ""},
 		{"qwen", func() string { return filepath.Join(sources.QwenConfigDir(), "settings.json") }, "hook-prompt", ""},
+		{"gigacode", func() string { return filepath.Join(sources.GigaCodeConfigDir(), "settings.json") }, "hook-prompt", ""},
 		{"codebuddy", codeBuddySettingsPath, "hook-context", ""},
 		{"workbuddy", workBuddySettingsPath, "hook-context", ""},
 		{"trae", traeHooksPath, "hook-context", ""},
@@ -162,7 +163,7 @@ func autoWirings() []autoWiring {
 // rather than one deja writes whole. Those exist whether deja ever wrote to
 // them or not, so the file being there says nothing about deja (#4275).
 var autoInClientConfig = map[string]bool{
-	"cursor": true, "qwen": true, "codebuddy": true, "workbuddy": true, "trae": true, "trae-ide": true, "muse": true, "kimi": true, "crush": true, "zcode": true, "commandcode": true, "clawcode": true, "junie": true,
+	"cursor": true, "qwen": true, "gigacode": true, "codebuddy": true, "workbuddy": true, "trae": true, "trae-ide": true, "muse": true, "kimi": true, "crush": true, "zcode": true, "commandcode": true, "clawcode": true, "junie": true,
 	"copilot": true, "devin": true, "omnigent": true, "orca": true,
 	// CodeWhale's config.toml is the reader's own, and the plain MCP targets
 	// of both write the file the row reads, so it is there with no hook of

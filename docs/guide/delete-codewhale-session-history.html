@@ -44,6 +44,7 @@
 <a href="agents.html">Agents &amp; MCP</a>
 <a href="search.html">Search</a>
 <a href="commands.html">CLI reference</a>
+<a href="configuration.html">Configuration</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
 <details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
@@ -225,7 +226,7 @@ deja "CodeWhale session about the refactor"</pre>
 <p>The full conversation messages, tool calls (such as <code>read</code>, <code>write</code>, <code>edit</code>, and <code>bash</code>), execution receipts with command exit codes, and diffs. Once deleted, <code>codewhale --resume &lt;id&gt;</code> (or <code>codewhale --session-id &lt;id&gt;</code>) can no longer find or reopen the session.</p>
 
 <h2>Keeping it searchable instead</h2>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads CodeWhale sessions, alongside fifty-one other coding agents on your machine, into one local index:</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads CodeWhale sessions, alongside fifty-two other coding agents on your machine, into one local index:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "codewhale session about the migration"</pre>
 <p><a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session for good when you do want it gone. <code>DEJA_CODEWHALE_ROOT</code> lets you point deja at a backup directory or external disk without moving CodeWhale.</p>

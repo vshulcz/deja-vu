@@ -71,16 +71,59 @@ import { execFile } from "node:child_process";
 const DEJA = %q;
 const ROUTE = "/deja/statusline";
 
+let hookExt = null;
+
+function parseHookExtEnvelope(raw) {
+  const text = String(raw || "").trim();
+  if (!text) return null;
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && typeof parsed.ok === "boolean") {
+      return parsed;
+    }
+  } catch {}
+  return null;
+}
+
 // The page polls every few seconds; one deja call answers them all.
 let cached = { at: 0, line: "" };
 
 function statusline() {
   if (Date.now() - cached.at < 2000) return Promise.resolve(cached.line);
   return new Promise((resolve) => {
-    const child = execFile(DEJA, ["statusline"], { windowsHide: true, encoding: "utf8", timeout: 3000, maxBuffer: 64 * 1024 }, (err, out) => {
-      const line = err ? "" : String(out).split("\n")[0].trim();
-      cached = { at: Date.now(), line };
-      resolve(line);
+    const runLegacy = () => {
+      const child = execFile(DEJA, ["statusline"], { windowsHide: true, encoding: "utf8", timeout: 3000, maxBuffer: 64 * 1024 }, (err, out) => {
+        const line = err ? "" : String(out).split("\n")[0].trim();
+        cached = { at: Date.now(), line };
+        resolve(line);
+      });
+      // deja can exit before it reads stdin (a missing binary, a launcher that
+      // fails), and the write then fails with EPIPE, an uncaught error in dsh.
+      if (child.stdin) {
+        child.stdin.on("error", () => {});
+        child.stdin.end("{}");
+      }
+    };
+    if (hookExt === false) {
+      runLegacy();
+      return;
+    }
+    const child = execFile(DEJA, ["hook-ext", "--host", "dsh", "--op", "statusline"], { windowsHide: true, encoding: "utf8", timeout: 3000, maxBuffer: 64 * 1024 }, (err, out) => {
+      const parsed = parseHookExtEnvelope(out);
+      if (parsed !== null) {
+        hookExt = true;
+        const line = parsed.ok ? String(parsed.output || "").split("\n")[0].trim() : "";
+        cached = { at: Date.now(), line };
+        resolve(line);
+        return;
+      }
+      if (err && (err.killed || err.code === "ETIMEDOUT")) {
+        cached = { at: Date.now(), line: "" };
+        resolve("");
+        return;
+      }
+      hookExt = false;
+      runLegacy();
     });
     // deja can exit before it reads stdin (a missing binary, a launcher that
     // fails), and the write then fails with EPIPE, an uncaught error in dsh.

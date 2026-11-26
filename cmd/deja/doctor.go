@@ -21,6 +21,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
+	"github.com/vshulcz/deja-vu/internal/userconfig"
 )
 
 // doctorVersionLookup fetches the latest released version. It is injected so
@@ -139,6 +140,8 @@ func printDoctorText(w io.Writer, report doctorReport, deepReport *index.DeepRep
 	}
 	fmt.Fprintln(w)
 	doctorTools(w)
+	fmt.Fprintln(w)
+	doctorConfig(w)
 	fmt.Fprintln(w)
 	doctorPolicy(w, dir)
 	fmt.Fprintln(w)
@@ -729,6 +732,32 @@ func unmatchedImportGroups(dir string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func doctorConfig(w io.Writer) {
+	fmt.Fprintln(w, "User config:")
+	diag := userconfig.Diagnose()
+	if !diag.Exists {
+		fmt.Fprintf(w, "  %-12s %s (none — defaults and environment variables apply)\n", "default", reportPath(diag.Path))
+		return
+	}
+	if diag.Err != nil {
+		fmt.Fprintf(w, "  %-12s %s: %v\n", "unreadable", reportPath(diag.Path), diag.Err)
+		fmt.Fprintf(w, "  %-12s ignored until valid TOML parses cleanly\n", "in force")
+		return
+	}
+	fmt.Fprintf(w, "  %-12s %s\n", "file", reportPath(diag.Path))
+	if keys := configuredConfigKeys(diag.Config); len(keys) > 0 {
+		fmt.Fprintf(w, "  %-12s %s\n", "keys", strings.Join(keys, ", "))
+	} else {
+		fmt.Fprintf(w, "  %-12s (empty)\n", "keys")
+	}
+	for _, u := range diag.Unknown {
+		fmt.Fprintf(w, "  %-12s %q is not a recognized config setting — this key does nothing\n", "ignored", u)
+	}
+	for _, warn := range diag.Warnings {
+		fmt.Fprintf(w, "  %-12s %s\n", "warning", warn)
+	}
 }
 
 // doctorPolicy reports the one mechanism that separates local memory from

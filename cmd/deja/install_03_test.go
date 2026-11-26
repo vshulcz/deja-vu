@@ -2822,7 +2822,7 @@ func TestDeepSeekAutoFindsThePromptInTheDsh020Log(t *testing.T) {
 	home := t.TempDir()
 	stub := filepath.Join(home, "deja")
 	calls := filepath.Join(home, "calls")
-	script := "#!/bin/sh\nin=$(cat)\nprintf '%s %s\\n' \"$1\" \"$in\" >> " + calls + "\n" +
+	script := "#!/bin/sh\nif [ \"$1\" = \"hook-ext\" ]; then exit 2; fi\nin=$(cat)\nprintf '%s %s\\n' \"$1\" \"$in\" >> " + calls + "\n" +
 		"case \"$1\" in hook-prompt) printf 'RECALLED' ;; esac\n"
 	if werr := os.WriteFile(stub, []byte(script), 0o755); werr != nil {
 		t.Fatal(werr)
@@ -2887,7 +2887,7 @@ func driveDSHAuto(t *testing.T, web, withLib, card bool) (string, string) {
 	calls := filepath.Join(home, "calls")
 	// JSON unless asked for --plain, as deja answers: the model's text in
 	// additionalContext, the person's lines in systemMessage.
-	script := "#!/bin/sh\ncat >/dev/null\nprintf '%s\\n' \"$*\" >> " + calls + "\n" +
+	script := "#!/bin/sh\nif [ \"$1\" = \"hook-ext\" ]; then exit 2; fi\ncat >/dev/null\nprintf '%s\\n' \"$*\" >> " + calls + "\n" +
 		"case \"$*\" in\n" +
 		"  *--plain*) printf 'MODEL TEXT %s' \"$1\" ;;\n" +
 		"  hook-prompt) printf '{\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"MODEL TEXT hook-prompt\"},\"systemMessage\":\"deja-vu — you have been here: \\\\\"zorbit drain\\\\\" (4d ago · via: drain)\"}' ;;\n" +
@@ -3184,7 +3184,7 @@ func TestDeepSeekAutoDigestContract(t *testing.T) {
 	home := t.TempDir()
 	stub := filepath.Join(home, "deja")
 	calls := filepath.Join(home, "calls")
-	script := "#!/bin/sh\nin=$(cat)\nprintf '%s %s\\n' \"$1\" \"$in\" >> " + calls + "\n" +
+	script := "#!/bin/sh\nif [ \"$1\" = \"hook-ext\" ]; then exit 2; fi\nin=$(cat)\nprintf '%s %s\\n' \"$1\" \"$in\" >> " + calls + "\n" +
 		"case \"$1\" in hook-context) printf 'DIGEST for this project' ;; esac\n"
 	if werr := os.WriteFile(stub, []byte(script), 0o755); werr != nil {
 		t.Fatal(werr)
@@ -3346,7 +3346,7 @@ func TestDeepSeekStatusPluginServesTheLine(t *testing.T) {
 	}
 	home := dshStatusHome(t)
 	fake := filepath.Join(home, "deja")
-	if werr := os.WriteFile(fake, []byte("#!/bin/sh\n[ \"$1\" = statusline ] && echo 'deja · 3 recalls · 2 KB ctx today'\n"), 0o755); werr != nil {
+	if werr := os.WriteFile(fake, []byte("#!/bin/sh\n[ \"$1\" = hook-ext ] && exit 2\n[ \"$1\" = statusline ] && echo 'deja · 3 recalls · 2 KB ctx today'\n"), 0o755); werr != nil {
 		t.Fatal(werr)
 	}
 	if _, ierr := installDeepSeekAuto(fake, false); ierr != nil {
@@ -3393,7 +3393,7 @@ func TestDeepSeekAutoRecallWithTemplateBracesRenders(t *testing.T) {
 	}
 	home := t.TempDir()
 	stub := filepath.Join(home, "deja")
-	script := "#!/bin/sh\ncat >/dev/null\n" +
+	script := "#!/bin/sh\n[ \"$1\" = hook-ext ] && exit 2\ncat >/dev/null\n" +
 		"printf '%s\\n' 'last time: unknown prompt variable \"{{cwd}}\" in context \"deja:project\"; {{cwd b {{a b}}'\n"
 	if werr := os.WriteFile(stub, []byte(script), 0o755); werr != nil {
 		t.Fatal(werr)
@@ -3717,7 +3717,7 @@ func TestDeepSeekAutoNotesTheFileAndTheFailedCommand(t *testing.T) {
 	home := t.TempDir()
 	stub := filepath.Join(home, "deja")
 	calls := filepath.Join(home, "calls")
-	script := "#!/bin/sh\nin=$(cat)\nprintf '%s %s %s\\n' \"$1\" \"$2\" \"$in\" >> " + calls + "\n" +
+	script := "#!/bin/sh\nif [ \"$1\" = \"hook-ext\" ]; then exit 2; fi\nin=$(cat)\nprintf '%s %s %s\\n' \"$1\" \"$2\" \"$in\" >> " + calls + "\n" +
 		"case \"$1\" in hook-tool) printf 'NOTE about the file' ;; hook-tool-after) printf 'FIX seen before' ;; esac\n"
 	if werr := os.WriteFile(stub, []byte(script), 0o755); werr != nil {
 		t.Fatal(werr)
@@ -3822,7 +3822,7 @@ func TestDeepSeekAutoToolNoteDoesNotBlockTheHost(t *testing.T) {
 	}
 	home := t.TempDir()
 	stub := filepath.Join(home, "deja")
-	if werr := os.WriteFile(stub, []byte("#!/bin/sh\ncat >/dev/null\nsleep 0.5\nprintf 'NOTE'\n"), 0o755); werr != nil {
+	if werr := os.WriteFile(stub, []byte("#!/bin/sh\nif [ \"$1\" = \"hook-ext\" ]; then exit 2; fi\ncat >/dev/null\nsleep 0.5\nprintf 'NOTE'\n"), 0o755); werr != nil {
 		t.Fatal(werr)
 	}
 	plugin := filepath.Join(home, "auto.js")
@@ -3967,7 +3967,7 @@ func TestDeepSeekAutoPluginAsksAboutTheSessionsWorkspace(t *testing.T) {
 	}
 	calls := filepath.Join(home, "calls.jsonl")
 	fake := filepath.Join(home, "deja")
-	if werr := os.WriteFile(fake, []byte("#!/bin/sh\ncat >> '"+calls+"'\necho >> '"+calls+"'\n"), 0o755); werr != nil {
+	if werr := os.WriteFile(fake, []byte("#!/bin/sh\nif [ \"$1\" = \"hook-ext\" ]; then exit 2; fi\ncat >> '"+calls+"'\necho >> '"+calls+"'\n"), 0o755); werr != nil {
 		t.Fatal(werr)
 	}
 	if _, ierr := installDeepSeekAuto(fake, false); ierr != nil {

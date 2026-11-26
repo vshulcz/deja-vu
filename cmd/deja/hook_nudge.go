@@ -207,8 +207,8 @@ func emitCommittedNudgeOnly(
 	if len(items) == 0 && failNudge == "" && rcLine == "" {
 		return nil
 	}
-	releaseSeenLock, _ := holdHookseenLock(dir)
-	latest := alreadyInjected(dir, sessionID)
+	seenTx, releaseSeenLock, _ := openHookseenTx(dir)
+	latest := seenTx.Load().Injected(sessionID)
 	kept, freshToks := filterFreshPromptAdvisories(items, latest)
 	nudge := joinPromptAdvisories(joinAdvisoryItems(kept), failNudge)
 	if tryConsensus && rcLine != "" && (rcTok == "" || !latest[rcTok]) && lineAddsNewTargetPath(nudge, rcLine) {
@@ -220,7 +220,7 @@ func emitCommittedNudgeOnly(
 		}
 	}
 	if sessionID != "" && len(freshToks) > 0 {
-		rememberInjectedIDs(dir, sessionID, freshToks...)
+		seenTx.RecordIDs(sessionID, freshToks...)
 	}
 	releaseSeenLock()
 	return emitNudgeOnly(stdout, plain, nudge)

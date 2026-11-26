@@ -8,7 +8,7 @@
 
 ![deja-vu 데모](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-같은 머신에 기록된 다른 51개 코딩 에이전트(Claude Code, Codex, Cursor, Gemini, Zed 등)의 세션 기록을 [OpenClaw](https://openclaw.ai)에 연결합니다. 단일 Go 바이너리 `deja`와 로컬 BM25 색인으로 동작하며 LLM 없이 실행됩니다(`DEJA_OFFLINE=1`로 일일 확인 비활성화 가능).
+같은 머신에 기록된 다른 52개 코딩 에이전트(Claude Code, Codex, Cursor, Gemini, Zed 등)의 세션 기록을 [OpenClaw](https://openclaw.ai)에 연결합니다. 단일 Go 바이너리 `deja`와 로컬 BM25 색인으로 동작하며 LLM 없이 실행됩니다(`DEJA_OFFLINE=1`로 일일 확인 비활성화 가능).
 
 ## 설치
 
@@ -86,7 +86,7 @@ openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 
 | 재현율 (Recall) | 토큰 사용량 | 인덱싱 & 조회 속도 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1) | **토큰 58% 절감** (반복 저장소 작업) | 19,195개 세션 **13.6초** 인덱싱 / 52개 코딩 에이전트 통합 **0.7 ms** 조회 |
+| LongMemEval-S **97.2% R@5** (470문항 88.9% hit@1) | **토큰 58% 절감** (반복 저장소 작업) | 19,195개 세션 **13.6초** 인덱싱 / 53개 코딩 에이전트 통합 **0.7 ms** 조회 |
 
 ## 저장소 메모리 및 에이전트 간 핸드오프
 
@@ -96,6 +96,6 @@ git을 통해 `.deja/memory.jsonl`에 검증된 프로젝트 결정 사항과 �
 
 ## 개인정보 보호
 
-인덱스는 `~/.cache/deja/index.db`(`DEJA_INDEX_DIR`로 변경 가능)에 저장되며 `sk-*`, `ghp_*`, `AKIA*`, `Bearer` 자격 증명은 색인 단계에서 제거됩니다. `deja embed`를 별도 지정하지 않는 한 로컬에서만 처리되며, `deja install --auto`로 52개 에이전트 전체에 적용할 수 있습니다.
+인덱스는 `~/.cache/deja/index.db`(`DEJA_INDEX_DIR`로 변경 가능)에 저장되며 `sk-*`, `ghp_*`, `AKIA*`, `Bearer` 자격 증명은 색인 단계에서 제거됩니다. `deja embed`를 별도 지정하지 않는 한 로컬에서만 처리되며, `deja install --auto`로 53개 에이전트 전체에 적용할 수 있습니다.
 
 [deja-vu](https://github.com/vshulcz/deja-vu)의 일부입니다. MIT.

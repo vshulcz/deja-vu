@@ -1,9 +1,12 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/vshulcz/deja-vu/internal/userconfig"
 )
 
 // Muse Code starts hooks with HOME, PATH and a few basics, nothing else, so a
@@ -76,6 +79,9 @@ func launcherEnv(environ []string) [][2]string {
 	for _, kv := range environ {
 		name, value, ok := strings.Cut(kv, "=")
 		if !ok || value == "" {
+			continue
+		}
+		if userconfig.WasApplied(name) && value == os.Getenv(name) {
 			continue
 		}
 		switch {

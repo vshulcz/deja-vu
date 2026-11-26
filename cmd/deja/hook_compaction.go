@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
+	"github.com/vshulcz/deja-vu/internal/hookengine"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -45,9 +46,7 @@ func compactionUsageKey(s index.CompactionState) usage.CompactionKey {
 // guesses another session or waits for a history rebuild on the hook path. It
 // returns the state this compaction stored, and false when it stored none.
 func captureCompaction(dir string, input precompactHookInput) (index.CompactionState, bool) {
-	return captureCompactionFrom(dir, input, func(workspace string) (sources.CompactionTranscript, string, usage.CompactionFailure) {
-		return compactionSource(input, workspace)
-	})
+	return captureCompactionWithTx(nil, dir, input)
 }
 
 // compactionSource reads what the host named: a transcript file, the turns it
@@ -275,30 +274,42 @@ func catchUpCompactionWith(dir string, input precompactHookInput, read func() (s
 	// below clears: a compaction whose capture failed must not clear it again
 	// on every prompt after.
 	seenKey, seen := onceDigestKey("compaction-seen:"+input.SessionID), "compaction-seen:"+shortHash(transcript.Fingerprint)
-	if loadSeen(dir).injected(seenKey)[seen] {
+	seenTx, releaseSeenLock, _ := openHookseenTx(dir)
+	defer releaseSeenLock()
+	if seenTx.Load().Injected(seenKey)[seen] {
 		return
 	}
 	workspace := compactionWorkspace(hookProjectPath(input.CWD, input.WorkspaceRoots))
 	if state, ok, err := index.Compaction(dir, input.SessionID, workspace); err == nil && ok && state.SourceDigest == transcript.Fingerprint {
 		return
 	}
-	rememberInjectedIDs(dir, seenKey, seen)
+	seenTx.RecordIDs(seenKey, seen)
 	// The same bookkeeping a PreCompact does: what this session was shown is
 	// gone from its window, so recall may show it again.
-	forgetInjected(dir, input.SessionID)
-	forgetInjected(dir, compactionFailureKey(input.SessionID))
-	captureCompactionFrom(dir, input, func(string) (sources.CompactionTranscript, string, usage.CompactionFailure) {
+	seenTx.ForgetSessions(input.SessionID, compactionFailureKey(input.SessionID))
+	captureCompactionFromWith(seenTx, dir, input, func(string) (sources.CompactionTranscript, string, usage.CompactionFailure) {
 		return transcript, "", usage.CompactionFailure{}
 	})
 }
 
-func captureCompactionFrom(dir string, input precompactHookInput, read func(workspace string) (sources.CompactionTranscript, string, usage.CompactionFailure)) (index.CompactionState, bool) {
+func captureCompactionWithTx(seenTx *hookengine.SeenTx, dir string, input precompactHookInput) (index.CompactionState, bool) {
+	return captureCompactionFromWith(seenTx, dir, input, func(workspace string) (sources.CompactionTranscript, string, usage.CompactionFailure) {
+		return compactionSource(input, workspace)
+	})
+}
+
+func captureCompactionFromWith(seenTx *hookengine.SeenTx, dir string, input precompactHookInput, read func(workspace string) (sources.CompactionTranscript, string, usage.CompactionFailure)) (index.CompactionState, bool) {
 	if input.SessionID == "" {
 		return index.CompactionState{}, false
 	}
 	workspace := compactionWorkspace(hookProjectPath(input.CWD, input.WorkspaceRoots))
 	blockOldPacket := func() {
-		rememberInjectedIDs(dir, compactionFailureKey(input.SessionID), compactionUnavailableToken(workspace))
+		key, tok := compactionFailureKey(input.SessionID), compactionUnavailableToken(workspace)
+		if seenTx != nil {
+			seenTx.RecordIDs(key, tok)
+			return
+		}
+		hookengine.NewLedger(dir).RecordIDs(key, tok)
 	}
 	pol := policy.Load()
 	if recallIsOff() || workspace == "" || !pol.Allows(policy.ActivationAuto, workspace) || pol.Ignored(input.TranscriptPath, workspace) {
@@ -518,12 +529,12 @@ func emitCompactionRecovery(dir, sessionID, cwd, event string, shape hookToolSha
 	if _, packet := compactionRecovery(dir, sessionID, cwd); packet == "" {
 		return false, nil
 	}
-	releaseSeenLock, _ := holdHookseenLock(dir)
+	seenTx, releaseSeenLock, _ := openHookseenTx(dir)
 	defer releaseSeenLock()
-	return emitCompactionRecoveryLocked(dir, sessionID, cwd, event, shape, stdout)
+	return emitCompactionRecoveryLocked(seenTx, dir, sessionID, cwd, event, shape, stdout)
 }
 
-func emitCompactionRecoveryLocked(dir, sessionID, cwd, event string, shape hookToolShape, stdout io.Writer) (bool, error) {
+func emitCompactionRecoveryLocked(seenTx *hookengine.SeenTx, dir, sessionID, cwd, event string, shape hookToolShape, stdout io.Writer) (bool, error) {
 	state, packet := compactionRecovery(dir, sessionID, cwd)
 	if packet == "" {
 		return false, nil
@@ -559,7 +570,11 @@ func emitCompactionRecoveryLocked(dir, sessionID, cwd, event string, shape hookT
 	if err != nil {
 		return true, err
 	}
-	rememberInjectedIDsFor(dir, sessionID, state.Project, []string{compactionDeliveryToken(state)})
+	if seenTx != nil {
+		seenTx.RecordForProject(sessionID, state.Project, compactionDeliveryToken(state))
+	} else {
+		rememberInjectedIDsFor(dir, sessionID, state.Project, []string{compactionDeliveryToken(state)})
+	}
 	usage.RecordDigestPolicySessionsFrom(dir, usage.KindHook, packet, sessionID, 1, state.SourceSize,
 		policy.Load().Describe(policy.ActivationAuto), []string{state.SessionID}, []string{state.Project})
 	return true, nil

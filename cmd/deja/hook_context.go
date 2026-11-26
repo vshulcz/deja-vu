@@ -117,8 +117,13 @@ func cmdHookPrecompact(dir string, rest []string) error {
 // payload does not name one: Kimi's PreCompact carries only the session id, and
 // the hook entry is the one place that knows whose session it is.
 func runHookPrecompactFor(dir, harness string) {
+	runHookPrecompactWith(dir, os.Stdin, harness)
+}
+
+// runHookPrecompactWith runs precompact handling reading payload bytes from stdin.
+func runHookPrecompactWith(dir string, stdin io.Reader, harness string) {
 	var input precompactHookInput
-	_ = json.Unmarshal(readHookStdin(), &input)
+	_ = json.Unmarshal(readHookPayloadFrom(stdin), &input)
 	input.adopt()
 	if input.Harness == "" {
 		input.Harness = harness
@@ -139,9 +144,8 @@ func runHookPrecompactFor(dir, harness string) {
 	// that stops them repeating outlives them — so the memory the agent just
 	// lost is exactly the memory recall refuses to send again. Forget what this
 	// session was shown; everything else in the file belongs to other sessions.
-	forgetInjected(dir, input.SessionID)
 	if input.SessionID != "" {
-		forgetInjected(dir, compactionFailureKey(input.SessionID))
+		hookengine.NewLedger(dir).ForgetSessions(input.SessionID, compactionFailureKey(input.SessionID))
 	}
 	captureCompaction(dir, input)
 	requestWarmup(dir)
@@ -321,7 +325,7 @@ func rememberSessionDigest(dir, sessionID string) {
 	rememberInjectedIDs(dir, onceDigestKey(sessionID), onceDigestMarker)
 }
 
-func onceDigestKey(sessionID string) string { return "once:" + sessionID }
+func onceDigestKey(sessionID string) string { return hookengine.OnceDigestKey(sessionID) }
 
 // onceDigestMarker is what the ledger row says: this session has had its
 // session-start attempt.
@@ -590,6 +594,20 @@ func indexNeedsRebuild(dir string) bool {
 // harness that has no session-start channel and has to carry the digest on its
 // per-prompt hook.
 func runHookContextMode(dir string, plain, once bool) error {
+	return runHookContextWith(dir, os.Stdin, os.Stdout, plain, once)
+}
+
+func readHookPayloadFrom(stdin io.Reader) []byte {
+	if stdin == nil || stdin == os.Stdin {
+		return readHookStdin()
+	}
+	return readHookPayload(stdin, hookStdinWait)
+}
+
+func runHookContextWith(dir string, stdin io.Reader, stdout io.Writer, plain, once bool) error {
+	if stdout == nil {
+		stdout = os.Stdout
+	}
 	// A session start is the one moment deja is guaranteed to run on every
 	// harness, which makes it the only reliable place to repair wiring left
 	// behind by an older binary. It costs one small file read when nothing
@@ -652,7 +670,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// cannot decode carries the session this injection went to, and losing it
 	// without a word left the audit log unable to tell that case from a host
 	// that sent nothing at all (#2161).
-	payload := readHookStdin()
+	payload := readHookPayloadFrom(stdin)
 	unreadable := len(bytes.TrimSpace(payload)) > 0 && json.Unmarshal(payload, &input) != nil
 	adoptCopilotHost(payload)
 	adoptCursorHost(payload)
@@ -680,10 +698,10 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// The first moment this session exists, so the first recall of it — the one
 	// an agent plans against — already knows whose transcript to leave out.
 	markSessionLive(dir, input.SessionID)
-	releaseSeenLock, contendedSeenLock := holdHookseenLock(dir)
+	seenTx, releaseSeenLock, contendedSeenLock := openHookseenTx(dir)
 	defer releaseSeenLock()
 	if contendedSeenLock && input.SessionID != "" && input.Source != "compact" && input.Source != "clear" &&
-		len(alreadyInjected(dir, sessionStartKeyPrefix+input.SessionID)) > 0 {
+		len(seenTx.Load().Injected(sessionStartKeyPrefix+input.SessionID)) > 0 {
 		return nil
 	}
 	// Grok shows the receipt and drops the context (#4588); the digest waits
@@ -701,13 +719,13 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// chain in sessions.db; reset the seen ledger and capture the pre-compaction
 	// turns from the store before emitting the recovery packet.
 	if eventName == "PostCompaction" {
-		preparePostCompactionContext(dir, input.SessionID, input.TranscriptPath, input.CWD, input.WorkspaceRoots)
+		preparePostCompactionContext(seenTx, dir, input.SessionID, input.TranscriptPath, input.CWD, input.WorkspaceRoots)
 	}
 	// --once rides a per-prompt event beside hook-prompt, and Kimi runs the two
 	// in parallel: both found the packet undelivered and it arrived twice. The
 	// prompt hook carries it there.
 	if !once {
-		if delivered, err := emitCompactionRecoveryLocked(dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), eventName, shape, os.Stdout); delivered {
+		if delivered, err := emitCompactionRecoveryLocked(seenTx, dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), eventName, shape, stdout); delivered {
 			return err
 		}
 	}
@@ -715,13 +733,16 @@ func runHookContextMode(dir string, plain, once bool) error {
 		input.Once = true
 	}
 	if input.Once {
-		if sessionHadDigest(dir, input.SessionID) {
+		seenSnap := seenTx.Load()
+		if seenSnap.Injected(onceDigestKey(input.SessionID))[onceDigestMarker] {
 			return nil
 		}
-		rememberSessionDigest(dir, input.SessionID)
+		if strings.TrimSpace(input.SessionID) != "" {
+			seenTx.RecordIDs(onceDigestKey(input.SessionID), onceDigestMarker)
+		}
 		// A Kimi /fork is a copy of its source under a new id, the digest
 		// that opened the source among what it copied (#5146).
-		if src := sources.KimiForkSource(input.SessionID); src != "" && sessionHadDigest(dir, src) {
+		if src := sources.KimiForkSource(input.SessionID); src != "" && seenSnap.Injected(onceDigestKey(src))[onceDigestMarker] {
 			return nil
 		}
 	}
@@ -787,9 +808,9 @@ func runHookContextMode(dir string, plain, once bool) error {
 	)
 	if digest == "" {
 		if parentBrief == "" {
-			return hookContextWithoutDigest(dir, rewired, unreadable, plain, eventName, input.SessionID, withheld)
+			return hookContextWithoutDigest(seenTx, dir, stdout, rewired, unreadable, plain, eventName, input.SessionID, withheld)
 		}
-		emitParentBriefWithoutDigest(dir, parentBrief, eventName, plain)
+		emitParentBriefWithoutDigest(dir, stdout, parentBrief, eventName, plain)
 		return nil
 	}
 	// One actionable line so injected memory leads somewhere: models that see
@@ -819,12 +840,12 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// per-prompt path bans a session it already showed *this* agent session,
 	// and unprefixed rows made a session-start block count as that — the first
 	// prompt about what the start just mentioned got nothing back.
-	rememberInjectedIDsFor(dir, sessionStartKeyPrefix+input.SessionID, hookProjectKey(hookProjectPath(input.CWD, input.WorkspaceRoots)), servedIDs)
+	seenTx.RecordForProject(sessionStartKeyPrefix+input.SessionID, hookProjectKey(hookProjectPath(input.CWD, input.WorkspaceRoots)), servedIDs...)
 	if len(servedIDs) == 0 && input.SessionID != "" {
-		rememberInjectedIDs(dir, sessionStartKeyPrefix+input.SessionID, onceDigestMarker)
+		seenTx.RecordIDs(sessionStartKeyPrefix+input.SessionID, onceDigestMarker)
 	}
 	if plain {
-		fmt.Fprintln(os.Stdout, digest)
+		fmt.Fprintln(stdout, digest)
 		return nil
 	}
 	var resp sessionStartHookResponse
@@ -842,7 +863,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// (#2697) — the silence #927 fixed on the environment-facts path, reached
 	// from the other side.
 	resp.SystemMessage = appendSessionStartSystemNotes(dir, rewired, resp.SystemMessage)
-	emitHookResponse(resp)
+	emitHookResponseTo(stdout, resp)
 	return nil
 }
 
@@ -859,12 +880,9 @@ func contextHookShape(plain bool) hookToolShape {
 	}
 }
 
-func preparePostCompactionContext(dir, sessionID, transcriptPath, cwd string, roots []string) {
-	forgetInjected(dir, sessionID)
-	if sessionID != "" {
-		forgetInjected(dir, compactionFailureKey(sessionID))
-	}
-	captureCompaction(dir, precompactHookInput{
+func preparePostCompactionContext(seenTx *hookengine.SeenTx, dir, sessionID, transcriptPath, cwd string, roots []string) {
+	seenTx.ForgetSessions(sessionID, compactionFailureKey(sessionID))
+	captureCompactionWithTx(seenTx, dir, precompactHookInput{
 		SessionID:      sessionID,
 		TranscriptPath: transcriptPath,
 		CWD:            cwd,
@@ -888,20 +906,20 @@ func resolveContextSubagentBrief(dir, source, sessionID, parentSessionID, transc
 	return coordSubagentBriefForStart(dir, sessionID, resolvedParent, parentTranscript, ctxCWD)
 }
 
-func emitParentBriefWithoutDigest(dir, parentBrief, eventName string, plain bool) {
+func emitParentBriefWithoutDigest(dir string, stdout io.Writer, parentBrief, eventName string, plain bool) {
 	combined := parentBrief
 	if env, _ := environmentBlockFrom(dir, policy.ActivationAuto); env != "" {
 		combined += "\n\n" + env
 	}
 	out := frameRecall(combined)
 	if plain {
-		fmt.Fprintln(os.Stdout, out)
+		fmt.Fprintln(stdout, out)
 		return
 	}
 	var resp sessionStartHookResponse
 	resp.HookSpecificOutput.HookEventName = eventName
 	resp.HookSpecificOutput.AdditionalContext = out
-	emitHookResponse(resp)
+	emitHookResponseTo(stdout, resp)
 }
 
 func formatSessionStartLead(dir, source, sessionID, ctxCWD string, shell bool) string {
@@ -950,7 +968,7 @@ func appendSessionStartSystemNotes(dir string, rewired []string, msg string) str
 
 // hookContextWithoutDigest answers a session start that found no session from
 // this project: the machine's environment block, or a word about the build.
-func hookContextWithoutDigest(dir string, rewired []string, unreadable, plain bool, eventName, sessionID string, withheld int) error {
+func hookContextWithoutDigest(seenTx *hookengine.SeenTx, dir string, stdout io.Writer, rewired []string, unreadable, plain bool, eventName, sessionID string, withheld int) error {
 	// No session from this project, which is the usual state in a new
 	// checkout — and exactly where knowing what this machine is missing
 	// helps most. The block is about the machine, not the project, so it
@@ -968,10 +986,10 @@ func hookContextWithoutDigest(dir string, rewired []string, unreadable, plain bo
 			usage.RecordDigestPolicyFrom(dir, usage.KindHook, out, sessionID, 0, 0, from, policy.Load().Describe(policy.ActivationAuto))
 		}
 		if sessionID != "" {
-			rememberInjectedIDs(dir, sessionStartKeyPrefix+sessionID, onceDigestMarker)
+			seenTx.RecordIDs(sessionStartKeyPrefix+sessionID, onceDigestMarker)
 		}
 		if plain {
-			fmt.Fprintln(os.Stdout, out)
+			fmt.Fprintln(stdout, out)
 			return nil
 		}
 		var resp sessionStartHookResponse
@@ -987,7 +1005,7 @@ func hookContextWithoutDigest(dir string, rewired []string, unreadable, plain bo
 			// like (#3065).
 			resp.SystemMessage = joinNotes(resp.SystemMessage, humanNotes(dir))
 		}
-		emitHookResponse(resp)
+		emitHookResponseTo(stdout, resp)
 		return nil
 	}
 	// A first build (or one forced by a new index format) is running in
@@ -1019,7 +1037,7 @@ func hookContextWithoutDigest(dir string, rewired []string, unreadable, plain bo
 			var resp sessionStartHookResponse
 			resp.HookSpecificOutput.HookEventName = eventName
 			resp.SystemMessage = line
-			emitHookResponse(resp)
+			emitHookResponseTo(stdout, resp)
 		}
 	}
 	return nil

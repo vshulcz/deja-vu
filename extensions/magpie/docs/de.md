@@ -8,7 +8,7 @@ Teil von **[★ vshulcz/deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% 
 
 ![deja-vu Demo](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-> Reicht Anfragen über [Magpie](https://github.com/yetone/magpie) automatisch mit lokalem Sitzungswissen aus 51 weiteren Coding-Agenten (Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes u. a.) an.
+> Reicht Anfragen über [Magpie](https://github.com/yetone/magpie) automatisch mit lokalem Sitzungswissen aus 52 weiteren Coding-Agenten (Claude Code, Codex, Cursor, Gemini CLI, OpenClaw, Hermes u. a.) an.
 
 Unterstützt OpenAI (`chat`, `responses`), Anthropic (`anthropic`) und Gemini (`gemini`) über die lokale Go-Binary `deja` und deren BM25-Index ohne zusätzliches LLM (`DEJA_OFFLINE=1` deaktiviert den täglichen Release-Check).
 
@@ -18,7 +18,7 @@ Unterstützt OpenAI (`chat`, `responses`), Anthropic (`anthropic`) und Gemini (`
 magpie plugin add @vshulcz/magpie-deja
 ```
 
-Voraussetzung sind die Binary `deja` (`@vshulcz/deja-vu`, `brew install deja-vu` oder `install.sh`) sowie ein via `deja index` aufgebauter Index. Für volle MCP-Werkzeuge (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) in allen 52 Agenten:
+Voraussetzung sind die Binary `deja` (`@vshulcz/deja-vu`, `brew install deja-vu` oder `install.sh`) sowie ein via `deja index` aufgebauter Index. Für volle MCP-Werkzeuge (`recall`, `fix`, `blame`, `how`, `orient`, `context`, `remember`, `handoff`) in allen 53 Agenten:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh && deja install --auto
@@ -50,7 +50,7 @@ Enthält eine Anfrage bereits `<deja-memory>` oder `<deja-recall>`, verzichtet d
 
 | Recall | Tokens | Indexierung & Suche |
 |---|---|---|
-| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 52 Coding-Agents hinweg |
+| **97.2% R@5** auf LongMemEval-S (88.9% hit@1 über 470 Fragen) | **58% weniger Tokens** (bei wiederholten Repo-Aufgaben) | **13.6 s** für 19,195 Sessions / **0.7 ms** Abfragezeit über 53 Coding-Agents hinweg |
 
 ## Repository-Gedächtnis & Agenten-Übergabe
 

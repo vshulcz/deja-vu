@@ -24,15 +24,16 @@ import (
 // config a user reads.
 var strictHookOutput bool
 
-// emitHookResponse writes the session-start response, minus anything a strict
-// host would reject.
-func emitHookResponse(resp sessionStartHookResponse) {
+func emitHookResponseTo(w io.Writer, resp sessionStartHookResponse) {
+	if w == nil {
+		w = os.Stdout
+	}
 	if mcodeHookOutput {
-		emitMcodeContext(os.Stdout, resp.HookSpecificOutput.HookEventName, resp.HookSpecificOutput.AdditionalContext)
+		emitMcodeContext(w, resp.HookSpecificOutput.HookEventName, resp.HookSpecificOutput.AdditionalContext)
 		return
 	}
 	if copilotHookOutput {
-		emitCopilotContext(os.Stdout, resp.HookSpecificOutput.AdditionalContext)
+		emitCopilotContext(w, resp.HookSpecificOutput.AdditionalContext)
 		return
 	}
 	if strictHookOutput {
@@ -43,7 +44,7 @@ func emitHookResponse(resp sessionStartHookResponse) {
 	if err != nil {
 		return
 	}
-	fmt.Fprintln(os.Stdout, string(b))
+	fmt.Fprintln(w, string(b))
 }
 
 // Copilot CLI reads a hook's answer as a flat {"additionalContext": "..."}.

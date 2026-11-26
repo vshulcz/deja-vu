@@ -505,6 +505,50 @@ function ask(args, payload) {
   }
 }
 
+function parseHookExtEnvelope(raw) {
+  const s = String(raw || "").trim();
+  if (!s.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(s);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && typeof parsed.ok === "boolean") {
+      return parsed;
+    }
+  } catch {}
+  return null;
+}
+
+const hookCwd = (dir) => (dir && existsSync(dir) ? dir : process.cwd());
+let hookExt = null;
+function runExt(op, payload, timeout = 10000, cwd = process.cwd()) {
+  let raw = "";
+  let timedOut = false;
+  try {
+    raw = execFileSync(DEJA, ["hook-ext", "--host", "openclaw", "--op", op], {
+      windowsHide: true,
+      input: JSON.stringify(payload),
+      encoding: "utf8",
+      timeout,
+      cwd: hookCwd(cwd),
+      maxBuffer: 4 * 1024 * 1024,
+      stdio: ["pipe", "pipe", "ignore"],
+    });
+  } catch (err) {
+    timedOut = Boolean(err?.killed || err?.signal || err?.code === "ETIMEDOUT");
+    raw = typeof err?.stdout === "string" ? err.stdout : "";
+  }
+  return { env: parseHookExtEnvelope(raw), timedOut };
+}
+function askExt(op, payload, timeout = 10000, cwd = process.cwd()) {
+  if (hookExt === false) return null;
+  const { env, timedOut } = runExt(op, payload, timeout, cwd);
+  if (env) {
+    hookExt = true;
+    return env;
+  }
+  if (!timedOut) hookExt = false;
+  return null;
+}
+
 // The agent's workspace is the directory its tools run in and the cwd its
 // session header records; the gateway's own cwd is wherever it was started.
 // The hooks name the workspace, so a compaction captured against the header is
@@ -569,15 +613,25 @@ function toolLine(event, ctx) {
   if (name === "read" || name === "edit" || name === "write") {
     const path = typeof args.path === "string" ? args.path : typeof args.file_path === "string" ? args.file_path : "";
     if (!path) return "";
-    return ask(["hook-tool", "--plain"], { tool_name: name === "read" ? "read" : "edit", tool_input: { ...args, file_path: path }, session_id, cwd });
+    const tool = name === "read" ? "read" : "edit";
+    const payload = { tool_name: tool, tool_input: { ...args, file_path: path }, session_id, cwd };
+    const ext = askExt("tool-before", { ...payload, tool, plain: true }, 10000, cwd);
+    if (ext !== null) return ext.ok ? ext.context || "" : "";
+    return ask(["hook-tool", "--plain"], payload);
   }
   if (name === "apply_patch" && typeof args.input === "string") {
-    return ask(["hook-tool", "--plain"], { tool_name: "apply_patch", tool_input: { command: args.input }, session_id, cwd });
+    const payload = { tool_name: "apply_patch", tool_input: { command: args.input }, session_id, cwd };
+    const ext = askExt("tool-before", { ...payload, tool: "apply_patch", plain: true }, 10000, cwd);
+    if (ext !== null) return ext.ok ? ext.context || "" : "";
+    return ask(["hook-tool", "--plain"], payload);
   }
   if (name === "exec" || name === "bash") {
     const text = resultText(event?.result);
     if (!text.trim()) return "";
-    return ask(["hook-tool-after", "--plain"], { tool_name: "bash", tool_input: { command: String(args.command || "") }, tool_response: text, session_id, cwd });
+    const payload = { tool_name: "bash", tool_input: { command: String(args.command || "") }, tool_response: text, session_id, cwd };
+    const ext = askExt("tool-after", { ...payload, tool: "bash", plain: true }, 10000, cwd);
+    if (ext !== null) return ext.ok ? ext.context || "" : "";
+    return ask(["hook-tool-after", "--plain"], payload);
   }
   return "";
 }
@@ -759,7 +813,9 @@ export default {
           res.statusCode = 200;
           res.setHeader("content-type", "text/html; charset=utf-8");
           res.setHeader("cache-control", "no-store");
-          res.end(statusPage(ask(["statusline"], {}) || "deja"));
+          const statusExt = askExt("status", {}, 5000);
+          const statusText = statusExt !== null ? (statusExt.ok ? statusExt.output || "" : "") : ask(["statusline"], {});
+          res.end(statusPage(statusText || "deja"));
           return true;
         },
       });
@@ -804,13 +860,16 @@ export default {
     // knows it by, and agent:main:main names no transcript (#4582).
     const digest = (ctx) => {
       const at = where(ctx);
-      return ask(["hook-context", "--plain"], {
+      const payload = {
         session_id: at.id,
         cwd: at.cwd,
         source: "startup",
         deja_once: true,
         deja_prompt_stamps: true,
-      });
+      };
+      const ext = askExt("context", { ...payload, plain: true, once: true }, 10000, at.cwd);
+      if (ext !== null) return ext.ok ? ext.context || "" : "";
+      return ask(["hook-context", "--plain"], payload);
     };
     // By default every DM shares agent:main:main, so a receipt is tied to the
     // run, the conversation and the sender it was asked for, and every new
@@ -904,11 +963,25 @@ export default {
         const turn = key ? turns.get(key) : undefined;
         if (key) turns.delete(key);
         const payload = { prompt, session_id: at.id, cwd: at.cwd };
+        const wantReceipt = showReceipt && receiptAllowed(turn, ctx, channel, api.config);
         // One spawn either way: the JSON reply where the receipt can be shown
         // (its context for the model, the receipt kept for the reply), --plain
         // anywhere else, which leaves the receipt unspent.
         let recall;
-        if (showReceipt && receiptAllowed(turn, ctx, channel, api.config)) {
+        const ext = askExt(
+          "prompt",
+          wantReceipt ? { ...payload, plain: false, silent: false } : { ...payload, plain: true },
+          10000,
+          at.cwd,
+        );
+        if (ext !== null) {
+          if (!ext.ok) return;
+          if (wantReceipt) {
+            const line = ext.receipt || receiptLine(ext.note);
+            if (line) keep(board, key, { ...turn, runId: ctx.runId, line });
+          }
+          recall = ext.context || "";
+        } else if (wantReceipt) {
           const reply = splitHookReply(ask(["hook-prompt"], payload));
           const line = receiptLine(reply.notes);
           if (line) keep(board, key, { ...turn, runId: ctx.runId, line });
@@ -948,12 +1021,20 @@ export default {
         // The gateway's compaction names no file and the run's own names no
         // session id; deja finds the session by whichever it is given.
         const at = where(ctx);
-        ask(["hook-precompact"], {
+        if (askExt("precompact", {
           session_id: at.id,
           transcript_path: event?.sessionFile || "",
           cwd: at.cwd,
           harness: "openclaw",
-        });
+          source: "openclaw",
+        }, 10000, at.cwd) === null) {
+          ask(["hook-precompact"], {
+            session_id: at.id,
+            transcript_path: event?.sessionFile || "",
+            cwd: at.cwd,
+            harness: "openclaw",
+          });
+        }
         promptCache.compact(scopeOf(at), false);
       },
       { timeoutMs: 15000 },
@@ -967,7 +1048,10 @@ export default {
       "session_end",
       async (event, ctx) => {
         const id = event?.sessionId || ctx?.sessionId || seen.get(ctx?.sessionKey || "")?.id || event?.sessionKey || ctx?.sessionKey || "";
-        if (id) ask(["hook-session-end"], { session_id: id, cwd: ctx?.workspaceDir || seen.get(ctx?.sessionKey || "")?.dir || process.cwd() });
+        const cwd = ctx?.workspaceDir || seen.get(ctx?.sessionKey || "")?.dir || process.cwd();
+        if (id && askExt("session-end", { session_id: id, cwd }, 5000, cwd) === null) {
+          ask(["hook-session-end"], { session_id: id, cwd });
+        }
       },
       { timeoutMs: 5000 },
     );

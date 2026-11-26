@@ -8,7 +8,7 @@ Parte do **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** no Lon
 
 ![Demonstração do deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-Leva o histórico em disco de outros 51 agentes de programação (Claude Code, Codex, Cursor, Gemini, Zed e mais) para o [OpenClaw](https://openclaw.ai). Baseado no binário Go único `deja` com índice BM25 local e sem LLM (`DEJA_OFFLINE=1` desativa a checagem diária).
+Leva o histórico em disco de outros 52 agentes de programação (Claude Code, Codex, Cursor, Gemini, Zed e mais) para o [OpenClaw](https://openclaw.ai). Baseado no binário Go único `deja` com índice BM25 local e sem LLM (`DEJA_OFFLINE=1` desativa a checagem diária).
 
 ## Instalação
 
@@ -86,7 +86,7 @@ openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 
 | Recall | Tokens | Indexação e busca |
 |---|---|---|
-| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 52 agentes de código |
+| **97.2% R@5** no LongMemEval-S (88.9% hit@1 em 470 perguntas) | **58% menos tokens** (em tarefas repetidas) | **13.6 s** para indexar 19,195 sessões / **0.7 ms** de busca entre 53 agentes de código |
 
 ## Memória do repositório e handoff entre agentes
 
@@ -96,6 +96,6 @@ Trocando de ferramenta no meio da tarefa? Execute `deja handoff --to <agent>` (o
 
 ## Privacidade
 
-Índice guardado em `~/.cache/deja/index.db` (`DEJA_INDEX_DIR`), removendo `sk-*`, `ghp_*`, `AKIA*` e `Bearer` durante a indexação. Nada sai do dispositivo sem `deja embed`. Use `deja install --auto` para configurar todos os 52 agentes.
+Índice guardado em `~/.cache/deja/index.db` (`DEJA_INDEX_DIR`), removendo `sk-*`, `ghp_*`, `AKIA*` e `Bearer` durante a indexação. Nada sai do dispositivo sem `deja embed`. Use `deja install --auto` para configurar todos os 53 agentes.
 
 Parte do [deja-vu](https://github.com/vshulcz/deja-vu). MIT.

@@ -38,6 +38,7 @@ var groups = []group{
 		{"agents.html", "Agents &amp; MCP"},
 		{"search.html", "Search"},
 		{"commands.html", "CLI reference"},
+		{"configuration.html", "Configuration"},
 		{"harnesses.html", "Harnesses"},
 		{"privacy.html", "Privacy"},
 	}},

@@ -334,7 +334,11 @@ func underAnyRoot(p string, roots []string) bool {
 func ParseCherryStudioFileFromOffset(path string, offset int64) ([]model.Session, error) {
 	return parseClaudeTypedWithOptions(path, func(fn func([]byte)) error {
 		return scanJSONLBytes(path, offset, fn)
-	}, claudeParseOptions{Harness: "cherrystudio", CollapseSnapshots: true})
+	}, claudeParseOptions{
+		Harness:           "cherrystudio",
+		CollapseSnapshots: true,
+		priorUsage:        seedClaudeUsageBefore(path, offset),
+	})
 }
 
 // CherryStudioUnderRoot reports whether a path belongs to this store, so the

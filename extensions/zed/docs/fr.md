@@ -6,7 +6,7 @@
 
 Fait partie de **[deja-vu](https://github.com/vshulcz/deja-vu)** (**97.2% R@5** sur LongMemEval-S) · [Documentation](https://vshulcz.github.io/deja-vu/guide/getting-started.html) · [Démo en ligne](https://vshulcz.github.io/deja-vu/view/) · [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html)
 
-[deja](https://github.com/vshulcz/deja-vu) indexe les fichiers de session déjà écrits sur disque par les agents de code — Claude Code, Codex, Cursor, opencode et 48 autres — et répond à partir d'eux. Cette extension expose cet index au panneau agent de Zed comme serveur de contexte, permettant à un fil de retrouver vos travaux passés, même antérieurs à l'installation de deja.
+[deja](https://github.com/vshulcz/deja-vu) indexe les fichiers de session déjà écrits sur disque par les agents de code — Claude Code, Codex, Cursor, opencode et 49 autres — et répond à partir d'eux. Cette extension expose cet index au panneau agent de Zed comme serveur de contexte, permettant à un fil de retrouver vos travaux passés, même antérieurs à l'installation de deja.
 
 ![Démo de deja-vu](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
@@ -49,7 +49,7 @@ L'indexation et la recherche restent locales : aucun appel réseau, et les ident
 
 | Rappel | Tokens | Indexation & recherche |
 |---|---|---|
-| **97.2% R@5** sur LongMemEval-S (88.9% hit@1 sur 470 questions) | **58% de tokens en moins** (sur des tâches répétées) | **13.6 s** pour indexer 19,195 sessions / **0.7 ms** par requête sur 52 agents de code |
+| **97.2% R@5** sur LongMemEval-S (88.9% hit@1 sur 470 questions) | **58% de tokens en moins** (sur des tâches répétées) | **13.6 s** pour indexer 19,195 sessions / **0.7 ms** par requête sur 53 agents de code |
 
 ## Mémoire de dépôt & transfert inter-agents
 

@@ -46,6 +46,7 @@
 <a href="agents.html">Agents &amp; MCP</a>
 <a href="search.html">Search</a>
 <a href="commands.html">CLI reference</a>
+<a href="configuration.html">Configuration</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
 <details class="grpfold"><summary>Why agents forget <span class="n">17</span></summary>
@@ -216,7 +217,7 @@
 <p>The database half needs the <code>sqlite3</code> CLI, and <code>deja doctor</code> says so by name when it is missing rather than reporting a store with no sessions in it.</p>
 
 <h2>The part that is not about this harness</h2>
-<p>The index covers every agent's transcripts on the machine — fifty-two of them, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Kilo Code answers a question asked in Claude Code, and the Roo tasks you had before switching are read too. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+<p>The index covers every agent's transcripts on the machine — fifty-three of them, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Kilo Code answers a question asked in Claude Code, and the Roo tasks you had before switching are read too. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
 
 <h2>Repository memory &amp; handoff</h2>
 <p>Share vetted project decisions and dead ends through git in <code>.deja/memory.jsonl</code> (<code>deja repo candidates</code>, <code>deja repo add &lt;id&gt;</code>). Entries are redacted on write, stored sorted with <code>merge=union</code> so parallel branches merge cleanly, and loaded for any teammate who clones the repository (<code>{"activations":{"auto":{"repo":false}}}</code> in the trust policy keeps them out of hooks). See <a href="repo-memory.html">repo memory</a>.</p>

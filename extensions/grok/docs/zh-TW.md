@@ -8,7 +8,7 @@
 
 ![deja-vu 示範](https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif)
 
-來自你本機工作階段歷史的跨工具記憶——包含 Claude Code、Codex、Cursor、opencode、Zed 以及另外 47 款程式設計智慧體。所有索引與檢索都由單一 Go 執行檔 `deja` 在本地執行（設定 `DEJA_OFFLINE=1` 可停用每日版本檢查）。
+來自你本機工作階段歷史的跨工具記憶——包含 Claude Code、Codex、Cursor、opencode、Zed 以及另外 48 款程式設計智慧體。所有索引與檢索都由單一 Go 執行檔 `deja` 在本地執行（設定 `DEJA_OFFLINE=1` 可停用每日版本檢查）。
 
 ## 安裝
 
@@ -55,7 +55,7 @@ deja install --auto
 
 | 召回率 | Token 用量 | 索引與檢索耗時 |
 |---|---|---|
-| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 52 個程式設計代理的檢索僅 **0.7 ms** |
+| LongMemEval-S **97.2% R@5**（470 題清洗後測得 88.9% hit@1） | **token 減少 58%**（同儲存庫重複任務） | **13.6 秒**索引 19,195 個歷史會話 / 跨越 53 個程式設計代理的檢索僅 **0.7 ms** |
 
 ## 儲存庫記憶與跨代理接力
 

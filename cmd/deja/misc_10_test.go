@@ -1476,6 +1476,7 @@ var readmeGuidanceNames = map[string]string{
 	"gemini":      "Gemini CLI",
 	"antigravity": "Antigravity",
 	"qwen":        "Qwen",
+	"gigacode":    "GigaCode CLI",
 	"kimi":        "Kimi Code",
 	"pi":          "pi",
 	"senpi":       "Senpi",
@@ -1598,7 +1599,7 @@ var countWords = map[int]string{
 	37: "thirty-seven", 38: "thirty-eight", 39: "thirty-nine", 40: "forty",
 	41: "forty-one", 42: "forty-two", 43: "forty-three", 44: "forty-four",
 	45: "forty-five", 46: "forty-six", 47: "forty-seven", 48: "forty-eight",
-	49: "forty-nine", 50: "fifty", 51: "fifty-one", 52: "fifty-two", 53: "fifty-three",
+	49: "forty-nine", 50: "fifty", 51: "fifty-one", 52: "fifty-two", 53: "fifty-three", 54: "fifty-four",
 }
 
 // countWord is the word for a count, or a failure naming what to add.
@@ -1854,7 +1855,7 @@ func TestNpmReadmeLeadsWithWhatTheMainOneLeadsWith(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, line := range []string{
-		"Instant local memory for 52 coding agents — reads the session logs already on your disk.",
+		"Instant local memory for 53 coding agents — reads the session logs already on your disk.",
 	} {
 		if !strings.Contains(string(main), line) {
 			t.Fatalf("the main README no longer says %q — update this test with it", line)

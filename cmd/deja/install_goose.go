@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/harness"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/proc"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -46,22 +47,6 @@ func inlineYAMLValue(doc, key string) string {
 		return rest
 	}
 	return ""
-}
-
-// yamlBlockIsSequence reports whether the block that follows a key opens with
-// a sequence item rather than a mapping entry, skipping blank lines and
-// comments. A block that is empty, or holds mapping entries, is not one.
-func yamlBlockIsSequence(block string) bool {
-	for line := range strings.SplitSeq(block, "\n") {
-		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
-			continue
-		}
-		if !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
-			return false
-		}
-		return strings.HasPrefix(strings.TrimSpace(line), "- ")
-	}
-	return false
 }
 
 // yamlEntrySwitchedOff reports whether the entry `name` under the top-level
@@ -114,126 +99,66 @@ func yamlEntrySwitchedOff(doc, topKey, name string) bool {
 
 func installGoose(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(gooseConfigDir(), "config.yaml")
-	old, err := readConfig(path)
-	if err != nil {
-		return installResult{}, err
-	}
-	// A config written on Windows, or by an editor set that way, uses CRLF.
-	// Every edit below splits and searches on "\n", so a key reads as
-	// "extensions:\r" and matches nothing: deja added a second one and left a
-	// file goose cannot read. Edit in LF and put the line endings back.
-	body, crlf := normaliseNewlines(string(old))
-	var note string
-	if !uninstall {
-		// Refused before any edit: goose reads neither of two extensions keys.
-		if _, err := yamlTopKeyEnd(body+"\n", "extensions:"); err != nil {
-			return installResult{}, fmt.Errorf("%s: %w", path, err)
-		}
-		// The entry the reader already has is edited where it stands, keys
-		// and switch kept (#5190, #5191).
-		lines, n, done, err := gooseEditEntry(strings.Split(body, "\n"), exe)
-		if err != nil {
-			return installResult{}, fmt.Errorf("%s: %w", path, err)
-		}
-		if done {
-			next := keepTrailingNewline(string(old), strings.Join(lines, "\n"))
-			if crlf {
-				next = strings.ReplaceAll(next, "\n", "\r\n")
+	spec := &harness.YAMLSectionSpec{
+		HarnessName:        "goose",
+		Path:               path,
+		SectionKey:         "extensions:",
+		EntryKey:           "deja",
+		DefaultIndent:      "  ",
+		DropEmptySection:   true,
+		CheckInlineValue:   true,
+		ContainsExactEntry: true,
+		SequenceMessage:    "extensions: holds a list, and goose keys extensions by name — deja cannot add itself to it",
+		Inspect: func(doc string) harness.YAMLProbeInfo {
+			return harness.YAMLProbeInfo{
+				DejaKeys: yamlDejaEntryNames(doc, "extensions:"),
+				Disabled: yamlEntrySwitchedOff(doc, "extensions:", "deja"),
 			}
-			n = withOtherDejaNames(n, yamlDejaEntryNames(next, "extensions:"))
-			a, werr := writeIfChanged(path, old, []byte(next))
-			return installResult{Path: path, Action: a, Note: n}, werr
-		}
-	}
-	if err := yamlDejaEntriesRemovable(body, "extensions:"); err != nil {
-		return installResult{}, fmt.Errorf("%s: %w", path, err)
-	}
-	// Entries found by key first: they read past a comment at column 0
-	// inside the entry, where the bare-line remover stopped and left half of
-	// it behind. That one stays for the legacy two-space entry (#2614).
-	next := removeGooseExtension(removeGooseExtensionEntries(body))
-	// Removing our entry can leave the key it lived under with nothing in it,
-	// and the insert below only recognises "extensions:" when a line follows
-	// it — so a second install appended a second key and left the file with
-	// "extensions:" twice, which is not a config goose can read. Dropping the
-	// empty key first makes the two paths meet: either the key has other
-	// extensions and ours joins them, or it is gone and one is written.
-	next = dropEmptyYAMLKey(next, "extensions:")
-	if !uninstall {
-		on := "true"
-		if yamlEntrySwitchedOff(body, "extensions:", "deja") {
-			on, note = "false", switchedOffNote
-		}
-		cmd, args := mcpCommandArgs(exe)
-		pad := yamlBlockIndent(gooseExtensionsBlock(next))
-		if pad == "" {
-			pad = "  "
-		}
-		key, val := pad, pad+"  "
-		var b strings.Builder
-		fmt.Fprintf(&b, "%sdeja:\n%senabled: %s\n%stype: stdio\n%sname: deja\n", key, val, on, val, val)
-		// Quote both: on Unix cmd is the exe path, on Windows the exe lands in
-		// args — either way a YAML metacharacter in the path (a ": ", a " #")
-		// would break the config Goose has to read back.
-		fmt.Fprintf(&b, "%scmd: %s\n", val, yamlQuote(cmd))
-		fmt.Fprintf(&b, "%sargs:\n", val)
-		for _, a := range args {
-			fmt.Fprintf(&b, "%s  - %s\n", val, yamlQuote(a))
-		}
-		fmt.Fprintf(&b, "%stimeout: 60\n", val)
-		entry := b.String()
-		// Already there, exactly: leave the file as it stands. Both writers
-		// for this config remove their block and add it back, and removing
-		// the only entry takes the key with it — so each re-appended its block
-		// at the bottom, under the other's, and every `deja install goose`
-		// swapped the two keys round and reported "updated" twice with nothing
-		// to update. A config.yaml in a dotfiles repository showed a diff after
-		// each upgrade's repair (#3689).
-		if strings.Contains(body, entry) {
-			return installResult{Path: path, Action: "unchanged", Note: note}, nil
-		}
-		// An inline value — `extensions: [a, b]` or `extensions: {…}` — is not
-		// followed by a block, so the insert below missed it and appended a
-		// second `extensions:` key. A parser takes the last of two, which is
-		// deja's, and the user's extensions were gone without a word (#1697).
-		if v := inlineYAMLValue(next, "extensions:"); v != "" {
-			return installResult{}, fmt.Errorf("%s: extensions: %s is on one line, and deja edits the block form — move it to a block and run this again", path, v)
-		}
-		if next != "" && !strings.HasSuffix(next, "\n") {
-			next += "\n"
-		}
-		at, err := yamlTopKeyEnd(next, "extensions:")
-		if err != nil {
-			return installResult{}, fmt.Errorf("%s: %w", path, err)
-		}
-		if at >= 0 {
-			// goose keys extensions by name. Writing our mapping entry under a
-			// key whose value is a sequence leaves a mapping and a sequence
-			// under one key, which no parser accepts — a config that was
-			// merely wrong for goose became one nothing can read, reported as
-			// "updated" (#1697). Refuse instead, as the opencode writer does
-			// when it cannot bound the block it was asked to edit.
-			if yamlBlockIsSequence(next[at:]) {
-				return installResult{}, fmt.Errorf("%s: extensions: holds a list, and goose keys extensions by name — deja cannot add itself to it", path)
+		},
+		EditExisting: func(doc string) (string, bool, bool, string, error) {
+			lines, n, done, err := gooseEditEntry(strings.Split(doc, "\n"), exe)
+			if err != nil || !done {
+				return "", false, false, "", err
 			}
-			next = next[:at] + entry + next[at:]
-		} else {
-			next += "extensions:\n" + entry
-		}
+			return strings.Join(lines, "\n"), true, false, n, nil
+		},
+		CheckRemovable: func(doc string) error {
+			return yamlDejaEntriesRemovable(doc, "extensions:")
+		},
+		RemoveEntries: func(doc string) string {
+			return removeGooseExtension(removeGooseExtensionEntries(doc))
+		},
+		BuildEntry: func(pad string, disabled bool) string {
+			on := "true"
+			if disabled {
+				on = "false"
+			}
+			cmd, args := mcpCommandArgs(exe)
+			val := pad + "  "
+			var b strings.Builder
+			fmt.Fprintf(&b, "%sdeja:\n%senabled: %s\n%stype: stdio\n%sname: deja\n", pad, val, on, val, val)
+			// Quote both: on Unix cmd is the exe path, on Windows the exe lands in
+			// args — either way a YAML metacharacter in the path (a ": ", a " #")
+			// would break the config Goose has to read back.
+			fmt.Fprintf(&b, "%scmd: %s\n", val, yamlQuote(cmd))
+			fmt.Fprintf(&b, "%sargs:\n", val)
+			for _, a := range args {
+				fmt.Fprintf(&b, "%s  - %s\n", val, yamlQuote(a))
+			}
+			fmt.Fprintf(&b, "%stimeout: 60\n", val)
+			return b.String()
+		},
+		OtherDejaNames: func(doc string) []string {
+			return yamlDejaEntryNames(doc, "extensions:")
+		},
+		FormatNote: func(baseNote string, disabled bool, otherNames []string) string {
+			if baseNote == "" && disabled {
+				baseNote = switchedOffNote
+			}
+			return withOtherDejaNames(baseNote, otherNames)
+		},
 	}
-	noteCreatedDirs(filepath.Dir(path))
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return installResult{}, err
-	}
-	next = keepTrailingNewline(string(old), next)
-	if crlf {
-		next = strings.ReplaceAll(next, "\n", "\r\n")
-	}
-	if !uninstall {
-		note = withOtherDejaNames(note, yamlDejaEntryNames(next, "extensions:"))
-	}
-	a, werr := writeIfChanged(path, old, []byte(next))
-	return installResult{Path: path, Action: a, Note: note}, werr
+	return runYAMLSectionSpec(spec, uninstall)
 }
 
 // normaliseNewlines returns the text with LF endings and whether it had CRLF,

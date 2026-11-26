@@ -30,6 +30,28 @@ func resumeOffset(old FileState) int64 {
 	return old.SafeSize
 }
 
+// heldSessionPaths returns every source path currently represented by a row
+// in old.Sessions or old.Empty (including Copies).
+func heldSessionPaths(old Manifest) map[string]bool {
+	held := make(map[string]bool, len(old.Sessions)+len(old.Empty))
+	for _, rows := range []map[string]SessionMeta{old.Sessions, old.Empty} {
+		for _, meta := range rows {
+			for _, p := range sessionFiles(meta) {
+				held[p] = true
+			}
+		}
+	}
+	return held
+}
+
+// needsWholeFromPreamble reports a known transcript whose earlier pass read
+// complete preamble lines (SafeSize > 0) that produced neither an indexed
+// session row nor an Empty row. Its next read must start from byte 0 so
+// header-only metadata is not skipped past SafeSize.
+func needsWholeFromPreamble(p string, of FileState, held map[string]bool) bool {
+	return of.SafeSize > 0 && !held[p] && !isCodexHistory(p) && storeHarness(p) == ""
+}
+
 func appendPrepared(dir, harness, scope string, old Manifest, files, changed map[string]FileState, ready map[string]splitRead) (filesTouched, messages, unreadable int, err error) {
 	// This pass's counts, like the two full paths: an incremental that nobody
 	// read between builds otherwise reported its own colliding ids plus the
@@ -100,10 +122,16 @@ func appendPrepared(dir, harness, scope string, old Manifest, files, changed map
 	// A file deja has never read is read whole here, not resumed, so its counts
 	// start over the way the full paths start them. Leaving it out of the
 	// parsed set added this pass's bad lines to a count the file never had.
+	held := heldSessionPaths(old)
+	preambleWhole := map[string]bool{}
 	newFiles := map[string]FileState{}
 	for p, f := range changed {
-		if _, ok := old.Files[p]; !ok {
+		of, ok := old.Files[p]
+		if !ok {
 			newFiles[p] = f
+		} else if needsWholeFromPreamble(p, of, held) {
+			newFiles[p] = f
+			preambleWhole[p] = true
 		}
 	}
 	parsedThisPass(newFiles)
@@ -114,7 +142,8 @@ func appendPrepared(dir, harness, scope string, old Manifest, files, changed map
 	sort.SliceStable(order, func(i, j int) bool { return !isCodexHistory(order[i]) && isCodexHistory(order[j]) })
 	for _, p := range order {
 		of, known := old.Files[p]
-		ss, ok := readAppended(harness, p, of, known, &m, changed, ready)
+		wholeFromPreamble := known && preambleWhole[p]
+		ss, ok := readAppended(harness, p, of, known, wholeFromPreamble, &m, changed, ready)
 		if !ok {
 			if ready != nil {
 				r := ready[p]
@@ -131,7 +160,7 @@ func appendPrepared(dir, harness, scope string, old Manifest, files, changed map
 		preRedactSessions(&m, ss)
 		for i := range ss {
 			var from *FileState
-			if known {
+			if known && !wholeFromPreamble {
 				from = &of
 			}
 			dropStoredRepeats(rw, dir, &ss[i], m.Sessions[ss[i].Key()], seenMsgs, m.Files, harness, from)
@@ -142,7 +171,7 @@ func appendPrepared(dir, harness, scope string, old Manifest, files, changed map
 		filesTouched++
 		for _, s := range ss {
 			key := s.Key()
-			meta, moved := appendedRow(&m, key, s, p, of, changed[p], known, emptyBefore)
+			meta, moved := appendedRow(&m, key, s, p, of, changed[p], known && !wholeFromPreamble, emptyBefore)
 			// Which copy's commands the tables count follows the row's file
 			// (foreignPath): one that moved has its runs mined again.
 			if moved {
@@ -205,6 +234,9 @@ func appendPrepared(dir, harness, scope string, old Manifest, files, changed map
 		return filesTouched, messages, unreadable, err
 	}
 	dropStale(stale)
+	if len(stale) > 0 {
+		invalidateDerivedSnapshot(dir)
+	}
 	m.bucketsLeaving = 0
 	// The sidecars, from what this pass read and from the records already on
 	// file. The replacement path does the same three things after it carries
@@ -251,15 +283,19 @@ func refreshAppendedSidecars(dir string, m Manifest, appended []model.Session, r
 }
 
 // readAppended reads what p holds past the last pass, or whole when the index
-// has never read it. A file it cannot take this pass is set back in m.Files to
-// what the index held, and ok is false.
-func readAppended(harness, p string, of FileState, known bool, m *Manifest, changed map[string]FileState, ready map[string]splitRead) (ss []model.Session, ok bool) {
+// has never read it or an earlier pass consumed only header/preamble lines. A
+// file it cannot take this pass is set back in m.Files to what the index held,
+// and ok is false.
+func readAppended(harness, p string, of FileState, known, wholeFromPreamble bool, m *Manifest, changed map[string]FileState, ready map[string]splitRead) (ss []model.Session, ok bool) {
 	var parseErr error
 	if known {
-		// Appended to from where the last pass stopped, which a rewrite
-		// moves: the next pass decides how to read it.
+		// Appended to from where the last pass stopped, or re-read whole
+		// when an earlier pass consumed only preamble lines without creating
+		// an indexed row.
 		if r, read := ready[p]; read {
 			ss, parseErr = r.sessions, r.err
+		} else if wholeFromPreamble {
+			ss, parseErr = parseAppendedFile(harness, p, FileState{}, true)
 		} else {
 			ss, parseErr = parseAppendedFile(harness, p, of, false)
 		}
