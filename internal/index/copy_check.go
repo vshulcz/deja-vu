@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 // copyCheckFullCutoff bounds full-log copy decoding; longer non-note sessions
@@ -331,7 +332,13 @@ func copyCheckSessionsIn(dir string, m Manifest, metas []SessionMeta) ([]model.S
 		matched := make([]model.Message, 0, 8)
 		err := walkLiveOffsetsSpans(f, live, func(idx int, payload []byte) error {
 			hdr, flag, rest, herr := decodeRecordHeader(payload, tbl)
-			if herr != nil || hdr.Key != k {
+			if herr != nil {
+				if errors.Is(herr, vault.ErrKeyUnavailable) {
+					return herr
+				}
+				return errOffsetsMismatch
+			}
+			if hdr.Key != k {
 				return errOffsetsMismatch
 			}
 			hashCopyFrame(h, hdr.Role, flag, rest)

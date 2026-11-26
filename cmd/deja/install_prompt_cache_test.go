@@ -393,3 +393,96 @@ assert.ok(out.system[0].includes("temp-v1"), "v1 plugin should receive digest");
 		t.Errorf("temp deja bin leaked prompt cache into %s", filepath.Join(userCache, "deja-vu"))
 	}
 }
+
+func TestPromptCacheBypassedWhenVaultEnabled(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is needed to run the generated prompt cache module")
+	}
+
+	dir := t.TempDir()
+	modPath := filepath.Join(dir, "cache.mjs")
+	modSrc := promptCacheImportsJS + "\nconst DEJA = \"deja\";\n" + promptCacheStoreJS +
+		"\nexport { createSessionStore };\n"
+	if err = os.WriteFile(modPath, []byte(modSrc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	vaultFile := filepath.Join(dir, "explicit-vault.json")
+	if err = os.WriteFile(vaultFile, []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	xdgCfg := filepath.Join(dir, "xdg-cfg")
+	if err = os.MkdirAll(filepath.Join(xdgCfg, "deja"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(xdgCfg, "deja", "vault.json"), []byte("{}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	seededCache := filepath.Join(dir, "seeded.json")
+	seededBody := `{"version":1,"sessions":{"s1":{"epoch":3,"updatedAt":1,"digest":"secret-digest","recalled":{"k":"secret-val"},"repairs":{"r":"secret-rep"}}}}`
+	if err = os.WriteFile(seededCache, []byte(seededBody), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	freshCache := filepath.Join(dir, "fresh.json")
+	xdgFallbackCache := filepath.Join(dir, "xdg-fallback.json")
+
+	driverPath := filepath.Join(dir, "drive.mjs")
+	driverSrc := `
+import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+import { createSessionStore } from "./cache.mjs";
+
+const store = createSessionStore("bypass-test");
+process.env.DEJA_PROMPT_CACHE_FILE = process.env.TEST_SEEDED;
+const r1 = store.read("s1");
+assert.equal(r1.epoch, 0);
+assert.equal(r1.session.digest, undefined);
+assert.equal(r1.session.recalled.k, undefined);
+
+process.env.DEJA_PROMPT_CACHE_FILE = process.env.TEST_FRESH;
+store.write("s1", 0, (cur) => {
+  cur.digest = "should-not-persist";
+  cur.recalled.k = "should-not-persist";
+});
+store.compact("s1", true);
+assert.equal(existsSync(process.env.TEST_FRESH), false);
+
+delete process.env.DEJA_VAULT_FILE;
+process.env.DEJA_PROMPT_CACHE_FILE = process.env.TEST_XDG_CACHE;
+store.write("s2", 0, (cur) => {
+  cur.digest = "xdg-vault-should-suppress";
+});
+assert.equal(existsSync(process.env.TEST_XDG_CACHE), false);
+assert.equal(readFileSync(process.env.TEST_SEEDED, "utf8"), ` + "`" + seededBody + "`" + `);
+`
+	if err = os.WriteFile(driverPath, []byte(driverSrc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := exec.CommandContext(t.Context(), node, driverPath)
+	baseEnv := os.Environ()
+	env := make([]string, 0, len(baseEnv)+7)
+	for _, kv := range baseEnv {
+		if strings.HasPrefix(kv, "XDG_CACHE_HOME=") ||
+			strings.HasPrefix(kv, "XDG_CONFIG_HOME=") ||
+			strings.HasPrefix(kv, "DEJA_VAULT_FILE=") ||
+			strings.HasPrefix(kv, "DEJA_PROMPT_CACHE_FILE=") {
+			continue
+		}
+		env = append(env, kv)
+	}
+	env = append(env,
+		"XDG_CACHE_HOME="+filepath.Join(dir, "xdg-cache"),
+		"XDG_CONFIG_HOME="+xdgCfg,
+		"DEJA_VAULT_FILE="+vaultFile,
+		"TEST_SEEDED="+seededCache,
+		"TEST_FRESH="+freshCache,
+		"TEST_XDG_CACHE="+xdgFallbackCache,
+	)
+	cmd.Env = env
+	if out, runErr := cmd.CombinedOutput(); runErr != nil {
+		t.Fatalf("running prompt cache vault bypass driver: %v\n%s", runErr, out)
+	}
+}

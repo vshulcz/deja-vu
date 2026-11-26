@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -171,7 +170,7 @@ func DeepVerify(dir string) (DeepReport, error) {
 	case dvErr != nil:
 		report.Findings = append(report.Findings, DeepFinding{Kind: "unreadable-postings", Detail: fmt.Sprintf("record tables unreadable: %v", dvErr)})
 	default:
-		f, ferr := os.Open(recordsPath(dir))
+		f, ferr := openIndexFile(recordsPath(dir))
 		if ferr != nil {
 			report.Findings = append(report.Findings, DeepFinding{Kind: "unreadable-postings", Detail: fmt.Sprintf("records unreadable: %v", ferr)})
 			break

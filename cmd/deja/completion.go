@@ -377,10 +377,10 @@ _deja_completion() {
             COMPREPLY=( $(compgen -W "--passphrase-stdin" -- "$cur") )
             ;;
         mcp)
-            if [[ "$prev" == "--http" ]]; then
+            if [[ "$prev" == "--http" || "$prev" == "--unix-socket" ]]; then
                 COMPREPLY=()
             else
-                COMPREPLY=( $(compgen -W "--context-search --http" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--context-search --http --unix-socket" -- "$cur") )
             fi
             ;;
         help)
@@ -641,7 +641,7 @@ _deja() {
       _arguments '--passphrase-stdin[read vault passphrase from stdin]'
       ;;
     mcp)
-      _arguments '--context-search[serve only context_search]' '--http=[listen on Streamable HTTP address]:address:'
+      _arguments '--context-search[serve only context_search]' '--http=[listen on Streamable HTTP address]:address:' '--unix-socket=[listen on Unix domain socket]:path:_files'
       ;;
     help)
       _describe -t commands 'deja command' commands
@@ -722,6 +722,7 @@ complete -c deja -n '__fish_seen_subcommand_from delete' -l dry-run -d 'List the
 complete -c deja -n '__fish_seen_subcommand_from delete' -l yes -d 'Do not ask'
 complete -c deja -n '__fish_seen_subcommand_from mcp' -l context-search -d 'Serve only context_search'
 complete -c deja -n '__fish_seen_subcommand_from mcp' -l http -r -d 'Listen on Streamable HTTP address'
+complete -c deja -n '__fish_seen_subcommand_from mcp' -l unix-socket -r -d 'Listen on Unix domain socket path'
 complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l list
 complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l dry-run
 complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l session -r
@@ -1045,8 +1046,8 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 @('--passphrase-stdin')
             }
             'mcp' {
-                if ($previous -eq '--http') { @() }
-                else { @('--context-search', '--http') }
+                if ($previous -eq '--http' -or $previous -eq '--unix-socket') { @() }
+                else { @('--context-search', '--http', '--unix-socket') }
             }
             'help' { $commands }
             { $_ -in @('aider', 'brief', 'check', 'ctx', 'embed', 'goose', 'hook-antigravity', 'hook-codewhale', 'hook-embed', 'hook-goose', 'hook-goose-prompt', 'hook-mcp-call', 'hook-plan', 'hook-precompact', 'hook-refresh', 'hook-stop', 'reasonix-ext', 'share', 'sources', 'statusline', 'version', 'warmup', 'warmup-status') } { @() }

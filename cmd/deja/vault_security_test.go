@@ -5,10 +5,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -413,5 +417,402 @@ func TestClientPolicyAuthAndScopesEndToEnd(t *testing.T) {
 	}
 	if !sawAllow || !sawDeny {
 		t.Fatalf("expected both allow and deny access events, got: %+v", events)
+	}
+}
+
+func TestVaultLiveSidecarsMigrationAndLockedPreservation(t *testing.T) {
+	_, dir := withSecurityVaultEnv(t)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	preDir := filepath.Join(deferredRoot(dir), "sesskey")
+	if err := os.MkdirAll(preDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	preFile := filepath.Join(preDir, "0001-prompt")
+	if err := os.WriteFile(preFile, []byte("canary_preinit_deferred"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	const pass = "sidecar-vault-pass-42"
+	if _, err := vault.Init(dir, pass, 30*time.Minute); err != nil {
+		t.Fatalf("vault.Init: %v", err)
+	}
+	t.Setenv(vault.EnvVaultPassphrase, pass)
+	if err := vault.Unlock(dir, pass); err != nil {
+		t.Fatalf("vault.Unlock after Init: %v", err)
+	}
+
+	// Pre-Init plaintext deferred file must have been sealed by the cmd_sidecars migrator.
+	preRaw, err := os.ReadFile(preFile)
+	if err != nil {
+		t.Fatalf("read migrated pre-init deferred file: %v", err)
+	}
+	if strings.Contains(string(preRaw), "canary_preinit_deferred") || !vault.IsSealedBytes(preRaw) {
+		t.Fatalf("migrated deferred file not sealed: %q", preRaw)
+	}
+	if got := takeDeferred(dir, "sesskey"); got != "canary_preinit_deferred" {
+		t.Fatalf("takeDeferred(sesskey) = %q, want canary_preinit_deferred", got)
+	}
+
+	// Verify live AEAD encryption + unlocked round-trips for all cmd/deja sidecars.
+	app := tuiApp{dir: dir, query: []rune("canary_tui_query"), rows: []tuiRow{{}}}
+	app.remember()
+	tuiRaw, err := os.ReadFile(tuiHistoryPath(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(tuiRaw), "canary_tui_query") || !vault.IsSealedBytes(tuiRaw) {
+		t.Fatalf(".tui-history not sealed: %q", tuiRaw)
+	}
+	if hist := loadTUIHistory(dir); len(hist) != 1 || hist[0] != "canary_tui_query" {
+		t.Fatalf("loadTUIHistory = %#v, want [canary_tui_query]", hist)
+	}
+
+	writeLiveSessions(dir, map[string]time.Time{"canary-live-sess": time.Now().UTC()})
+	liveRaw, err := os.ReadFile(liveSessionsPath(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(liveRaw), "canary-live-sess") || !vault.IsSealedBytes(liveRaw) {
+		t.Fatalf(".live not sealed: %q", liveRaw)
+	}
+	if live, err := readLiveSessionsErr(dir); err != nil || live["canary-live-sess"].IsZero() {
+		t.Fatalf("readLiveSessionsErr = (%v, %v), want canary-live-sess", live, err)
+	}
+
+	stampEnvironmentServed(dir)
+	envRaw, err := os.ReadFile(environmentMarker(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !vault.IsSealedBytes(envRaw) {
+		t.Fatalf(".envblock not sealed: %q", envRaw)
+	}
+	if !environmentServedRecently(dir) {
+		t.Fatal("environmentServedRecently = false right after stampEnvironmentServed")
+	}
+
+	if !dejaVuLineDue(dir, "canary-dj-sess") {
+		t.Fatal("first dejaVuLineDue = false, want true")
+	}
+	djRaw, err := os.ReadFile(dir + ".dejavu")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(djRaw), "canary-dj-sess") || !vault.IsSealedBytes(djRaw) {
+		t.Fatalf(".dejavu not sealed: %q", djRaw)
+	}
+	if dejaVuLineDue(dir, "canary-dj-sess") {
+		t.Fatal("second dejaVuLineDue within window = true, want false")
+	}
+
+	forkPlain := "canary-fork-sid canary-fork-parent " + strconv.FormatInt(time.Now().Unix(), 10)
+	forkSealed, err := vault.SealSidecarLine(dir, vault.DomainSidecar, []byte(forkPlain))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(forkMarksPath(dir), []byte(forkSealed+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	forkRaw, err := os.ReadFile(forkMarksPath(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(forkRaw), "canary-fork-sid") || strings.Contains(string(forkRaw), "canary-fork-parent") {
+		t.Fatalf(".forks leaked plaintext: %q", forkRaw)
+	}
+	if got := claudeForkMark(dir, "canary-fork-sid"); got != "canary-fork-parent" {
+		t.Fatalf("claudeForkMark = %q, want canary-fork-parent", got)
+	}
+	pruneForkMarks(forkMarksPath(dir))
+	if got := claudeForkMark(dir, "canary-fork-sid"); got != "canary-fork-parent" {
+		t.Fatalf("claudeForkMark after prune = %q, want canary-fork-parent", got)
+	}
+
+	deferText(dir, "sesskey2", "hook-prompt", "canary_live_deferred")
+	liveDefEntries, err := os.ReadDir(filepath.Join(deferredRoot(dir), "sesskey2"))
+	if err != nil || len(liveDefEntries) != 1 {
+		t.Fatalf("expected 1 deferred entry for sesskey2, got %v (err=%v)", liveDefEntries, err)
+	}
+	liveDefRaw, err := os.ReadFile(filepath.Join(deferredRoot(dir), "sesskey2", liveDefEntries[0].Name()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(liveDefRaw), "canary_live_deferred") || !vault.IsSealedBytes(liveDefRaw) {
+		t.Fatalf("deferred/* not sealed: %q", liveDefRaw)
+	}
+
+	// Simulate missing DEK while sidecar files sit sealed on disk: every reader/writer
+	// must fail closed without destroying or truncating sealed state.
+	t.Setenv(vault.EnvVaultPassphrase, "")
+	vault.ClearCache()
+
+	if hasDeferred(dir) {
+		t.Fatal("hasDeferred returned true with missing DEK")
+	}
+	if hasDeferredFor(dir, "sesskey2") {
+		t.Fatal("hasDeferredFor returned true with missing DEK")
+	}
+	if got := takeDeferred(dir, "sesskey2"); got != "" {
+		t.Fatalf("takeDeferred returned %q with missing DEK", got)
+	}
+	sweepDeferred(dir)
+	writeLiveSessions(dir, nil)
+	dropHookCaches(dir)
+	pruneForkMarks(forkMarksPath(dir))
+	if dejaVuLineDue(dir, "canary-dj-new") {
+		t.Fatal("dejaVuLineDue returned true with missing DEK")
+	}
+	if hist := loadTUIHistory(dir); len(hist) != 0 {
+		t.Fatalf("loadTUIHistory returned %#v with missing DEK", hist)
+	}
+	if got := claudeForkMark(dir, "canary-fork-sid"); got != "" {
+		t.Fatalf("claudeForkMark returned %q with missing DEK", got)
+	}
+
+	// Confirm sealed sidecar bytes were preserved on disk across locked calls.
+	if _, err := os.Stat(filepath.Join(deferredRoot(dir), "sesskey2", liveDefEntries[0].Name())); err != nil {
+		t.Fatalf("deferred file was removed while locked: %v", err)
+	}
+	if afterLive, err := os.ReadFile(liveSessionsPath(dir)); err != nil || !bytes.Equal(afterLive, liveRaw) {
+		t.Fatalf(".live changed under writeLiveSessions(dir, nil) while DEK missing: err=%v", err)
+	}
+	if afterDJ, err := os.ReadFile(dir + ".dejavu"); err != nil || !bytes.Equal(afterDJ, djRaw) {
+		t.Fatalf(".dejavu changed under dejaVuLineDue while DEK missing: err=%v", err)
+	}
+
+	// Restore DEK and confirm full recovery of preserved sidecars, plus lock -> unlock archive round-trip.
+	t.Setenv(vault.EnvVaultPassphrase, pass)
+	if err := vault.Unlock(dir, pass); err != nil {
+		t.Fatalf("vault.Unlock recovery: %v", err)
+	}
+	if !hasDeferred(dir) || !hasDeferredFor(dir, "sesskey2") {
+		t.Fatal("deferred state missing after unlock")
+	}
+	if got := takeDeferred(dir, "sesskey2"); got != "canary_live_deferred" {
+		t.Fatalf("recovered takeDeferred(sesskey2) = %q, want canary_live_deferred", got)
+	}
+	if live, err := readLiveSessionsErr(dir); err != nil || live["canary-live-sess"].IsZero() {
+		t.Fatalf("recovered readLiveSessionsErr = (%v, %v)", live, err)
+	}
+	if hist := loadTUIHistory(dir); len(hist) != 1 || hist[0] != "canary_tui_query" {
+		t.Fatalf("recovered loadTUIHistory = %#v", hist)
+	}
+	if got := claudeForkMark(dir, "canary-fork-sid"); got != "canary-fork-parent" {
+		t.Fatalf("recovered claudeForkMark = %q", got)
+	}
+	if !environmentServedRecently(dir) {
+		t.Fatal("recovered environmentServedRecently = false")
+	}
+	if dejaVuLineDue(dir, "canary-dj-sess") {
+		t.Fatal("preserved .dejavu window failed to rate-limit canary-dj-sess")
+	}
+	if !dejaVuLineDue(dir, "canary-dj-new") {
+		t.Fatal("unlocked dejaVuLineDue for fresh session failed")
+	}
+
+	if err := vault.Lock(dir, pass); err != nil {
+		t.Fatalf("vault.Lock: %v", err)
+	}
+	if _, statErr := os.Stat(dir); !os.IsNotExist(statErr) {
+		t.Fatalf("indexDir still exists after vault.Lock: %v", statErr)
+	}
+	if err := vault.Unlock(dir, pass); err != nil {
+		t.Fatalf("vault.Unlock after full Lock: %v", err)
+	}
+	if live, err := readLiveSessionsErr(dir); err != nil || live["canary-live-sess"].IsZero() {
+		t.Fatalf("readLiveSessionsErr after Lock+Unlock = (%v, %v)", live, err)
+	}
+}
+
+type memTestKeyring struct {
+	mu   sync.Mutex
+	keys map[string][]byte
+}
+
+func (m *memTestKeyring) Name() string { return "keyring" }
+
+func (m *memTestKeyring) Set(keyID string, dek []byte) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.keys == nil {
+		m.keys = make(map[string][]byte)
+	}
+	cp := append([]byte(nil), dek...)
+	m.keys[keyID] = cp
+	return nil
+}
+
+func (m *memTestKeyring) Get(keyID string) ([]byte, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	dek, ok := m.keys[keyID]
+	if !ok {
+		return nil, errors.New("keyring entry not found")
+	}
+	return append([]byte(nil), dek...), nil
+}
+
+func (m *memTestKeyring) Delete(keyID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.keys, keyID)
+	return nil
+}
+
+func (m *memTestKeyring) count() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.keys)
+}
+
+func captureDoctorArgs(t *testing.T, args []string, dir string) string {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := runDoctor(&buf, args, nil, dir); err != nil {
+		t.Fatalf("runDoctor(%v): %v", args, err)
+	}
+	return buf.String()
+}
+
+func runHookPromptJSON(t *testing.T, payload string) (string, error) {
+	t.Helper()
+	oldStdin := os.Stdin
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.WriteString(payload); err != nil {
+		t.Fatal(err)
+	}
+	_ = w.Close()
+	os.Stdin = r
+	defer func() {
+		os.Stdin = oldStdin
+		_ = r.Close()
+	}()
+	return captureStdoutRun(t, []string{"hook-prompt"})
+}
+
+func TestVaultLauncherEnvKeyringHooksAndDoctor(t *testing.T) {
+	tmp := hermeticEnv(t)
+	dir := index.DefaultDir()
+	oldIter := vault.KDFIterations
+	vault.KDFIterations = 1000
+	t.Cleanup(func() { vault.KDFIterations = oldIter })
+
+	kr := &memTestKeyring{}
+	restore := vault.SetKeyringForTest(kr)
+	defer restore()
+	t.Setenv("DEJA_VAULT_BACKEND", "keyring")
+
+	// 1. launcherEnv must forward DEJA_VAULT_BACKEND and DEJA_VAULT_FILE, never DEJA_VAULT_PASSPHRASE.
+	vaultFile := filepath.Join(tmp, "custom-vault.json")
+	pairs := launcherEnv([]string{
+		"HOME=" + tmp,
+		"DEJA_VAULT_BACKEND=keyring",
+		"DEJA_VAULT_FILE=" + vaultFile,
+		"DEJA_VAULT_PASSPHRASE=never-leak-this",
+		"DEJA_INDEX_DIR=" + dir,
+	})
+	envMap := map[string]string{}
+	for _, kv := range pairs {
+		envMap[kv[0]] = kv[1]
+	}
+	if envMap["DEJA_VAULT_BACKEND"] != "keyring" {
+		t.Fatalf("launcherEnv missing DEJA_VAULT_BACKEND: %+v", envMap)
+	}
+	if envMap["DEJA_VAULT_FILE"] != vaultFile {
+		t.Fatalf("launcherEnv missing DEJA_VAULT_FILE: %+v", envMap)
+	}
+	if _, leaked := envMap["DEJA_VAULT_PASSPHRASE"]; leaked {
+		t.Fatalf("launcherEnv leaked DEJA_VAULT_PASSPHRASE: %+v", envMap)
+	}
+
+	// 2. Doctor telemetry before vault is initialized.
+	plainText := captureDoctorArgs(t, []string{"--offline"}, dir)
+	if !strings.Contains(plainText, "plaintext on disk") || !strings.Contains(plainText, "Vault\n") {
+		t.Fatalf("doctor plaintext output missing expected lines:\n%s", plainText)
+	}
+	plainJSON := captureDoctorArgs(t, []string{"--offline", "--json"}, dir)
+	var docPlain doctorReport
+	if err := json.Unmarshal([]byte(plainJSON), &docPlain); err != nil {
+		t.Fatalf("unmarshal plain doctor JSON: %v\n%s", err, plainJSON)
+	}
+	if docPlain.Vault.Enabled || docPlain.Vault.Locked || !docPlain.Vault.KeyringAvailable {
+		t.Fatalf("unexpected pre-init doctor vault JSON: %+v", docPlain.Vault)
+	}
+
+	// 3. Seed & index a session, initialize encrypted keyring vault, and unlock into keyring.
+	t.Setenv("DEJA_VAULT_BACKEND", "keyring")
+	seedVaultSecuritySessions(t, filepath.Join(tmp, "claude"))
+	if err := run([]string{"index"}); err != nil {
+		t.Fatalf("index: %v", err)
+	}
+	const pass = "keyring-vault-pass-99"
+	if _, err := vault.Init(dir, pass, 30*time.Minute); err != nil {
+		t.Fatalf("vault.Init: %v", err)
+	}
+	if err := vault.Unlock(dir, pass); err != nil {
+		t.Fatalf("vault.Unlock: %v", err)
+	}
+	if kr.count() == 0 {
+		t.Fatal("vault.Unlock did not store DEK in keyring backend")
+	}
+
+	// 4. Simulate stripped hook environment (no passphrase env, cleared memory DEK cache):
+	// keyring backend must unlock hook-prompt and doctor must report unlocked vault.
+	t.Setenv(vault.EnvVaultPassphrase, "")
+	vault.ClearCache()
+
+	unlockedText := captureDoctorArgs(t, []string{"--offline"}, dir)
+	if strings.Contains(unlockedText, "plaintext on disk") || !strings.Contains(unlockedText, "vault encryption enabled") {
+		t.Fatalf("doctor unlocked output kept plaintext warning:\n%s", unlockedText)
+	}
+	if !strings.Contains(unlockedText, "enabled          true (unlocked)") || !strings.Contains(unlockedText, "key_backend      keyring") {
+		t.Fatalf("doctor unlocked Vault section unexpected:\n%s", unlockedText)
+	}
+	unlockedJSON := captureDoctorArgs(t, []string{"--offline", "--json"}, dir)
+	var docUnlocked doctorReport
+	if err := json.Unmarshal([]byte(unlockedJSON), &docUnlocked); err != nil {
+		t.Fatalf("unmarshal unlocked doctor JSON: %v\n%s", err, unlockedJSON)
+	}
+	if !docUnlocked.Vault.Enabled || docUnlocked.Vault.Locked || !docUnlocked.Vault.EncryptedStore || docUnlocked.Vault.KeyBackend != "keyring" {
+		t.Fatalf("unexpected unlocked doctor vault JSON: %+v", docUnlocked.Vault)
+	}
+
+	hkPayload := `{"session_id":"hk-kr-1","cwd":"/tmp/alpha","prompt":"canary_alpha_9911 deployment"}`
+	hkOut, hkErr := runHookPromptJSON(t, hkPayload)
+	if hkErr != nil {
+		t.Fatalf("hook-prompt under unlocked keyring returned err: %v", hkErr)
+	}
+	if !strings.Contains(hkOut, "canary_alpha_9911") {
+		t.Fatalf("hook-prompt under stripped-env unlocked keyring did not recall canary_alpha_9911:\n%s", hkOut)
+	}
+
+	// 5. Lock the vault (deletes keyring entry and seals archive): doctor reports locked, hook fails closed.
+	if err := vault.Lock(dir, pass); err != nil {
+		t.Fatalf("vault.Lock: %v", err)
+	}
+	vault.ClearCache()
+
+	lockedText := captureDoctorArgs(t, []string{"--offline"}, dir)
+	if !strings.Contains(lockedText, "enabled          true (locked)") {
+		t.Fatalf("doctor locked Vault section unexpected:\n%s", lockedText)
+	}
+	lockedJSON := captureDoctorArgs(t, []string{"--offline", "--json"}, dir)
+	var docLocked doctorReport
+	if err := json.Unmarshal([]byte(lockedJSON), &docLocked); err != nil {
+		t.Fatalf("unmarshal locked doctor JSON: %v\n%s", err, lockedJSON)
+	}
+	if !docLocked.Vault.Enabled || !docLocked.Vault.Locked || !docLocked.Vault.EncryptedStore {
+		t.Fatalf("unexpected locked doctor vault JSON: %+v", docLocked.Vault)
+	}
+
+	hkLockedOut, _ := runHookPromptJSON(t, hkPayload)
+	if strings.Contains(hkLockedOut, "canary_alpha_9911") {
+		t.Fatalf("hook-prompt leaked canary_alpha_9911 while vault locked:\n%s", hkLockedOut)
 	}
 }

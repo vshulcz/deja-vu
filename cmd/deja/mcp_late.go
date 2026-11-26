@@ -19,7 +19,8 @@ const mcpLateMinRoom = 1024
 // it needs to read twice. The reply as a whole stays within the largest page
 // a deja call returns.
 func (s *mcpServer) withLateLocked(key string, result any) any {
-	if s.contextOnly || !strings.HasPrefix(key, "tools/call\x00") {
+	scope, rest, ok := mcpSplitCallKey(key)
+	if s.contextOnly || !ok || !strings.HasPrefix(rest, "tools/call\x00") {
 		return result
 	}
 	m, ok := result.(map[string]any)
@@ -31,8 +32,9 @@ func (s *mcpServer) withLateLocked(key string, result any) any {
 		return result
 	}
 	var keys []string
+	wantPrefix := scope + "tools/call\x00"
 	for k, l := range s.late {
-		if k != key && l.served > 0 && l.code == 0 && time.Since(l.at) < mcpLateTTL {
+		if strings.HasPrefix(k, wantPrefix) && k != key && l.served > 0 && l.code == 0 && time.Since(l.at) < mcpLateTTL {
 			keys = append(keys, k)
 		}
 	}

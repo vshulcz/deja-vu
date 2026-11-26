@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 // Deferred delivery is for a host whose event fires but drops what the hook
@@ -78,6 +80,9 @@ func deferText(dir, key, hook, text string) {
 	if key == "" || text == "" {
 		return
 	}
+	if _, err := vault.CheckUnlocked(dir); err != nil {
+		return
+	}
 	sweepDeferred(dir)
 	d := filepath.Join(deferredRoot(dir), key)
 	if err := os.MkdirAll(d, 0o700); err != nil {
@@ -95,17 +100,16 @@ func deferText(dir, key, hook, text string) {
 	// rename would put the second pair over the first: the sequence and the pid
 	// keep the names apart and the order intact.
 	name := fmt.Sprintf("%s-%020d-%010d-%d", order, time.Now().UnixNano(), deferredSeq.Add(1), os.Getpid())
-	tmp := filepath.Join(d, "."+name)
-	if err := os.WriteFile(tmp, []byte(text), 0o600); err != nil {
-		return
-	}
-	_ = os.Rename(tmp, filepath.Join(d, name))
+	_ = vault.WriteSealedFile(dir, filepath.Join(d, name), vault.DomainSidecar, []byte(text), 0o600)
 }
 
 // sweepDeferred drops what waited past deferredTTL for a session that never
 // came back, or a CodeWhale call whose tool_call_after never fired: takeDeferred
 // would skip it anyway, and nothing else would ever remove it.
 func sweepDeferred(dir string) {
+	if _, err := vault.CheckUnlocked(dir); err != nil {
+		return
+	}
 	root := deferredRoot(dir)
 	entries, err := os.ReadDir(root)
 	if err != nil {
@@ -121,12 +125,18 @@ func sweepDeferred(dir string) {
 // hasDeferred is the cheap check every hook pays: one stat of a directory that
 // exists only on a machine where a host defers.
 func hasDeferred(dir string) bool {
+	if _, err := vault.CheckUnlocked(dir); err != nil {
+		return false
+	}
 	_, err := os.Stat(deferredRoot(dir))
 	return err == nil
 }
 
 func hasDeferredFor(dir, key string) bool {
 	if key == "" {
+		return false
+	}
+	if _, err := vault.CheckUnlocked(dir); err != nil {
 		return false
 	}
 	_, err := os.Stat(filepath.Join(deferredRoot(dir), key))
@@ -138,12 +148,20 @@ func takeDeferred(dir, key string) string {
 	if key == "" {
 		return ""
 	}
+	if _, err := vault.CheckUnlocked(dir); err != nil {
+		return ""
+	}
 	src := filepath.Join(deferredRoot(dir), key)
 	taken := fmt.Sprintf("%s.taken-%d-%d", src, os.Getpid(), time.Now().UnixNano())
 	if err := os.Rename(src, taken); err != nil {
 		return ""
 	}
-	defer os.RemoveAll(taken)
+	keepTaken := false
+	defer func() {
+		if !keepTaken {
+			_ = os.RemoveAll(taken)
+		}
+	}()
 	entries, err := os.ReadDir(taken)
 	if err != nil {
 		return ""
@@ -163,7 +181,12 @@ func takeDeferred(dir, key string) string {
 		if fi, err := os.Stat(p); err != nil || time.Since(fi.ModTime()) > deferredTTL {
 			continue
 		}
-		b, err := os.ReadFile(p)
+		b, err := vault.ReadSealedFile(dir, p, vault.DomainSidecar)
+		if errors.Is(err, vault.ErrLocked) || errors.Is(err, vault.ErrKeyUnavailable) {
+			_ = os.Rename(taken, src)
+			keepTaken = true
+			return ""
+		}
 		t := strings.TrimSpace(string(b))
 		if err != nil || t == "" || seen[t] || size+len(t) > deferredMax {
 			continue

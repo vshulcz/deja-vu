@@ -32,6 +32,9 @@ var waitOutSwapWindow = func() { time.Sleep(swapWindowWait) }
 
 // openIndexFile is os.Open for a file inside the index directory.
 func openIndexFile(path string) (*os.File, error) {
+	if err := ensureVaultUnlocked(vaultDirForFile(path)); err != nil {
+		return nil, err
+	}
 	f, err := os.Open(path)
 	// errors.Is rather than os.IsNotExist: Windows reports a directory caught
 	// mid-rename as a sharing violation, and the wrapped form is the one that

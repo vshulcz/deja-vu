@@ -516,7 +516,9 @@ func readManifest(dir string) (Manifest, error) {
 	if err != nil {
 		return Manifest{}, err
 	}
-	return manifestFromCore(core, sessions), nil
+	m := manifestFromCore(core, sessions)
+	m.vaultDir = canonicalVaultDir(dir)
+	return m, nil
 }
 
 // manifestFromCore is the Manifest that manifest.gob's core and sessions make.
@@ -652,7 +654,9 @@ func commitManifest(dir string, m Manifest, wroteRecords, share bool) error {
 		if sessions == nil {
 			sessions = map[string]SessionMeta{}
 		}
-		cacheManifest(dir, mfi, sfi, manifestFromCore(core, sessions))
+		cached := manifestFromCore(core, sessions)
+		cached.vaultDir = canonicalVaultDir(dir)
+		cacheManifest(dir, mfi, sfi, cached)
 	}
 	return err
 }

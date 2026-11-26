@@ -23,6 +23,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/userconfig"
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 type doctorStore struct {
@@ -153,6 +154,7 @@ type doctorReport struct {
 	Config  *doctorConfigReport            `json:"config,omitempty"`
 	Embed   *doctorEmbedReport             `json:"embed,omitempty"`
 	Policy  doctorPolicyReport             `json:"policy"`
+	Vault   vault.VaultStatus              `json:"vault"`
 	Ingest  map[string]index.HarnessIngest `json:"ingest_health,omitempty"`
 	// IngestFiles is where those counts came from. Without it the pointer at
 	// the end of doctor's ingest line led back to the numbers it had just
@@ -498,6 +500,7 @@ func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 		report.Git.State = "ok"
 	}
 	report.Policy = collectDoctorPolicy(dir)
+	report.Vault = vault.Status(dir)
 	report.Config = collectDoctorConfig()
 	report.Sync = collectDoctorSync(dir)
 	report.Version = collectDoctorVersion(lookup)

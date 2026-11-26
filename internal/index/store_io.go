@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 // recordLogScans counts keyed passes over the record log. The offset table
@@ -104,10 +105,17 @@ type logWalk struct {
 	off  int64
 	dead deadCursor
 	buf  []byte
+	err  error
 }
 
 func newLogWalk(r io.Reader, t *recordTables, from int64) *logWalk {
-	return &logWalk{r: bufio.NewReaderSize(r, 1024*1024), off: from, dead: t.deadFrom(from)}
+	w := &logWalk{r: bufio.NewReaderSize(r, 1024*1024), off: from, dead: t.deadFrom(from)}
+	if named, ok := r.(interface{ Name() string }); ok {
+		w.err = t.ensureCipherForFile(named.Name())
+	} else if _, dir := t.recordCipher(); dir != "" {
+		w.err = t.ensureCipher(dir)
+	}
+	return w
 }
 
 // next is the next live record. A clean or torn end of the log is io.EOF or
@@ -117,6 +125,9 @@ func (w *logWalk) next() (int64, []byte, error) {
 }
 
 func (w *logWalk) nextInRoles(t *recordTables, want map[string]bool, keepKey func(string) bool) (int64, []byte, error) {
+	if w.err != nil {
+		return 0, nil, w.err
+	}
 	var hdr [4]byte
 	for {
 		if _, err := io.ReadFull(w.r, hdr[:]); err != nil {
@@ -183,6 +194,9 @@ func Generation(dir string) (string, error) {
 }
 
 func newRecordWriter(f *os.File, t *recordTables) (*recordWriter, error) {
+	if err := t.ensureCipherForFile(f.Name()); err != nil {
+		return nil, err
+	}
 	off, err := f.Seek(0, io.SeekEnd)
 	if err != nil {
 		return nil, err
@@ -191,7 +205,10 @@ func newRecordWriter(f *os.File, t *recordTables) (*recordWriter, error) {
 }
 
 func (rw *recordWriter) write(r Record) (int64, error) {
-	b := encodeRecord(r, rw.tables)
+	b, err := encodeRecordChecked(r, rw.tables)
+	if err != nil {
+		return 0, err
+	}
 	if len(b) > 1<<31 {
 		return 0, errors.New("record too large")
 	}
@@ -235,6 +252,9 @@ func (rw *recordWriter) Close() error {
 // is a few hundred bytes. A larger record costs a second read, which is the
 // same work the old path did anyway.
 func readRecordAt(f *os.File, off int64, t *recordTables) (Record, error) {
+	if err := t.ensureCipherForFile(f.Name()); err != nil {
+		return Record{}, err
+	}
 	buf := readAheadPool.Get().(*[]byte) //nolint:forcetypeassert // the pool holds only *[]byte
 	defer readAheadPool.Put(buf)
 	b := *buf
@@ -288,6 +308,9 @@ func eachRecordUntil(path string, t *recordTables, fn func(Record) bool) error {
 		return err
 	}
 	defer func() { _ = f.Close() }()
+	if err := t.ensureCipherForFile(path); err != nil {
+		return err
+	}
 	w := newLogWalk(f, t, 0)
 	for {
 		_, payload, err := w.next()
@@ -349,6 +372,13 @@ func roleWanted(roles map[string]bool, role string) bool {
 
 func decodeRecordHeader(b []byte, t *recordTables) (Record, byte, []byte, error) {
 	var rec Record
+	rc, dir := t.recordCipher()
+	if rc == nil && dir != "" {
+		if err := t.ensureCipher(dir); err != nil {
+			return rec, 0, nil, err
+		}
+		rc, _ = t.recordCipher()
+	}
 	kid, n := binary.Uvarint(b)
 	if n <= 0 {
 		return rec, 0, nil, errShortRecord
@@ -370,7 +400,25 @@ func decodeRecordHeader(b []byte, t *recordTables) (Record, byte, []byte, error)
 	if len(b) < 1 {
 		return rec, 0, nil, errShortRecord
 	}
-	return rec, b[0], b[1:], nil
+	flag := b[0]
+	payload := b[1:]
+	if flag == recordSealed|recordRaw || flag == recordSealed|recordDeflated {
+		baseFlag := flag &^ recordSealed
+		if rc == nil {
+			return rec, 0, nil, vault.ErrKeyUnavailable
+		}
+		plain, err := rc.Open(baseFlag, payload)
+		if err != nil {
+			return rec, 0, nil, fmt.Errorf("%w: %w", errCorruptIndex, err)
+		}
+		return rec, baseFlag, plain, nil
+	}
+	if rc != nil {
+		if flag != recordRaw || slices.ContainsFunc(payload, func(c byte) bool { return c != 0 }) {
+			return rec, 0, nil, fmt.Errorf("%w: unsealed record in encrypted store", errCorruptIndex)
+		}
+	}
+	return rec, flag, payload, nil
 }
 
 const stubDeflatePrefix = 384
@@ -433,6 +481,9 @@ func eachRecordInRolesWhere(path string, t *recordTables, want map[string]bool, 
 		return err
 	}
 	defer func() { _ = f.Close() }()
+	if err := t.ensureCipherForFile(path); err != nil {
+		return err
+	}
 	w := newLogWalk(f, t, 0)
 	for {
 		_, payload, err := w.nextInRoles(t, want, keepKey)
@@ -482,6 +533,9 @@ func eachRecordForKeysInRolesWindowedTail(path string, t *recordTables, want, ro
 		return err
 	}
 	defer func() { _ = f.Close() }()
+	if err := t.ensureCipherForFile(path); err != nil {
+		return err
+	}
 	if ok, err := eachRecordForKeysByOffsetsWindowedTail(f, filepath.Dir(path), t, want, roles, matchedByKey, tail, fn); ok || err != nil {
 		return err
 	}
@@ -625,6 +679,49 @@ type recordTables struct {
 	id   map[string]uint64
 	// dead is the manifest's DeadRecords: records a walk of the log skips.
 	dead []int64
+
+	cipherMu sync.RWMutex
+	dir      string
+	cipher   *vault.RecordCipher
+}
+
+func (t *recordTables) recordCipher() (*vault.RecordCipher, string) {
+	if t == nil {
+		return nil, ""
+	}
+	t.cipherMu.RLock()
+	rc, dir := t.cipher, t.dir
+	t.cipherMu.RUnlock()
+	return rc, dir
+}
+
+func (t *recordTables) ensureCipher(dir string) error {
+	canon := canonicalVaultDir(dir)
+	if canon == "" {
+		return nil
+	}
+	rc, err := vault.ActiveRecordCipher(canon)
+	if err != nil {
+		invalidateSnapshot(canon)
+		return err
+	}
+	if t != nil {
+		t.cipherMu.Lock()
+		t.dir = canon
+		t.cipher = rc
+		t.cipherMu.Unlock()
+	}
+	return nil
+}
+
+func (t *recordTables) ensureCipherForFile(path string) error {
+	if dir := vaultDirForFile(path); dir != "" {
+		return t.ensureCipher(dir)
+	}
+	if _, dir := t.recordCipher(); dir != "" {
+		return t.ensureCipher(dir)
+	}
+	return nil
 }
 
 // isDead reports whether the record at off was replaced by a later pass.
@@ -672,6 +769,7 @@ func tablesFromStrings(strs []string) *recordTables {
 func tablesFromManifest(m Manifest) *recordTables {
 	t := tablesFromStrings(m.RecordStrings)
 	t.dead = m.DeadRecords
+	t.dir = canonicalVaultDir(m.vaultDir)
 	return t
 }
 
@@ -682,7 +780,11 @@ func loadRecordTables(dir string) (*recordTables, error) {
 	if err != nil {
 		return nil, err
 	}
-	return tablesFromManifest(m), nil
+	t := tablesFromManifest(m)
+	if err := t.ensureCipher(dir); err != nil {
+		return nil, err
+	}
+	return t, nil
 }
 
 // fresh gives s an id of its own from here on, past every id the table had.
@@ -739,6 +841,7 @@ const compressFloor = 256
 const (
 	recordRaw      = 0
 	recordDeflated = 1
+	recordSealed   = 0x80
 )
 
 var deflateWriters = sync.Pool{New: func() any { w, _ := flate.NewWriter(nil, flate.BestSpeed); return w }}
@@ -747,7 +850,14 @@ var inflateReaders = sync.Pool{New: func() any { return flate.NewReader(nil) }}
 // A record is [keyID][pathID][flag][payload]. The ids stay outside the
 // payload so a walk can peek the key and skip the record without inflating
 // anything — that path never touches a compressed byte.
-func encodeRecord(r Record, t *recordTables) []byte {
+func encodeRecordChecked(r Record, t *recordTables) ([]byte, error) {
+	rc, dir := t.recordCipher()
+	if rc == nil && dir != "" {
+		if err := t.ensureCipher(dir); err != nil {
+			return nil, err
+		}
+		rc, _ = t.recordCipher()
+	}
 	body := make([]byte, 0, len(r.Text)+24)
 	body = binary.LittleEndian.AppendUint64(body, uint64(recordNanos(r.Time))) //nolint:gosec // a signed time's bits, read back as int64
 	body = appendField(body, r.Text)
@@ -761,24 +871,42 @@ func encodeRecord(r Record, t *recordTables) []byte {
 	// `deja how` asks — decompress all 280,000 records to read 20,000 of them:
 	// 53% of that command's time was flate.
 	b = binary.AppendUvarint(b, t.intern(r.Role))
-	if len(body) < compressFloor {
-		return append(append(b, recordRaw), body...)
+
+	var baseFlag byte = recordRaw
+	payload := body
+	if len(body) >= compressFloor {
+		var buf bytes.Buffer
+		w := deflateWriters.Get().(*flate.Writer) //nolint:forcetypeassert // the pool holds only *flate.Writer
+		w.Reset(&buf)
+		if _, err := w.Write(body); err != nil {
+			deflateWriters.Put(w)
+		} else {
+			err := w.Close()
+			deflateWriters.Put(w)
+			// Incompressible payloads (already-compressed blobs, random ids) are
+			// stored as they are rather than grown.
+			if err == nil && buf.Len() < len(body) {
+				baseFlag = recordDeflated
+				payload = buf.Bytes()
+			}
+		}
 	}
-	var buf bytes.Buffer
-	w := deflateWriters.Get().(*flate.Writer) //nolint:forcetypeassert // the pool holds only *flate.Writer
-	w.Reset(&buf)
-	if _, err := w.Write(body); err != nil {
-		deflateWriters.Put(w)
-		return append(append(b, recordRaw), body...)
+	if rc != nil {
+		sealed, err := rc.Seal(baseFlag, payload)
+		if err != nil {
+			return nil, err
+		}
+		return append(append(b, baseFlag|recordSealed), sealed...), nil
 	}
-	err := w.Close()
-	deflateWriters.Put(w)
-	// Incompressible payloads (already-compressed blobs, random ids) are
-	// stored as they are rather than grown.
-	if err != nil || buf.Len() >= len(body) {
-		return append(append(b, recordRaw), body...)
+	return append(append(b, baseFlag), payload...), nil
+}
+
+func encodeRecord(r Record, t *recordTables) []byte {
+	b, err := encodeRecordChecked(r, t)
+	if err != nil {
+		panic(fmt.Sprintf("encodeRecord: %v", err))
 	}
-	return append(append(b, recordDeflated), buf.Bytes()...)
+	return b
 }
 
 func appendField(b []byte, s string) []byte {
@@ -856,6 +984,9 @@ func eachRecordAtInRoles(f *os.File, offsets []int64, t *recordTables, roles map
 }
 
 func eachOffsetRecordAtInRoles(f *os.File, offsets []int64, t *recordTables, roles map[string]bool, fn func(int64, Record)) error {
+	if err := t.ensureCipherForFile(f.Name()); err != nil {
+		return err
+	}
 	buf := make([]byte, 0, 64*1024)
 	for i := 0; i < len(offsets); {
 		j := i + 1

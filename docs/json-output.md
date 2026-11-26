@@ -515,12 +515,23 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
     "imported": [
       {"machine": "desktop", "sessions": 5}
     ]
+  },
+  "vault": {
+    "enabled": true,
+    "locked": false,
+    "key_backend": "keyring",
+    "keyring_available": true,
+    "auto_lock_seconds": 1800,
+    "encrypted_store": true
   }
 }
 ```
 
 `embed`, `ingest_health`, `ingest_files` and `deep` (present only under
-`--deep`) are omitted when unavailable or empty; `policy` is always present. `embed.state` is the endpoint's,
+`--deep`) are omitted when unavailable or empty; `policy` and `vault`
+(`enabled`, `locked`, `key_backend`, `keyring_available`, `auto_lock_seconds`,
+`encrypted_store`, `error`) are always present (`key_backend`,
+`auto_lock_seconds` and `error` are omitted inside `vault` when empty or zero). `embed.state` is the endpoint's,
 `unavailable` or `reachable`. `sidecar` is the file's own state and appears only
 when it is `unreadable` — the sidecar is on disk and deja cannot parse it —
 with an `error` saying why. A sidecar fault is reported whether or not an

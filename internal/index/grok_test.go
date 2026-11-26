@@ -31,15 +31,17 @@ func TestMain(m *testing.M) {
 		// suite appended fixture notes to the developer's real store and then
 		// failed reading them back as leaked `deja` sessions (#1141). cmd/deja's
 		// TestMain already blanks the same keys; this closes the drift.
-		"XDG_DATA_HOME":           "",
-		"APPDATA":                 filepath.Join(root, "AppData", "Roaming"),
-		"DEJA_NOTES_FILE":         "",
-		"DEJA_SOURCE_INSTANCE":    "",
-		"CLAUDE_CONFIG_DIR":       "",
-		"CODEX_HOME":              "",
-		"GEMINI_CLI_HOME":         "",
-		"CURSOR_CONFIG_DIR":       "",
-		"AIDER_CHAT_HISTORY_FILE": "",
+		"XDG_DATA_HOME":            "",
+		"XDG_RUNTIME_DIR":          "",
+		"DBUS_SESSION_BUS_ADDRESS": "",
+		"APPDATA":                  filepath.Join(root, "AppData", "Roaming"),
+		"DEJA_NOTES_FILE":          "",
+		"DEJA_SOURCE_INSTANCE":     "",
+		"CLAUDE_CONFIG_DIR":        "",
+		"CODEX_HOME":               "",
+		"GEMINI_CLI_HOME":          "",
+		"CURSOR_CONFIG_DIR":        "",
+		"AIDER_CHAT_HISTORY_FILE":  "",
 		// A developer with DEJA_INDEX_DIR exported reads their own index
 		// here, and the suite went red on their machine only.
 		"DEJA_INDEX_DIR":        "",

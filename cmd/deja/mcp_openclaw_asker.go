@@ -1,7 +1,10 @@
 package main
 
 import (
+	"runtime"
+	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -10,12 +13,163 @@ import (
 )
 
 // mcpClient is the clientInfo.name the host sent in initialize: one host per
-// stdio server process.
-var mcpClient atomic.Value
+// stdio server process. Multi-session transports (Streamable HTTP, Unix socket)
+// bind a per-connection/per-session mcpClientSession onto the worker goroutine.
+var (
+	mcpClient            atomic.Value
+	mcpGoroutineSessions sync.Map // uint64 gid -> *mcpClientSession
+)
 
-func setMCPClient(name string) { mcpClient.Store(name) }
+// mcpClientSession isolates per-connection identity, client policy credentials,
+// and transport authentication state across concurrent MCP sessions.
+type mcpClientSession struct {
+	mu          sync.RWMutex
+	connID      string
+	client      string
+	clientToken string
+	authed      bool
+}
+
+func newMCPClientSession(connID string) *mcpClientSession {
+	if connID == "" {
+		connID = newMCPConn()
+	}
+	return &mcpClientSession{connID: connID}
+}
+
+func (s *mcpClientSession) connIDValue() string {
+	if s == nil {
+		return ""
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.connID
+}
+
+func (s *mcpClientSession) setConnID(id string) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.connID = id
+	s.mu.Unlock()
+}
+
+func (s *mcpClientSession) clientName() string {
+	if s == nil {
+		return ""
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.client
+}
+
+func (s *mcpClientSession) setClientName(name string) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.client = name
+	s.mu.Unlock()
+}
+
+func (s *mcpClientSession) tokenValue() string {
+	if s == nil {
+		return ""
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.clientToken
+}
+
+func (s *mcpClientSession) setClientToken(tok string) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.clientToken = tok
+	s.mu.Unlock()
+}
+
+func (s *mcpClientSession) isAuthed() bool {
+	if s == nil {
+		return false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.authed
+}
+
+func (s *mcpClientSession) setAuthed(v bool) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	s.authed = v
+	s.mu.Unlock()
+}
+
+func currentGoroutineID() uint64 {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	s := strings.TrimPrefix(string(buf[:n]), "goroutine ")
+	field, _, _ := strings.Cut(s, " ")
+	id, err := strconv.ParseUint(field, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return id
+}
+
+func withMCPClientSession(sess *mcpClientSession, fn func()) {
+	gid := currentGoroutineID()
+	if gid == 0 || sess == nil {
+		fn()
+		return
+	}
+	prev, had := mcpGoroutineSessions.Load(gid)
+	mcpGoroutineSessions.Store(gid, sess)
+	defer func() {
+		if had {
+			mcpGoroutineSessions.Store(gid, prev)
+		} else {
+			mcpGoroutineSessions.Delete(gid)
+		}
+	}()
+	fn()
+}
+
+func currentMCPClientSession() *mcpClientSession {
+	gid := currentGoroutineID()
+	if gid == 0 {
+		return nil
+	}
+	v, ok := mcpGoroutineSessions.Load(gid)
+	if !ok {
+		return nil
+	}
+	sess, _ := v.(*mcpClientSession)
+	return sess
+}
+
+func setMCPClient(name string) {
+	if sess := currentMCPClientSession(); sess != nil {
+		sess.setClientName(name)
+		return
+	}
+	mcpClient.Store(name)
+}
+
+func setMCPClientToken(tok string) {
+	if sess := currentMCPClientSession(); sess != nil {
+		sess.setClientToken(tok)
+	}
+}
 
 func mcpClientName() string {
+	if sess := currentMCPClientSession(); sess != nil {
+		return sess.clientName()
+	}
 	s, _ := mcpClient.Load().(string)
 	return s
 }

@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"bufio"
 	"bytes"
-	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/binary"
@@ -38,7 +37,10 @@ var contentSidecars = []string{
 	".forks",
 	".embeddings",
 	".embeddings.bin",
+	".vectors.bin",
+	".compactions.gob",
 	".firstrecall",
+	".tui-history",
 }
 
 // Init enables encryption at rest, generates a random 32-byte DEK wrapped by
@@ -77,6 +79,7 @@ func Init(indexDir, passphrase string, autoLock time.Duration) (string, error) {
 		AutoLockSeconds: int64(autoLock.Seconds()),
 		UnlockedAt:      time.Now().UTC().Format(time.RFC3339Nano),
 	}
+	ClearCache()
 	if err := activeKeyring.Set(cfg.KeyID, dek); err != nil {
 		cfg.KeyBackend = "passphrase"
 	}
@@ -84,10 +87,20 @@ func Init(indexDir, passphrase string, autoLock time.Duration) (string, error) {
 		_ = activeKeyring.Delete(cfg.KeyID)
 		return "", err
 	}
+	dir := effectiveIndexDir(indexDir)
+	if dir != "" {
+		wipePromptCache(dir)
+	}
 	if err := encryptExistingNotes(dek); err != nil {
 		return "", err
 	}
-	if err := encryptExistingSnapshots(effectiveIndexDir(indexDir), dek); err != nil {
+	if err := encryptExistingSnapshots(dir, dek); err != nil {
+		return "", err
+	}
+	if err := encryptExistingSidecars(dir, dek); err != nil {
+		return "", err
+	}
+	if err := runMigrators(dir, dek); err != nil {
 		return "", err
 	}
 	return cfg.KeyBackend, nil
@@ -96,6 +109,7 @@ func Init(indexDir, passphrase string, autoLock time.Duration) (string, error) {
 // Lock seals the index directory and content-bearing sibling sidecars into
 // ArchivePath(indexDir), securely wipes the plaintext files, and evicts the key.
 func Lock(indexDir, passphrase string) error {
+	ClearCache()
 	if !Enabled() {
 		return ErrNotInitialized
 	}
@@ -131,12 +145,14 @@ func Lock(indexDir, passphrase string) error {
 		return err
 	}
 	_ = activeKeyring.Delete(cfg.KeyID)
+	ClearCache()
 	return nil
 }
 
 // Unlock validates passphrase, restores any sealed archive back into indexDir,
 // stores the DEK in the OS keyring when available, and clears the locked flag.
 func Unlock(indexDir, passphrase string) error {
+	ClearCache()
 	if !Enabled() {
 		return ErrNotInitialized
 	}
@@ -171,7 +187,19 @@ func Unlock(indexDir, passphrase string) error {
 	}
 	cfg.Locked = false
 	cfg.UnlockedAt = time.Now().UTC().Format(time.RFC3339Nano)
-	return saveConfig(cfg)
+	if err := saveConfig(cfg); err != nil {
+		return err
+	}
+	if err := encryptExistingNotes(dek); err != nil {
+		return err
+	}
+	if err := encryptExistingSnapshots(dir, dek); err != nil {
+		return err
+	}
+	if err := encryptExistingSidecars(dir, dek); err != nil {
+		return err
+	}
+	return runMigrators(dir, dek)
 }
 
 func hasPlaintextStore(indexDir string) bool {
@@ -442,6 +470,10 @@ func wipePlaintextStore(base string) {
 	for _, suf := range contentSidecars {
 		shredFile(base + suf)
 	}
+	wipePromptCache(base)
+}
+
+func wipePromptCache(base string) {
 	cacheDir, singleFile := promptCacheTargets(base)
 	if cacheDir != "" {
 		wipeTree(cacheDir)
@@ -737,16 +769,11 @@ type chunkWriter struct {
 }
 
 func newChunkWriter(w io.Writer, dek []byte) (*chunkWriter, error) {
-	sub, err := deriveSubkey(dek, archiveDomain)
-	if err != nil {
-		return nil, err
-	}
-	defer clear(sub)
-	block, err := aes.NewCipher(sub)
-	if err != nil {
-		return nil, err
-	}
-	aead, err := cipher.NewGCM(block)
+	return newChunkWriterDomain(w, dek, archiveDomain)
+}
+
+func newChunkWriterDomain(w io.Writer, dek []byte, domain string) (*chunkWriter, error) {
+	aead, err := aeadFor(dek, domain)
 	if err != nil {
 		return nil, err
 	}
@@ -821,6 +848,10 @@ type chunkReader struct {
 }
 
 func newChunkReader(r io.Reader, dek []byte) (*chunkReader, error) {
+	return newChunkReaderDomain(r, dek, archiveDomain)
+}
+
+func newChunkReaderDomain(r io.Reader, dek []byte, domain string) (*chunkReader, error) {
 	var head [12]byte
 	if _, err := io.ReadFull(r, head[:]); err != nil {
 		return nil, fmt.Errorf("vault archive header: %w", err)
@@ -828,16 +859,7 @@ func newChunkReader(r io.Reader, dek []byte) (*chunkReader, error) {
 	if string(head[:4]) != archiveMagic {
 		return nil, errors.New("not a deja vault archive")
 	}
-	sub, err := deriveSubkey(dek, archiveDomain)
-	if err != nil {
-		return nil, err
-	}
-	defer clear(sub)
-	block, err := aes.NewCipher(sub)
-	if err != nil {
-		return nil, err
-	}
-	aead, err := cipher.NewGCM(block)
+	aead, err := aeadFor(dek, domain)
 	if err != nil {
 		return nil, err
 	}

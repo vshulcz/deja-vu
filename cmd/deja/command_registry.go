@@ -288,6 +288,7 @@ var commandSpecs = []CommandSpec{
 		Flags: []FlagSpec{
 			{Name: "--context-search"},
 			{Name: "--http", TakesValue: true},
+			{Name: "--unix-socket", TakesValue: true},
 		},
 	},
 	{
@@ -571,6 +572,7 @@ var primaryFlagOwners = map[string]string{
 	"--quiet":            "index",
 	"--context-search":   "mcp",
 	"--http":             "mcp",
+	"--unix-socket":      "mcp",
 	"--secrets":          "audit",
 	"--fail-on-secrets":  "audit",
 	"--encrypted":        "init",
@@ -825,6 +827,9 @@ func buildQField() map[string]string {
 }
 
 func isMCPReadTarget(name string) bool {
+	if name == "context_search" {
+		return true
+	}
 	for _, m := range mcpModeSpecs {
 		if m.Target == name {
 			return !m.IsWrite

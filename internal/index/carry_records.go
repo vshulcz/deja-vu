@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -95,7 +96,7 @@ func recordPrefix(b []byte) (kid, pid, rid uint64, rest []byte, ok bool) {
 	// What decodeRecord would refuse without inflating anything: an encoding
 	// it does not know, or a plain body shorter than its own fields.
 	switch b[0] {
-	case recordDeflated:
+	case recordDeflated, recordRaw | recordSealed, recordDeflated | recordSealed:
 	case recordRaw:
 		if len(b) < 9 {
 			return 0, 0, 0, nil, false
@@ -112,6 +113,14 @@ func recordPrefix(b []byte) (kid, pid, rid uint64, rest []byte, ok bool) {
 // writeStored writes a record from its stored body, re-interning only the
 // three ids, which the new table numbers in its own order.
 func (rw *recordWriter) writeStored(key, path, role string, rest []byte) (int64, error) {
+	if len(rest) == 0 {
+		return 0, errShortRecord
+	}
+	if rc, _ := rw.tables.recordCipher(); rc != nil && rest[0] != recordRaw|recordSealed && rest[0] != recordDeflated|recordSealed {
+		if rest[0] != recordRaw || slices.ContainsFunc(rest[1:], func(c byte) bool { return c != 0 }) {
+			return 0, errors.New("vault: unsealed record payload in encrypted store")
+		}
+	}
 	var pre [3 * binary.MaxVarintLen64]byte
 	p := binary.AppendUvarint(pre[:0], rw.tables.intern(key))
 	p = binary.AppendUvarint(p, rw.tables.intern(path))

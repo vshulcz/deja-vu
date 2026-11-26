@@ -53,12 +53,15 @@ func (d *cachedBucketDir) find(tok string) (bucketEntry, bool) {
 
 // bucketDirOf is the directory of the bucket file f, just opened from p: the
 // cached one while f is the file it was read from, read off f otherwise.
-func bucketDirOf(p string, f *os.File) (*cachedBucketDir, error) {
+func bucketDirOf(p string, f *indexBlobFile) (*cachedBucketDir, error) {
+	dir := filepath.Dir(filepath.Dir(p))
+	if err := ensureVaultUnlocked(dir); err != nil {
+		return nil, err
+	}
 	fi, err := f.Stat()
 	if err != nil {
 		return nil, err
 	}
-	dir := filepath.Dir(filepath.Dir(p))
 	norm := normSnapshotDir(dir)
 	warmFileIdentity(fi)
 	snapshots.mu.Lock()

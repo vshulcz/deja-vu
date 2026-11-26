@@ -14,53 +14,87 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 )
 
-var mcpFlags = []string{"--context-search", "--http"}
+var mcpFlags = []string{"--context-search", "--http", "--unix-socket"}
 
-// parseMCPFlags parses `deja mcp` flags. Without --http the server runs on
-// stdio and never opens a socket.
-func parseMCPFlags(args []string) (contextOnly bool, httpAddr string, err error) {
+type mcpOptions struct {
+	contextOnly bool
+	httpAddr    string
+	unixSocket  string
+}
+
+func parseMCPOptions(args []string) (mcpOptions, error) {
+	var opts mcpOptions
 	for len(args) > 0 {
 		a := args[0]
 		args = args[1:]
 		switch {
 		case a == "--context-search", a == "-context-search":
-			contextOnly = true
+			opts.contextOnly = true
 		case a == "--http", a == "-http":
 			if len(args) == 0 || strings.HasPrefix(args[0], "-") {
-				return false, "", errors.New("mcp: --http requires a listen address (for example 127.0.0.1:8788)")
+				return opts, errors.New("mcp: --http requires a listen address (for example 127.0.0.1:8788)")
 			}
-			httpAddr = strings.TrimSpace(args[0])
+			opts.httpAddr = strings.TrimSpace(args[0])
 			args = args[1:]
 		case strings.HasPrefix(a, "--http="), strings.HasPrefix(a, "-http="):
 			_, v, _ := strings.Cut(a, "=")
-			httpAddr = strings.TrimSpace(v)
-			if httpAddr == "" {
-				return false, "", errors.New("mcp: --http requires a listen address (for example 127.0.0.1:8788)")
+			opts.httpAddr = strings.TrimSpace(v)
+			if opts.httpAddr == "" {
+				return opts, errors.New("mcp: --http requires a listen address (for example 127.0.0.1:8788)")
+			}
+		case a == "--unix-socket", a == "-unix-socket":
+			if len(args) == 0 || strings.HasPrefix(args[0], "-") {
+				return opts, errors.New("mcp: --unix-socket requires a socket path (for example ~/.deja/mcp.sock)")
+			}
+			opts.unixSocket = strings.TrimSpace(args[0])
+			args = args[1:]
+		case strings.HasPrefix(a, "--unix-socket="), strings.HasPrefix(a, "-unix-socket="):
+			_, v, _ := strings.Cut(a, "=")
+			opts.unixSocket = strings.TrimSpace(v)
+			if opts.unixSocket == "" {
+				return opts, errors.New("mcp: --unix-socket requires a socket path (for example ~/.deja/mcp.sock)")
 			}
 		case strings.HasPrefix(a, "-"):
-			return false, "", unknownFlag("mcp", a, mcpFlags)
+			return opts, unknownFlag("mcp", a, mcpFlags)
 		default:
-			return false, "", fmt.Errorf("mcp: unexpected argument %q", a)
+			return opts, fmt.Errorf("mcp: unexpected argument %q", a)
 		}
 	}
-	return contextOnly, httpAddr, nil
+	if opts.httpAddr != "" && opts.unixSocket != "" {
+		return opts, errors.New("mcp: --http and --unix-socket are mutually exclusive — pick one listener")
+	}
+	return opts, nil
+}
+
+// parseMCPFlags parses `deja mcp` flags. Without --http or --unix-socket the
+// server runs on stdio and never opens a socket.
+func parseMCPFlags(args []string) (contextOnly bool, httpAddr string, err error) {
+	opts, err := parseMCPOptions(args)
+	if err != nil {
+		return false, "", err
+	}
+	return opts.contextOnly, opts.httpAddr, nil
 }
 
 func runMCP(dir string, args []string, r io.Reader, w io.Writer) error {
-	contextOnly, httpAddr, err := parseMCPFlags(args)
+	opts, err := parseMCPOptions(args)
 	if err != nil {
 		return err
 	}
-	if httpAddr != "" {
-		return serveMCPHTTPProcess(dir, httpAddr, contextOnly)
+	if opts.httpAddr != "" {
+		return serveMCPHTTPProcess(dir, opts.httpAddr, opts.contextOnly)
 	}
-	return serveMCPProcess(dir, r, w, contextOnly)
+	if opts.unixSocket != "" {
+		return serveMCPUnixSocketProcess(dir, opts.unixSocket, opts.contextOnly)
+	}
+	return serveMCPProcess(dir, r, w, opts.contextOnly)
 }
 
 func isLoopbackHost(host string) bool {
@@ -147,8 +181,74 @@ type mcpHTTPReply struct {
 	msg    string
 }
 
+const maxMCPHTTPSessions = 1024
+
+type mcpHTTPSessionStore struct {
+	mu       sync.Mutex
+	sessions map[string]*mcpClientSession
+	order    []string
+}
+
+func newMCPHTTPSessionStore() *mcpHTTPSessionStore {
+	return &mcpHTTPSessionStore{sessions: make(map[string]*mcpClientSession)}
+}
+
+func (s *mcpHTTPSessionStore) getOrCreate(id string) *mcpClientSession {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if sess, ok := s.sessions[id]; ok {
+		return sess
+	}
+	sess := newMCPClientSession(id)
+	s.insertLocked(id, sess)
+	return sess
+}
+
+func (s *mcpHTTPSessionStore) set(sess *mcpClientSession) {
+	if sess == nil {
+		return
+	}
+	id := sess.connIDValue()
+	if id == "" {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.sessions[id]; !ok {
+		s.insertLocked(id, sess)
+	} else {
+		s.sessions[id] = sess
+	}
+}
+
+func (s *mcpHTTPSessionStore) insertLocked(id string, sess *mcpClientSession) {
+	for len(s.sessions) >= maxMCPHTTPSessions && len(s.order) > 0 {
+		old := s.order[0]
+		s.order = s.order[1:]
+		delete(s.sessions, old)
+	}
+	if len(s.sessions) == 0 {
+		s.order = nil
+	}
+	s.sessions[id] = sess
+	s.order = append(s.order, id)
+}
+
+func (s *mcpHTTPSessionStore) delete(id string) {
+	if id == "" {
+		return
+	}
+	s.mu.Lock()
+	delete(s.sessions, id)
+	s.mu.Unlock()
+}
+
 func newMCPHTTPHandler(dir string, contextOnly bool, token string) http.Handler {
-	mcpConn.Store(newMCPConn())
+	return newMCPHTTPHandlerWithOpts(dir, contextOnly, token, false)
+}
+
+func newMCPHTTPHandlerWithOpts(dir string, contextOnly bool, token string, unixSocket bool) http.Handler {
+	store := newMCPHTTPSessionStore()
 	srv := newMCPServer(dir, json.NewEncoder(io.Discard))
 	srv.contextOnly = contextOnly
 
@@ -157,11 +257,12 @@ func newMCPHTTPHandler(dir string, contextOnly bool, token string) http.Handler 
 			http.NotFound(w, r)
 			return
 		}
-		if !mcpHTTPAllowedRequest(w, r, token) {
+		if !mcpHTTPAllowedRequestWithOpts(w, r, token, unixSocket) {
 			return
 		}
 		switch r.Method {
 		case http.MethodDelete:
+			store.delete(cleanMCPSessionID(r.Header.Get("Mcp-Session-Id")))
 			w.WriteHeader(http.StatusNoContent)
 		case http.MethodGet:
 			// Streamable HTTP allows 405 when the server does not offer a
@@ -169,7 +270,7 @@ func newMCPHTTPHandler(dir string, contextOnly bool, token string) http.Handler 
 			w.Header().Set("Allow", "POST, DELETE")
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		case http.MethodPost:
-			serveMCPHTTPPost(w, r, srv)
+			serveMCPHTTPPost(w, r, srv, store)
 		default:
 			w.Header().Set("Allow", "POST, DELETE")
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -178,6 +279,10 @@ func newMCPHTTPHandler(dir string, contextOnly bool, token string) http.Handler 
 }
 
 func mcpHTTPAllowedRequest(w http.ResponseWriter, r *http.Request, token string) bool {
+	return mcpHTTPAllowedRequestWithOpts(w, r, token, false)
+}
+
+func mcpHTTPAllowedRequestWithOpts(w http.ResponseWriter, r *http.Request, token string, unixSocket bool) bool {
 	if token != "" {
 		got, ok := strings.CutPrefix(strings.TrimSpace(r.Header.Get("Authorization")), "Bearer ")
 		got = strings.TrimSpace(got)
@@ -186,7 +291,7 @@ func mcpHTTPAllowedRequest(w http.ResponseWriter, r *http.Request, token string)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return false
 		}
-	} else if !isLoopbackHost(hostFromHostPort(r.Host)) {
+	} else if !unixSocket && !isLoopbackHost(hostFromHostPort(r.Host)) {
 		// Prevent DNS rebinding against an unauthenticated loopback listener.
 		http.Error(w, "forbidden host", http.StatusForbidden)
 		return false
@@ -237,13 +342,30 @@ func cleanMCPSessionID(raw string) string {
 	return string(out)
 }
 
-func serveMCPHTTPPost(w http.ResponseWriter, r *http.Request, srv *mcpServer) {
+func cleanMCPHeaderText(raw string, maxLen int) string {
+	s := strings.TrimSpace(raw)
+	if s == "" || len(s) > maxLen {
+		return ""
+	}
+	out := make([]byte, len(s))
+	for i := range len(s) {
+		b := s[i]
+		if b < 0x20 || b > 0x7e {
+			return ""
+		}
+		out[i] = asciiIdentity[b]
+	}
+	return string(out)
+}
+
+func serveMCPHTTPPost(w http.ResponseWriter, r *http.Request, srv *mcpServer, store *mcpHTTPSessionStore) {
 	sessID := cleanMCPSessionID(r.Header.Get("Mcp-Session-Id"))
+	var sess *mcpClientSession
 	if sessID != "" {
-		mcpConn.Store(sessID)
+		sess = store.getOrCreate(sessID)
 		w.Header().Set("Mcp-Session-Id", sessID)
-	} else if mcpConnID() == "" {
-		mcpConn.Store(newMCPConn())
+	} else {
+		sess = newMCPClientSession(newMCPConn())
 	}
 
 	rawBody, err := io.ReadAll(io.LimitReader(r.Body, mcpMaxFrame+1))
@@ -287,7 +409,7 @@ func serveMCPHTTPPost(w http.ResponseWriter, r *http.Request, srv *mcpServer) {
 
 	if isNotification(req.ID) {
 		if req.Method == "notifications/cancelled" {
-			srv.cancel(req.Params)
+			srv.cancelFor(sess, req.Params)
 		}
 		w.WriteHeader(http.StatusAccepted)
 		return
@@ -299,10 +421,18 @@ func serveMCPHTTPPost(w http.ResponseWriter, r *http.Request, srv *mcpServer) {
 	if req.Method == "initialize" && sessID == "" {
 		sessID = newMCPConn()
 		if sessID != "" {
-			mcpConn.Store(sessID)
+			sess.setConnID(sessID)
+			store.set(sess)
 			w.Header().Set("Mcp-Session-Id", sessID)
 		}
 	}
+	if headerClient := cleanMCPHeaderText(r.Header.Get("X-Deja-Client"), 128); headerClient != "" && (sess.clientName() == "" || req.Method == "initialize") {
+		sess.setClientName(headerClient)
+	}
+	if headerToken := cleanMCPHeaderText(r.Header.Get("X-Deja-Client-Token"), 512); headerToken != "" {
+		sess.setClientToken(headerToken)
+	}
+	req.session = sess
 
 	ch := make(chan mcpHTTPReply, 1)
 	p := srv.serveRequest(req, func(id any, result any, code int, msg string) { //nolint:contextcheck // mcpServer workers outlive individual requests to populate the late-answer cache

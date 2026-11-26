@@ -27,6 +27,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/termwidth"
 	"github.com/vshulcz/deja-vu/internal/usage"
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 const warmupRetryAfter = 10 * time.Minute
@@ -1502,5 +1503,7 @@ func dropHookCaches(dir string) {
 	// The marks for the sessions being written go with them: a forget that left
 	// them behind would keep hiding whatever they name for the rest of the
 	// window, and after a forget there is nothing left to hide.
-	_ = os.Remove(liveSessionsPath(dir))
+	if _, err := vault.CheckUnlocked(dir); err == nil {
+		_ = os.Remove(liveSessionsPath(dir))
+	}
 }

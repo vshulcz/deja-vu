@@ -11,6 +11,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/evidence"
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 func TestSeenKeySanitizationAndPrefixGuards(t *testing.T) {
@@ -335,5 +336,74 @@ func TestCoalesceRecallMessages(t *testing.T) {
 	}
 	if !strings.Contains(got, "plain supplement") {
 		t.Fatalf("missing plain supplement:\n%s", got)
+	}
+}
+
+func TestLedgerEncryptsLinesWhenVaultEnabledAndFailClosedWhenLocked(t *testing.T) {
+	vault.ClearCache()
+	t.Cleanup(vault.ClearCache)
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
+	t.Setenv("DEJA_VAULT_FILE", filepath.Join(tmp, "vault.json"))
+	t.Setenv("DEJA_VAULT_BACKEND", "passphrase")
+	t.Setenv("DEJA_VAULT_PASSPHRASE", "ledger-vault-pass")
+	oldIter := vault.KDFIterations
+	vault.KDFIterations = 1000
+	t.Cleanup(func() { vault.KDFIterations = oldIter })
+
+	dir := filepath.Join(tmp, "index.db")
+	if _, err := vault.Init(dir, "ledger-vault-pass", 0); err != nil {
+		t.Fatalf("vault.Init: %v", err)
+	}
+
+	l := NewLedger(dir)
+	l.rotateBytes = 256
+	l.RecordIDs("conv-canary", "CANARY_LEDGER_TOK_7731")
+	l.RecordIDs("conv-canary", "compaction:CANARY_KEEP_881")
+	l.RecordIDs("conv-other", "noise-1", "noise-2", "noise-3", "noise-4")
+
+	raw, err := os.ReadFile(dir + ".hookseen")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), vault.NoteLinePrefix) {
+		t.Fatalf(".hookseen missing %q prefix: %q", vault.NoteLinePrefix, raw)
+	}
+	for _, secret := range []string{"conv-canary", "CANARY_LEDGER_TOK_7731", "CANARY_KEEP_881", "conv-other"} {
+		if strings.Contains(string(raw), secret) {
+			t.Fatalf("plaintext secret %q leaked into .hookseen: %q", secret, raw)
+		}
+	}
+
+	seen := l.Read().Injected("conv-canary")
+	if !seen["CANARY_LEDGER_TOK_7731"] || !seen["compaction:CANARY_KEEP_881"] {
+		t.Fatalf("decryption of encrypted .hookseen lost entries: %v", seen)
+	}
+	if !l.ForgetCheckpoint("conv-canary", "cp-vault-1") {
+		t.Fatal("ForgetCheckpoint failed on encrypted .hookseen")
+	}
+	rawAfterCP, _ := os.ReadFile(dir + ".hookseen")
+	if strings.Contains(string(rawAfterCP), "cp-vault-1") || strings.Contains(string(rawAfterCP), "conv-canary") {
+		t.Fatalf("plaintext leaked after ForgetCheckpoint rewrite: %q", rawAfterCP)
+	}
+	if l.Read().Injected("conv-canary")["CANARY_LEDGER_TOK_7731"] {
+		t.Fatal("checkpoint failed to forget encrypted entry")
+	}
+	if !l.Read().Injected("conv-canary")["compaction:CANARY_KEEP_881"] {
+		t.Fatal("compaction mark dropped on encrypted .hookseen")
+	}
+
+	// Lock vault: Read returns nil/empty, writes fail closed without plaintext leak.
+	t.Setenv("DEJA_VAULT_PASSPHRASE", "")
+	if err := vault.Lock(dir, "ledger-vault-pass"); err != nil {
+		t.Fatalf("vault.Lock: %v", err)
+	}
+	if gotLocked := l.Read().Injected("conv-canary"); len(gotLocked) != 0 {
+		t.Fatalf("Read when locked returned entries: %v", gotLocked)
+	}
+	l.RecordIDs("conv-locked", "SECRET_WHEN_LOCKED")
+	if rawLocked, err := os.ReadFile(dir + ".hookseen"); err == nil && strings.Contains(string(rawLocked), "SECRET_WHEN_LOCKED") {
+		t.Fatalf("wrote plaintext entry while vault locked")
 	}
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/sources"
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 // A Claude Code fork made with --resume <id> --fork-session writes the turns it
@@ -63,7 +64,12 @@ func rememberClaudeForkSource(dir, sid, transcript string) {
 	if src == "" {
 		return
 	}
-	line := sid + " " + src + " " + strconv.FormatInt(time.Now().Unix(), 10) + "\n"
+	plain := sid + " " + src + " " + strconv.FormatInt(time.Now().Unix(), 10)
+	sealed, err := vault.SealSidecarLine(dir, vault.DomainSidecar, []byte(plain))
+	if err != nil {
+		return
+	}
+	line := sealed + "\n"
 	p := forkMarksPath(dir)
 	// Appended, so two forks starting together both keep theirs; pruned once
 	// the file holds more than a few days of them.
@@ -82,21 +88,42 @@ func rememberClaudeForkSource(dir, sid, transcript string) {
 const forkMarksPruneAt = 8 << 10
 
 func pruneForkMarks(p string) {
+	dir := strings.TrimSuffix(p, ".forks")
+	if _, err := vault.CheckUnlocked(dir); err != nil {
+		return
+	}
 	b, err := os.ReadFile(p)
 	if err != nil {
 		return
 	}
 	now := time.Now()
 	var keep []string
-	for line := range strings.SplitSeq(string(b), "\n") {
-		f := strings.Fields(line)
+	for rawLine := range strings.SplitSeq(string(b), "\n") {
+		trimmed := strings.TrimSpace(rawLine)
+		if trimmed == "" {
+			continue
+		}
+		plainBytes, _, err := vault.OpenSidecarLine(dir, vault.DomainSidecar, trimmed)
+		if err != nil {
+			if vault.Enabled() {
+				// Abort prune rather than dropping undecryptable lines.
+				return
+			}
+			continue
+		}
+		plain := strings.TrimSuffix(string(plainBytes), "\n")
+		f := strings.Fields(plain)
 		if len(f) != 3 {
 			continue
 		}
 		if at, err := strconv.ParseInt(f[2], 10, 64); err != nil || now.Sub(time.Unix(at, 0)) > forkMarkTTL {
 			continue
 		}
-		keep = append(keep, line+"\n")
+		sealed, err := vault.SealSidecarLine(dir, vault.DomainSidecar, []byte(plain))
+		if err != nil {
+			return
+		}
+		keep = append(keep, sealed+"\n")
 	}
 	_ = atomicfile.Write(p, []byte(strings.Join(keep, "")), 0o600)
 }
@@ -104,13 +131,24 @@ func pruneForkMarks(p string) {
 // claudeForkMark is the source SessionStart kept for sid, or "". A missing
 // file, the usual state, costs one failed open.
 func claudeForkMark(dir, sid string) string {
+	if _, err := vault.CheckUnlocked(dir); err != nil {
+		return ""
+	}
 	b, err := os.ReadFile(forkMarksPath(dir))
 	if err != nil {
 		return ""
 	}
 	src := ""
-	for line := range strings.SplitSeq(string(b), "\n") {
-		if f := strings.Fields(line); len(f) == 3 && f[0] == sid {
+	for rawLine := range strings.SplitSeq(string(b), "\n") {
+		trimmed := strings.TrimSpace(rawLine)
+		if trimmed == "" {
+			continue
+		}
+		plain, _, err := vault.OpenSidecarLine(dir, vault.DomainSidecar, trimmed)
+		if err != nil {
+			continue
+		}
+		if f := strings.Fields(string(plain)); len(f) == 3 && f[0] == sid {
 			src = f[1]
 		}
 	}

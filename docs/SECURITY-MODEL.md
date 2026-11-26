@@ -120,12 +120,14 @@ and only inside that agent's store directory.
 
 The index and sidecar never leave the machine through indexing, search, MCP,
 stats, or hook operation. The MCP server uses JSON-RPC over standard input and
-output by default and does not listen on a network socket unless started with
-`deja mcp --http <addr>` (which checks `Origin` and `Host` headers on loopback
-and requires `DEJA_MCP_TOKEN` on non-loopback addresses). The git commands deja runs to
-read a repository (changed files, blame, worktree names) set
-`GIT_NO_LAZY_FETCH=1`, so in a partial clone they answer from what is on disk
-instead of fetching missing objects from the remote.
+output by default and does not listen on a socket unless started with `deja mcp
+--unix-socket <path>` (creates a `0600` Unix domain socket in a `0700` directory
+after symlink and stale-socket checks, with optional `DEJA_MCP_TOKEN`
+authentication) or `deja mcp --http <addr>` (which checks `Origin` and `Host`
+headers on loopback and requires `DEJA_MCP_TOKEN` on non-loopback addresses).
+The git commands deja runs to read a repository (changed files, blame, worktree
+names) set `GIT_NO_LAZY_FETCH=1`, so in a partial clone they answer from what is
+on disk instead of fetching missing objects from the remote.
 
 ### Explicit exports and network paths
 
@@ -234,10 +236,18 @@ output. Do not use it with histories that contain secrets.
 
 ## Non-goals and trust assumptions
 
-- deja is not an access-control system. Anyone who can read the index files can
-  inspect the data stored in them.
-- The index and usage sidecar inherit the permissions and protections of their
-  directory and filesystem. deja does not encrypt them at rest.
+- By default, deja stores the index and usage sidecars in plaintext inheriting
+  filesystem permissions. With Vault mode enabled (`deja init --encrypt`, `deja
+  lock`, `deja unlock`), deja encrypts index shards, vector caches, SQLite
+  evidence, and live working sidecars with AES-256-GCM using keys derived via
+  PBKDF2-HMAC-SHA256 and HKDF-SHA256, optionally caches the DEK in the OS
+  keyring while unlocked, and seals state into `.vault.enc` while locked. Raw
+  session transcripts managed by external coding tools remain outside deja's
+  encryption.
+- Policy rules scope what deja surfaces across clients, but local processes
+  running under the same OS user share access to unlocked key material and raw
+  agent transcripts unless isolated by filesystem permissions and dedicated MCP
+  client tokens.
 - Sync trusts the SSH host, account, and keys selected by the user. deja does
   not authenticate peers beyond the system SSH client's checks and does not
   revoke data after a peer imports it.
@@ -353,13 +363,24 @@ only when all three activations allow it.
 `ignore` lists shell globs matched against a session's path and project; a
 match stays out of recall. With no `ignore` key the default is
 `*/.claude/jobs/*`, a background agent's own scratch tree; writing the key
-replaces that default. Two operational booleans also live in `policy.json` so
-hooks started without the user's shell environment see them: `"auto_index":
-false` (same as `DEJA_NO_AUTO_INDEX=1`) stops automatic index updates, and
-`"search_only": true` (same as `DEJA_SEARCH_ONLY=1`) skips mining fixes,
-commands and co-occurrence tables. A file that is missing or does not parse
-means the default policy, so recall never breaks on a bad file; `deja doctor`
-reports what is in force.
+replaces that default. Operational flags also live in `policy.json` so hooks
+started without the user's shell environment see them: `"auto_index": false`
+(same as `DEJA_NO_AUTO_INDEX=1`) stops automatic index updates, `"search_only":
+true` (same as `DEJA_SEARCH_ONLY=1`) skips mining fixes, commands and
+co-occurrence tables, and `"source_hints": false` (same as
+`DEJA_NO_SOURCE_HINTS=1`) suppresses cross-harness transcript path hints. A file
+that is missing or does not parse means the default policy, so recall never
+breaks on a bad file; `deja doctor` reports what is in force.
+
+For shared sockets and multi-client MCP environments, `policy.json` supports
+`"write"` surface controls (such as read-only or restricted memory mutations)
+and per-client ACLs via `"require_clients"`, `"clients"` (per-client project
+scopes and allowed surfaces), and `"client_tokens"` (SHA-256 token digests).
+Client identity and bearer tokens are read from `DEJA_CLIENT` /
+`DEJA_CLIENT_TOKEN`, MCP `initialize` `clientInfo` / `clientToken`, or HTTP
+`X-Deja-Client` / `X-Deja-Client-Token` headers, and bound to isolated
+per-session MCP execution contexts so concurrent clients cannot bleed
+identities, tokens, or cached replies across connections.
 
 The policy filters what recall serves. It does not keep this machine's own
 sessions out of the index; the exclude list and `deja forget` above do that. A

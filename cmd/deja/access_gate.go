@@ -49,7 +49,15 @@ func hookClientName() string {
 }
 
 func mcpActiveClientName() string {
-	if c := mcpClientName(); c != "" {
+	return mcpActiveClientNameFor(currentMCPClientSession())
+}
+
+func mcpActiveClientNameFor(sess *mcpClientSession) string {
+	if sess != nil {
+		if c := sess.clientName(); c != "" {
+			return c
+		}
+	} else if c := mcpClientName(); c != "" {
 		return c
 	}
 	if c := os.Getenv(envDejaClient); c != "" {
@@ -58,13 +66,21 @@ func mcpActiveClientName() string {
 	return ""
 }
 
+func mcpActiveClientTokenFor(sess *mcpClientSession) string {
+	if sess != nil {
+		if tok := sess.tokenValue(); tok != "" {
+			return tok
+		}
+	}
+	return os.Getenv(envDejaClientToken)
+}
+
 func shouldAuditAllow(pol policy.Policy, action string) bool {
 	return action == "write" || pol.RequireClients || len(pol.Clients) > 0 || len(pol.ClientTokens) > 0 || vault.Enabled()
 }
 
-func enforceClientPolicy(dir, surface, client, action, projectScope string) error {
+func enforceClientPolicyWithToken(dir, surface, client, token, action, projectScope string) error {
 	pol := policy.Load()
-	token := os.Getenv(envDejaClientToken)
 	var ok bool
 	var reason string
 	if action == "write" {
@@ -83,6 +99,14 @@ func enforceClientPolicy(dir, surface, client, action, projectScope string) erro
 		usage.RecordAccess(dir, surface, client, action, projectScope, "allow", "")
 	}
 	return nil
+}
+
+func enforceClientPolicy(dir, surface, client, action, projectScope string) error {
+	token := os.Getenv(envDejaClientToken)
+	if surface == "mcp" {
+		token = mcpActiveClientTokenFor(currentMCPClientSession())
+	}
+	return enforceClientPolicyWithToken(dir, surface, client, token, action, projectScope)
 }
 
 func checkSurfaceAccess(dir, surface, client, action, projectScope string) error {

@@ -1,6 +1,7 @@
 package hookengine
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"hash/fnv"
@@ -14,7 +15,103 @@ import (
 	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
+
+func init() {
+	vault.RegisterMigrator("hookengine", migrateLedgerSidecar)
+}
+
+func migrateLedgerSidecar(indexDir string, dek []byte) error {
+	if len(dek) == 0 || strings.TrimSpace(indexDir) == "" {
+		return nil
+	}
+	path := indexDir + ".hookseen"
+	b, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	var out []string
+	changed := false
+	for line := range strings.SplitSeq(string(b), "\n") {
+		if line == "" {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, vault.NoteLinePrefix) {
+			if _, err := vault.OpenLine(dek, vault.DomainSidecar, trimmed); err == nil {
+				out = append(out, trimmed)
+				continue
+			}
+		}
+		sealed, err := vault.SealLine(dek, vault.DomainSidecar, []byte(line))
+		if err != nil {
+			return err
+		}
+		out = append(out, sealed)
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	body := ""
+	if len(out) > 0 {
+		body = strings.Join(out, "\n") + "\n"
+	}
+	return atomicfile.Write(path, []byte(body), 0o600)
+}
+
+func ledgerDEK(path string) ([]byte, error) {
+	return vault.CheckUnlocked(strings.TrimSuffix(path, ".hookseen"))
+}
+
+type ledgerEntry struct {
+	raw   string
+	plain string
+}
+
+func decodeLedgerEntries(dek, b []byte) ([]ledgerEntry, bool) {
+	if len(dek) == 0 {
+		if bytes.Contains(b, []byte(vault.NoteLinePrefix)) {
+			return nil, false
+		}
+		var out []ledgerEntry
+		for line := range strings.SplitSeq(string(b), "\n") {
+			if line == "" {
+				continue
+			}
+			out = append(out, ledgerEntry{raw: line, plain: line})
+		}
+		return out, true
+	}
+	var out []ledgerEntry
+	for line := range strings.SplitSeq(string(b), "\n") {
+		if line == "" {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, vault.NoteLinePrefix) {
+			plain, err := vault.OpenLine(dek, vault.DomainSidecar, trimmed)
+			if err != nil {
+				continue
+			}
+			out = append(out, ledgerEntry{raw: trimmed, plain: string(plain)})
+			continue
+		}
+		out = append(out, ledgerEntry{raw: line, plain: line})
+	}
+	return out, true
+}
+
+func encodeLedgerLine(dek []byte, plain string) (string, error) {
+	if len(dek) == 0 {
+		return plain, nil
+	}
+	return vault.SealLine(dek, vault.DomainSidecar, []byte(plain))
+}
 
 // Key prefixes and limits shared across hook dedupe ledgers.
 const (
@@ -254,11 +351,26 @@ func (l *Ledger) Read() SeenLines {
 	if l == nil || l.path == "" {
 		return nil
 	}
+	dek, err := ledgerDEK(l.path)
+	if err != nil {
+		return nil
+	}
+	if len(dek) == 32 {
+		defer clear(dek)
+	}
 	b, err := os.ReadFile(l.path)
 	if err != nil {
 		return nil
 	}
-	return SeenLines(strings.Split(string(b), "\n"))
+	entries, ok := decodeLedgerEntries(dek, b)
+	if !ok {
+		return nil
+	}
+	out := make([]string, len(entries))
+	for i, e := range entries {
+		out[i] = e.plain
+	}
+	return SeenLines(out)
 }
 
 // RecordIDs locks the ledger and appends sid -> id tokens.
@@ -333,6 +445,13 @@ func (tx *SeenTx) appendRecords(sid, stamp, project string, ids []string) {
 		return
 	}
 	p := tx.ledger.path
+	dek, err := ledgerDEK(p)
+	if err != nil {
+		return
+	}
+	if len(dek) == 32 {
+		defer clear(dek)
+	}
 	if tx.ledger.rotateBytes > 0 {
 		if fi, err := os.Stat(p); err == nil && fi.Size() > tx.ledger.rotateBytes {
 			RotateFile(p, sid)
@@ -347,22 +466,28 @@ func (tx *SeenTx) appendRecords(sid, stamp, project string, ids []string) {
 		_, _ = f.WriteString("\n")
 	}
 	sKey := SeenKey(sid)
-	var buf strings.Builder
+	var buf, lineBuf strings.Builder
 	for _, id := range ids {
 		if !IsSeenField(id) {
 			continue
 		}
-		buf.WriteString(sKey)
-		buf.WriteByte(' ')
-		buf.WriteString(id)
+		lineBuf.Reset()
+		lineBuf.WriteString(sKey)
+		lineBuf.WriteByte(' ')
+		lineBuf.WriteString(id)
 		if stamp != "" {
-			buf.WriteByte(' ')
-			buf.WriteString(stamp)
+			lineBuf.WriteByte(' ')
+			lineBuf.WriteString(stamp)
 			if project != "" {
-				buf.WriteByte(' ')
-				buf.WriteString(project)
+				lineBuf.WriteByte(' ')
+				lineBuf.WriteString(project)
 			}
 		}
+		encoded, err := encodeLedgerLine(dek, lineBuf.String())
+		if err != nil {
+			return
+		}
+		buf.WriteString(encoded)
 		buf.WriteByte('\n')
 	}
 	if buf.Len() > 0 {
@@ -416,6 +541,14 @@ func (tx *SeenTx) rewriteOmitting(sids, appendLines []string) {
 	if tx == nil || tx.ledger == nil || tx.ledger.path == "" {
 		return
 	}
+	p := tx.ledger.path
+	dek, err := ledgerDEK(p)
+	if err != nil {
+		return
+	}
+	if len(dek) == 32 {
+		defer clear(dek)
+	}
 	keys := make(map[string]bool)
 	for _, sid := range sids {
 		if sid == "" {
@@ -431,25 +564,45 @@ func (tx *SeenTx) rewriteOmitting(sids, appendLines []string) {
 	if len(keys) == 0 && len(appendLines) == 0 {
 		return
 	}
-	p := tx.ledger.path
+	sealAll := func(lines []string) ([]string, error) {
+		if len(dek) == 0 || len(lines) == 0 {
+			return lines, nil
+		}
+		sealed := make([]string, 0, len(lines))
+		for _, ln := range lines {
+			s, err := encodeLedgerLine(dek, ln)
+			if err != nil {
+				return nil, err
+			}
+			sealed = append(sealed, s)
+		}
+		return sealed, nil
+	}
 	b, err := os.ReadFile(p)
 	if err != nil {
 		if os.IsNotExist(err) && len(appendLines) > 0 {
-			_ = atomicfile.Write(p, []byte(strings.Join(appendLines, "\n")+"\n"), 0o600)
+			if sealed, serr := sealAll(appendLines); serr == nil {
+				_ = atomicfile.Write(p, []byte(strings.Join(sealed, "\n")+"\n"), 0o600)
+			}
 		}
 		return
 	}
-	var kept []string
-	for line := range strings.SplitSeq(string(b), "\n") {
-		if line == "" {
-			continue
-		}
-		if parts := strings.Fields(line); len(parts) >= 2 && keys[parts[0]] && !strings.HasPrefix(parts[1], "compaction:") {
-			continue
-		}
-		kept = append(kept, line)
+	entries, ok := decodeLedgerEntries(dek, b)
+	if !ok {
+		return
 	}
-	kept = append(kept, appendLines...)
+	var kept []string
+	for _, e := range entries {
+		if parts := strings.Fields(e.plain); len(parts) >= 2 && keys[parts[0]] && !strings.HasPrefix(parts[1], "compaction:") {
+			continue
+		}
+		kept = append(kept, e.raw)
+	}
+	sealedAppend, serr := sealAll(appendLines)
+	if serr != nil {
+		return
+	}
+	kept = append(kept, sealedAppend...)
 	out := ""
 	if len(kept) > 0 {
 		out = strings.Join(kept, "\n") + "\n"
@@ -460,28 +613,35 @@ func (tx *SeenTx) rewriteOmitting(sids, appendLines []string) {
 // RotateFile shrinks the ledger at path to sid's lines, compaction delivery
 // marks, and the recent tail.
 func RotateFile(path, sid string) {
+	dek, err := ledgerDEK(path)
+	if err != nil {
+		return
+	}
+	if len(dek) == 32 {
+		defer clear(dek)
+	}
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return
 	}
-	lines := strings.Split(string(b), "\n")
+	entries, ok := decodeLedgerEntries(dek, b)
+	if !ok {
+		return
+	}
 	start := 0
-	if len(lines) > ledgerTailLines {
-		start = len(lines) - ledgerTailLines
+	if len(entries) > ledgerTailLines {
+		start = len(entries) - ledgerTailLines
 	}
 	var keep, mine, packets []string
 	prefix := SeenKey(sid) + " "
-	for i, ln := range lines {
-		if ln == "" {
-			continue
-		}
+	for i, e := range entries {
 		switch {
 		case i >= start:
-			keep = append(keep, ln)
-		case strings.HasPrefix(ln, prefix):
-			mine = append(mine, ln)
-		case compactionMark(ln):
-			packets = append(packets, ln)
+			keep = append(keep, e.raw)
+		case strings.HasPrefix(e.plain, prefix):
+			mine = append(mine, e.raw)
+		case compactionMark(e.plain):
+			packets = append(packets, e.raw)
 		}
 	}
 	if len(mine) > ledgerTailLines {
@@ -491,7 +651,20 @@ func RotateFile(path, sid string) {
 		packets = packets[len(packets)-CompactionMarksKept:]
 	}
 	outLines := slices.Concat(packets, mine, keep)
-	_ = atomicfile.Write(path, []byte(strings.Join(outLines, "\n")+"\n"), 0o600)
+	if len(dek) == 32 {
+		for i, ln := range outLines {
+			if !strings.HasPrefix(strings.TrimSpace(ln), vault.NoteLinePrefix) {
+				if sealed, err := encodeLedgerLine(dek, ln); err == nil {
+					outLines[i] = sealed
+				}
+			}
+		}
+	}
+	body := ""
+	if len(outLines) > 0 {
+		body = strings.Join(outLines, "\n") + "\n"
+	}
+	_ = atomicfile.Write(path, []byte(body), 0o600)
 }
 
 func compactionMark(line string) bool {

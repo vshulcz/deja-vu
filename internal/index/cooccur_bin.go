@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 const (
@@ -32,17 +34,16 @@ func cooccurHash(s string) uint64 {
 
 func cooccurGobStamp(dir string) (uint64, [sha256.Size]byte, error) {
 	var zero [sha256.Size]byte
-	f, err := openIndexFile(cooccurPath(dir))
+	f, err := openIndexBlobFile(cooccurPath(dir), vault.DomainIndexFile)
 	if err != nil {
 		return 0, zero, err
 	}
 	defer func() { _ = f.Close() }()
 
-	fi, err := f.Stat()
+	size, err := f.PlainSize()
 	if err != nil {
 		return 0, zero, err
 	}
-	size := fi.Size()
 	if size < 0 {
 		return 0, zero, os.ErrInvalid
 	}
@@ -145,7 +146,7 @@ func writeCooccurBinBuild(dir string, m map[string][]string) error {
 	if err != nil {
 		return err
 	}
-	return writeIndexFile(cooccurBinPath(dir), encodeCooccurBin(gobSize, stamp, m))
+	return writeSealedIndexFile(cooccurBinPath(dir), encodeCooccurBin(gobSize, stamp, m), vault.DomainIndexFile)
 }
 
 func writeCooccurBinAtomic(dir string, m map[string][]string) error {
@@ -202,14 +203,14 @@ func lookupCooccurFallback(dir string, terms []string) (map[string][]string, boo
 }
 
 func lookupCooccurFromBin(dir string, gobSize uint64, stamp [sha256.Size]byte, terms []string) (map[string][]string, bool) {
-	f, err := openIndexFile(cooccurBinPath(dir))
+	f, err := openIndexBlobFile(cooccurBinPath(dir), vault.DomainIndexFile)
 	if err != nil {
 		return nil, false
 	}
 	defer func() { _ = f.Close() }()
 
-	fi, err := f.Stat()
-	if err != nil || fi.Size() < cooccurBinHeaderSize {
+	plainSize, err := f.PlainSize()
+	if err != nil || plainSize < cooccurBinHeaderSize {
 		return nil, false
 	}
 	var hdr [cooccurBinHeaderSize]byte
@@ -224,7 +225,7 @@ func lookupCooccurFromBin(dir string, gobSize uint64, stamp [sha256.Size]byte, t
 	}
 	bucketCount := binary.LittleEndian.Uint32(hdr[48:52])
 	if bucketCount == 0 {
-		if fi.Size() != cooccurBinHeaderSize {
+		if plainSize != cooccurBinHeaderSize {
 			return nil, false
 		}
 		return map[string][]string{}, true
@@ -233,7 +234,7 @@ func lookupCooccurFromBin(dir string, gobSize uint64, stamp [sha256.Size]byte, t
 		return nil, false
 	}
 	dataStart := uint64(cooccurBinHeaderSize) + (uint64(bucketCount)+1)*8
-	fileSize := uint64(fi.Size()) //nolint:gosec // checked >= cooccurBinHeaderSize above
+	fileSize := uint64(plainSize) //nolint:gosec // checked >= cooccurBinHeaderSize above
 	if fileSize < dataStart || fileSize > math.MaxInt64 {
 		return nil, false
 	}

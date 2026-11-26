@@ -571,7 +571,7 @@ func recallErrorFixesBlock(dir, q string) (string, int) {
 	}
 	pol := policy.Load()
 	pairs := index.FixesFor(dir, q, 2, func(project string) bool {
-		return pol.Allows(policy.ActivationMCP, project)
+		return policyAllowsProject(pol, policy.ActivationMCP, project)
 	})
 	if len(pairs) == 0 {
 		return "", 0

@@ -17,6 +17,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 func postingsFor(dir, tok string) ([]posting, error) {
@@ -357,7 +358,7 @@ func substringPostingsFrom(dirs []bucketDir, bare []string, dead []int64) (_ []p
 	}
 	for _, bd := range dirs {
 		entries := bd.entries
-		var f *os.File
+		var f *indexBlobFile
 		if entries == nil {
 			var err error
 			entries, f, err = openBucketDir(bd.path)
@@ -381,7 +382,7 @@ func substringPostingsFrom(dirs []bucketDir, bare []string, dead []int64) (_ []p
 				}
 				if f == nil {
 					var err error
-					if f, err = openIndexFile(bd.path); err != nil {
+					if f, err = openIndexBlobFile(bd.path, vault.DomainIndexFile); err != nil {
 						return nil, nil, false, nil //nolint:nilerr // not ok: the caller reads the slow way
 					}
 					// The same file, not one of the same size: a rebuild renames a

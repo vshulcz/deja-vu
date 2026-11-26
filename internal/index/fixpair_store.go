@@ -292,6 +292,9 @@ func ReadFixes(dir string) []FixPair {
 	if dir == "" {
 		dir = DefaultDir()
 	}
+	if err := ensureVaultUnlocked(dir); err != nil {
+		return nil
+	}
 	p := fixesPath(dir)
 	fi, err := os.Stat(p)
 	if err != nil {

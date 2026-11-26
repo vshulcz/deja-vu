@@ -58,16 +58,23 @@ func contextSearchTool() map[string]any {
 // declare a capability for are not found, as they would be on any server
 // without that capability.
 func handleContextMCP(dir string, req rpcRequest) (any, int, string) {
+	var res any
+	var code int
+	var msg string
+	withMCPClientSession(req.session, func() {
+		res, code, msg = handleContextMCPSession(dir, req)
+	})
+	return res, code, msg
+}
+
+func handleContextMCPSession(dir string, req rpcRequest) (any, int, string) {
 	switch req.Method {
 	case "initialize":
 		var p struct {
 			ProtocolVersion string `json:"protocolVersion"`
-			ClientInfo      struct {
-				Name string `json:"name"`
-			} `json:"clientInfo"`
 		}
 		_ = json.Unmarshal(req.Params, &p)
-		setMCPClient(p.ClientInfo.Name)
+		applyMCPInitializeClient(req.Params)
 		// structuredContent and outputSchema arrived in 2025-06-18; a client
 		// that speaks it or later gets it, an older one the version deja's
 		// own server speaks.

@@ -414,6 +414,9 @@ func dropCooccurCache(dir string) {
 }
 
 func readCooccur(dir string) map[string][]string {
+	if err := ensureVaultUnlocked(dir); err != nil {
+		return nil
+	}
 	p := cooccurPath(dir)
 	fi, err := os.Stat(p)
 	if err != nil {

@@ -543,6 +543,9 @@ func eachCommandAndOutputFrom(path string, m Manifest, from, end int64, redo map
 		return 0, err
 	}
 	t := tablesFromManifest(m)
+	if err := t.ensureCipherForFile(path); err != nil {
+		return 0, err
+	}
 	dead := t.deadFrom(off)
 	var src io.Reader = f
 	if end > 0 {

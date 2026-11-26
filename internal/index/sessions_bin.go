@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 const (
@@ -60,34 +62,13 @@ func writeSessionsBinAtomicStat(p string, sessions map[string]SessionMeta) (os.F
 	if err != nil {
 		return nil, err
 	}
-	tmp := p + ".tmp"
-	f, err := openIndexFileWrite(tmp, os.O_RDWR|os.O_CREATE|os.O_TRUNC)
+	fi, err := writeSealedAtomicStat(p, data, vault.DomainIndexFile)
 	if err != nil {
 		return nil, err
 	}
-	if _, err = f.Write(data); err != nil {
-		_ = f.Close()
-		_ = os.Remove(tmp)
-		return nil, err
+	if fi != nil {
+		_ = os.SameFile(fi, fi)
 	}
-	if err = f.Sync(); err != nil {
-		_ = f.Close()
-		_ = os.Remove(tmp)
-		return nil, err
-	}
-	if err = f.Close(); err != nil {
-		_ = os.Remove(tmp)
-		return nil, err
-	}
-	if err = renameWaiting(tmp, p); err != nil {
-		_ = os.Remove(tmp)
-		return nil, err
-	}
-	fi, err := os.Stat(p)
-	if err != nil {
-		return nil, err
-	}
-	_ = os.SameFile(fi, fi)
 	return fi, nil
 }
 
@@ -152,24 +133,24 @@ func encodeSessionsBin(sessions map[string]SessionMeta) ([]byte, error) {
 }
 
 func readSessionsBinCount(dir string) (int, error) {
-	f, err := openIndexFile(filepath.Join(dir, "sessions.bin"))
+	f, err := openIndexBlobFile(filepath.Join(dir, "sessions.bin"), vault.DomainIndexFile)
 	if err != nil {
 		return 0, err
 	}
 	defer func() { _ = f.Close() }()
 
-	fi, err := f.Stat()
+	size, err := f.PlainSize()
 	if err != nil {
 		return 0, err
 	}
-	if fi.Size() < sessionsBinMinSize {
-		return 0, fmt.Errorf("%w: sessions.bin truncated (%d bytes)", errCorruptIndex, fi.Size())
+	if size < sessionsBinMinSize {
+		return 0, fmt.Errorf("%w: sessions.bin truncated (%d bytes)", errCorruptIndex, size)
 	}
 	var hdr [sessionsBinHeaderSize]byte
 	if _, err = io.ReadFull(f, hdr[:]); err != nil {
 		return 0, fmt.Errorf("%w: sessions.bin header: %w", errCorruptIndex, err)
 	}
-	cnt, _, err := parseSessionsBinHeader(hdr[:], fi.Size())
+	cnt, _, err := parseSessionsBinHeader(hdr[:], size)
 	if err != nil {
 		return 0, err
 	}
@@ -181,13 +162,7 @@ func readSessionsBinCount(dir string) (int, error) {
 }
 
 func readSessionsBin(dir string) (map[string]SessionMeta, error) {
-	f, err := openIndexFile(filepath.Join(dir, "sessions.bin"))
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = f.Close() }()
-
-	data, err := io.ReadAll(f)
+	data, err := readIndexBytes(filepath.Join(dir, "sessions.bin"), vault.DomainIndexFile)
 	if err != nil {
 		return nil, err
 	}
@@ -237,24 +212,24 @@ func readSessionsBin(dir string) (map[string]SessionMeta, error) {
 }
 
 func readSessionsBinKey(dir, target string) (SessionMeta, bool, error) {
-	f, err := openIndexFile(filepath.Join(dir, "sessions.bin"))
+	f, err := openIndexBlobFile(filepath.Join(dir, "sessions.bin"), vault.DomainIndexFile)
 	if err != nil {
 		return SessionMeta{}, false, err
 	}
 	defer func() { _ = f.Close() }()
 
-	fi, err := f.Stat()
+	size, err := f.PlainSize()
 	if err != nil {
 		return SessionMeta{}, false, err
 	}
-	if fi.Size() < sessionsBinMinSize {
-		return SessionMeta{}, false, fmt.Errorf("%w: sessions.bin truncated (%d bytes)", errCorruptIndex, fi.Size())
+	if size < sessionsBinMinSize {
+		return SessionMeta{}, false, fmt.Errorf("%w: sessions.bin truncated (%d bytes)", errCorruptIndex, size)
 	}
 	var hdr [sessionsBinHeaderSize]byte
 	if _, err = f.ReadAt(hdr[:], 0); err != nil {
 		return SessionMeta{}, false, fmt.Errorf("%w: sessions.bin header: %w", errCorruptIndex, err)
 	}
-	cnt, dirOffset, err := parseSessionsBinHeader(hdr[:], fi.Size())
+	cnt, dirOffset, err := parseSessionsBinHeader(hdr[:], size)
 	if err != nil {
 		return SessionMeta{}, false, err
 	}

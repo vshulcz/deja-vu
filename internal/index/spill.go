@@ -2,6 +2,7 @@ package index
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -11,6 +12,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 // A full build used to assemble the whole token -> postings map in RAM and only
@@ -37,10 +40,11 @@ const spillWriters = 2
 // end up in, so a shard can be assembled and written without touching any
 // other.
 type spiller struct {
-	dir string
-	mu  [spillShards]sync.Mutex
-	f   [spillShards]*os.File
-	w   [spillShards]*bufio.Writer
+	dir    string
+	mu     [spillShards]sync.Mutex
+	f      [spillShards]*os.File
+	wClose [spillShards]io.Closer
+	w      [spillShards]*bufio.Writer
 
 	bmu     sync.Mutex
 	buckets map[string]bool
@@ -70,12 +74,28 @@ func (s *spiller) append(i int, b []byte) error {
 	s.mu[i].Lock()
 	defer s.mu[i].Unlock()
 	if s.w[i] == nil {
-		f, err := openIndexFileWrite(filepath.Join(s.dir, shardName(i)), os.O_RDWR|os.O_CREATE|os.O_TRUNC)
+		p := filepath.Join(s.dir, shardName(i))
+		dek, err := indexDEKForFile(p)
+		if err != nil {
+			return err
+		}
+		f, err := openIndexFileWrite(p, os.O_RDWR|os.O_CREATE|os.O_TRUNC)
 		if err != nil {
 			return err
 		}
 		s.f[i] = f
-		s.w[i] = bufio.NewWriterSize(f, 1<<16)
+		var dst io.Writer = f
+		if len(dek) > 0 {
+			sw, err := vault.NewStreamWriter(f, dek, vault.DomainSpill)
+			if err != nil {
+				_ = f.Close()
+				s.f[i] = nil
+				return err
+			}
+			s.wClose[i] = sw
+			dst = sw
+		}
+		s.w[i] = bufio.NewWriterSize(dst, 1<<16)
 	}
 	_, err := s.w[i].Write(b)
 	return err
@@ -187,6 +207,12 @@ func (s *spiller) flushWriters() error {
 				first = err
 			}
 			s.w[i] = nil
+		}
+		if s.wClose[i] != nil {
+			if err := s.wClose[i].Close(); err != nil && first == nil {
+				first = err
+			}
+			s.wClose[i] = nil
 		}
 		if s.f[i] != nil {
 			if err := s.f[i].Close(); err != nil && first == nil {
@@ -361,7 +387,31 @@ func (g *spillGroups) encode(seen map[string]bool) [][]byte {
 // readSpill turns one spill file back into token -> postings. The postings come
 // out in the order they were spilled; writeBucket sorts them anyway.
 func readSpill(f *os.File) (map[string][]posting, error) {
-	r := bufio.NewReaderSize(f, 1<<16)
+	dek, err := indexDEKForFile(f.Name())
+	if err != nil {
+		return nil, err
+	}
+	var src io.Reader = f
+	if len(dek) > 0 {
+		sr, err := vault.NewStreamReader(f, dek, vault.DomainSpill)
+		if err != nil {
+			return nil, err
+		}
+		src = sr
+	} else {
+		var head [4]byte
+		n, herr := io.ReadFull(f, head[:])
+		if herr != nil && !errors.Is(herr, io.EOF) && !errors.Is(herr, io.ErrUnexpectedEOF) {
+			return nil, herr
+		}
+		if n > 0 {
+			if vault.IsStreamHeader(head[:n]) {
+				return nil, vault.ErrKeyUnavailable
+			}
+			src = io.MultiReader(bytes.NewReader(head[:n]), f)
+		}
+	}
+	r := bufio.NewReaderSize(src, 1<<16)
 	lists := map[string][]posting{}
 	var tok []byte
 	for {

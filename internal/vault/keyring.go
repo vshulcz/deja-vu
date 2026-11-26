@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,6 +29,18 @@ var (
 	activeKeyring Keyring = osKeyring{}
 	execKeyringFn         = defaultExecKeyring
 )
+
+// SetKeyringForTest swaps the process keyring backend for tests and clears any
+// cached key state, returning a restore closure.
+func SetKeyringForTest(kr Keyring) func() {
+	prev := activeKeyring
+	activeKeyring = kr
+	ClearCache()
+	return func() {
+		activeKeyring = prev
+		ClearCache()
+	}
+}
 
 func defaultExecKeyring(bin string, args []string, stdin string, extraEnv []string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -83,13 +97,19 @@ func keyringCommand(goos, op, keyID, secret string) (bin string, args []string, 
 			return "/usr/bin/security", []string{"delete-generic-password", "-s", keyringService, "-a", keyID}, "", nil, nil
 		}
 	case "linux":
+		var extraEnv []string
+		if strings.TrimSpace(os.Getenv("DBUS_SESSION_BUS_ADDRESS")) == "" {
+			if sock := linuxDBusSocket(); sock != "" {
+				extraEnv = append(extraEnv, "DBUS_SESSION_BUS_ADDRESS=unix:path="+sock)
+			}
+		}
 		switch op {
 		case "set":
-			return "secret-tool", []string{"store", "--label=deja-vu vault", "service", keyringService, "account", keyID}, secret, nil, nil
+			return "secret-tool", []string{"store", "--label=deja-vu vault", "service", keyringService, "account", keyID}, secret, extraEnv, nil
 		case "get":
-			return "secret-tool", []string{"lookup", "service", keyringService, "account", keyID}, "", nil, nil
+			return "secret-tool", []string{"lookup", "service", keyringService, "account", keyID}, "", extraEnv, nil
 		case "delete":
-			return "secret-tool", []string{"clear", "service", keyringService, "account", keyID}, "", nil, nil
+			return "secret-tool", []string{"clear", "service", keyringService, "account", keyID}, "", extraEnv, nil
 		}
 	case "windows":
 		path, perr := dpapiPath(keyID)
@@ -117,6 +137,46 @@ func keyringCommand(goos, op, keyID, secret string) (bin string, args []string, 
 
 func usePassphraseOnly() bool {
 	return strings.EqualFold(strings.TrimSpace(os.Getenv("DEJA_VAULT_BACKEND")), "passphrase")
+}
+
+func linuxDBusSocket() string {
+	var cands []string
+	if dir := strings.TrimSpace(os.Getenv("XDG_RUNTIME_DIR")); dir != "" {
+		cands = append(cands, filepath.Join(dir, "bus"))
+	}
+	if uid := os.Getuid(); uid >= 0 {
+		cands = append(cands, filepath.Join("/run/user", strconv.Itoa(uid), "bus"))
+	}
+	for _, p := range cands {
+		if fi, err := os.Stat(p); err == nil && fi.Mode()&os.ModeSocket != 0 {
+			return p
+		}
+	}
+	return ""
+}
+
+// KeyringAvailable reports whether the platform credential backend appears usable.
+func KeyringAvailable() bool {
+	if usePassphraseOnly() {
+		return false
+	}
+	if _, isOS := activeKeyring.(osKeyring); !isOS && activeKeyring != nil {
+		return true
+	}
+	switch runtime.GOOS {
+	case "darwin":
+		_, err := exec.LookPath("/usr/bin/security")
+		return err == nil
+	case "linux":
+		if _, err := exec.LookPath("secret-tool"); err != nil {
+			return false
+		}
+		return strings.TrimSpace(os.Getenv("DBUS_SESSION_BUS_ADDRESS")) != "" || linuxDBusSocket() != ""
+	case "windows":
+		return true
+	default:
+		return false
+	}
 }
 
 func (osKeyring) Set(keyID string, dek []byte) error {

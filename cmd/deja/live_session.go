@@ -12,10 +12,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/sources"
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 // An agent's own transcript is in the index while it is still being written, so
@@ -163,7 +163,7 @@ func readLiveSessions(dir string) map[string]time.Time {
 
 func readLiveSessionsErr(dir string) (map[string]time.Time, error) {
 	out := map[string]time.Time{}
-	b, err := os.ReadFile(liveSessionsPath(dir))
+	b, err := vault.ReadSealedFile(dir, liveSessionsPath(dir), vault.DomainSidecar)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return out, nil
@@ -187,6 +187,9 @@ func readLiveSessionsErr(dir string) (map[string]time.Time, error) {
 }
 
 func writeLiveSessions(dir string, rows map[string]time.Time) {
+	if _, err := vault.CheckUnlocked(dir); err != nil {
+		return
+	}
 	type row struct {
 		id   string
 		when time.Time
@@ -224,7 +227,7 @@ func writeLiveSessions(dir string, rows map[string]time.Time) {
 	// fire at once often enough — a prompt and the action it leads to — and a
 	// reader that catches a half-written file would read a truncated id as a
 	// live session and hide the wrong one.
-	_ = atomicfile.Write(liveSessionsPath(dir), []byte(b.String()), 0o600)
+	_ = vault.WriteSealedFile(dir, liveSessionsPath(dir), vault.DomainSidecar, []byte(b.String()), 0o600)
 }
 
 // liveSessionIDs is the sessions an agent is inside right now: stamped inside
