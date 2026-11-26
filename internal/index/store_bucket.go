@@ -205,11 +205,12 @@ func openBucketDir(p string) ([]bucketEntry, *indexBlobFile, error) {
 func readBucketDir(f *indexBlobFile, fi os.FileInfo) ([]bucketEntry, error) {
 	bucketDirReads.Add(1)
 	var plainSize int64
-	if f.sealed {
+	switch {
+	case f.sealed:
 		plainSize = int64(len(f.plain))
-	} else if fi != nil {
+	case fi != nil:
 		plainSize = fi.Size()
-	} else {
+	default:
 		var err error
 		plainSize, err = f.PlainSize()
 		if err != nil {
@@ -217,7 +218,7 @@ func readBucketDir(f *indexBlobFile, fi os.FileInfo) ([]bucketEntry, error) {
 		}
 	}
 	r := bufio.NewReader(io.NewSectionReader(f, 0, plainSize))
-	return parseBucketDir(r, uint64(plainSize)) //nolint:gosec // file sizes are non-negative
+	return parseBucketDir(r, uint64(plainSize))
 }
 
 func parseBucketDir(r *bufio.Reader, fileSize uint64) ([]bucketEntry, error) {

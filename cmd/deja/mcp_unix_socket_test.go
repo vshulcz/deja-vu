@@ -90,7 +90,7 @@ func startTestUnixSocketServer(t *testing.T, dir, sockPath string, contextOnly b
 		time.Sleep(15 * time.Millisecond)
 	}
 	close(stopCh)
-	<-doneCh
+	_ = <-doneCh
 	t.Fatalf("timed out waiting for unix socket server %s", sockPath)
 	return nil
 }
@@ -918,6 +918,7 @@ func TestMCPUnixSocketEdgeCases(t *testing.T) {
 	hermeticEnv(t)
 	homeDir := t.TempDir()
 	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
 
 	if _, err := expandMCPSocketPath("   "); err == nil {
 		t.Fatal("expandMCPSocketPath blank succeeded")

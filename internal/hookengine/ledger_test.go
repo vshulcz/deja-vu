@@ -1,6 +1,7 @@
 package hookengine
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -448,7 +449,7 @@ func TestMigrateLedgerSidecarAndDecodeEdges(t *testing.T) {
 		t.Fatalf("migrateLedgerSidecar idempotent = %v", mErr)
 	}
 	rawAgain, rErr := os.ReadFile(dir + ".hookseen")
-	if rErr != nil || string(rawAgain) != string(raw) {
+	if rErr != nil || !bytes.Equal(rawAgain, raw) {
 		t.Fatalf("second migrateLedgerSidecar mutated file: err=%v", rErr)
 	}
 

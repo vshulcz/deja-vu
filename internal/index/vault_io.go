@@ -634,12 +634,12 @@ func sealSpillFileAtomic(src, dst string, dek []byte) error {
 	if err != nil {
 		return err
 	}
-	if _, err = sw.Write(raw); err != nil {
+	if _, wErr := sw.Write(raw); wErr != nil {
 		_ = sw.Close()
-		return err
+		return wErr
 	}
-	if err = sw.Close(); err != nil {
-		return err
+	if cErr := sw.Close(); cErr != nil {
+		return cErr
 	}
 	return writeRawFileAtomic(dst, buf.Bytes())
 }

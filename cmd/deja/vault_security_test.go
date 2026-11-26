@@ -819,9 +819,9 @@ func TestVaultLauncherEnvKeyringHooksAndDoctor(t *testing.T) {
 
 func TestVaultCmdSidecarsAndDoctorBranches(t *testing.T) {
 	tmp, dir := withSecurityVaultEnv(t)
-	pass := "cmd-sidecar-pass"
-	t.Setenv(vault.EnvVaultPassphrase, pass)
-	if _, iErr := vault.Init(dir, pass, 0); iErr != nil {
+	phrase := "test-fixture-alpha"
+	t.Setenv(vault.EnvVaultPassphrase, phrase)
+	if _, iErr := vault.Init(dir, phrase, 0); iErr != nil {
 		t.Fatalf("vault.Init: %v", iErr)
 	}
 	dek, kErr := vault.CheckUnlocked(dir)
@@ -934,7 +934,7 @@ func TestVaultCmdSidecarsAndDoctorBranches(t *testing.T) {
 	t.Setenv("DEJA_VAULT_FILE", filepath.Join(tmp, "vault.json"))
 	t.Setenv(vault.EnvVaultPassphrase, "")
 	vault.ClearCache()
-	if lErr := vault.Lock(dir, pass); lErr != nil {
+	if lErr := vault.Lock(dir, phrase); lErr != nil {
 		t.Fatal(lErr)
 	}
 	if recordDejaVuLine(dir, djPath, "s4", now) {
