@@ -55,9 +55,6 @@ func (d *cachedBucketDir) find(tok string) (bucketEntry, bool) {
 // cached one while f is the file it was read from, read off f otherwise.
 func bucketDirOf(p string, f *indexBlobFile) (*cachedBucketDir, error) {
 	dir := filepath.Dir(filepath.Dir(p))
-	if err := ensureVaultUnlocked(dir); err != nil {
-		return nil, err
-	}
 	fi, err := f.Stat()
 	if err != nil {
 		return nil, err

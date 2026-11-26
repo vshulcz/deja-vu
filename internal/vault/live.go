@@ -299,8 +299,7 @@ func IsStreamHeader(head []byte) bool {
 
 // SealBytes encrypts data into a DJVF1 whole-file AES-256-GCM envelope bound to domain.
 func SealBytes(dek []byte, domain string, data []byte) ([]byte, error) {
-	n := len(data)
-	if n > maxSealedBytesPayload {
+	if len(data) > maxSealedBytesPayload {
 		return nil, errors.New("vault payload exceeds maximum whole-file size")
 	}
 	gcm, err := aeadFor(dek, domain)
@@ -312,10 +311,10 @@ func SealBytes(dek []byte, domain string, data []byte) ([]byte, error) {
 		return nil, rErr
 	}
 	aad := []byte(fileMagic + ":" + domain)
-	out := make([]byte, len(fileMagic), len(fileMagic)+fileNonceSize+n+fileTagSize)
-	copy(out, fileMagic)
-	out = append(out, nonce...)
-	return gcm.Seal(out, nonce, data, aad), nil
+	hdr := make([]byte, len(fileMagic)+fileNonceSize)
+	copy(hdr, fileMagic)
+	copy(hdr[len(fileMagic):], nonce)
+	return gcm.Seal(hdr, nonce, data, aad), nil
 }
 
 // OpenBytes decrypts and authenticates a DJVF1 whole-file envelope bound to domain.
@@ -443,9 +442,7 @@ func (rc *RecordCipher) Seal(baseFlag byte, payload []byte) ([]byte, error) {
 		return nil, err
 	}
 	aad := [5]byte{'D', 'J', 'R', '1', baseFlag}
-	out := make([]byte, fileNonceSize, fileNonceSize+len(payload)+fileTagSize)
-	copy(out, nonce)
-	return rc.aead.Seal(out, nonce, payload, aad[:]), nil
+	return rc.aead.Seal(nonce, nonce, payload, aad[:]), nil
 }
 
 // Open decrypts sealed and verifies its GCM tag against baseFlag.

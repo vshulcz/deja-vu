@@ -538,7 +538,7 @@ func blankWords(p string, gone map[string]bool) error {
 		for _, h := range hits {
 			copy(raw[h.at:], h.blank)
 		}
-		wErr := writeSealedFileAtomic(p, raw, vault.DomainIndexFile)
+		wErr := writeSealedFileAtomic(p, raw)
 		clear(raw)
 		return wErr
 	}

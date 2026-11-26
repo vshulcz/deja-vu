@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
@@ -105,77 +106,59 @@ func indexDEKForFile(path string) ([]byte, error) {
 	return indexDEKForDir(vaultDirForFile(path))
 }
 
+func writeRawFileAtomic(p string, data []byte) error {
+	return atomicfile.Write(p, data, 0o600)
+}
+
 func writeRawFileAtomicStat(p string, data []byte) (os.FileInfo, error) {
-	tmp := p + ".tmp"
-	f, err := openIndexFileWrite(tmp, os.O_RDWR|os.O_CREATE|os.O_TRUNC)
-	if err != nil {
+	if err := atomicfile.Write(p, data, 0o600); err != nil {
 		return nil, err
 	}
-	if _, err = f.Write(data); err != nil {
-		_ = f.Close()
-		_ = os.Remove(tmp)
-		return nil, err
+	fi, stErr := os.Stat(p)
+	if stErr != nil {
+		return nil, nil //nolint:nilerr,nilnil // written; nil caches nothing
 	}
-	if err = f.Sync(); err != nil {
-		_ = f.Close()
-		_ = os.Remove(tmp)
-		return nil, err
-	}
-	fi, err := f.Stat()
-	if err != nil {
-		_ = f.Close()
-		_ = os.Remove(tmp)
-		return nil, err
-	}
-	if err = f.Close(); err != nil {
-		_ = os.Remove(tmp)
-		return nil, err
-	}
-	if err = renameWaiting(tmp, p); err != nil {
-		_ = os.Remove(tmp)
-		return nil, err
-	}
+	_ = os.SameFile(fi, fi)
 	return fi, nil
 }
 
-func writeRawFileAtomic(p string, data []byte) error {
-	_, err := writeRawFileAtomicStat(p, data)
-	return err
-}
-
-func writeSealedAtomicStat(p string, data []byte, domain string) (os.FileInfo, error) {
+func sealIndexDataForFile(p string, data []byte) ([]byte, error) {
 	dek, err := indexDEKForFile(p)
 	if err != nil {
 		return nil, err
 	}
-	if len(dek) > 0 {
-		sealed, sErr := vault.SealBytes(dek, domain, data)
-		if sErr != nil {
-			return nil, sErr
-		}
-		data = sealed
+	if len(dek) == 0 {
+		return data, nil
 	}
-	return writeRawFileAtomicStat(p, data)
+	return vault.SealBytes(dek, vault.DomainIndexFile, data)
 }
 
-func writeSealedFileAtomic(p string, data []byte, domain string) error {
-	_, err := writeSealedAtomicStat(p, data, domain)
+func maybeSealBytes(dek []byte, domain string, raw []byte) ([]byte, error) {
+	if vault.IsSealedBytes(raw) {
+		return raw, nil
+	}
+	return vault.SealBytes(dek, domain, raw)
+}
+
+func writeSealedAtomicStat(p string, data []byte) (os.FileInfo, error) {
+	sealed, err := sealIndexDataForFile(p, data)
+	if err != nil {
+		return nil, err
+	}
+	return writeRawFileAtomicStat(p, sealed)
+}
+
+func writeSealedFileAtomic(p string, data []byte) error {
+	_, err := writeSealedAtomicStat(p, data)
 	return err
 }
 
-func writeSealedIndexFile(p string, data []byte, domain string) error {
-	dek, err := indexDEKForFile(p)
+func writeSealedIndexFile(p string, data []byte) error {
+	sealed, err := sealIndexDataForFile(p, data)
 	if err != nil {
 		return err
 	}
-	if len(dek) > 0 {
-		sealed, sErr := vault.SealBytes(dek, domain, data)
-		if sErr != nil {
-			return sErr
-		}
-		data = sealed
-	}
-	return writeIndexFile(p, data)
+	return writeIndexFile(p, sealed)
 }
 
 func readIndexBytes(p string) ([]byte, error) {
@@ -183,7 +166,7 @@ func readIndexBytes(p string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	f, err := openIndexFile(p)
+	f, err := openIndexFileRaw(p)
 	if err != nil {
 		return nil, err
 	}
@@ -205,10 +188,12 @@ func readIndexBytes(p string) ([]byte, error) {
 }
 
 // indexBlobFile wraps either a raw *os.File (zero-copy when the vault is
-// disabled) or a decrypted in-memory buffer paired with the underlying *os.File
-// so os.SameFile inode identity checks continue to match.
+// disabled) or a decrypted in-memory buffer paired with captured os.FileInfo
+// so os.SameFile inode identity checks continue to match without keeping the
+// file handle open.
 type indexBlobFile struct {
 	f      *os.File
+	fi     os.FileInfo
 	r      *bytes.Reader
 	plain  []byte
 	sealed bool
@@ -219,7 +204,7 @@ func openIndexBlobFile(p string) (*indexBlobFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	f, err := openIndexFile(p)
+	f, err := openIndexFileRaw(p)
 	if err != nil {
 		return nil, err
 	}
@@ -232,22 +217,27 @@ func openIndexBlobFile(p string) (*indexBlobFile, error) {
 		}
 		return &indexBlobFile{f: f}, nil
 	}
-	raw, err := io.ReadAll(f)
-	if err != nil {
-		_ = f.Close()
-		return nil, err
+	fi, statErr := f.Stat()
+	if statErr == nil {
+		_ = os.SameFile(fi, fi)
+	}
+	raw, readErr := io.ReadAll(f)
+	_ = f.Close()
+	if readErr != nil {
+		return nil, readErr
+	}
+	if statErr != nil {
+		return nil, statErr
 	}
 	if !vault.IsSealedBytes(raw) {
-		_ = f.Close()
 		return nil, fmt.Errorf("vault: unsealed index file %s", filepath.Base(p))
 	}
 	plain, err := vault.OpenBytes(dek, vault.DomainIndexFile, raw)
 	if err != nil {
-		_ = f.Close()
 		return nil, err
 	}
 	return &indexBlobFile{
-		f:      f,
+		fi:     fi,
 		r:      bytes.NewReader(plain),
 		plain:  plain,
 		sealed: true,
@@ -276,6 +266,9 @@ func (b *indexBlobFile) Seek(offset int64, whence int) (int64, error) {
 }
 
 func (b *indexBlobFile) Stat() (os.FileInfo, error) {
+	if b.fi != nil {
+		return b.fi, nil
+	}
 	return b.f.Stat()
 }
 
@@ -300,8 +293,12 @@ func (b *indexBlobFile) Close() error {
 	return nil
 }
 
+func isTempIndexArtifact(name string) bool {
+	return strings.HasSuffix(name, ".tmp") || strings.Contains(name, ".tmp-")
+}
+
 func isVaultInfraFile(name string) bool {
-	if strings.HasSuffix(name, ".lock") || strings.HasSuffix(name, ".tmp") {
+	if isTempIndexArtifact(name) || strings.HasSuffix(name, ".lock") {
 		return true
 	}
 	switch name {
@@ -374,7 +371,7 @@ func migrateIndexTopEntries(canon, stageDir string, dek []byte) error {
 	for _, e := range entries {
 		name := e.Name()
 		if name == "manifest.gob" || name == "records.bin" || name == "buckets" ||
-			name == recordOffsetsFile || name == frictionTextsFile || strings.HasSuffix(name, ".tmp") {
+			name == recordOffsetsFile || name == frictionTextsFile || isTempIndexArtifact(name) {
 			continue
 		}
 		src := filepath.Join(canon, name)
@@ -390,8 +387,8 @@ func migrateIndexTopEntries(canon, stageDir string, dek []byte) error {
 			return rErr
 		}
 		out := raw
-		if !isVaultInfraFile(name) && !vault.IsSealedBytes(raw) {
-			sealed, sErr := vault.SealBytes(dek, vault.DomainIndexFile, raw)
+		if !isVaultInfraFile(name) {
+			sealed, sErr := maybeSealBytes(dek, vault.DomainIndexFile, raw)
 			if sErr != nil {
 				return sErr
 			}
@@ -531,23 +528,8 @@ func sweepUnsealedDirFiles(canon string, dek []byte) error {
 		}
 		p := filepath.Join(canon, name)
 		if e.IsDir() {
-			switch name {
-			case "buckets":
-				if sErr := sealUnsealedFilesInDir(p, dek, vault.DomainIndexFile); sErr != nil {
-					return sErr
-				}
-			case "deferred":
-				if sErr := sealUnsealedFilesInDir(p, dek, vault.DomainSidecar); sErr != nil {
-					return sErr
-				}
-			case "spill":
-				if sErr := sealUnsealedSpillsInDir(p, dek); sErr != nil {
-					return sErr
-				}
-			default:
-				if sErr := sealUnsealedFilesInDir(p, dek, vault.DomainIndexFile); sErr != nil {
-					return sErr
-				}
+			if sErr := migrateIndexSubdir(name, p, p, dek); sErr != nil {
+				return sErr
 			}
 			continue
 		}
@@ -570,64 +552,20 @@ func sealFileInPlace(p string, dek []byte, domain string) error {
 	return writeRawFileAtomic(p, sealed)
 }
 
-func sealUnsealedFilesInDir(dir string, dek []byte, domain string) error {
-	entries, err := os.ReadDir(dir)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	for _, e := range entries {
-		name := e.Name()
-		if strings.HasSuffix(name, ".tmp") {
-			continue
-		}
-		p := filepath.Join(dir, name)
-		if e.IsDir() {
-			if sErr := sealUnsealedFilesInDir(p, dek, domain); sErr != nil {
-				return sErr
-			}
-			continue
-		}
-		if sErr := sealFileInPlace(p, dek, domain); sErr != nil {
-			return sErr
-		}
-	}
-	return nil
-}
-
-func sealUnsealedSpillsInDir(dir string, dek []byte) error {
-	entries, err := os.ReadDir(dir)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	for _, e := range entries {
-		if e.IsDir() || strings.HasSuffix(e.Name(), ".tmp") {
-			continue
-		}
-		p := filepath.Join(dir, e.Name())
-		if sErr := sealSpillFileAtomic(p, p, dek); sErr != nil {
-			return sErr
-		}
-	}
-	return nil
-}
-
 func migrateSealedTree(srcDir, dstDir string, dek []byte, domain string) error {
-	if err := mkdirIndexAll(dstDir); err != nil {
-		return err
-	}
 	entries, err := os.ReadDir(srcDir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
+	if mkErr := mkdirIndexAll(dstDir); mkErr != nil {
+		return mkErr
+	}
 	for _, e := range entries {
 		name := e.Name()
-		if strings.HasSuffix(name, ".tmp") {
+		if isTempIndexArtifact(name) {
 			continue
 		}
 		src := filepath.Join(srcDir, name)
@@ -642,12 +580,13 @@ func migrateSealedTree(srcDir, dstDir string, dek []byte, domain string) error {
 		if rErr != nil {
 			return rErr
 		}
-		if !vault.IsSealedBytes(raw) {
-			sealed, sErr := vault.SealBytes(dek, domain, raw)
-			if sErr != nil {
-				return sErr
-			}
-			raw = sealed
+		if src == dst && vault.IsSealedBytes(raw) {
+			continue
+		}
+		var sErr error
+		raw, sErr = maybeSealBytes(dek, domain, raw)
+		if sErr != nil {
+			return sErr
 		}
 		if wErr := writeRawFileAtomic(dst, raw); wErr != nil {
 			return wErr
@@ -657,16 +596,19 @@ func migrateSealedTree(srcDir, dstDir string, dek []byte, domain string) error {
 }
 
 func migrateSpillTree(srcDir, dstDir string, dek []byte) error {
-	if err := mkdirIndexAll(dstDir); err != nil {
-		return err
-	}
 	entries, err := os.ReadDir(srcDir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
+	if mkErr := mkdirIndexAll(dstDir); mkErr != nil {
+		return mkErr
+	}
 	for _, e := range entries {
 		name := e.Name()
-		if e.IsDir() || strings.HasSuffix(name, ".tmp") {
+		if e.IsDir() || isTempIndexArtifact(name) {
 			continue
 		}
 		if sErr := sealSpillFileAtomic(filepath.Join(srcDir, name), filepath.Join(dstDir, name), dek); sErr != nil {
@@ -682,44 +624,24 @@ func sealSpillFileAtomic(src, dst string, dek []byte) error {
 		return err
 	}
 	if len(raw) >= 4 && vault.IsStreamHeader(raw[:4]) {
+		if src == dst {
+			return nil
+		}
 		return writeRawFileAtomic(dst, raw)
 	}
-	tmp := dst + ".tmp"
-	f, err := openIndexFileWrite(tmp, os.O_RDWR|os.O_CREATE|os.O_TRUNC)
+	var buf bytes.Buffer
+	sw, err := vault.NewStreamWriter(&buf, dek, vault.DomainSpill)
 	if err != nil {
-		return err
-	}
-	sw, err := vault.NewStreamWriter(f, dek, vault.DomainSpill)
-	if err != nil {
-		_ = f.Close()
-		_ = os.Remove(tmp)
 		return err
 	}
 	if _, err = sw.Write(raw); err != nil {
 		_ = sw.Close()
-		_ = f.Close()
-		_ = os.Remove(tmp)
 		return err
 	}
 	if err = sw.Close(); err != nil {
-		_ = f.Close()
-		_ = os.Remove(tmp)
 		return err
 	}
-	if err = f.Sync(); err != nil {
-		_ = f.Close()
-		_ = os.Remove(tmp)
-		return err
-	}
-	if err = f.Close(); err != nil {
-		_ = os.Remove(tmp)
-		return err
-	}
-	if err = renameWaiting(tmp, dst); err != nil {
-		_ = os.Remove(tmp)
-		return err
-	}
-	return nil
+	return writeRawFileAtomic(dst, buf.Bytes())
 }
 
 func migrateRecordsLog(srcPath, dstPath string, rc *vault.RecordCipher, dead []int64) (map[int64]int64, int64, int64, int64, error) {
@@ -786,10 +708,7 @@ func migrateRecordsLog(srcPath, dstPath string, rc *vault.RecordCipher, dead []i
 			if sErr != nil {
 				return nil, 0, 0, 0, sErr
 			}
-			outPayload = make([]byte, prefixLen+1+len(sealedBody))
-			copy(outPayload, payload[:prefixLen])
-			outPayload[prefixLen] = flag | recordSealed
-			copy(outPayload[prefixLen+1:], sealedBody)
+			outPayload = slices.Concat(payload[:prefixLen:prefixLen], []byte{flag | recordSealed}, sealedBody)
 		default:
 			return nil, 0, 0, 0, fmt.Errorf("vault: unknown record flag %d at offset %d", flag, oldOff)
 		}
@@ -849,7 +768,7 @@ func migrateBucketsDir(srcDir, dstDir string, dek []byte, offsetMap map[int64]in
 	}
 	for _, e := range entries {
 		name := e.Name()
-		if e.IsDir() || strings.HasSuffix(name, ".tmp") {
+		if e.IsDir() || isTempIndexArtifact(name) {
 			continue
 		}
 		raw, err := os.ReadFile(filepath.Join(srcDir, name))
@@ -858,14 +777,11 @@ func migrateBucketsDir(srcDir, dstDir string, dek []byte, offsetMap map[int64]in
 		}
 		dst := filepath.Join(dstDir, name)
 		if !isPostingsFile(name) {
-			if !vault.IsSealedBytes(raw) {
-				sealed, sErr := vault.SealBytes(dek, vault.DomainIndexFile, raw)
-				if sErr != nil {
-					return sErr
-				}
-				raw = sealed
+			sealed, sErr := maybeSealBytes(dek, vault.DomainIndexFile, raw)
+			if sErr != nil {
+				return sErr
 			}
-			if wErr := writeRawFileAtomic(dst, raw); wErr != nil {
+			if wErr := writeRawFileAtomic(dst, sealed); wErr != nil {
 				return wErr
 			}
 			continue

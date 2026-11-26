@@ -3,11 +3,13 @@ package index
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/gob"
 	"errors"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -523,15 +525,13 @@ func TestVaultMigrationCoversTreesSpillsAndCanonicalPaths(t *testing.T) {
 }
 
 func makeRawLogRecord(rec []byte) []byte {
-	var hdr [4]byte
-	if len(rec) > 1<<30 {
+	n, ok := intToU32(len(rec))
+	if !ok || n > 1<<30 {
 		panic("record too large")
 	}
-	binary.LittleEndian.PutUint32(hdr[:], uint32(len(rec)))
-	out := make([]byte, 4+len(rec))
-	copy(out[:4], hdr[:])
-	copy(out[4:], rec)
-	return out
+	var hdr [4]byte
+	binary.LittleEndian.PutUint32(hdr[:], n)
+	return slices.Concat(hdr[:], rec)
 }
 
 func TestVaultIOHelpersAndMigrationEdgeCases(t *testing.T) {
@@ -542,7 +542,7 @@ func TestVaultIOHelpersAndMigrationEdgeCases(t *testing.T) {
 
 	// Unsealed indexBlobFile covers Seek, PlainSize, Stat, Read, ReadAt, and Close.
 	unsealedPath := filepath.Join(dir, "plain.dat")
-	if err := writeSealedFileAtomic(unsealedPath, []byte("abcdef"), vault.DomainIndexFile); err != nil {
+	if err := writeSealedFileAtomic(unsealedPath, []byte("abcdef")); err != nil {
 		t.Fatalf("writeSealedFileAtomic unsealed: %v", err)
 	}
 	ub, err := openIndexBlobFile(unsealedPath)
@@ -583,7 +583,7 @@ func TestVaultIOHelpersAndMigrationEdgeCases(t *testing.T) {
 	}
 
 	sealedPath := filepath.Join(dir, "sealed.dat")
-	if wErr := writeSealedIndexFile(sealedPath, []byte("hello-blob"), vault.DomainIndexFile); wErr != nil {
+	if wErr := writeSealedIndexFile(sealedPath, []byte("hello-blob")); wErr != nil {
 		t.Fatalf("writeSealedIndexFile: %v", wErr)
 	}
 	sb, err := openIndexBlobFile(sealedPath)
@@ -725,13 +725,14 @@ func TestVaultIOHelpersAndMigrationEdgeCases(t *testing.T) {
 		t.Fatalf("migrateBucketsDir missing: %v", mErr)
 	}
 
-	// sealUnsealedSpillsInDir + idempotent sealSpillFileAtomic.
+	// migrateSpillTree + idempotent sealSpillFileAtomic.
 	spDir := filepath.Join(workDir, "spills")
 	if mErr := os.MkdirAll(spDir, 0o700); mErr != nil {
 		t.Fatal(mErr)
 	}
-	if sErr := sealUnsealedSpillsInDir(filepath.Join(workDir, "no-spills"), dek); sErr != nil {
-		t.Fatalf("sealUnsealedSpillsInDir missing: %v", sErr)
+	missingSpill := filepath.Join(workDir, "no-spills")
+	if sErr := migrateSpillTree(missingSpill, missingSpill, dek); sErr != nil {
+		t.Fatalf("migrateSpillTree missing: %v", sErr)
 	}
 	if wErr := os.WriteFile(filepath.Join(spDir, "001.spill"), []byte("spill-plain"), 0o600); wErr != nil {
 		t.Fatal(wErr)
@@ -739,11 +740,11 @@ func TestVaultIOHelpersAndMigrationEdgeCases(t *testing.T) {
 	if wErr := os.WriteFile(filepath.Join(spDir, "ignore.tmp"), []byte("tmp"), 0o600); wErr != nil {
 		t.Fatal(wErr)
 	}
-	if sErr := sealUnsealedSpillsInDir(spDir, dek); sErr != nil {
-		t.Fatalf("sealUnsealedSpillsInDir plain: %v", sErr)
+	if sErr := migrateSpillTree(spDir, spDir, dek); sErr != nil {
+		t.Fatalf("migrateSpillTree plain: %v", sErr)
 	}
-	if sErr := sealUnsealedSpillsInDir(spDir, dek); sErr != nil {
-		t.Fatalf("sealUnsealedSpillsInDir idempotent: %v", sErr)
+	if sErr := migrateSpillTree(spDir, spDir, dek); sErr != nil {
+		t.Fatalf("migrateSpillTree idempotent: %v", sErr)
 	}
 
 	// migrateIndexStore error branches: regular file as index dir, records without manifest, corrupt manifest.
@@ -910,6 +911,64 @@ func TestVaultIOHelpersAndMigrationEdgeCases(t *testing.T) {
 		t.Fatal("sealSpillFileAtomic missing src succeeded unexpectedly")
 	}
 
+	// sealCompactionSidecar missing, plain -> sealed, idempotent.
+	if sErr := sealCompactionSidecar(filepath.Join(workDir, "no-compactions"), dek); sErr != nil {
+		t.Fatalf("sealCompactionSidecar missing: %v", sErr)
+	}
+	if wErr := os.WriteFile(compactionSidecarPath(badSubRoot), []byte("compaction-bytes"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if sErr := sealCompactionSidecar(badSubRoot, dek); sErr != nil {
+		t.Fatalf("sealCompactionSidecar plain: %v", sErr)
+	}
+	if sErr := sealCompactionSidecar(badSubRoot, dek); sErr != nil {
+		t.Fatalf("sealCompactionSidecar idempotent: %v", sErr)
+	}
+
+	// isVaultInfraFile negative case & migrateIndexTopEntries across infra, tmp, plain, and subdirs.
+	if isVaultInfraFile("ordinary.dat") || !isVaultInfraFile("vault.json") || !isVaultInfraFile("tombstones") {
+		t.Fatal("isVaultInfraFile classification mismatch")
+	}
+	topStage := filepath.Join(workDir, "top-stage")
+	if mErr := os.WriteFile(filepath.Join(badSubRoot, "vault.json"), []byte(`{"version":1}`), 0o600); mErr != nil {
+		t.Fatal(mErr)
+	}
+	if mErr := os.WriteFile(filepath.Join(badSubRoot, "extra.dat"), []byte("top-plain"), 0o600); mErr != nil {
+		t.Fatal(mErr)
+	}
+	if mErr := os.WriteFile(filepath.Join(badSubRoot, "skip.tmp"), []byte("tmp"), 0o600); mErr != nil {
+		t.Fatal(mErr)
+	}
+	if mErr := migrateIndexTopEntries(badSubRoot, topStage, dek); mErr != nil {
+		t.Fatalf("migrateIndexTopEntries: %v", mErr)
+	}
+	sealedTopRaw, rErr := os.ReadFile(filepath.Join(topStage, "extra.dat"))
+	if rErr != nil || !vault.IsSealedBytes(sealedTopRaw) {
+		t.Fatalf("migrated extra.dat not sealed: (%v, %v)", vault.IsSealedBytes(sealedTopRaw), rErr)
+	}
+
+	// migrateRecordsLog with recordDeflated + dead delta + decodeRecordHeader mismatch checks.
+	deflatedRec := append(append([]byte(nil), prefix...), recordDeflated, 'd', 'e', 'f', 'l')
+	deflatedSrc := filepath.Join(workDir, "deflated.bin")
+	if wErr := os.WriteFile(deflatedSrc, makeRawLogRecord(deflatedRec), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	omDefl, _, _, deadDelta, dErr := migrateRecordsLog(deflatedSrc, filepath.Join(workDir, "deflated.out"), rc, []int64{0})
+	if dErr != nil || len(omDefl) != 1 || deadDelta != vault.RecordOverhead {
+		t.Fatalf("migrateRecordsLog deflated = (om=%d, deadDelta=%d, err=%v)", len(omDefl), deadDelta, dErr)
+	}
+
+	noCipherTbl := &recordTables{strs: []string{"k1", "p1", "assistant"}}
+	sealedFrame := append([]byte{1, 2, 3, recordRaw | recordSealed}, make([]byte, vault.RecordOverhead)...)
+	if _, _, _, decErr := decodeRecordHeader(sealedFrame, noCipherTbl); !errors.Is(decErr, vault.ErrKeyUnavailable) {
+		t.Fatalf("decodeRecordHeader sealed without cipher = %v, want ErrKeyUnavailable", decErr)
+	}
+	cipherTbl := &recordTables{strs: []string{"k1", "p1", "assistant"}, dir: dir, cipher: rc}
+	unsealedFrame := []byte{1, 2, 3, recordRaw, 'x'}
+	if _, _, _, decErr := decodeRecordHeader(unsealedFrame, cipherTbl); !errors.Is(decErr, errCorruptIndex) {
+		t.Fatalf("decodeRecordHeader unsealed with active cipher = %v, want errCorruptIndex", decErr)
+	}
+
 	t.Setenv("DEJA_VAULT_PASSPHRASE", "")
 	if lErr := vault.Lock(dir, "index-vault-pass"); lErr != nil {
 		t.Fatal(lErr)
@@ -921,15 +980,757 @@ func TestVaultIOHelpersAndMigrationEdgeCases(t *testing.T) {
 	if _, oErr := openIndexBlobFile(lockedFile); !errors.Is(oErr, vault.ErrLocked) {
 		t.Fatalf("openIndexBlobFile locked = %v, want ErrLocked", oErr)
 	}
-	if wErr := writeSealedFileAtomic(lockedFile, []byte("x"), vault.DomainIndexFile); !errors.Is(wErr, vault.ErrLocked) {
+	if wErr := writeSealedFileAtomic(lockedFile, []byte("x")); !errors.Is(wErr, vault.ErrLocked) {
 		t.Fatalf("writeSealedFileAtomic locked = %v, want ErrLocked", wErr)
 	}
-	if wErr := writeSealedIndexFile(lockedFile, []byte("x"), vault.DomainIndexFile); !errors.Is(wErr, vault.ErrLocked) {
+	if wErr := writeSealedIndexFile(lockedFile, []byte("x")); !errors.Is(wErr, vault.ErrLocked) {
 		t.Fatalf("writeSealedIndexFile locked = %v, want ErrLocked", wErr)
 	}
 	if sp, spErr := newSpiller(dir); spErr == nil {
 		if aErr := sp.append(0, []byte("x")); !errors.Is(aErr, vault.ErrLocked) {
 			t.Fatalf("spiller.append locked = %v, want ErrLocked", aErr)
 		}
+	}
+}
+
+func writePlainGob(t *testing.T, p string, v any) {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := gob.NewEncoder(&buf).Encode(v); err != nil {
+		t.Fatalf("encode gob %s: %v", p, err)
+	}
+	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, buf.Bytes(), 0o600); err != nil {
+		t.Fatalf("write %s: %v", p, err)
+	}
+}
+
+func TestVaultMigrationAndBlobEdgeCases(t *testing.T) {
+	dir, _ := setupIndexVaultTest(t)
+	if _, iErr := vault.Init(dir, "index-vault-pass", 0); iErr != nil {
+		t.Fatal(iErr)
+	}
+	dek, err := vault.CheckUnlocked(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// migrateIndexStore guards: missing dir and short DEK.
+	workDir := t.TempDir()
+	if mErr := migrateIndexStore(filepath.Join(workDir, "missing-idx"), dek); mErr != nil {
+		t.Fatalf("migrateIndexStore missing = %v", mErr)
+	}
+	shortDEKDir := filepath.Join(workDir, "short-dek-idx")
+	writePlainGob(t, filepath.Join(shortDEKDir, "manifest.gob"), manifestCore{Version: 1})
+	if mErr := migrateIndexStore(shortDEKDir, []byte("short")); mErr == nil {
+		t.Fatal("migrateIndexStore short DEK succeeded unexpectedly")
+	}
+
+	// Full migrateIndexStore across core, buckets, deferred, spill, custom subdir, infra exclusion, and compaction sidecar.
+	fullDir := filepath.Join(workDir, "full-migrate")
+	tbl := newRecordTables()
+	rec := Record{
+		Key:        "sid-mig",
+		SourcePath: "/workspace/demo/a.go",
+		Role:       "user",
+		Text:       "canary migration record payload",
+	}
+	rawRec, encErr := encodeRecordChecked(rec, tbl)
+	if encErr != nil {
+		t.Fatal(encErr)
+	}
+	framedRec := makeRawLogRecord(rawRec)
+	if mkErr := os.MkdirAll(filepath.Join(fullDir, "buckets"), 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	if mkErr := os.MkdirAll(filepath.Join(fullDir, "deferred", "nested"), 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	if mkErr := os.MkdirAll(filepath.Join(fullDir, "spill"), 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	if mkErr := os.MkdirAll(filepath.Join(fullDir, "customdir"), 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	writePlainGob(t, filepath.Join(fullDir, "manifest.gob"), manifestCore{
+		Version:       1,
+		RecordStrings: tbl.strs,
+		RecordsSize:   int64(len(framedRec)),
+	})
+	if wErr := os.WriteFile(recordsPath(fullDir), framedRec, 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	plainBucket := encodeBucketBytes(map[string][]posting{
+		"canary": {{Off: 0, Sid: 1}},
+		"camel":  {{Off: 0, Sid: 2}},
+	})
+	if wErr := os.WriteFile(filepath.Join(fullDir, "buckets", "ca.bin"), plainBucket, 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if wErr := os.WriteFile(filepath.Join(fullDir, "buckets", "extra.meta"), []byte("bucket-meta"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if wErr := os.WriteFile(filepath.Join(fullDir, "buckets", "skip.tmp"), []byte("temp"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if wErr := os.WriteFile(filepath.Join(fullDir, "deferred", "nested", "item.json"), []byte(`{"ok":true}`), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if wErr := os.WriteFile(filepath.Join(fullDir, "spill", "plain.spill"), []byte("plain-spill"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	var sealedSpill bytes.Buffer
+	sw, swErr := vault.NewStreamWriter(&sealedSpill, dek, vault.DomainSpill)
+	if swErr != nil {
+		t.Fatal(swErr)
+	}
+	if _, wErr := sw.Write([]byte("already-sealed-spill")); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if cErr := sw.Close(); cErr != nil {
+		t.Fatal(cErr)
+	}
+	if wErr := os.WriteFile(filepath.Join(fullDir, "spill", "sealed.spill"), sealedSpill.Bytes(), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if wErr := os.WriteFile(filepath.Join(fullDir, "customdir", "blob.dat"), []byte("custom-blob"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if wErr := os.WriteFile(filepath.Join(fullDir, "topfile.dat"), []byte("top-plain"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if wErr := os.WriteFile(filepath.Join(fullDir, "vault.json"), []byte("{}"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	writePlainGob(t, compactionSidecarPath(fullDir), map[string]CompactionState{
+		"sid-mig": {SessionID: "sid-mig", Harness: "claude", Workspace: "/workspace/demo"},
+	})
+
+	if mErr := migrateIndexStore(fullDir, dek); mErr != nil {
+		t.Fatalf("migrateIndexStore full: %v", mErr)
+	}
+	for sealedRel, domain := range map[string]string{
+		"manifest.gob":                                   vault.DomainIndexFile,
+		filepath.Join("buckets", "extra.meta"):           vault.DomainIndexFile,
+		filepath.Join("deferred", "nested", "item.json"): vault.DomainSidecar,
+		filepath.Join("customdir", "blob.dat"):           vault.DomainIndexFile,
+		"topfile.dat":                                    vault.DomainIndexFile,
+	} {
+		raw, rErr := os.ReadFile(filepath.Join(fullDir, sealedRel))
+		if rErr != nil {
+			t.Fatalf("read migrated %s: %v", sealedRel, rErr)
+		}
+		if _, oErr := vault.OpenBytes(dek, domain, raw); oErr != nil {
+			t.Fatalf("migrated %s did not open cleanly: %v", sealedRel, oErr)
+		}
+	}
+	if rawSidecar, rErr := os.ReadFile(compactionSidecarPath(fullDir)); rErr != nil {
+		t.Fatal(rErr)
+	} else if _, oErr := vault.OpenBytes(dek, vault.DomainIndexFile, rawSidecar); oErr != nil {
+		t.Fatalf("migrated compaction sidecar did not open cleanly: %v", oErr)
+	}
+	if rawInfra, rErr := os.ReadFile(filepath.Join(fullDir, "vault.json")); rErr != nil || string(rawInfra) != "{}" {
+		t.Fatalf("vault.json altered: %q, err=%v", string(rawInfra), rErr)
+	}
+	if sf, oErr := os.Open(filepath.Join(fullDir, "spill", "plain.spill")); oErr != nil {
+		t.Fatal(oErr)
+	} else {
+		sr, srErr := vault.NewStreamReader(sf, dek, vault.DomainSpill)
+		if srErr != nil {
+			_ = sf.Close()
+			t.Fatal(srErr)
+		}
+		got, gaErr := io.ReadAll(sr)
+		_ = sf.Close()
+		if gaErr != nil || string(got) != "plain-spill" {
+			t.Fatalf("migrated spill content = %q, err=%v", string(got), gaErr)
+		}
+	}
+
+	// Second migrateIndexStore call sees already-sealed manifest.gob and sweeps newly planted unsealed files.
+	for rel, content := range map[string]string{
+		"record_offsets.bin":                   "late-offsets",
+		filepath.Join("deferred", "late.json"): "late-deferred",
+		filepath.Join("spill", "late.spill"):   "late-spill",
+		"top2.dat":                             "late-top",
+	} {
+		if wErr := os.WriteFile(filepath.Join(fullDir, rel), []byte(content), 0o600); wErr != nil {
+			t.Fatal(wErr)
+		}
+	}
+	if mErr := migrateIndexStore(fullDir, dek); mErr != nil {
+		t.Fatalf("migrateIndexStore second sweep: %v", mErr)
+	}
+	for rel, domain := range map[string]string{
+		"record_offsets.bin":                   vault.DomainIndexFile,
+		filepath.Join("deferred", "late.json"): vault.DomainSidecar,
+		"top2.dat":                             vault.DomainIndexFile,
+	} {
+		raw, rErr := os.ReadFile(filepath.Join(fullDir, rel))
+		if rErr != nil {
+			t.Fatal(rErr)
+		}
+		if _, oErr := vault.OpenBytes(dek, domain, raw); oErr != nil {
+			t.Fatalf("swept %s not sealed: %v", rel, oErr)
+		}
+	}
+
+	// migrateRecordsLog seals recordDeflated payloads without inflating; decodeRecord rejects bad flate streams.
+	rc, rcErr := vault.NewRecordCipher(dek)
+	if rcErr != nil {
+		t.Fatal(rcErr)
+	}
+	badDeflate := append([]byte{0, 0, 0, recordDeflated}, []byte("not-flate-stream")...)
+	deflateSrc := filepath.Join(workDir, "deflate.bin")
+	deflateOut := filepath.Join(workDir, "deflate.out")
+	if wErr := os.WriteFile(deflateSrc, makeRawLogRecord(badDeflate), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if om, _, _, _, mErr := migrateRecordsLog(deflateSrc, deflateOut, rc, nil); mErr != nil || len(om) != 1 {
+		t.Fatalf("migrateRecordsLog recordDeflated = (%v, %v)", om, mErr)
+	}
+	if _, dErr := decodeRecord(badDeflate, newRecordTables()); dErr == nil {
+		t.Fatal("decodeRecord bad flate succeeded unexpectedly")
+	}
+
+	// recordTables nil methods, lazy ensureCipher, scrubbed zeroed raw record, and decodeRecordStubRole errors.
+	var nilTbl *recordTables
+	if gRC, gDir := nilTbl.recordCipher(); gRC != nil || gDir != "" {
+		t.Fatalf("nil recordTables.recordCipher = (%v, %q)", gRC, gDir)
+	}
+	if eErr := nilTbl.ensureCipher(dir); eErr != nil {
+		t.Fatalf("nil recordTables.ensureCipher = %v", eErr)
+	}
+	if nilTbl.isDead(10) {
+		t.Fatal("nil recordTables.isDead = true, want false")
+	}
+	if dc := nilTbl.deadFrom(0); dc.at(0) {
+		t.Fatal("nil recordTables.deadFrom.at(0) = true, want false")
+	}
+
+	lazyTbl := newRecordTables()
+	lazyTbl.strs = []string{"sid-s", "/p/s.go", "user"}
+	if eErr := lazyTbl.ensureCipher(dir); eErr != nil {
+		t.Fatalf("lazy ensureCipher unlocked = %v", eErr)
+	}
+	if gRC, _ := lazyTbl.recordCipher(); gRC == nil {
+		t.Fatal("lazy ensureCipher unlocked left cipher nil")
+	}
+	scrubbedRaw := append([]byte{0, 1, 2, recordRaw}, make([]byte, 8)...)
+	if _, _, _, hErr := decodeRecordHeader(scrubbedRaw, lazyTbl); hErr != nil {
+		t.Fatalf("decodeRecordHeader scrubbed raw with cipher = %v", hErr)
+	}
+	if _, sErr := decodeRecordStubRole([]byte{1}, lazyTbl); !errors.Is(sErr, errShortRecord) {
+		t.Fatalf("decodeRecordStubRole short header = %v, want errShortRecord", sErr)
+	}
+	if _, sErr := decodeRecordStubRole([]byte{0, 1, 2, recordRaw, 1, 2, 3}, lazyTbl); !errors.Is(sErr, errCorruptIndex) {
+		t.Fatalf("decodeRecordStubRole unsealed with cipher = %v, want errCorruptIndex", sErr)
+	}
+	if _, sErr := decodeRecordStubRole([]byte{0, 1, 2, recordRaw, 1, 2, 3}, newRecordTables()); !errors.Is(sErr, errShortRecord) {
+		t.Fatalf("decodeRecordStubRole short body = %v, want errShortRecord", sErr)
+	}
+	if _, sErr := decodeRecordStubRole([]byte{0, 1, 2, 0x55, 1, 2}, newRecordTables()); !errors.Is(sErr, errCorruptIndex) {
+		t.Fatalf("decodeRecordStubRole bad flag = %v, want errCorruptIndex", sErr)
+	}
+
+	// decodeBucketBytes error paths and blankWords on a sealed bucket in dir.
+	if _, dErr := decodeBucketBytes([]byte("NOPE")); !errors.Is(dErr, errCorruptIndex) {
+		t.Fatalf("decodeBucketBytes bad magic = %v, want errCorruptIndex", dErr)
+	}
+	truncPost := append([]byte(nil), bucketMagic...)
+	truncPost = append(truncPost, 1, 4, 'g', 'o', 'o', 'd', 4) // missing 4-byte posting block
+	if _, dErr := decodeBucketBytes(truncPost); !errors.Is(dErr, errCorruptIndex) {
+		t.Fatalf("decodeBucketBytes truncated block = %v, want errCorruptIndex", dErr)
+	}
+	badPost := append([]byte(nil), bucketMagic...)
+	badPost = append(badPost, 1, 4, 'g', 'o', 'o', 'd', 4, 5, 0, 0, 0) // duplicate posting offset 5 <= 5
+	if _, dErr := decodeBucketBytes(badPost); !errors.Is(dErr, errCorruptIndex) {
+		t.Fatalf("decodeBucketBytes duplicate offset = %v, want errCorruptIndex", dErr)
+	}
+
+	// blankWords rewrites sealed bucket with target ASCII word blanked, and fails with ErrKeyUnavailable if vault disabled.
+	if mkErr := os.MkdirAll(filepath.Join(dir, "buckets"), 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	blankTarget := filepath.Join(dir, "buckets", "ca.bin")
+	if wErr := writeBucket(blankTarget, map[string][]posting{
+		"canary": {{Off: 0, Sid: 1}},
+		"camel":  {{Off: 16, Sid: 2}},
+	}); wErr != nil {
+		t.Fatal(wErr)
+	}
+	origVF := os.Getenv("DEJA_VAULT_FILE")
+	t.Setenv("DEJA_VAULT_FILE", filepath.Join(workDir, "absent-vault.json"))
+	vault.ClearCache()
+	if bErr := blankWords(blankTarget, map[string]bool{"canary": true}); !errors.Is(bErr, vault.ErrKeyUnavailable) {
+		t.Fatalf("blankWords disabled vault = %v, want ErrKeyUnavailable", bErr)
+	}
+	t.Setenv("DEJA_VAULT_FILE", origVF)
+	vault.ClearCache()
+
+	if bErr := blankWords(blankTarget, map[string]bool{"canary": true}); bErr != nil {
+		t.Fatalf("blankWords unlocked = %v", bErr)
+	}
+	if sealedAfter, rErr := os.ReadFile(blankTarget); rErr != nil {
+		t.Fatal(rErr)
+	} else if plainAfter, oErr := vault.OpenBytes(dek, vault.DomainIndexFile, sealedAfter); oErr != nil {
+		t.Fatalf("blankWords left bucket unreadable: %v", oErr)
+	} else if decoded, dErr := decodeBucketBytes(plainAfter); dErr != nil {
+		t.Fatal(dErr)
+	} else {
+		wantBlank, ok := blankedWord("canary")
+		if !ok {
+			t.Fatal("blankedWord(canary) = false")
+		}
+		if bytes.Contains(plainAfter, []byte("canary")) || !bytes.Contains(plainAfter, wantBlank) {
+			t.Fatalf("blankWords plaintext mismatch: want %q scrubbed to %q", "canary", wantBlank)
+		}
+		if _, stillPlain := decoded["canary"]; stillPlain {
+			t.Fatal("blankWords left plaintext token 'canary' in bucket")
+		}
+		if _, hasBlank := decoded[string(wantBlank)]; hasBlank {
+			t.Fatalf("parseBucketDir should omit blanked token %q from decoded map", string(wantBlank))
+		}
+		if _, hasCamel := decoded["camel"]; !hasCamel {
+			t.Fatal("blankWords dropped unrelated token 'camel'")
+		}
+	}
+
+	// ensureCipher when locked returns vault.ErrLocked; disabled vault leaves cipher nil.
+	t.Setenv("DEJA_VAULT_FILE", filepath.Join(workDir, "no-vault-cipher.json"))
+	vault.ClearCache()
+	disabledTbl := newRecordTables()
+	if eErr := disabledTbl.ensureCipher(dir); eErr != nil {
+		t.Fatalf("ensureCipher disabled vault = %v", eErr)
+	}
+	if c, _ := disabledTbl.recordCipher(); c != nil {
+		t.Fatal("ensureCipher disabled vault populated cipher unexpectedly")
+	}
+	t.Setenv("DEJA_VAULT_FILE", origVF)
+	t.Setenv("DEJA_VAULT_PASSPHRASE", "")
+	vault.ClearCache()
+	if lErr := vault.Lock(dir, "index-vault-pass"); lErr != nil {
+		t.Fatal(lErr)
+	}
+	lockedTbl := newRecordTables()
+	if eErr := lockedTbl.ensureCipher(dir); !errors.Is(eErr, vault.ErrLocked) {
+		t.Fatalf("ensureCipher locked = %v, want ErrLocked", eErr)
+	}
+}
+
+func TestVaultIOAndBucketExtraEdges(t *testing.T) {
+	dir, _ := setupIndexVaultTest(t)
+	if _, iErr := vault.Init(dir, "index-vault-pass", 0); iErr != nil {
+		t.Fatalf("vault.Init: %v", iErr)
+	}
+	dek, kErr := vault.CheckUnlocked(dir)
+	if kErr != nil {
+		t.Fatalf("vault.CheckUnlocked: %v", kErr)
+	}
+	defer clear(dek)
+	rc, rcErr := vault.NewRecordCipher(dek)
+	if rcErr != nil {
+		t.Fatalf("NewRecordCipher: %v", rcErr)
+	}
+
+	// migrateSpillTree: missing dir -> nil; in-place skips already-streamed files & seals plain files.
+	tmp := t.TempDir()
+	if sErr := migrateSpillTree(filepath.Join(tmp, "missing-spill"), filepath.Join(tmp, "dst"), dek); sErr != nil {
+		t.Fatalf("migrateSpillTree missing: %v", sErr)
+	}
+	spillDir := filepath.Join(tmp, "spill")
+	if mkErr := os.MkdirAll(spillDir, 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	if mkErr := os.MkdirAll(filepath.Join(spillDir, "sub"), 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	if wErr := os.WriteFile(filepath.Join(spillDir, "000.spill"), []byte("plain-spill"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	var sealedSpill bytes.Buffer
+	sw, swErr := vault.NewStreamWriter(&sealedSpill, dek, vault.DomainSpill)
+	if swErr != nil {
+		t.Fatal(swErr)
+	}
+	_, _ = sw.Write([]byte("already-streamed"))
+	_ = sw.Close()
+	if wErr := os.WriteFile(filepath.Join(spillDir, "001.spill"), sealedSpill.Bytes(), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if wErr := os.WriteFile(filepath.Join(spillDir, "skip.tmp"), []byte("tmp"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if sErr := migrateSpillTree(spillDir, spillDir, dek); sErr != nil {
+		t.Fatalf("migrateSpillTree in-place: %v", sErr)
+	}
+	gotSpill0, _ := os.ReadFile(filepath.Join(spillDir, "000.spill"))
+	if !vault.IsStreamHeader(gotSpill0) {
+		t.Fatal("000.spill not converted to encrypted stream")
+	}
+
+	// migrateRecordsLog: missing log, recordDeflated, zeroed recordRaw, already-sealed, short/unknown flags.
+	dstRecs := filepath.Join(tmp, "dst-records.bin")
+	if om, _, _, _, mErr := migrateRecordsLog(filepath.Join(tmp, "absent.bin"), dstRecs, rc, nil); mErr != nil || len(om) != 0 {
+		t.Fatalf("migrateRecordsLog missing = (%v, %v)", om, mErr)
+	}
+	srcRecs := filepath.Join(tmp, "src-records.bin")
+	preSealedBody, _ := rc.Seal(recordRaw, []byte("presealed"))
+	var recBuf bytes.Buffer
+	recBuf.Write(makeRawLogRecord(append([]byte{1, 0, 0, recordDeflated}, []byte("deflated-bytes")...)))
+	recBuf.Write(makeRawLogRecord([]byte{1, 0, 0, recordRaw, 0, 0, 0, 0}))
+	recBuf.Write(makeRawLogRecord(append([]byte{1, 0, 0, recordRaw | recordSealed}, preSealedBody...)))
+	if wErr := os.WriteFile(srcRecs, recBuf.Bytes(), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	offMap, oldSz, newSz, _, mErr := migrateRecordsLog(srcRecs, dstRecs, rc, []int64{0})
+	if mErr != nil || len(offMap) != 3 || newSz <= oldSz {
+		t.Fatalf("migrateRecordsLog mixed = (map=%d old=%d new=%d err=%v)", len(offMap), oldSz, newSz, mErr)
+	}
+	_ = os.Remove(dstRecs)
+
+	badFlagPath := filepath.Join(tmp, "badflag.bin")
+	if wErr := os.WriteFile(badFlagPath, makeRawLogRecord([]byte{1, 0, 0, 0x7f, 'x'}), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if _, _, _, _, mErr = migrateRecordsLog(badFlagPath, dstRecs, rc, nil); mErr == nil {
+		t.Fatal("migrateRecordsLog accepted unknown record flag")
+	}
+	shortHdrPath := filepath.Join(tmp, "shorthdr.bin")
+	var shdr [4]byte
+	binary.LittleEndian.PutUint32(shdr[:], 1)
+	if wErr := os.WriteFile(shortHdrPath, append(shdr[:], 0xff), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if _, _, _, _, mErr = migrateRecordsLog(shortHdrPath, dstRecs, rc, nil); !errors.Is(mErr, errShortRecord) {
+		t.Fatalf("migrateRecordsLog short header = %v, want errShortRecord", mErr)
+	}
+
+	// migrateBucketsDir: missing dir, non-postings file, unsealed + pre-sealed postings remap.
+	if bErr := migrateBucketsDir(filepath.Join(tmp, "no-buckets"), filepath.Join(tmp, "dst-buckets"), dek, offMap); bErr != nil {
+		t.Fatalf("migrateBucketsDir missing: %v", bErr)
+	}
+	bSrc := filepath.Join(tmp, "buckets-src")
+	bDst := filepath.Join(tmp, "buckets-dst")
+	if mkErr := os.MkdirAll(bSrc, 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	if wErr := os.WriteFile(filepath.Join(bSrc, "notes.meta"), []byte("bucket-meta"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	sealedPost, spErr := vault.SealBytes(dek, vault.DomainIndexFile, encodeBucketBytes(map[string][]posting{"k": {{Off: 0, Sid: 1}}}))
+	if spErr != nil {
+		t.Fatal(spErr)
+	}
+	if wErr := os.WriteFile(filepath.Join(bSrc, "01.bin"), sealedPost, 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if bErr := migrateBucketsDir(bSrc, bDst, dek, map[int64]int64{0: 64}); bErr != nil {
+		t.Fatalf("migrateBucketsDir: %v", bErr)
+	}
+
+	// migrateIndexStore edge errors & top-level directory sweep without manifest.gob.
+	if mErr := migrateIndexStore(filepath.Join(tmp, "never-created"), dek); mErr != nil {
+		t.Fatalf("migrateIndexStore absent = %v", mErr)
+	}
+	notDirIdx := filepath.Join(tmp, "not-a-dir")
+	if wErr := os.WriteFile(notDirIdx, []byte("file"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if mErr := migrateIndexStore(notDirIdx, dek); mErr == nil {
+		t.Fatal("migrateIndexStore file path succeeded")
+	}
+	orphanIdx := filepath.Join(tmp, "orphan-recs")
+	if mkErr := os.MkdirAll(orphanIdx, 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	if wErr := os.WriteFile(recordsPath(orphanIdx), []byte("data"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if mErr := migrateIndexStore(orphanIdx, dek); mErr == nil {
+		t.Fatal("migrateIndexStore records.bin without manifest succeeded")
+	}
+	badManifestIdx := filepath.Join(tmp, "bad-manifest")
+	if mkErr := os.MkdirAll(badManifestIdx, 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	if wErr := os.WriteFile(filepath.Join(badManifestIdx, "manifest.gob"), []byte("not-gob"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if mErr := migrateIndexStore(badManifestIdx, dek); mErr == nil {
+		t.Fatal("migrateIndexStore corrupt manifest succeeded")
+	}
+
+	// Sweep unsealed files + subdirs (deferred, spill, misc subdir) when manifest.gob is absent.
+	sweepIdx := filepath.Join(tmp, "sweep-idx")
+	for _, sub := range []string{"deferred", "spill", "extra"} {
+		if mkErr := os.MkdirAll(filepath.Join(sweepIdx, sub), 0o700); mkErr != nil {
+			t.Fatal(mkErr)
+		}
+	}
+	_ = os.WriteFile(filepath.Join(sweepIdx, recordOffsetsFile), []byte("old-off"), 0o600)
+	_ = os.WriteFile(filepath.Join(sweepIdx, frictionTextsFile), []byte("old-fric"), 0o600)
+	_ = os.WriteFile(filepath.Join(sweepIdx, "plain.meta"), []byte("meta"), 0o600)
+	_ = os.WriteFile(filepath.Join(sweepIdx, "deferred", "d.txt"), []byte("d"), 0o600)
+	_ = os.WriteFile(filepath.Join(sweepIdx, "spill", "000.spill"), []byte("s"), 0o600)
+	_ = os.WriteFile(filepath.Join(sweepIdx, "extra", "x.bin"), []byte("x"), 0o600)
+	if mErr := migrateIndexStore(sweepIdx, dek); mErr != nil {
+		t.Fatalf("migrateIndexStore sweep: %v", mErr)
+	}
+	if gotExtra, _ := os.ReadFile(filepath.Join(sweepIdx, "extra", "x.bin")); !vault.IsSealedBytes(gotExtra) {
+		t.Fatal("sweep did not seal extra/x.bin")
+	}
+
+	// bucketReader.filePostings reopens closed cached dir file, plus blankWords error branches.
+	if mkErr := os.MkdirAll(filepath.Join(dir, "buckets"), 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	brPath := filepath.Join(dir, "buckets", "re.bin")
+	if wErr := writeBucket(brPath, map[string][]posting{"reuse": {{Off: 32, Sid: 1}}}); wErr != nil {
+		t.Fatal(wErr)
+	}
+	brFile, oErr := openIndexBlobFile(brPath)
+	if oErr != nil {
+		t.Fatal(oErr)
+	}
+	brDir, dErr := bucketDirOf(brPath, brFile)
+	_ = brFile.Close()
+	if dErr != nil {
+		t.Fatal(dErr)
+	}
+	br := &bucketReader{dirs: map[string]*cachedBucketDir{brPath: brDir}, files: map[string]*indexBlobFile{}}
+	if posts, fpErr := br.filePostings(brPath, "reuse"); fpErr != nil || len(posts) != 1 {
+		t.Fatalf("bucketReader.filePostings cached-dir reopen = (%v, %v)", posts, fpErr)
+	}
+
+	corruptBkt := filepath.Join(dir, "buckets", "bad-blank.bin")
+	sealedBadBkt, _ := vault.SealBytes(dek, vault.DomainIndexFile, []byte("BAD!"))
+	_ = os.WriteFile(corruptBkt, sealedBadBkt, 0o600)
+	if bErr := blankWords(corruptBkt, map[string]bool{"word": true}); !errors.Is(bErr, errCorruptIndex) {
+		t.Fatalf("blankWords corrupt bucket = %v, want errCorruptIndex", bErr)
+	}
+	truncCountBkt := filepath.Join(dir, "buckets", "trunc-cnt.bin")
+	sealedTruncCnt, _ := vault.SealBytes(dek, vault.DomainIndexFile, bucketMagic)
+	_ = os.WriteFile(truncCountBkt, sealedTruncCnt, 0o600)
+	if bErr := blankWords(truncCountBkt, map[string]bool{"word": true}); bErr == nil {
+		t.Fatal("blankWords truncated count succeeded")
+	}
+	if bErr := blankWords(filepath.Join(dir, "buckets", "missing.bin"), map[string]bool{"word": true}); !errors.Is(bErr, os.ErrNotExist) {
+		t.Fatalf("blankWords missing = %v, want ErrNotExist", bErr)
+	}
+
+	// writeBucket, writeGob, writeGobAtomicStat fail closed while locked.
+	t.Setenv("DEJA_VAULT_PASSPHRASE", "")
+	if lErr := vault.Lock(dir, "index-vault-pass"); lErr != nil {
+		t.Fatal(lErr)
+	}
+	if wErr := writeBucket(filepath.Join(dir, "buckets", "lk.bin"), map[string][]posting{}); !errors.Is(wErr, vault.ErrLocked) {
+		t.Fatalf("writeBucket locked = %v, want ErrLocked", wErr)
+	}
+	if wErr := writeGob(filepath.Join(dir, "lk.gob"), manifestCore{}); !errors.Is(wErr, vault.ErrLocked) {
+		t.Fatalf("writeGob locked = %v, want ErrLocked", wErr)
+	}
+	if _, wErr := writeGobAtomicStat(filepath.Join(dir, "lk2.gob"), manifestCore{}); !errors.Is(wErr, vault.ErrLocked) {
+		t.Fatalf("writeGobAtomicStat locked = %v, want ErrLocked", wErr)
+	}
+}
+
+func TestIndexLockedSidecarsAndCodecEdges(t *testing.T) {
+	dir, _ := setupIndexVaultTest(t)
+	if mkErr := os.MkdirAll(filepath.Join(dir, "buckets"), 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	if _, iErr := vault.Init(dir, "index-vault-pass", 0); iErr != nil {
+		t.Fatal(iErr)
+	}
+	dek, dErr := vault.CheckUnlocked(dir)
+	if dErr != nil || len(dek) == 0 {
+		t.Fatalf("CheckUnlocked: %v", dErr)
+	}
+	defer clear(dek)
+
+	// writeGob and writeGobAtomicStat surface gob encode errors under live vault encryption.
+	if gErr := writeGob(filepath.Join(dir, "bad.gob"), make(chan int)); gErr == nil {
+		t.Fatal("writeGob(chan) succeeded")
+	}
+	if _, gErr := writeGobAtomicStat(filepath.Join(dir, "bad2.gob"), make(chan int)); gErr == nil {
+		t.Fatal("writeGobAtomicStat(chan) succeeded")
+	}
+
+	// blankWords error branches: truncated token len, oversized token len, short token read, missing posting count.
+	badBuckets := [][]byte{
+		append(slices.Clone(bucketMagic), 1),
+		append(append(slices.Clone(bucketMagic), 1), binary.AppendUvarint(nil, uint64(maxRecordSize)+1)...),
+		append(append(append(slices.Clone(bucketMagic), 1), 10), "ab"...),
+		append(append(append(slices.Clone(bucketMagic), 1), 2), "hi"...),
+	}
+	for i, rawBkt := range badBuckets {
+		bktPath := filepath.Join(dir, "buckets", strings.Repeat("x", i+1)+".bin")
+		sealedBkt, sErr := vault.SealBytes(dek, vault.DomainIndexFile, rawBkt)
+		if sErr != nil {
+			t.Fatal(sErr)
+		}
+		if wErr := os.WriteFile(bktPath, sealedBkt, 0o600); wErr != nil {
+			t.Fatal(wErr)
+		}
+		if bErr := blankWords(bktPath, map[string]bool{"hi": true}); bErr == nil {
+			t.Fatalf("blankWords case %d unexpectedly succeeded", i)
+		}
+	}
+
+	// readSpill surfaces corrupt uvarints and truncated token payloads inside sealed spill streams.
+	spillCases := [][]byte{
+		{0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80},
+		append(binary.AppendUvarint(nil, 5), "ab"...),
+	}
+	for i, spRaw := range spillCases {
+		spPath := filepath.Join(dir, strings.Repeat("s", i+1)+".spill")
+		var spBuf bytes.Buffer
+		sw, swErr := vault.NewStreamWriter(&spBuf, dek, vault.DomainSpill)
+		if swErr != nil {
+			t.Fatal(swErr)
+		}
+		if _, wErr := sw.Write(spRaw); wErr != nil {
+			t.Fatal(wErr)
+		}
+		if cErr := sw.Close(); cErr != nil {
+			t.Fatal(cErr)
+		}
+		if wErr := os.WriteFile(spPath, spBuf.Bytes(), 0o600); wErr != nil {
+			t.Fatal(wErr)
+		}
+		sf, oErr := os.Open(spPath)
+		if oErr != nil {
+			t.Fatal(oErr)
+		}
+		_, rsErr := readSpill(sf)
+		_ = sf.Close()
+		if rsErr == nil {
+			t.Fatalf("readSpill case %d unexpectedly succeeded", i)
+		}
+	}
+
+	// recordTables.ensureCipher(""), logWalk sticky error, decodeRecordHeader bad ciphertext, and writeStored guards.
+	unlockedTbl := &recordTables{id: map[string]uint64{}}
+	if cErr := unlockedTbl.ensureCipher(""); cErr != nil {
+		t.Fatalf("ensureCipher empty = %v", cErr)
+	}
+	if cErr := unlockedTbl.ensureCipher(dir); cErr != nil {
+		t.Fatalf("ensureCipher(dir) = %v", cErr)
+	}
+	if cErr := unlockedTbl.ensureCipher(dir); cErr != nil {
+		t.Fatalf("repeat ensureCipher(dir) = %v", cErr)
+	}
+	if _, _, lwErr := (&logWalk{err: errors.New("sticky")}).next(); lwErr == nil {
+		t.Fatal("logWalk sticky err succeeded")
+	}
+	var badRec []byte
+	badRec = binary.AppendUvarint(badRec, unlockedTbl.intern("k"))
+	badRec = binary.AppendUvarint(badRec, unlockedTbl.intern("p"))
+	badRec = binary.AppendUvarint(badRec, unlockedTbl.intern("user"))
+	badRec = append(badRec, recordRaw|recordSealed, 1, 2, 3)
+	if _, _, _, dhErr := decodeRecordHeader(badRec, unlockedTbl); !errors.Is(dhErr, errCorruptIndex) {
+		t.Fatalf("decodeRecordHeader corrupt = %v, want errCorruptIndex", dhErr)
+	}
+	wsPath := filepath.Join(t.TempDir(), "ws.bin")
+	wsF, oErr := os.OpenFile(wsPath, os.O_CREATE|os.O_RDWR, 0o600)
+	if oErr != nil {
+		t.Fatal(oErr)
+	}
+	rw, rwErr := newRecordWriter(wsF, unlockedTbl)
+	if rwErr != nil {
+		_ = wsF.Close()
+		t.Fatal(rwErr)
+	}
+	if _, sErr := rw.writeStored("k", "p", "user", nil); !errors.Is(sErr, errShortRecord) {
+		t.Fatalf("writeStored empty = %v, want errShortRecord", sErr)
+	}
+	if _, sErr := rw.writeStored("k", "p", "user", []byte{recordRaw, 'x'}); sErr == nil || !strings.Contains(sErr.Error(), "unsealed record") {
+		t.Fatalf("writeStored unsealed = %v, want unsealed error", sErr)
+	}
+	_ = wsF.Close()
+
+	// Lock the vault and exercise fail-closed record/sidecar readers against a bound non-vault scratch path.
+	t.Setenv("DEJA_VAULT_PASSPHRASE", "")
+	if lErr := vault.Lock(dir, "index-vault-pass"); lErr != nil {
+		t.Fatal(lErr)
+	}
+	outsideDir := t.TempDir()
+	outsidePath := filepath.Join(outsideDir, "records.bin")
+	if wErr := os.WriteFile(outsidePath, make([]byte, 16), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	outsideF, ofErr := os.OpenFile(outsidePath, os.O_RDWR, 0o600)
+	if ofErr != nil {
+		t.Fatal(ofErr)
+	}
+	defer func() { _ = outsideF.Close() }()
+
+	lockedTbl := &recordTables{dir: canonicalVaultDir(dir), id: map[string]uint64{}}
+	if _, nwErr := newRecordWriter(outsideF, lockedTbl); !errors.Is(nwErr, vault.ErrLocked) {
+		t.Fatalf("newRecordWriter locked = %v, want ErrLocked", nwErr)
+	}
+	if _, wrErr := (&recordWriter{tables: lockedTbl}).write(Record{Key: "k"}); !errors.Is(wrErr, vault.ErrLocked) {
+		t.Fatalf("recordWriter.write locked = %v, want ErrLocked", wrErr)
+	}
+	if _, raErr := readRecordAt(outsideF, 0, lockedTbl); !errors.Is(raErr, vault.ErrLocked) {
+		t.Fatalf("readRecordAt locked = %v, want ErrLocked", raErr)
+	}
+	if erErr := eachRecordUntil(outsidePath, lockedTbl, func(Record) bool { return true }); !errors.Is(erErr, vault.ErrLocked) {
+		t.Fatalf("eachRecordUntil locked = %v, want ErrLocked", erErr)
+	}
+	if _, _, _, dhErr := decodeRecordHeader([]byte{0, 0, 0, recordRaw}, lockedTbl); !errors.Is(dhErr, vault.ErrLocked) {
+		t.Fatalf("decodeRecordHeader locked = %v, want ErrLocked", dhErr)
+	}
+	if irErr := eachRecordInRolesWhere(outsidePath, lockedTbl, nil, nil, func(Record) {}); !errors.Is(irErr, vault.ErrLocked) {
+		t.Fatalf("eachRecordInRolesWhere locked = %v, want ErrLocked", irErr)
+	}
+	if wtErr := eachRecordForKeysInRolesWindowedTail(outsidePath, lockedTbl, map[string]bool{"k": true}, nil, nil, 0, func(Record) {}); !errors.Is(wtErr, vault.ErrLocked) {
+		t.Fatalf("eachRecordForKeysInRolesWindowedTail locked = %v, want ErrLocked", wtErr)
+	}
+	if _, ecErr := encodeRecordChecked(Record{Key: "k"}, lockedTbl); !errors.Is(ecErr, vault.ErrLocked) {
+		t.Fatalf("encodeRecordChecked locked = %v, want ErrLocked", ecErr)
+	}
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Fatal("encodeRecord locked did not panic")
+			}
+		}()
+		encodeRecord(Record{Key: "k"}, lockedTbl)
+	}()
+	if eoErr := eachOffsetRecordAtInRoles(outsideF, []int64{0}, lockedTbl, nil, func(int64, Record) {}); !errors.Is(eoErr, vault.ErrLocked) {
+		t.Fatalf("eachOffsetRecordAtInRoles locked = %v, want ErrLocked", eoErr)
+	}
+	if _, _, rrErr := readRecordAtInRoles(outsideF, 0, lockedTbl, nil, nil); !errors.Is(rrErr, vault.ErrLocked) {
+		t.Fatalf("readRecordAtInRoles locked = %v, want ErrLocked", rrErr)
+	}
+	if _, _, dwErr := deadWordsOf(outsidePath, lockedTbl, []int64{0}, false); !errors.Is(dwErr, vault.ErrLocked) {
+		t.Fatalf("deadWordsOf locked = %v, want ErrLocked", dwErr)
+	}
+	if ct := commandsTail(outsidePath, lockedTbl, 0, 8, nil); ct != nil {
+		t.Fatalf("commandsTail locked = %v, want nil", ct)
+	}
+	buildCommandTables(dir, outsideDir, Manifest{}, 0, nil)
+	if co := readCooccur(dir); co != nil {
+		t.Fatalf("readCooccur locked = %v, want nil", co)
+	}
+	if fx := ReadFixes(dir); fx != nil {
+		t.Fatalf("ReadFixes locked = %v, want nil", fx)
+	}
+	if _, oiErr := openIndexFile(filepath.Join(dir, "records.bin")); !errors.Is(oiErr, vault.ErrLocked) {
+		t.Fatalf("openIndexFile locked = %v, want ErrLocked", oiErr)
+	}
+	var nilRC *recordTables
+	if rc0, d0, ck0 := nilRC.cipherState(); rc0 != nil || d0 != "" || ck0 {
+		t.Fatalf("nil recordTables.cipherState = (%v, %q, %v)", rc0, d0, ck0)
+	}
+	if efErr := (&recordTables{}).ensureCipherForFile(""); efErr != nil {
+		t.Fatalf("empty recordTables.ensureCipherForFile(\"\") = %v", efErr)
+	}
+	if efErr := (&recordTables{dir: dir}).ensureCipherForFile(""); !errors.Is(efErr, vault.ErrLocked) {
+		t.Fatalf("locked recordTables.ensureCipherForFile(\"\") = %v, want ErrLocked", efErr)
 	}
 }

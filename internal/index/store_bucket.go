@@ -202,11 +202,19 @@ func openBucketDir(p string) ([]bucketEntry, *indexBlobFile, error) {
 
 // readBucketDir parses the directory of the bucket file f, just opened, which
 // fi describes. f is left open.
-func readBucketDir(f *indexBlobFile, _ os.FileInfo) ([]bucketEntry, error) {
+func readBucketDir(f *indexBlobFile, fi os.FileInfo) ([]bucketEntry, error) {
 	bucketDirReads.Add(1)
-	plainSize, err := f.PlainSize()
-	if err != nil {
-		return nil, err
+	var plainSize int64
+	if f.sealed {
+		plainSize = int64(len(f.plain))
+	} else if fi != nil {
+		plainSize = fi.Size()
+	} else {
+		var err error
+		plainSize, err = f.PlainSize()
+		if err != nil {
+			return nil, err
+		}
 	}
 	r := bufio.NewReader(io.NewSectionReader(f, 0, plainSize))
 	return parseBucketDir(r, uint64(plainSize)) //nolint:gosec // file sizes are non-negative
@@ -436,7 +444,7 @@ func writeGob(p string, v any) error {
 		if encErr := gob.NewEncoder(&buf).Encode(v); encErr != nil {
 			return encErr
 		}
-		return writeSealedIndexFile(p, buf.Bytes(), vault.DomainIndexFile)
+		return writeSealedIndexFile(p, buf.Bytes())
 	}
 	f, err := openIndexFileWrite(p, os.O_RDWR|os.O_CREATE|os.O_TRUNC)
 	if err != nil {
@@ -465,19 +473,7 @@ func writeGobAtomicStat(p string, v any) (os.FileInfo, error) {
 		if encErr := gob.NewEncoder(&buf).Encode(v); encErr != nil {
 			return nil, encErr
 		}
-		if wErr := writeSealedFileAtomic(p, buf.Bytes(), vault.DomainIndexFile); wErr != nil {
-			return nil, wErr
-		}
-		// The lock keeps other writers out, so what is at p is what it wrote.
-		fi, stErr := os.Stat(p)
-		if stErr != nil {
-			// Written; only the stat failed, and nil caches nothing.
-			return nil, nil //nolint:nilerr,nilnil // written; nil caches nothing
-		}
-		// Windows reads a file's identity from its path when first compared, and
-		// this path moves with the staging directory: read it while it is here.
-		_ = os.SameFile(fi, fi)
-		return fi, nil
+		return writeSealedAtomicStat(p, buf.Bytes())
 	}
 	tmp := p + ".tmp"
 	f, err := openIndexFileWrite(tmp, os.O_RDWR|os.O_CREATE|os.O_TRUNC)

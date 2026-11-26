@@ -24,59 +24,41 @@ func init() {
 	vault.RegisterMigrator("embed", migrateVectorSidecar)
 }
 
+func hasPlainSidecarHeader(raw []byte) bool {
+	if len(raw) < 6 || [4]byte(raw[:4]) != magic {
+		return false
+	}
+	ver := binary.LittleEndian.Uint16(raw[4:6])
+	return ver >= 1 && ver <= sidecarVersion
+}
+
 func migrateVectorSidecar(indexDir string, dek []byte) error {
 	if len(dek) == 0 {
 		return nil
 	}
 	path := Path(indexDir)
-	f, err := os.Open(path)
+	raw, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
 		return err
 	}
-	alreadyEnc := false
-	if sr, sErr := vault.NewStreamReader(f, dek, vault.DomainEmbed); sErr == nil {
+	if sr, sErr := vault.NewStreamReader(bytes.NewReader(raw), dek, vault.DomainEmbed); sErr == nil {
 		if _, cpErr := io.Copy(io.Discard, sr); cpErr == nil {
-			alreadyEnc = true
+			return nil
 		}
 	}
-	if alreadyEnc {
-		_ = f.Close()
+	if !hasPlainSidecarHeader(raw) {
 		return nil
 	}
-	if _, skErr := f.Seek(0, io.SeekStart); skErr != nil {
-		_ = f.Close()
-		return skErr
-	}
-	var got [4]byte
-	var version uint16
-	if _, rErr := io.ReadFull(f, got[:]); rErr != nil || got != magic {
-		_ = f.Close()
-		return nil
-	}
-	if vErr := binary.Read(f, binary.LittleEndian, &version); vErr != nil || version < 1 || version > sidecarVersion {
-		_ = f.Close()
-		return nil
-	}
-	if _, skErr := f.Seek(0, io.SeekStart); skErr != nil {
-		_ = f.Close()
-		return skErr
-	}
-	raw, readErr := io.ReadAll(f)
-	_ = f.Close()
-	if readErr != nil {
-		return readErr
-	}
-	src := bytes.NewReader(raw)
 	if wErr := atomicfile.WriteStream(path, 0o600, func(w io.Writer) error {
 		sw, swErr := vault.NewStreamWriter(w, dek, vault.DomainEmbed)
 		if swErr != nil {
 			return swErr
 		}
-		if _, cpErr := io.Copy(sw, src); cpErr != nil {
-			return cpErr
+		if _, wrErr := sw.Write(raw); wrErr != nil {
+			return wrErr
 		}
 		return sw.Close()
 	}); wErr != nil {

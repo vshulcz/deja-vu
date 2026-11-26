@@ -57,8 +57,8 @@ func defaultExecKeyring(bin string, args []string, stdin string, extraEnv []stri
 
 type osKeyring struct{}
 
-func (osKeyring) Name() string {
-	switch runtime.GOOS {
+func keyringBackendName(goos string) string {
+	switch goos {
 	case "darwin":
 		return "keychain"
 	case "linux":
@@ -68,6 +68,10 @@ func (osKeyring) Name() string {
 	default:
 		return "passphrase"
 	}
+}
+
+func (osKeyring) Name() string {
+	return keyringBackendName(runtime.GOOS)
 }
 
 const keyringService = "deja-vu-vault"
@@ -155,20 +159,13 @@ func linuxDBusSocket() string {
 	return ""
 }
 
-// KeyringAvailable reports whether the platform credential backend appears usable.
-func KeyringAvailable() bool {
-	if usePassphraseOnly() {
-		return false
-	}
-	if _, isOS := activeKeyring.(osKeyring); !isOS && activeKeyring != nil {
-		return true
-	}
-	switch runtime.GOOS {
+func keyringAvailableFor(goos string, lookPath func(string) (string, error)) bool {
+	switch goos {
 	case "darwin":
-		_, err := exec.LookPath("/usr/bin/security")
+		_, err := lookPath("/usr/bin/security")
 		return err == nil
 	case "linux":
-		if _, err := exec.LookPath("secret-tool"); err != nil {
+		if _, err := lookPath("secret-tool"); err != nil {
 			return false
 		}
 		return strings.TrimSpace(os.Getenv("DBUS_SESSION_BUS_ADDRESS")) != "" || linuxDBusSocket() != ""
@@ -177,6 +174,17 @@ func KeyringAvailable() bool {
 	default:
 		return false
 	}
+}
+
+// KeyringAvailable reports whether the platform credential backend appears usable.
+func KeyringAvailable() bool {
+	if usePassphraseOnly() {
+		return false
+	}
+	if _, isOS := activeKeyring.(osKeyring); !isOS && activeKeyring != nil {
+		return true
+	}
+	return keyringAvailableFor(runtime.GOOS, exec.LookPath)
 }
 
 func (osKeyring) Set(keyID string, dek []byte) error {
@@ -218,29 +226,33 @@ func (osKeyring) Get(keyID string) ([]byte, error) {
 	return dek, nil
 }
 
-func (osKeyring) Delete(keyID string) error {
+func deleteOSKeyring(goos, keyID string) error {
 	if usePassphraseOnly() {
 		return nil
 	}
 	if !validKeyID(keyID) {
 		return nil
 	}
-	if runtime.GOOS == "windows" {
+	if goos == "windows" {
 		path, err := dpapiPath(keyID)
 		if err != nil {
 			return err
 		}
-		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-			return err
+		if rmErr := os.Remove(path); rmErr != nil && !os.IsNotExist(rmErr) {
+			return rmErr
 		}
 		return nil
 	}
-	bin, args, stdin, env, err := keyringCommand(runtime.GOOS, "delete", keyID, "")
+	bin, args, stdin, env, err := keyringCommand(goos, "delete", keyID, "")
 	if err != nil {
 		return err
 	}
 	_, err = execKeyringFn(bin, args, stdin, env)
 	return err
+}
+
+func (osKeyring) Delete(keyID string) error {
+	return deleteOSKeyring(runtime.GOOS, keyID)
 }
 
 func dpapiPath(keyID string) (string, error) {

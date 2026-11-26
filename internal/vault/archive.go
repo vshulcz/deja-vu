@@ -91,19 +91,24 @@ func Init(indexDir, passphrase string, autoLock time.Duration) (string, error) {
 	if dir != "" {
 		wipePromptCache(dir)
 	}
-	if err := encryptExistingNotes(dek); err != nil {
-		return "", err
-	}
-	if err := encryptExistingSnapshots(dir, dek); err != nil {
-		return "", err
-	}
-	if err := encryptExistingSidecars(dir, dek); err != nil {
-		return "", err
-	}
-	if err := runMigrators(dir, dek); err != nil {
+	if err := sealUnlockedArtifacts(dir, dek); err != nil {
 		return "", err
 	}
 	return cfg.KeyBackend, nil
+}
+
+func sealUnlockedArtifacts(dir string, dek []byte) error {
+	for _, step := range []func() error{
+		func() error { return encryptExistingNotes(dek) },
+		func() error { return encryptExistingSnapshots(dir, dek) },
+		func() error { return encryptExistingSidecars(dir, dek) },
+		func() error { return runMigrators(dir, dek) },
+	} {
+		if err := step(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Lock seals the index directory and content-bearing sibling sidecars into
@@ -190,16 +195,7 @@ func Unlock(indexDir, passphrase string) error {
 	if err := saveConfig(cfg); err != nil {
 		return err
 	}
-	if err := encryptExistingNotes(dek); err != nil {
-		return err
-	}
-	if err := encryptExistingSnapshots(dir, dek); err != nil {
-		return err
-	}
-	if err := encryptExistingSidecars(dir, dek); err != nil {
-		return err
-	}
-	return runMigrators(dir, dek)
+	return sealUnlockedArtifacts(dir, dek)
 }
 
 func hasPlaintextStore(indexDir string) bool {

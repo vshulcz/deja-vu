@@ -10,8 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-
-	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 const (
@@ -146,7 +144,7 @@ func writeCooccurBinBuild(dir string, m map[string][]string) error {
 	if err != nil {
 		return err
 	}
-	return writeSealedIndexFile(cooccurBinPath(dir), encodeCooccurBin(gobSize, stamp, m), vault.DomainIndexFile)
+	return writeSealedIndexFile(cooccurBinPath(dir), encodeCooccurBin(gobSize, stamp, m))
 }
 
 func writeCooccurBinAtomic(dir string, m map[string][]string) error {

@@ -372,16 +372,13 @@ func commandTablesBehind(dir string, m Manifest) bool {
 	if from > fi.Size() || fi.Size()-from > commandsTailWalkMax {
 		return true
 	}
-	f, err := openIndexFile(path)
+	t := tablesFromManifest(m)
+	f, err := openRecordFile(path, t)
 	if err != nil {
 		return false
 	}
 	defer func() { _ = f.Close() }()
 	if _, err = f.Seek(from, io.SeekStart); err != nil {
-		return false
-	}
-	t := tablesFromManifest(m)
-	if cErr := t.ensureCipherForFile(f.Name()); cErr != nil {
 		return false
 	}
 	errFound := errors.New("found")
@@ -440,14 +437,11 @@ func commandsTail(path string, t *recordTables, from, to int64, redo map[string]
 	if from >= to {
 		return out
 	}
-	f, err := openIndexFile(path)
+	f, err := openRecordFile(path, t)
 	if err != nil {
 		return nil
 	}
 	defer func() { _ = f.Close() }()
-	if err = t.ensureCipherForFile(path); err != nil {
-		return nil
-	}
 	if _, err = f.Seek(from, io.SeekStart); err != nil {
 		return nil
 	}

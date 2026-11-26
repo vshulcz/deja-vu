@@ -816,3 +816,142 @@ func TestVaultLauncherEnvKeyringHooksAndDoctor(t *testing.T) {
 		t.Fatalf("hook-prompt leaked canary_alpha_9911 while vault locked:\n%s", hkLockedOut)
 	}
 }
+
+func TestVaultCmdSidecarsAndDoctorBranches(t *testing.T) {
+	tmp, dir := withSecurityVaultEnv(t)
+	pass := "cmd-sidecar-pass"
+	t.Setenv(vault.EnvVaultPassphrase, pass)
+	if _, iErr := vault.Init(dir, pass, 0); iErr != nil {
+		t.Fatalf("vault.Init: %v", iErr)
+	}
+	dek, kErr := vault.CheckUnlocked(dir)
+	if kErr != nil {
+		t.Fatalf("vault.CheckUnlocked: %v", kErr)
+	}
+	defer clear(dek)
+
+	// Empty and missing directories are no-ops.
+	if mErr := migrateCmdSidecars("", dek); mErr != nil {
+		t.Fatalf("migrateCmdSidecars empty = %v", mErr)
+	}
+	if mErr := migrateCmdSidecars(filepath.Join(tmp, "absent-idx"), dek); mErr != nil {
+		t.Fatalf("migrateCmdSidecars absent = %v", mErr)
+	}
+
+	// Regular file at .deferred path is ignored safely.
+	fileDeferredIdx := filepath.Join(tmp, "file-def-idx")
+	defRegPath := deferredRoot(fileDeferredIdx)
+	if mkErr := os.MkdirAll(filepath.Dir(defRegPath), 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	if wErr := os.WriteFile(defRegPath, []byte("not-a-dir"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if mErr := migrateCmdSidecars(fileDeferredIdx, dek); mErr != nil {
+		t.Fatalf("migrateCmdSidecars file deferred = %v", mErr)
+	}
+
+	// Nested .deferred files get sealed; hidden and already-sealed files remain untouched.
+	defSub := filepath.Join(deferredRoot(dir), "sub")
+	if mkErr := os.MkdirAll(defSub, 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	if mkErr := os.MkdirAll(filepath.Join(deferredRoot(dir), ".hidden"), 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	plainNote := filepath.Join(defSub, "note.txt")
+	if wErr := os.WriteFile(plainNote, []byte("secret-deferred-note"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	sealedPre, sErr := vault.SealBytes(dek, vault.DomainSidecar, []byte("pre-sealed"))
+	if sErr != nil {
+		t.Fatal(sErr)
+	}
+	prePath := filepath.Join(deferredRoot(dir), "already.bin")
+	if wErr := os.WriteFile(prePath, sealedPre, 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if wErr := os.WriteFile(filepath.Join(deferredRoot(dir), ".hidden", "skip.txt"), []byte("hidden"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if mErr := migrateCmdSidecars(dir, dek); mErr != nil {
+		t.Fatalf("migrateCmdSidecars nested: %v", mErr)
+	}
+	gotNote, rErr := os.ReadFile(plainNote)
+	if rErr != nil || !vault.IsSealedBytes(gotNote) {
+		t.Fatalf("migrateCmdSidecars did not seal plain note: %q (%v)", gotNote, rErr)
+	}
+
+	// recordDejaVuLine unlocked skips malformed timestamps; locked returns false.
+	now := time.Now()
+	djPath := filepath.Join(tmp, "custom.dejavu")
+	seedLine := "bad-ts notanumber\nold-sess 1\n"
+	if wErr := vault.WriteSealedFile(dir, djPath, vault.DomainSidecar, []byte(seedLine), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if !recordDejaVuLine(dir, djPath, "s1", now) {
+		t.Fatal("recordDejaVuLine unlocked = false, want true")
+	}
+
+	// pruneForkMarks + claudeForkMark undecryptable line handling when enabled vs disabled.
+	forksPath := forkMarksPath(dir)
+	validLine, slErr := vault.SealSidecarLine(dir, vault.DomainSidecar, []byte("sid-keep claude 9999999999"))
+	if slErr != nil {
+		t.Fatal(slErr)
+	}
+	badEncLine := vault.NoteLinePrefix + "invalid-cipher-data"
+	mixedForks := badEncLine + "\n" + validLine + "\n"
+	if wErr := os.WriteFile(forksPath, []byte(mixedForks), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	pruneForkMarks(forksPath)
+	afterPrune, rErr := os.ReadFile(forksPath)
+	if rErr != nil || !strings.Contains(string(afterPrune), badEncLine) {
+		t.Fatalf("pruneForkMarks enabled dropped undecryptable line: %q (%v)", afterPrune, rErr)
+	}
+	if gotFork := claudeForkMark(dir, "sid-keep"); gotFork != "claude" {
+		t.Fatalf("claudeForkMark with corrupt prefix = %q, want claude", gotFork)
+	}
+
+	// Disabled vault skips undecryptable lines in pruneForkMarks; sealed .dejavu fails closed in hook_dejavu_line.
+	if wErr := os.WriteFile(dir+".dejavu", sealedPre, 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	t.Setenv("DEJA_VAULT_FILE", filepath.Join(tmp, "disabled-vault.json"))
+	vault.ClearCache()
+	pruneForkMarks(forksPath)
+	if dejaVuLineDue(dir, "s2") {
+		t.Fatal("dejaVuLineDue succeeded on sealed .dejavu while vault disabled")
+	}
+	sealedOffPath := filepath.Join(tmp, "sealed-when-off.dejavu")
+	if wErr := os.WriteFile(sealedOffPath, sealedPre, 0o600); wErr == nil {
+		if recordDejaVuLine(dir, sealedOffPath, "s3", now) {
+			t.Fatal("recordDejaVuLine succeeded on sealed file while vault disabled")
+		}
+	}
+
+	// Locked vault fails closed in recordDejaVuLine and pruneForkMarks.
+	t.Setenv("DEJA_VAULT_FILE", filepath.Join(tmp, "vault.json"))
+	t.Setenv(vault.EnvVaultPassphrase, "")
+	vault.ClearCache()
+	if lErr := vault.Lock(dir, pass); lErr != nil {
+		t.Fatal(lErr)
+	}
+	if recordDejaVuLine(dir, djPath, "s4", now) {
+		t.Fatal("recordDejaVuLine succeeded while locked")
+	}
+	pruneForkMarks(forksPath)
+
+	// doctorVault renders key_backend fallback and error line when vault.json is corrupt.
+	corruptVaultPath := filepath.Join(tmp, "corrupt-vault.json")
+	if wErr := os.WriteFile(corruptVaultPath, []byte("{corrupt"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	t.Setenv("DEJA_VAULT_FILE", corruptVaultPath)
+	vault.ClearCache()
+	var docBuf bytes.Buffer
+	doctorVault(&docBuf, dir)
+	if !strings.Contains(docBuf.String(), "keyring          available=") || !strings.Contains(docBuf.String(), "error            ") {
+		t.Fatalf("doctorVault corrupt config output missing expected fields:\n%s", docBuf.String())
+	}
+}

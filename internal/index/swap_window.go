@@ -35,6 +35,10 @@ func openIndexFile(path string) (*os.File, error) {
 	if err := ensureVaultUnlocked(vaultDirForFile(path)); err != nil {
 		return nil, err
 	}
+	return openIndexFileRaw(path)
+}
+
+func openIndexFileRaw(path string) (*os.File, error) {
 	f, err := os.Open(path)
 	// errors.Is rather than os.IsNotExist: Windows reports a directory caught
 	// mid-rename as a sharing violation, and the wrapped form is the one that
@@ -50,8 +54,8 @@ func openIndexFile(path string) (*os.File, error) {
 	// coming.
 	for range swapWindowTries {
 		inFlight := swapInFlight(path)
-		if f, oerr := os.Open(path); oerr == nil {
-			return f, nil
+		if of, oerr := os.Open(path); oerr == nil {
+			return of, nil
 		}
 		if !inFlight {
 			return nil, err

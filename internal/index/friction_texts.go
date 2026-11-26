@@ -13,8 +13,6 @@ import (
 	"sort"
 	"strings"
 	"sync/atomic"
-
-	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 // frictionTextsFile holds, for every session that carries a wall, the first
@@ -548,7 +546,7 @@ func carryFrictionTexts(dir, tmp string, old Manifest, changed map[string]bool) 
 	}
 	size, fp, err := logFingerprint(filepath.Join(tmp, "records.bin"))
 	if err != nil {
-		_ = writeSealedIndexFile(dst, b, vault.DomainIndexFile)
+		_ = writeSealedIndexFile(dst, b)
 		return
 	}
 	for k := range changed {

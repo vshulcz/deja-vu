@@ -209,30 +209,29 @@ func serveMCPUnixSocketUntil(dir, rawPath string, contextOnly bool, stop <-chan 
 		}
 	}()
 
-	select {
-	case aerr := <-acceptErrCh:
+	shutdown := func() {
 		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = httpSrv.Shutdown(shutCtx)
 		closeAll()
 		wg.Wait()
+	}
+
+	select {
+	case aerr := <-acceptErrCh:
+		shutdown()
 		if errors.Is(aerr, net.ErrClosed) {
 			return nil
 		}
 		return aerr
 	case herr := <-httpErrCh:
-		closeAll()
-		wg.Wait()
+		shutdown()
 		if errors.Is(herr, http.ErrServerClosed) || errors.Is(herr, net.ErrClosed) {
 			return nil
 		}
 		return herr
 	case <-stop:
-		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = httpSrv.Shutdown(shutCtx)
-		closeAll()
-		wg.Wait()
+		shutdown()
 		return nil
 	}
 }
@@ -253,9 +252,6 @@ func serveMCPUnixConn(dir string, contextOnly bool, token string, conn net.Conn,
 		return false
 	}
 	firstLine, err := br.ReadSlice('\n')
-	if err != nil && len(firstLine) == 0 {
-		return false
-	}
 	if errors.Is(err, bufio.ErrBufferFull) {
 		writeRPCError(json.NewEncoder(conn), nil, -32700, "parse error")
 		return false
@@ -405,6 +401,13 @@ func newChannelListener(addr net.Addr) *channelListener {
 
 func (l *channelListener) enqueue(c net.Conn, stop <-chan struct{}) bool {
 	select {
+	case <-l.done:
+		return false
+	case <-stop:
+		return false
+	default:
+	}
+	select {
 	case l.ch <- c:
 		return true
 	case <-l.done:
@@ -415,6 +418,11 @@ func (l *channelListener) enqueue(c net.Conn, stop <-chan struct{}) bool {
 }
 
 func (l *channelListener) Accept() (net.Conn, error) {
+	select {
+	case <-l.done:
+		return nil, net.ErrClosed
+	default:
+	}
 	select {
 	case c, ok := <-l.ch:
 		if !ok {

@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -89,7 +90,7 @@ func startTestUnixSocketServer(t *testing.T, dir, sockPath string, contextOnly b
 		time.Sleep(15 * time.Millisecond)
 	}
 	close(stopCh)
-	_ = <-doneCh
+	<-doneCh
 	t.Fatalf("timed out waiting for unix socket server %s", sockPath)
 	return nil
 }
@@ -824,5 +825,591 @@ func TestMCPLateRecallIsolatedAcrossClients(t *testing.T) {
 	alphaTxt := replyText(alphaRep)
 	if !strings.HasPrefix(alphaTxt, `deja: earlier answer for recall "alpha-secret-query"`) || !strings.HasSuffix(alphaTxt, "answer for alpha-next") {
 		t.Fatalf("client-alpha did not receive its own late recall: %q", alphaTxt)
+	}
+}
+
+func TestMigrateCmdSidecars(t *testing.T) {
+	dek := make([]byte, 32)
+	for i := range dek {
+		dek[i] = byte(i + 3)
+	}
+	if err := migrateCmdSidecars("", dek); err != nil {
+		t.Fatalf("empty dir = %v", err)
+	}
+	if err := migrateCmdSidecars(t.TempDir(), []byte{1, 2}); err != nil {
+		t.Fatalf("short dek = %v", err)
+	}
+	missingDir := filepath.Join(t.TempDir(), "index.db")
+	if err := migrateCmdSidecars(missingDir, dek); err != nil {
+		t.Fatalf("missing deferred root = %v", err)
+	}
+
+	nonDirBase := filepath.Join(t.TempDir(), "index.db")
+	if err := os.MkdirAll(nonDirBase, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(deferredRoot(nonDirBase), []byte("file"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrateCmdSidecars(nonDirBase, dek); err != nil {
+		t.Fatalf("non-dir deferred root = %v", err)
+	}
+
+	idxDir := filepath.Join(t.TempDir(), "index.db")
+	root := deferredRoot(idxDir)
+	if err := os.MkdirAll(filepath.Join(root, ".hidden"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "sub"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	hiddenFile := filepath.Join(root, ".hidden", "skip.txt")
+	if err := os.WriteFile(hiddenFile, []byte("skip-dir"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dotFile := filepath.Join(root, ".dotfile")
+	if err := os.WriteFile(dotFile, []byte("skip-dot"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	plainFile := filepath.Join(root, "sub", "item.txt")
+	if err := os.WriteFile(plainFile, []byte("CANARY_DEFERRED_PLAINTEXT"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" {
+		_ = os.Symlink(plainFile, filepath.Join(root, "link.txt"))
+	}
+
+	if err := migrateCmdSidecars(idxDir, dek); err != nil {
+		t.Fatalf("migrateCmdSidecars: %v", err)
+	}
+	sealedRaw, err := os.ReadFile(plainFile)
+	if err != nil || !vault.IsSealedBytes(sealedRaw) || bytes.Contains(sealedRaw, []byte("CANARY_DEFERRED_PLAINTEXT")) {
+		t.Fatalf("deferred file not sealed: (%v, %v)", vault.IsSealedBytes(sealedRaw), err)
+	}
+	opened, err := vault.OpenBytes(dek, vault.DomainSidecar, sealedRaw)
+	if err != nil || string(opened) != "CANARY_DEFERRED_PLAINTEXT" {
+		t.Fatalf("OpenBytes deferred = (%q, %v)", opened, err)
+	}
+	dotRaw, err := os.ReadFile(dotFile)
+	if err != nil || string(dotRaw) != "skip-dot" {
+		t.Fatalf("dotfile unexpectedly modified: %q (%v)", dotRaw, err)
+	}
+	if err := migrateCmdSidecars(idxDir, dek); err != nil {
+		t.Fatalf("migrateCmdSidecars idempotent: %v", err)
+	}
+	regFile := filepath.Join(t.TempDir(), "file-not-dir")
+	if wErr := os.WriteFile(regFile, []byte("x"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if runtime.GOOS != "windows" {
+		if mErr := migrateCmdSidecars(regFile, dek); mErr == nil {
+			t.Fatal("migrateCmdSidecars under regular file succeeded unexpectedly")
+		}
+	}
+}
+
+type failWriter struct{}
+
+func (failWriter) Write([]byte) (int, error) {
+	return 0, errors.New("write boom")
+}
+
+func TestMCPUnixSocketEdgeCases(t *testing.T) {
+	hermeticEnv(t)
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+
+	if _, err := expandMCPSocketPath("   "); err == nil {
+		t.Fatal("expandMCPSocketPath blank succeeded")
+	}
+	if got, err := expandMCPSocketPath("~"); err != nil || got != homeDir {
+		t.Fatalf("expandMCPSocketPath(~) = (%q, %v), want %q", got, err, homeDir)
+	}
+	if got, err := expandMCPSocketPath("~/sub/mcp.sock"); err != nil || got != filepath.Join(homeDir, "sub", "mcp.sock") {
+		t.Fatalf("expandMCPSocketPath(~/sub/mcp.sock) = (%q, %v)", got, err)
+	}
+	if runtime.GOOS != "windows" {
+		t.Setenv("HOME", "")
+		if _, err := expandMCPSocketPath("~/mcp.sock"); err == nil {
+			t.Fatal("expandMCPSocketPath with empty HOME succeeded")
+		}
+		t.Setenv("HOME", homeDir)
+	}
+
+	// prepareMCPUnixSocket directory creation, conflict guards, and stale socket replacement.
+	regParent := filepath.Join(t.TempDir(), "notadir")
+	if err := os.WriteFile(regParent, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := prepareMCPUnixSocket(filepath.Join(regParent, "mcp.sock")); err == nil {
+		t.Fatal("prepareMCPUnixSocket non-dir parent succeeded")
+	}
+
+	shortBase, err := allocShortSockDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(shortBase) })
+	nestedSock := filepath.Join(shortBase, "created", "mcp.sock")
+	ln, info, err := prepareMCPUnixSocket(nestedSock)
+	if err != nil {
+		t.Fatalf("prepareMCPUnixSocket create parent: %v", err)
+	}
+	// Active socket guard.
+	if _, _, inUseErr := prepareMCPUnixSocket(nestedSock); inUseErr == nil || !strings.Contains(inUseErr.Error(), "already in use") {
+		_ = ln.Close()
+		t.Fatalf("prepareMCPUnixSocket active = %v, want already-in-use", inUseErr)
+	}
+	_ = ln.Close()
+	cleanupMCPUnixSocket(nestedSock, info)
+
+	// Stale socket replacement.
+	staleSock := filepath.Join(shortBase, "stale.sock")
+	staleLn, sErr := (&net.ListenConfig{}).Listen(t.Context(), "unix", staleSock)
+	if sErr != nil {
+		t.Fatalf("listen stale: %v", sErr)
+	}
+	_ = staleLn.Close()
+	reboundLn, reboundInfo, rbErr := prepareMCPUnixSocket(staleSock)
+	if rbErr != nil {
+		t.Fatalf("prepareMCPUnixSocket stale replacement: %v", rbErr)
+	}
+	_ = reboundLn.Close()
+	cleanupMCPUnixSocket(staleSock, reboundInfo)
+
+	// Non-socket file guard & symlink guards.
+	nonSock := filepath.Join(shortBase, "plain.sock")
+	if wErr := os.WriteFile(nonSock, []byte("plain"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if _, _, nsErr := prepareMCPUnixSocket(nonSock); nsErr == nil {
+		t.Fatal("prepareMCPUnixSocket non-socket target succeeded")
+	}
+	if runtime.GOOS != "windows" {
+		symParent := filepath.Join(shortBase, "symdir")
+		_ = os.Symlink(shortBase, symParent)
+		if _, _, spErr := prepareMCPUnixSocket(filepath.Join(symParent, "s.sock")); spErr == nil {
+			t.Fatal("prepareMCPUnixSocket symlink parent succeeded")
+		}
+		symTarget := filepath.Join(shortBase, "symtarget.sock")
+		_ = os.Symlink(nonSock, symTarget)
+		if _, _, stErr := prepareMCPUnixSocket(symTarget); stErr == nil {
+			t.Fatal("prepareMCPUnixSocket symlink target succeeded")
+		}
+	}
+
+	// contentLengthWriter & channelListener helpers.
+	cw := &contentLengthWriter{dst: failWriter{}}
+	if n, wErr := cw.Write([]byte("\n")); wErr != nil || n != 1 {
+		t.Fatalf("contentLengthWriter empty line = (%d, %v)", n, wErr)
+	}
+	if _, wErr := cw.Write([]byte("{}")); wErr == nil {
+		t.Fatal("contentLengthWriter failWriter succeeded")
+	}
+	c1, c2 := net.Pipe()
+	cl := newChannelListener(staleLn.Addr())
+	if cl.Addr() == nil {
+		t.Fatal("channelListener.Addr returned nil")
+	}
+	if !cl.enqueue(c1, t.Context().Done()) {
+		t.Fatal("enqueue before close returned false")
+	}
+	_ = cl.Close()
+	_ = c2.Close()
+	c3, c4 := net.Pipe()
+	defer func() {
+		_ = c3.Close()
+		_ = c4.Close()
+	}()
+	if cl.enqueue(c3, t.Context().Done()) {
+		t.Fatal("enqueue after close returned true")
+	}
+
+	// Live server framing edge cases: EOF, non-JSON fallback line, oversized line, Content-Length errors.
+	dir := index.DefaultDir()
+	if eErr := index.Ensure(dir, "", true, nil); eErr != nil {
+		t.Fatal(eErr)
+	}
+	edgeSock := shortUnixSockPath(t, "edge.sock")
+	startTestUnixSocketServer(t, dir, edgeSock, false)
+
+	eofConn := dialUnixConn(t, edgeSock)
+	_ = eofConn.Close()
+
+	badCLReplies := sendRawUnixLines(t, edgeSock, "PING")
+	if len(badCLReplies) == 0 {
+		t.Fatal("expected parse error response for PING")
+	}
+
+	overConn := dialUnixConn(t, edgeSock)
+	_ = overConn.SetDeadline(time.Now().Add(5 * time.Second))
+	_, _ = overConn.Write(bytes.Repeat([]byte("A"), 70*1024))
+	if uc, ok := overConn.(*net.UnixConn); ok {
+		_ = uc.CloseWrite()
+	}
+	overResp, _ := io.ReadAll(overConn)
+	_ = overConn.Close()
+	if !bytes.Contains(overResp, []byte("-32700")) {
+		t.Fatalf("oversized line response = %q, want -32700", overResp)
+	}
+
+	for _, rawFrame := range []string{
+		"Content-Length: -1\r\n\r\n",
+		"Content-Length: notanumber\r\n\r\n",
+		"Content-Length: 999999999\r\n\r\n",
+		"Content-Type: application/json\r\n\r\n",
+		"Content-Length: 50\r\n\r\n{\"jsonrpc\":\"2.0\"",
+	} {
+		clConn := dialUnixConn(t, edgeSock)
+		_ = clConn.SetDeadline(time.Now().Add(5 * time.Second))
+		_, _ = io.WriteString(clConn, rawFrame)
+		if uc, ok := clConn.(*net.UnixConn); ok {
+			_ = uc.CloseWrite()
+		}
+		_, _ = io.ReadAll(clConn)
+		_ = clConn.Close()
+	}
+
+	// Direct helper & Content-Length loop / writeErr / cleanup / stop-enqueue coverage.
+	closedStop := make(chan struct{})
+	close(closedStop)
+	if sErr := serveMCPUnixSocketUntil(dir, "   ", false, closedStop); sErr == nil {
+		t.Fatal("serveMCPUnixSocketUntil blank path succeeded")
+	}
+	if !looksLikeHTTPRequestLine([]byte("POST /mcp HTTP/1.1\r\n")) ||
+		looksLikeHTTPRequestLine([]byte("BOGUS /mcp HTTP/1.1\r\n")) ||
+		looksLikeHTTPRequestLine([]byte("POST /mcp\r\n")) {
+		t.Fatal("looksLikeHTTPRequestLine classification mismatch")
+	}
+	if looksLikeContentLengthHeader([]byte("Host: localhost\r\n")) {
+		t.Fatal("looksLikeContentLengthHeader matched Host header")
+	}
+	// cleanupMCPUnixSocket must not remove a replacement regular file.
+	keepFile := filepath.Join(shortBase, "keep-replacement")
+	keepLn, keepInfo, keepErr := prepareMCPUnixSocket(keepFile)
+	if keepErr != nil {
+		t.Fatalf("prepareMCPUnixSocket keep: %v", keepErr)
+	}
+	_ = keepLn.Close()
+	_ = os.Remove(keepFile)
+	if wErr := os.WriteFile(keepFile, []byte("keep"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	cleanupMCPUnixSocket(keepFile, keepInfo)
+	if _, stErr := os.Stat(keepFile); stErr != nil {
+		t.Fatalf("cleanupMCPUnixSocket removed replacement regular file: %v", stErr)
+	}
+
+	// Second Write failure in contentLengthWriter.
+	secondFail := &nthFailWriter{failAt: 2}
+	if _, wErr := (&contentLengthWriter{dst: secondFail}).Write([]byte(`{"ok":true}`)); wErr == nil {
+		t.Fatal("contentLengthWriter second write failure returned nil")
+	}
+
+	// channelListener enqueue with closed stop + Accept after Close.
+	cl2 := newChannelListener(staleLn.Addr())
+	pc1, pc2 := net.Pipe()
+	if cl2.enqueue(pc1, closedStop) {
+		t.Fatal("enqueue on closed stop succeeded")
+	}
+	_ = pc1.Close()
+	_ = pc2.Close()
+	_ = cl2.Close()
+	if _, aErr := cl2.Accept(); !errors.Is(aErr, net.ErrClosed) {
+		t.Fatalf("Accept after Close = %v, want net.ErrClosed", aErr)
+	}
+
+	// serveMCPContentLength: multi-frame pendingHeader == nil path + writeErr exit + header overflow.
+	sess := newMCPClientSession("")
+	f1 := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"cl-test"}}}`
+	f2 := `{"jsonrpc":"2.0","method":"notifications/initialized"}`
+	f3 := `{"jsonrpc":"2.0","id":2,"method":"ping"}`
+	clStream := fmt.Sprintf(
+		"Content-Length: %d\r\n\r\n%sContent-Length: %d\r\n\r\n%sContent-Length: %d\r\n\r\n%s",
+		len(f1), f1, len(f2), f2, len(f3), f3,
+	)
+	var outBuf bytes.Buffer
+	firstHdr, rest, _ := strings.Cut(clStream, "\n")
+	serveMCPContentLength(dir, false, "", sess, []byte(firstHdr+"\n"), bufio.NewReader(strings.NewReader(rest)), &outBuf)
+	if !bytes.Contains(outBuf.Bytes(), []byte("Content-Length:")) {
+		t.Fatalf("serveMCPContentLength multi-frame wrote no framed output: %q", outBuf.String())
+	}
+
+	// Two frames written to failWriter forces srv.writeErr() != nil check on loop re-entry.
+	serveMCPContentLength(dir, false, "", sess, []byte(firstHdr+"\n"), bufio.NewReader(strings.NewReader(rest)), failWriter{})
+
+	// Oversized header line (>64KiB) hits bufio.ErrBufferFull both initially and inside header loop.
+	bigHdr := bytes.Repeat([]byte("X"), 70*1024)
+	var bigOut bytes.Buffer
+	serveMCPContentLength(dir, false, "", sess, []byte("X-Ok: 1\r\n"), bufio.NewReaderSize(bytes.NewReader(bigHdr), 64*1024), &bigOut)
+	if !bytes.Contains(bigOut.Bytes(), []byte("-32700")) {
+		t.Fatalf("serveMCPContentLength oversized secondary header = %q, want -32700", bigOut.String())
+	}
+	var bigOut2 bytes.Buffer
+	serveMCPContentLength(dir, false, "", sess, nil, bufio.NewReaderSize(bytes.NewReader(bigHdr), 64*1024), &bigOut2)
+	if !bytes.Contains(bigOut2.Bytes(), []byte("-32700")) {
+		t.Fatalf("serveMCPContentLength oversized initial header = %q, want -32700", bigOut2.String())
+	}
+
+	// serveMCPUnixConn HTTP dispatch aborted by closed stop & no-newline short line.
+	p1, p2 := net.Pipe()
+	go func() {
+		_, _ = io.WriteString(p2, "POST /mcp HTTP/1.1\r\n")
+		_ = p2.Close()
+	}()
+	if serveMCPUnixConn(dir, false, "", p1, cl2, closedStop) {
+		t.Fatal("serveMCPUnixConn with closed stop unexpectedly forwarded HTTP conn")
+	}
+	_ = p1.Close()
+
+	q1, q2 := net.Pipe()
+	go func() {
+		_, _ = io.WriteString(q2, "X")
+		_ = q2.Close()
+	}()
+	if serveMCPUnixConn(dir, false, "", q1, cl2, t.Context().Done()) {
+		t.Fatal("serveMCPUnixConn short EOF unexpectedly forwarded HTTP conn")
+	}
+	_ = q1.Close()
+}
+
+type nthFailWriter struct {
+	calls  int
+	failAt int
+}
+
+func (w *nthFailWriter) Write(p []byte) (int, error) {
+	w.calls++
+	if w.calls >= w.failAt {
+		return 0, errors.New("nth write boom")
+	}
+	return len(p), nil
+}
+
+func TestMCPClientSessionAndGoroutineIsolation(t *testing.T) {
+	var nilSess *mcpClientSession
+	nilSess.setConnID("x")
+	nilSess.setClientName("x")
+	nilSess.setClientToken("x")
+	nilSess.setAuthed(true)
+	if nilSess.connIDValue() != "" || nilSess.clientName() != "" || nilSess.tokenValue() != "" || nilSess.isAuthed() {
+		t.Fatal("nil mcpClientSession getters returned non-zero values")
+	}
+
+	s1 := newMCPClientSession("")
+	if s1.connIDValue() == "" {
+		t.Fatal("newMCPClientSession(\"\") produced empty connID")
+	}
+	s1.setConnID("c-1")
+	s1.setClientName("openclaw-a")
+	s1.setClientToken("tok-a")
+	s1.setAuthed(true)
+	if s1.connIDValue() != "c-1" || s1.clientName() != "openclaw-a" || s1.tokenValue() != "tok-a" || !s1.isAuthed() {
+		t.Fatalf("mcpClientSession state mismatch: id=%q client=%q tok=%q authed=%v", s1.connIDValue(), s1.clientName(), s1.tokenValue(), s1.isAuthed())
+	}
+
+	s2 := newMCPClientSession("c-2")
+	withMCPClientSession(nil, func() {
+		if currentMCPClientSession() != nil {
+			t.Fatal("expected nil session outside withMCPClientSession")
+		}
+	})
+	withMCPClientSession(s1, func() {
+		setMCPClient("openclaw-nested-1")
+		withMCPClientSession(s2, func() {
+			if got := currentMCPClientSession(); got != s2 {
+				t.Fatalf("inner currentMCPClientSession = %v, want s2", got)
+			}
+			setMCPClient("openclaw-nested-2")
+		})
+		if got := currentMCPClientSession(); got != s1 || s1.clientName() != "openclaw-nested-1" || s2.clientName() != "openclaw-nested-2" {
+			t.Fatalf("restored session mismatch: cur=%v s1=%q s2=%q", got, s1.clientName(), s2.clientName())
+		}
+	})
+	if currentMCPClientSession() != nil {
+		t.Fatal("session leaked after withMCPClientSession exit")
+	}
+}
+
+func TestMCPUnixSocketCoverageEdges(t *testing.T) {
+	hermeticEnv(t)
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatalf("index.Ensure: %v", err)
+	}
+
+	// Empty path exercises serveMCPUnixSocketProcess immediately without blocking for signals.
+	if pErr := serveMCPUnixSocketProcess(dir, "", false); pErr == nil {
+		t.Fatal("serveMCPUnixSocketProcess empty path succeeded")
+	}
+
+	// Non-existent nested parent directory is created with 0o700.
+	baseDir, aErr := allocShortSockDir()
+	if aErr != nil {
+		t.Fatal(aErr)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(baseDir) })
+	nestedParent := filepath.Join(baseDir, "sub", "dir")
+	nestedSock := filepath.Join(nestedParent, "deja.sock")
+	stopNested := startTestUnixSocketServer(t, dir, nestedSock, false)
+	if st, sErr := os.Stat(nestedParent); sErr != nil || !st.IsDir() {
+		t.Fatalf("nested parent dir not created: st=%v err=%v", st, sErr)
+	}
+	stopNested()
+
+	// Parent path traversing a regular file fails MkdirAll cleanly.
+	fileAncestor := filepath.Join(baseDir, "file-parent")
+	if wErr := os.WriteFile(fileAncestor, []byte("x"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if _, _, pErr := prepareMCPUnixSocket(filepath.Join(fileAncestor, "child", "deja.sock")); pErr == nil {
+		t.Fatal("prepareMCPUnixSocket under file ancestor succeeded")
+	}
+
+	// Stale Unix socket left unlinked on disk is dialed, replaced, and serves active connections closed on shutdown.
+	staleSock := filepath.Join(baseDir, "stale.sock")
+	uln, lErr := (&net.ListenConfig{}).Listen(t.Context(), "unix", staleSock)
+	if lErr != nil {
+		t.Fatalf("Listen stale unix socket: %v", lErr)
+	}
+	if ul, ok := uln.(*net.UnixListener); ok {
+		ul.SetUnlinkOnClose(false)
+	}
+	_ = uln.Close()
+
+	stopStale := startTestUnixSocketServer(t, dir, staleSock, false)
+
+	// Open a persistent Content-Length connection, wait for its reply so liveConns
+	// tracks it deterministically, then leave it open across shutdown.
+	liveConn := dialUnixConn(t, staleSock)
+	t.Cleanup(func() { _ = liveConn.Close() })
+	initBody := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"edge-live"}}}`
+	initFrame := fmt.Sprintf("Content-Length: %d\r\n\r\n%s", len(initBody), initBody)
+	if _, wErr := io.WriteString(liveConn, initFrame); wErr != nil {
+		t.Fatal(wErr)
+	}
+	liveBR := bufio.NewReader(liveConn)
+	_ = liveConn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	clHdr, hdrErr := liveBR.ReadString('\n')
+	if hdrErr != nil || !strings.Contains(clHdr, "Content-Length:") {
+		t.Fatalf("liveConn Content-Length header = %q (%v)", clHdr, hdrErr)
+	}
+	if blank, bErr := liveBR.ReadString('\n'); bErr != nil || strings.TrimSpace(blank) != "" {
+		t.Fatalf("liveConn header separator = %q (%v)", blank, bErr)
+	}
+	nLen, _ := strconv.Atoi(strings.TrimSpace(strings.TrimPrefix(clHdr, "Content-Length:")))
+	respBuf := make([]byte, nLen)
+	if _, rErr := io.ReadFull(liveBR, respBuf); rErr != nil {
+		t.Fatalf("liveConn body read: %v", rErr)
+	}
+	_ = liveConn.SetReadDeadline(time.Time{})
+
+	// Non-HTTP, non-Content-Length first line falls through to serveMCPBuffered.
+	fallbackReplies := sendRawUnixLines(t, staleSock, "XYZ not json\n")
+	if len(fallbackReplies) != 1 || !mcpToolIsError(fallbackReplies[0]) {
+		t.Fatalf("fallback non-JSON line replies = %#v", fallbackReplies)
+	}
+
+	// Oversized first line triggers parse error in serveMCPUnixConn.
+	overConn := dialUnixConn(t, staleSock)
+	_ = overConn.SetDeadline(time.Now().Add(5 * time.Second))
+	bigLine := bytes.Repeat([]byte{'X'}, 70*1024)
+	_, _ = overConn.Write(bigLine)
+	if uc, ok := overConn.(*net.UnixConn); ok {
+		_ = uc.CloseWrite()
+	}
+	overResp, _ := io.ReadAll(overConn)
+	_ = overConn.Close()
+	if !strings.Contains(string(overResp), "-32700") {
+		t.Fatalf("oversized line reply = %q, want -32700", overResp)
+	}
+
+	// Invalid Content-Length header returns -32700 Content-Length parse error.
+	badCLConn := dialUnixConn(t, staleSock)
+	_ = badCLConn.SetDeadline(time.Now().Add(5 * time.Second))
+	_, _ = io.WriteString(badCLConn, "Content-Length: nope\r\n\r\n")
+	if uc, ok := badCLConn.(*net.UnixConn); ok {
+		_ = uc.CloseWrite()
+	}
+	badCLResp, _ := io.ReadAll(badCLConn)
+	_ = badCLConn.Close()
+	if !strings.Contains(string(badCLResp), "-32700") {
+		t.Fatalf("invalid Content-Length reply = %q, want -32700", badCLResp)
+	}
+
+	// Stop server while liveConn is still open so closeAll iterates liveConns.
+	stopStale()
+
+	// channelListener edge branches: closed stop, full channel unblock, closed Accept.
+	cl := newChannelListener(&net.UnixAddr{Name: staleSock, Net: "unix"})
+	closedStop := make(chan struct{})
+	close(closedStop)
+	c1, c2 := net.Pipe()
+	t.Cleanup(func() {
+		_ = c1.Close()
+		_ = c2.Close()
+	})
+	if cl.enqueue(c1, closedStop) {
+		t.Fatal("enqueue succeeded with closed stop")
+	}
+	openStop := make(chan struct{})
+	for range cap(cl.ch) {
+		pA, pB := net.Pipe()
+		t.Cleanup(func() {
+			_ = pA.Close()
+			_ = pB.Close()
+		})
+		if !cl.enqueue(pA, openStop) {
+			t.Fatal("enqueue failed before channel full")
+		}
+	}
+	if cl.enqueue(c1, closedStop) {
+		t.Fatal("enqueue succeeded on full channel with closed stop")
+	}
+	go func() { close(openStop) }()
+	if cl.enqueue(c1, openStop) {
+		t.Fatal("enqueue succeeded as openStop closed")
+	}
+	_ = cl.Close()
+	if cl.enqueue(c1, make(chan struct{})) {
+		t.Fatal("enqueue succeeded after Close")
+	}
+	if _, accErr := cl.Accept(); !errors.Is(accErr, net.ErrClosed) {
+		t.Fatalf("Accept after Close = %v, want net.ErrClosed", accErr)
+	}
+
+	// mcp_http.go session store & header sanitizer edge cases.
+	store := newMCPHTTPSessionStore()
+	store.set(nil)
+	store.set(&mcpClientSession{})
+	sessA := newMCPClientSession("sess-edge-1")
+	store.set(sessA)
+	store.set(sessA)
+	if cleanMCPHeaderText("bad\x01ctrl", 32) != "" {
+		t.Fatal("cleanMCPHeaderText accepted control character")
+	}
+	if cleanMCPSessionID("bad\x01id") != "" {
+		t.Fatal("cleanMCPSessionID accepted control character")
+	}
+
+	// mcp.go serveMCPBuffered nil session, blank lines, unauthed batch, and empty auth token.
+	var mcpBuf bytes.Buffer
+	batchIn := "\n[{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}]\n{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"ping\"}\n"
+	if sErr := serveMCPBuffered(dir, bufio.NewReader(strings.NewReader(batchIn)), &mcpBuf, false, nil, "secret-tok"); sErr != nil {
+		t.Fatalf("serveMCPBuffered: %v", sErr)
+	}
+	if !strings.Contains(mcpBuf.String(), "-32001") {
+		t.Fatalf("unauthed batch missing -32001: %s", mcpBuf.String())
+	}
+	if !mcpRequestMatchesAuthToken(nil, "") {
+		t.Fatal("mcpRequestMatchesAuthToken empty authToken returned false")
+	}
+
+	// sameSocketFile rejects empty/nil and non-socket paths.
+	if sameSocketFile("", nil) {
+		t.Fatal("sameSocketFile(\"\", nil) = true, want false")
+	}
+	if ancestorInfo, ancErr := os.Stat(fileAncestor); ancErr != nil || sameSocketFile(fileAncestor, ancestorInfo) {
+		t.Fatalf("sameSocketFile on non-socket file = err:%v", ancErr)
 	}
 }

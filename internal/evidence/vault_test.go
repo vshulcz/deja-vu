@@ -106,7 +106,7 @@ func TestPlainAndVaultLifecycle(t *testing.T) {
 	// Sealed receipts fail closed when vault is not active.
 	t.Setenv("DEJA_VAULT_FILE", filepath.Join(root, "vault.json"))
 	t.Setenv("DEJA_VAULT_BACKEND", "passphrase")
-	pass := "evidence-vault-pass" //nolint:gosec // G101: synthetic test passphrase
+	pass := "evidence-vault-pass"
 	t.Setenv("DEJA_VAULT_PASSPHRASE", pass)
 	oldIter := vault.KDFIterations
 	vault.KDFIterations = 1000
@@ -171,5 +171,129 @@ func TestPlainAndVaultLifecycle(t *testing.T) {
 	}
 	if _, err := vault.CheckUnlocked(dir); !errors.Is(err, nil) {
 		t.Fatalf("CheckUnlocked unexpected error: %v", err)
+	}
+
+	// Malformed and truncated receipts.bin edge cases in load/Open/Update.
+	badDir := t.TempDir()
+	binPath := filepath.Join(badDir, fileName)
+	for _, payload := range [][]byte{
+		[]byte("BAD!"),
+		[]byte("XXXX12345678"),
+		[]byte("EVD1\x01\x00\x00\x00"),
+		append([]byte("EVD1\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x64\x00\x00\x00"), make([]byte, 16)...),
+	} {
+		resetEvidenceReaders(t)
+		if wErr := os.WriteFile(binPath, payload, 0o600); wErr != nil {
+			t.Fatal(wErr)
+		}
+		if _, ok := load(badDir); ok {
+			t.Fatalf("load unexpectedly accepted malformed payload %x", payload)
+		}
+	}
+	// Sealed receipts with corrupted ciphertext fail closed even while unlocked.
+	if wErr := os.WriteFile(filepath.Join(dir, fileName), []byte("DJVF1corrupt-payload-bytes"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	resetEvidenceReaders(t)
+	if _, ok := load(dir); ok {
+		t.Fatal("load accepted corrupt DJVF1 payload while unlocked")
+	}
+
+	// Cached Reader.Lookup fails closed once vault is locked.
+	t.Setenv("DEJA_VAULT_PASSPHRASE", "")
+	if lErr := vault.Lock(dir, pass); lErr != nil {
+		t.Fatalf("vault.Lock before Lookup: %v", lErr)
+	}
+	if got := rdUnlocked.Lookup("claude", "ev-2", ans2); got != nil {
+		t.Fatalf("cached Reader.Lookup leaked while locked: %v", got)
+	}
+	if wErr := write(dir, map[uint64]string{1: "line"}); !errors.Is(wErr, vault.ErrLocked) {
+		t.Fatalf("write while locked = %v, want ErrLocked", wErr)
+	}
+}
+
+func TestEvidenceVaultEdgeCases(t *testing.T) {
+	resetEvidenceReaders(t)
+	root := t.TempDir()
+	t.Setenv("DEJA_VAULT_FILE", filepath.Join(root, "disabled-vault.json"))
+	vault.ClearCache()
+
+	// Sealed receipts.bin must fail closed when vault is disabled.
+	sealedDir := filepath.Join(root, "sealed.db")
+	if err := os.MkdirAll(sealedDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	sealed, err := vault.SealBytes(bytes.Repeat([]byte{7}, 32), vault.DomainIndexFile, []byte("receipt-data"))
+	if err != nil || !vault.IsSealedBytes(sealed) {
+		t.Fatalf("SealBytes setup failed: err=%v sealed=%v", err, vault.IsSealedBytes(sealed))
+	}
+	if wErr := os.WriteFile(filepath.Join(sealedDir, fileName), sealed, 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if _, ok := load(sealedDir); ok {
+		t.Fatal("load accepted sealed receipts.bin with disabled vault")
+	}
+
+	// Short / corrupt unsealed receipts.bin is rejected by load.
+	if wErr := os.WriteFile(filepath.Join(sealedDir, fileName), []byte("BAD"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if _, ok := load(sealedDir); ok {
+		t.Fatal("load accepted corrupt receipts.bin")
+	}
+
+	// write fails when target parent is a regular file.
+	notDir := filepath.Join(root, "file-parent")
+	if wErr := os.WriteFile(notDir, []byte("x"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if wErr := write(notDir, map[uint64]string{1: "line"}); wErr == nil {
+		t.Fatal("write into file path unexpectedly succeeded")
+	}
+
+	// Plaintext Reader.Lookup handles missing and truncated on-disk receipts cleanly.
+	plainDir := filepath.Join(root, "plain.db")
+	if mkErr := os.MkdirAll(plainDir, 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	ans := "Updated edge_tok in edge.go to 42"
+	s := model.Session{
+		Harness: "claude",
+		ID:      "ev-edge",
+		Updated: time.Now(),
+		Messages: []model.Message{
+			{Role: "user", Text: "verify edge_tok"},
+			{Role: "edit", Text: "edge.go\nedge_tok = 42"},
+			{Role: "assistant", Text: ans},
+		},
+	}
+	Build(plainDir, []model.Session{s}, nil)
+	rd := Open(plainDir)
+	if rd == nil || len(rd.Lookup("claude", "ev-edge", ans)) == 0 {
+		t.Fatalf("plaintext Open/Lookup setup failed: rd=%v", rd)
+	}
+	raw, rErr := os.ReadFile(filepath.Join(plainDir, fileName))
+	if rErr != nil {
+		t.Fatal(rErr)
+	}
+	recPath := filepath.Join(plainDir, fileName)
+	hdrOnlyLen := len(magic) + 4 + entrySize
+	if wErr := os.WriteFile(recPath, raw[:hdrOnlyLen], 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if got := rd.Lookup("claude", "ev-edge", ans); got != nil {
+		t.Fatalf("Lookup with truncated value returned %v, want nil", got)
+	}
+	if wErr := os.WriteFile(recPath, raw[:len(magic)+6], 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if got := rd.Lookup("claude", "ev-edge", ans); got != nil {
+		t.Fatalf("Lookup with truncated entry returned %v, want nil", got)
+	}
+	if rmErr := os.Remove(recPath); rmErr != nil {
+		t.Fatal(rmErr)
+	}
+	if got := rd.Lookup("claude", "ev-edge", ans); got != nil {
+		t.Fatalf("Lookup on missing receipts.bin returned %v, want nil", got)
 	}
 }

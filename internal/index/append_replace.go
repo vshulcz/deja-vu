@@ -356,14 +356,11 @@ func deadWords(path string, t *recordTables, offs []int64, unindexed bool) (buck
 }
 
 func deadWordsOf(path string, t *recordTables, offs []int64, unindexed bool) (bucketPostings, map[string]bool, error) {
-	f, err := openIndexFile(path)
+	f, err := openRecordFile(path, t)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer func() { _ = f.Close() }()
-	if err := t.ensureCipherForFile(path); err != nil {
-		return nil, nil, err
-	}
 	words := bucketPostings{}
 	unposted := map[string]bool{}
 	var hdr [4]byte

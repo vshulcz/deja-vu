@@ -112,7 +112,7 @@ func newLogWalk(r io.Reader, t *recordTables, from int64) *logWalk {
 	w := &logWalk{r: bufio.NewReaderSize(r, 1024*1024), off: from, dead: t.deadFrom(from)}
 	if named, ok := r.(interface{ Name() string }); ok {
 		w.err = t.ensureCipherForFile(named.Name())
-	} else if _, dir := t.recordCipher(); dir != "" {
+	} else if _, dir, checked := t.cipherState(); dir != "" && !checked {
 		w.err = t.ensureCipher(dir)
 	}
 	return w
@@ -303,14 +303,11 @@ var readAheadPool = sync.Pool{New: func() any { b := make([]byte, readAheadSize)
 // enough, which is how an existence question avoids reading a log it has already
 // answered.
 func eachRecordUntil(path string, t *recordTables, fn func(Record) bool) error {
-	f, err := openIndexFile(path)
+	f, err := openRecordFile(path, t)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	if err := t.ensureCipherForFile(path); err != nil {
-		return err
-	}
 	w := newLogWalk(f, t, 0)
 	for {
 		_, payload, err := w.next()
@@ -372,12 +369,9 @@ func roleWanted(roles map[string]bool, role string) bool {
 
 func decodeRecordHeader(b []byte, t *recordTables) (Record, byte, []byte, error) {
 	var rec Record
-	rc, dir := t.recordCipher()
-	if rc == nil && dir != "" {
-		if err := t.ensureCipher(dir); err != nil {
-			return rec, 0, nil, err
-		}
-		rc, _ = t.recordCipher()
+	rc, rcErr := t.cipherOrInit()
+	if rcErr != nil {
+		return rec, 0, nil, rcErr
 	}
 	kid, n := binary.Uvarint(b)
 	if n <= 0 {
@@ -476,14 +470,11 @@ func eachRecordInRoles(path string, t *recordTables, want map[string]bool, fn fu
 }
 
 func eachRecordInRolesWhere(path string, t *recordTables, want map[string]bool, keepKey func(string) bool, fn func(Record)) error {
-	f, err := openIndexFile(path)
+	f, err := openRecordFile(path, t)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	if err := t.ensureCipherForFile(path); err != nil {
-		return err
-	}
 	w := newLogWalk(f, t, 0)
 	for {
 		_, payload, err := w.nextInRoles(t, want, keepKey)
@@ -528,14 +519,11 @@ func eachRecordForKeysInRolesWindowed(path string, t *recordTables, want, roles 
 
 func eachRecordForKeysInRolesWindowedTail(path string, t *recordTables, want, roles map[string]bool, matchedByKey map[string][]int64, tail int, fn func(Record)) error {
 	atomic.AddInt64(&recordLogScans, 1)
-	f, err := openIndexFile(path)
+	f, err := openRecordFile(path, t)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	if err := t.ensureCipherForFile(path); err != nil {
-		return err
-	}
 	if ok, err := eachRecordForKeysByOffsetsWindowedTail(f, filepath.Dir(path), t, want, roles, matchedByKey, tail, fn); ok || err != nil {
 		return err
 	}
@@ -680,24 +668,33 @@ type recordTables struct {
 	// dead is the manifest's DeadRecords: records a walk of the log skips.
 	dead []int64
 
-	cipherMu sync.RWMutex
-	dir      string
-	cipher   *vault.RecordCipher
+	cipherMu      sync.RWMutex
+	dir           string
+	cipher        *vault.RecordCipher
+	cipherChecked bool
+}
+
+func (t *recordTables) cipherState() (*vault.RecordCipher, string, bool) {
+	if t == nil {
+		return nil, "", false
+	}
+	t.cipherMu.RLock()
+	rc, dir, checked := t.cipher, t.dir, t.cipherChecked
+	t.cipherMu.RUnlock()
+	return rc, dir, checked
 }
 
 func (t *recordTables) recordCipher() (*vault.RecordCipher, string) {
-	if t == nil {
-		return nil, ""
-	}
-	t.cipherMu.RLock()
-	rc, dir := t.cipher, t.dir
-	t.cipherMu.RUnlock()
+	rc, dir, _ := t.cipherState()
 	return rc, dir
 }
 
 func (t *recordTables) ensureCipher(dir string) error {
 	canon := canonicalVaultDir(dir)
 	if canon == "" {
+		return nil
+	}
+	if _, curDir, checked := t.cipherState(); checked && curDir == canon {
 		return nil
 	}
 	rc, _, err := vault.ActiveRecordCipher(canon)
@@ -709,19 +706,43 @@ func (t *recordTables) ensureCipher(dir string) error {
 		t.cipherMu.Lock()
 		t.dir = canon
 		t.cipher = rc
+		t.cipherChecked = true
 		t.cipherMu.Unlock()
 	}
 	return nil
+}
+
+func (t *recordTables) cipherOrInit() (*vault.RecordCipher, error) {
+	rc, dir, checked := t.cipherState()
+	if rc == nil && !checked && dir != "" {
+		if err := t.ensureCipher(dir); err != nil {
+			return nil, err
+		}
+		rc, _, _ = t.cipherState()
+	}
+	return rc, nil
 }
 
 func (t *recordTables) ensureCipherForFile(path string) error {
 	if dir := vaultDirForFile(path); dir != "" {
 		return t.ensureCipher(dir)
 	}
-	if _, dir := t.recordCipher(); dir != "" {
+	if _, dir, checked := t.cipherState(); dir != "" && !checked {
 		return t.ensureCipher(dir)
 	}
 	return nil
+}
+
+func openRecordFile(path string, t *recordTables) (*os.File, error) {
+	f, err := openIndexFile(path)
+	if err != nil {
+		return nil, err
+	}
+	if cErr := t.ensureCipherForFile(path); cErr != nil {
+		_ = f.Close()
+		return nil, cErr
+	}
+	return f, nil
 }
 
 // isDead reports whether the record at off was replaced by a later pass.
@@ -851,12 +872,9 @@ var inflateReaders = sync.Pool{New: func() any { return flate.NewReader(nil) }}
 // payload so a walk can peek the key and skip the record without inflating
 // anything — that path never touches a compressed byte.
 func encodeRecordChecked(r Record, t *recordTables) ([]byte, error) {
-	rc, dir := t.recordCipher()
-	if rc == nil && dir != "" {
-		if err := t.ensureCipher(dir); err != nil {
-			return nil, err
-		}
-		rc, _ = t.recordCipher()
+	rc, rcErr := t.cipherOrInit()
+	if rcErr != nil {
+		return nil, rcErr
 	}
 	body := make([]byte, 0, len(r.Text)+24)
 	body = binary.LittleEndian.AppendUint64(body, uint64(recordNanos(r.Time))) //nolint:gosec // a signed time's bits, read back as int64

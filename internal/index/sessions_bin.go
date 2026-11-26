@@ -12,8 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-
-	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 const (
@@ -62,7 +60,7 @@ func writeSessionsBinAtomicStat(p string, sessions map[string]SessionMeta) (os.F
 	if err != nil {
 		return nil, err
 	}
-	fi, err := writeSealedAtomicStat(p, data, vault.DomainIndexFile)
+	fi, err := writeSealedAtomicStat(p, data)
 	if err != nil {
 		return nil, err
 	}

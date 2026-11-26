@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -459,5 +460,466 @@ func TestDBusFallbackAndStatus(t *testing.T) {
 	st2 := Status(indexDir)
 	if !st2.Enabled || !st2.Locked {
 		t.Fatalf("locked Status = %+v", st2)
+	}
+}
+
+func TestKeyringHelpersAndOSBackend(t *testing.T) {
+	restoreKR := SetKeyringForTest(&memKeyring{name: "swap-kr", keys: map[string][]byte{}})
+	if !KeyringAvailable() {
+		t.Fatal("KeyringAvailable with swapped test keyring = false, want true")
+	}
+	restoreKR()
+	if got := keyringIdentity(nil); got != "" {
+		t.Fatalf("keyringIdentity(nil) = %q, want empty", got)
+	}
+	if got := keyringIdentity(osKeyring{}); !strings.Contains(got, osKeyring{}.Name()) {
+		t.Fatalf("keyringIdentity(osKeyring{}) = %q", got)
+	}
+
+	if (osKeyring{}).Name() == "" {
+		t.Fatal("osKeyring.Name returned empty")
+	}
+	for _, tc := range []struct {
+		id   string
+		want bool
+	}{
+		{"0123456789abcdef", true},
+		{"", false},
+		{"0123456789abcdeF", false},
+		{"0123456789abcdeg", false},
+	} {
+		if got := validKeyID(tc.id); got != tc.want {
+			t.Errorf("validKeyID(%q) = %v, want %v", tc.id, got, tc.want)
+		}
+	}
+
+	t.Setenv("LOCALAPPDATA", t.TempDir())
+	for _, tc := range []struct {
+		goos string
+		op   string
+	}{
+		{"darwin", "set"},
+		{"darwin", "get"},
+		{"darwin", "delete"},
+		{"linux", "set"},
+		{"linux", "delete"},
+		{"windows", "set"},
+		{"windows", "get"},
+		{"windows", "delete"},
+	} {
+		if _, _, _, _, err := keyringCommand(tc.goos, tc.op, "0123456789abcdef", "secret"); err != nil {
+			t.Errorf("keyringCommand(%s, %s): %v", tc.goos, tc.op, err)
+		}
+	}
+	if _, _, _, _, err := keyringCommand("darwin", "badop", "0123456789abcdef", ""); err == nil {
+		t.Fatal("keyringCommand(darwin, badop) succeeded")
+	}
+	if _, _, _, _, err := keyringCommand("plan9", "get", "0123456789abcdef", ""); err == nil {
+		t.Fatal("keyringCommand(plan9, get) succeeded")
+	}
+
+	if runtime.GOOS != "windows" {
+		out, execErr := defaultExecKeyring("sh", []string{"-c", "cat"}, "pong", []string{"DEJA_KR_ENV=1"})
+		if execErr != nil || strings.TrimSpace(string(out)) != "pong" {
+			t.Fatalf("defaultExecKeyring = (%q, %v)", out, execErr)
+		}
+	}
+
+	origExec := execKeyringFn
+	t.Cleanup(func() { execKeyringFn = origExec })
+	var kr osKeyring
+	t.Setenv("DEJA_VAULT_BACKEND", "passphrase")
+	if KeyringAvailable() {
+		t.Fatal("KeyringAvailable with DEJA_VAULT_BACKEND=passphrase = true, want false")
+	}
+	if err := kr.Set("0123456789abcdef", make([]byte, 32)); err == nil {
+		t.Fatal("osKeyring.Set under passphrase backend succeeded")
+	}
+	if _, err := kr.Get("0123456789abcdef"); err == nil {
+		t.Fatal("osKeyring.Get under passphrase backend succeeded")
+	}
+	if err := kr.Delete("0123456789abcdef"); err != nil {
+		t.Fatalf("osKeyring.Delete under passphrase backend = %v", err)
+	}
+
+	t.Setenv("DEJA_VAULT_BACKEND", "")
+	if err := kr.Set("bad-id", make([]byte, 32)); err == nil {
+		t.Fatal("osKeyring.Set bad keyID succeeded")
+	}
+	if _, err := kr.Get("bad-id"); err == nil {
+		t.Fatal("osKeyring.Get bad keyID succeeded")
+	}
+	if err := kr.Delete("bad-id"); err != nil {
+		t.Fatalf("osKeyring.Delete bad keyID = %v", err)
+	}
+
+	dek := make([]byte, 32)
+	for i := range dek {
+		dek[i] = byte(i + 10)
+	}
+	execKeyringFn = func(_ string, _ []string, _ string, _ []string) ([]byte, error) {
+		return []byte(hex.EncodeToString(dek) + "\n"), nil
+	}
+	if err := kr.Set("0123456789abcdef", dek); err != nil {
+		t.Fatalf("osKeyring.Set valid: %v", err)
+	}
+	if got, err := kr.Get("0123456789abcdef"); err != nil || !slices.Equal(got, dek) {
+		t.Fatalf("osKeyring.Get valid = (%x, %v)", got, err)
+	}
+	if err := kr.Delete("0123456789abcdef"); err != nil {
+		t.Fatalf("osKeyring.Delete valid: %v", err)
+	}
+
+	execKeyringFn = func(_ string, _ []string, _ string, _ []string) ([]byte, error) {
+		return []byte("not-hex"), nil
+	}
+	if _, err := kr.Get("0123456789abcdef"); err == nil {
+		t.Fatal("osKeyring.Get corrupt hex succeeded")
+	}
+	execKeyringFn = func(_ string, _ []string, _ string, _ []string) ([]byte, error) {
+		return []byte("boom"), errors.New("backend failure")
+	}
+	if err := kr.Set("0123456789abcdef", dek); err == nil {
+		t.Fatal("osKeyring.Set error returned nil")
+	}
+	if _, err := kr.Get("0123456789abcdef"); err == nil {
+		t.Fatal("osKeyring.Get error returned nil")
+	}
+
+	// Parameterized OS backend name, availability, and delete helpers (cover all platforms in CI).
+	for _, tc := range []struct {
+		goos string
+		want string
+	}{
+		{"darwin", "keychain"},
+		{"linux", "secret-service"},
+		{"windows", "dpapi"},
+		{"plan9", "passphrase"},
+	} {
+		if got := keyringBackendName(tc.goos); got != tc.want {
+			t.Fatalf("keyringBackendName(%q) = %q, want %q", tc.goos, got, tc.want)
+		}
+	}
+
+	okLook := func(string) (string, error) { return "/bin/true", nil }
+	errLook := func(string) (string, error) { return "", errors.New("missing") }
+	if !keyringAvailableFor("darwin", okLook) || keyringAvailableFor("darwin", errLook) {
+		t.Fatal("keyringAvailableFor(darwin) mismatch")
+	}
+	if keyringAvailableFor("linux", errLook) {
+		t.Fatal("keyringAvailableFor(linux) with missing tool returned true")
+	}
+	t.Setenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/tmp/fake-dbus")
+	if !keyringAvailableFor("linux", okLook) {
+		t.Fatal("keyringAvailableFor(linux) with DBUS_SESSION_BUS_ADDRESS returned false")
+	}
+	if !keyringAvailableFor("windows", errLook) || keyringAvailableFor("plan9", okLook) {
+		t.Fatal("keyringAvailableFor(windows/default) mismatch")
+	}
+
+	dpapiDir := t.TempDir()
+	t.Setenv("LOCALAPPDATA", dpapiDir)
+	t.Setenv("DEJA_VAULT_BACKEND", "passphrase")
+	if dErr := deleteOSKeyring("darwin", "0123456789abcdef"); dErr != nil {
+		t.Fatalf("deleteOSKeyring passphrase forced: %v", dErr)
+	}
+	t.Setenv("DEJA_VAULT_BACKEND", "")
+	if dErr := deleteOSKeyring("windows", "bad-id"); dErr != nil {
+		t.Fatalf("deleteOSKeyring invalid keyID: %v", dErr)
+	}
+	dpPath, pErr := dpapiPath("0123456789abcdef")
+	if pErr != nil {
+		t.Fatal(pErr)
+	}
+	if mkErr := os.MkdirAll(filepath.Dir(dpPath), 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	if wErr := os.WriteFile(dpPath, []byte("dpapi-blob"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if dErr := deleteOSKeyring("windows", "0123456789abcdef"); dErr != nil {
+		t.Fatalf("deleteOSKeyring windows remove: %v", dErr)
+	}
+	if dErr := deleteOSKeyring("windows", "0123456789abcdef"); dErr != nil {
+		t.Fatalf("deleteOSKeyring windows missing idempotent: %v", dErr)
+	}
+	if dErr := deleteOSKeyring("plan9", "0123456789abcdef"); dErr == nil {
+		t.Fatal("deleteOSKeyring unsupported OS succeeded")
+	}
+	execKeyringFn = func(_ string, _ []string, _ string, _ []string) ([]byte, error) { return nil, nil }
+	if dErr := deleteOSKeyring("darwin", "0123456789abcdef"); dErr != nil {
+		t.Fatalf("deleteOSKeyring darwin stub = %v", dErr)
+	}
+}
+
+func TestLiveVaultEdgeBranches(t *testing.T) {
+	indexDir, _ := withTestVaultEnv(t)
+	if err := os.MkdirAll(indexDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	storeConfigCache("ignored", nil, Config{})
+	if _, err := aeadFor([]byte("short"), DomainIndexFile); err == nil {
+		t.Fatal("aeadFor accepted short DEK")
+	}
+	if _, err := aeadFor(make([]byte, 32), ""); err == nil {
+		t.Fatal("aeadFor accepted empty domain")
+	}
+	if _, err := OpenBytes(make([]byte, 32), DomainIndexFile, []byte("plain")); err == nil {
+		t.Fatal("OpenBytes accepted unsealed prefix")
+	}
+	if err := encryptExistingSidecars("", make([]byte, 32)); err != nil {
+		t.Fatalf("encryptExistingSidecars empty dir = %v", err)
+	}
+
+	// Vault disabled: sealed DJVF1 file and sealed sidecar line fail closed.
+	sealedBlob, err := SealBytes(make([]byte, 32), DomainSidecar, []byte("secret"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	orphanSealed := indexDir + ".orphan"
+	if wErr := os.WriteFile(orphanSealed, sealedBlob, 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if _, rErr := ReadSealedFile(indexDir, orphanSealed, DomainSidecar); rErr == nil {
+		t.Fatal("ReadSealedFile disabled vault accepted sealed blob")
+	}
+	if _, rErr := ReadSealedFile(indexDir, filepath.Join(t.TempDir(), "missing"), DomainSidecar); rErr == nil {
+		t.Fatal("ReadSealedFile missing succeeded")
+	}
+	if _, _, oErr := OpenSidecarLine(indexDir, DomainSidecar, NoteLinePrefix+"abc"); oErr == nil {
+		t.Fatal("OpenSidecarLine disabled vault accepted NoteLinePrefix")
+	}
+
+	// Corrupt vault.json -> Status reports Locked + Error.
+	if wErr := os.MkdirAll(filepath.Dir(ConfigPath()), 0o700); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if wErr := os.WriteFile(ConfigPath(), []byte("{broken"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	badSt := Status(indexDir)
+	if !badSt.Enabled || !badSt.Locked || badSt.Error == "" {
+		t.Fatalf("Status corrupt vault.json = %+v", badSt)
+	}
+	_ = os.Remove(ConfigPath())
+	invalidateConfigCache()
+
+	// encryptExistingSidecars handles dir collision, mixed lines, idempotent rerun, and Archive/sealed-manifest Status.
+	base := strings.TrimSuffix(indexDir, string(os.PathSeparator))
+	if mErr := os.MkdirAll(base+".dejavu", 0o700); mErr != nil {
+		t.Fatal(mErr)
+	}
+	if _, iErr := Init(indexDir, "edge-passphrase-1", 0); iErr != nil {
+		t.Fatalf("Init: %v", iErr)
+	}
+	dek, err := CheckUnlocked(indexDir)
+	if err != nil {
+		t.Fatalf("CheckUnlocked: %v", err)
+	}
+	defer clear(dek)
+
+	encLine, err := SealLine(dek, DomainSidecar, []byte("already-sealed"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	hookSeen := base + ".hookseen"
+	if wErr := os.WriteFile(hookSeen, []byte("\nplain-entry 1\n"+encLine+"\n"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if eErr := encryptExistingSidecars(indexDir, dek); eErr != nil {
+		t.Fatalf("encryptExistingSidecars first: %v", eErr)
+	}
+	if eErr := encryptExistingSidecars(indexDir, dek); eErr != nil {
+		t.Fatalf("encryptExistingSidecars idempotent: %v", eErr)
+	}
+	if _, _, oErr := OpenSidecarLine(indexDir, DomainSidecar, NoteLinePrefix+"corrupt!!!"); oErr == nil {
+		t.Fatal("OpenSidecarLine unlocked accepted corrupt ciphertext")
+	}
+
+	// Sealed manifest.gob sets EncryptedStore=true in Status, as does ArchivePath.
+	sealedManifest, err := SealBytes(dek, DomainIndexFile, []byte("manifest"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wErr := os.WriteFile(filepath.Join(base, "manifest.gob"), sealedManifest, 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if st := Status(indexDir); !st.EncryptedStore {
+		t.Fatalf("Status with sealed manifest = %+v, want EncryptedStore=true", st)
+	}
+	_ = os.Remove(filepath.Join(base, "manifest.gob"))
+	if wErr := os.WriteFile(ArchivePath(base), []byte("archive"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if st := Status(indexDir); !st.EncryptedStore {
+		t.Fatalf("Status with archive = %+v, want EncryptedStore=true", st)
+	}
+
+	// Additional edge branches: pbCache hit, keyringIdentity nil/pointer, RecordCipher/WriteSealedFile errors, Unlock migrator failure.
+	cfg, cErr := LoadConfig()
+	if cErr != nil {
+		t.Fatalf("LoadConfig: %v", cErr)
+	}
+	u1, uErr := unwrapDEKCached(cfg, "edge-passphrase-1")
+	if uErr != nil {
+		t.Fatalf("unwrapDEKCached first: %v", uErr)
+	}
+	clear(u1)
+	u2, uErr2 := unwrapDEKCached(cfg, "edge-passphrase-1")
+	if uErr2 != nil {
+		t.Fatalf("unwrapDEKCached cached hit: %v", uErr2)
+	}
+	clear(u2)
+	if _, wErr := unwrapDEKCached(cfg, "wrong-passphrase"); wErr == nil {
+		t.Fatal("unwrapDEKCached wrong passphrase succeeded")
+	}
+	if got := keyringIdentity(nil); got != "" {
+		t.Fatalf("keyringIdentity(nil) = %q, want empty", got)
+	}
+	ptrKR := &countingKeyring{}
+	if got := keyringIdentity(ptrKR); !strings.Contains(got, "countingKeyring") {
+		t.Fatalf("keyringIdentity(ptr) = %q", got)
+	}
+	if _, sErr := SealBytes([]byte("short"), DomainSidecar, []byte("x")); sErr == nil {
+		t.Fatal("SealBytes short DEK succeeded")
+	}
+	if _, oErr := OpenBytes(dek, DomainSidecar, []byte(fileMagic+"short")); oErr == nil {
+		t.Fatal("OpenBytes truncated succeeded")
+	}
+	if _, oErr := OpenBytes([]byte("short"), DomainSidecar, sealedManifest); oErr == nil {
+		t.Fatal("OpenBytes short DEK succeeded")
+	}
+	if wErr := WriteSealedFile(indexDir, filepath.Join(t.TempDir(), "x"), "", []byte("a"), 0o600); wErr == nil {
+		t.Fatal("WriteSealedFile empty domain succeeded")
+	}
+	if _, rcErr := NewRecordCipher([]byte("short")); rcErr == nil {
+		t.Fatal("NewRecordCipher short DEK succeeded")
+	}
+	rc, active, rcErr := ActiveRecordCipher(indexDir)
+	if rcErr != nil || !active || rc == nil {
+		t.Fatalf("ActiveRecordCipher unlocked = (%v, %v, %v)", rc, active, rcErr)
+	}
+	if _, oErr := rc.Open(0, []byte("short")); oErr == nil {
+		t.Fatal("RecordCipher.Open truncated succeeded")
+	}
+
+	if lErr := Lock(indexDir, "edge-passphrase-1"); lErr != nil {
+		t.Fatalf("Lock: %v", lErr)
+	}
+	if wErr := WriteSealedFile(indexDir, filepath.Join(t.TempDir(), "locked"), DomainSidecar, []byte("x"), 0o600); !errors.Is(wErr, ErrLocked) {
+		t.Fatalf("WriteSealedFile locked = %v, want ErrLocked", wErr)
+	}
+	if _, _, aErr := ActiveRecordCipher(indexDir); !errors.Is(aErr, ErrLocked) {
+		t.Fatalf("ActiveRecordCipher locked = %v, want ErrLocked", aErr)
+	}
+
+	_ = os.Remove(ArchivePath(base))
+	RegisterMigrator("zzz_edge_fail", func(string, []byte) error {
+		return errors.New("migrator boom")
+	})
+	t.Cleanup(func() { unregisterMigratorForTest("zzz_edge_fail") })
+	if uErr := Unlock(indexDir, "edge-passphrase-1"); uErr == nil || !strings.Contains(uErr.Error(), "migrator boom") {
+		t.Fatalf("Unlock failing migrator = %v, want migrator boom", uErr)
+	}
+}
+
+func TestVaultLiveMigrationAndCacheBranches(t *testing.T) {
+	tmp := t.TempDir()
+	indexDir := filepath.Join(tmp, "index.db")
+	if err := os.MkdirAll(indexDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	vaultPath := filepath.Join(tmp, "vault.json")
+	t.Setenv("DEJA_VAULT_FILE", vaultPath)
+	t.Setenv("DEJA_VAULT_BACKEND", "passphrase")
+	t.Setenv("DEJA_VAULT_PASSPHRASE", "mig-pass-1")
+	oldIter := KDFIterations
+	KDFIterations = 1000
+	t.Cleanup(func() { KDFIterations = oldIter })
+	ClearCache()
+	t.Cleanup(ClearCache)
+
+	if _, iErr := Init(indexDir, "mig-pass-1", 0); iErr != nil {
+		t.Fatalf("Init: %v", iErr)
+	}
+	dek, kErr := CheckUnlocked(indexDir)
+	if kErr != nil {
+		t.Fatalf("CheckUnlocked: %v", kErr)
+	}
+	defer clear(dek)
+
+	// Invalid DEK / domain checks in aeadFor, SealBytes, and NewStreamReader.
+	if _, sErr := SealBytes([]byte("short"), DomainSidecar, []byte("hi")); sErr == nil {
+		t.Fatal("SealBytes short DEK succeeded")
+	}
+	if _, sErr := SealBytes(dek, "", []byte("hi")); sErr == nil {
+		t.Fatal("SealBytes empty domain succeeded")
+	}
+	if _, srErr := NewStreamReader(bytes.NewReader([]byte("BAD!")), dek, DomainEmbed); srErr == nil {
+		t.Fatal("NewStreamReader bad magic succeeded")
+	}
+
+	// ActiveRecordCipher under corrupt vault config fails with error.
+	badVault := filepath.Join(tmp, "bad-vault.json")
+	if wErr := os.WriteFile(badVault, []byte("{bad"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	t.Setenv("DEJA_VAULT_FILE", badVault)
+	ClearCache()
+	if _, _, rcErr := ActiveRecordCipher(indexDir); rcErr == nil {
+		t.Fatal("ActiveRecordCipher with bad vault config succeeded")
+	}
+	st := Status(indexDir)
+	if !st.Enabled || !st.Locked || st.Error == "" {
+		t.Fatalf("Status corrupt vault = %+v, want enabled+locked+error", st)
+	}
+
+	// Wrong passphrase fails unwrap cleanly.
+	t.Setenv("DEJA_VAULT_FILE", vaultPath)
+	t.Setenv("DEJA_VAULT_PASSPHRASE", "wrong-pass")
+	ClearCache()
+	if _, ckErr := CheckUnlocked(indexDir); ckErr == nil || !strings.Contains(ckErr.Error(), "passphrase") {
+		t.Fatalf("CheckUnlocked wrong passphrase = %v, want invalid passphrase error", ckErr)
+	}
+	t.Setenv("DEJA_VAULT_PASSPHRASE", "mig-pass-1")
+	ClearCache()
+
+	// encryptExistingSidecars seals plaintext wholeFileSidecars and plaintext lines in lineEncryptedSidecars.
+	dejavuSidecar := indexDir + ".dejavu"
+	if wErr := os.WriteFile(dejavuSidecar, []byte("plain-dejavu-entry"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	sealedLine, slErr := SealLine(dek, DomainSidecar, []byte("already-sealed"))
+	if slErr != nil {
+		t.Fatal(slErr)
+	}
+	hookseenSidecar := indexDir + ".hookseen"
+	if wErr := os.WriteFile(hookseenSidecar, []byte("\n"+sealedLine+"\nplain-hookseen-token\n"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if mErr := encryptExistingSidecars(indexDir, dek); mErr != nil {
+		t.Fatalf("encryptExistingSidecars: %v", mErr)
+	}
+	gotDV, rErr := os.ReadFile(dejavuSidecar)
+	if rErr != nil || !IsSealedBytes(gotDV) {
+		t.Fatalf("wholeFileSidecar not sealed: %q (%v)", gotDV, rErr)
+	}
+	gotHS, rErr := os.ReadFile(hookseenSidecar)
+	if rErr != nil || strings.Contains(string(gotHS), "plain-hookseen-token") || !strings.Contains(string(gotHS), NoteLinePrefix) {
+		t.Fatalf("lineEncryptedSidecar not sealed: %q (%v)", gotHS, rErr)
+	}
+
+	// OS keyring availability & deleteOSKeyring cross-platform branches.
+	t.Setenv("DEJA_VAULT_BACKEND", "")
+	restoreKR := SetKeyringForTest(nil)
+	defer restoreKR()
+	_ = KeyringAvailable()
+	if krErr := deleteOSKeyring("plan9", "0123456789abcdef"); krErr == nil {
+		t.Fatal("deleteOSKeyring unsupported OS succeeded")
+	}
+	t.Setenv("LOCALAPPDATA", tmp)
+	if krErr := deleteOSKeyring("windows", "0123456789abcdef"); krErr != nil {
+		t.Fatalf("deleteOSKeyring windows missing = %v", krErr)
 	}
 }

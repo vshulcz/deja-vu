@@ -15,8 +15,6 @@ import (
 	"sort"
 	"strings"
 	"sync/atomic"
-
-	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 // recordOffsetsFile lists, per session, where its records sit in records.bin.
@@ -614,7 +612,7 @@ func readRecordAtInRoles(f *os.File, off int64, t *recordTables, want, roles map
 // writeFileAtomic writes b beside p and renames it over p. No fsync: the
 // table is a cache checked against the log, and a torn one is refused.
 func writeFileAtomic(p string, b []byte) error {
-	return writeSealedFileAtomic(p, b, vault.DomainIndexFile)
+	return writeSealedFileAtomic(p, b)
 }
 
 // passOffsets is the offset table of a log a pass writes from scratch,
