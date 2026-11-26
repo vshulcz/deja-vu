@@ -6,6 +6,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"io"
@@ -36,6 +37,8 @@ const (
 	fileNonceSize   = 12
 	fileTagSize     = 16
 	keyringCacheTTL = 5 * time.Second
+
+	maxSealedBytesPayload = 512 << 20
 
 	// RecordOverhead is the per-record byte overhead added by 12B nonce + 16B GCM tag.
 	RecordOverhead = fileNonceSize + fileTagSize
@@ -68,7 +71,10 @@ type (
 		wrappedDEK string
 		salt       string
 		iterations int
-		passSum    [sha256.Size]byte
+	}
+	pbCacheEntry struct {
+		pass []byte
+		dek  []byte
 	}
 	krCacheKey struct {
 		cfgPath    string
@@ -88,7 +94,7 @@ type (
 var (
 	cacheMu  sync.Mutex
 	cfgCache cfgCacheEntry
-	pbCache  = map[pbCacheKey][]byte{}
+	pbCache  = map[pbCacheKey]pbCacheEntry{}
 	krEntry  struct {
 		key       krCacheKey
 		dek       []byte
@@ -107,7 +113,8 @@ func ClearCache() {
 	defer cacheMu.Unlock()
 	cfgCache = cfgCacheEntry{}
 	for k, v := range pbCache {
-		clear(v)
+		clear(v.pass)
+		clear(v.dek)
 		delete(pbCache, k)
 	}
 	clear(krEntry.dek)
@@ -164,11 +171,10 @@ func unwrapDEKCached(cfg Config, passphrase string) ([]byte, error) {
 		wrappedDEK: cfg.WrappedDEK,
 		salt:       cfg.Salt,
 		iterations: cfg.Iterations,
-		passSum:    sha256.Sum256([]byte(passphrase)),
 	}
 	cacheMu.Lock()
-	if cached, ok := pbCache[key]; ok {
-		out := append([]byte(nil), cached...)
+	if cached, ok := pbCache[key]; ok && subtle.ConstantTimeCompare(cached.pass, []byte(passphrase)) == 1 {
+		out := append([]byte(nil), cached.dek...)
 		cacheMu.Unlock()
 		return out, nil
 	}
@@ -179,7 +185,14 @@ func unwrapDEKCached(cfg Config, passphrase string) ([]byte, error) {
 		return nil, err
 	}
 	cacheMu.Lock()
-	pbCache[key] = append([]byte(nil), dek...)
+	if prev, ok := pbCache[key]; ok {
+		clear(prev.pass)
+		clear(prev.dek)
+	}
+	pbCache[key] = pbCacheEntry{
+		pass: append([]byte(nil), passphrase...),
+		dek:  append([]byte(nil), dek...),
+	}
 	cacheMu.Unlock()
 	return dek, nil
 }
@@ -189,12 +202,11 @@ func keyringIdentity(kr Keyring) string {
 		return ""
 	}
 	rv := reflect.ValueOf(kr)
-	switch rv.Kind() {
-	case reflect.Pointer, reflect.Map, reflect.Slice, reflect.Chan, reflect.UnsafePointer:
+	k := rv.Kind()
+	if k == reflect.Pointer || k == reflect.Map || k == reflect.Slice || k == reflect.Chan || k == reflect.UnsafePointer {
 		return fmt.Sprintf("%T:%x", kr, rv.Pointer())
-	default:
-		return fmt.Sprintf("%T:%s", kr, kr.Name())
 	}
+	return fmt.Sprintf("%T:%s", kr, kr.Name())
 }
 
 func execFnPointer() uintptr {
@@ -287,16 +299,20 @@ func IsStreamHeader(head []byte) bool {
 
 // SealBytes encrypts data into a DJVF1 whole-file AES-256-GCM envelope bound to domain.
 func SealBytes(dek []byte, domain string, data []byte) ([]byte, error) {
+	n := len(data)
+	if n > maxSealedBytesPayload {
+		return nil, errors.New("vault payload exceeds maximum whole-file size")
+	}
 	gcm, err := aeadFor(dek, domain)
 	if err != nil {
 		return nil, err
 	}
 	nonce := make([]byte, fileNonceSize)
-	if _, err := rand.Read(nonce); err != nil {
-		return nil, err
+	if _, rErr := rand.Read(nonce); rErr != nil {
+		return nil, rErr
 	}
 	aad := []byte(fileMagic + ":" + domain)
-	out := make([]byte, len(fileMagic), len(fileMagic)+fileNonceSize+len(data)+fileTagSize)
+	out := make([]byte, len(fileMagic), len(fileMagic)+fileNonceSize+n+fileTagSize)
 	copy(out, fileMagic)
 	out = append(out, nonce...)
 	return gcm.Seal(out, nonce, data, aad), nil
@@ -372,7 +388,7 @@ type verifiedStreamReader struct {
 
 func (s *verifiedStreamReader) Read(p []byte) (int, error) {
 	n, err := s.cr.Read(p)
-	if err == io.EOF {
+	if errors.Is(err, io.EOF) {
 		if verifyErr := s.cr.VerifyEOF(); verifyErr != nil {
 			return n, verifyErr
 		}
@@ -395,16 +411,20 @@ type RecordCipher struct {
 }
 
 // ActiveRecordCipher validates that the store is usable and returns a RecordCipher when encryption is enabled.
-func ActiveRecordCipher(indexDir string) (*RecordCipher, error) {
+func ActiveRecordCipher(indexDir string) (*RecordCipher, bool, error) {
 	dek, err := CheckUnlocked(indexDir)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if len(dek) == 0 {
-		return nil, nil
+		return nil, false, nil
 	}
 	defer clear(dek)
-	return NewRecordCipher(dek)
+	rc, err := NewRecordCipher(dek)
+	if err != nil {
+		return nil, false, err
+	}
+	return rc, true, nil
 }
 
 // NewRecordCipher returns a RecordCipher backed by dek.
@@ -572,8 +592,8 @@ func encryptExistingSidecars(indexDir string, dek []byte) error {
 	return nil
 }
 
-// VaultStatus describes encryption state for diagnostics such as deja doctor.
-type VaultStatus struct {
+// DiagnosticStatus describes encryption state for diagnostics such as deja doctor.
+type DiagnosticStatus struct {
 	Enabled          bool   `json:"enabled"`
 	Locked           bool   `json:"locked"`
 	KeyBackend       string `json:"key_backend,omitempty"`
@@ -584,8 +604,8 @@ type VaultStatus struct {
 }
 
 // Status inspects vault configuration and index encryption state without modifying disk state.
-func Status(indexDir string) VaultStatus {
-	st := VaultStatus{KeyringAvailable: KeyringAvailable()}
+func Status(indexDir string) DiagnosticStatus {
+	st := DiagnosticStatus{KeyringAvailable: KeyringAvailable()}
 	if !Enabled() {
 		return st
 	}

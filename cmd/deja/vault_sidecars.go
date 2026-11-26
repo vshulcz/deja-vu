@@ -29,7 +29,15 @@ func migrateCmdSidecars(indexDir string, dek []byte) error {
 	if !fi.IsDir() || fi.Mode()&os.ModeSymlink != 0 {
 		return nil
 	}
-	return filepath.WalkDir(root, func(p string, d fs.DirEntry, werr error) error {
+	dirRoot, err := os.OpenRoot(root)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	defer func() { _ = dirRoot.Close() }()
+	return fs.WalkDir(dirRoot.FS(), ".", func(rel string, d fs.DirEntry, werr error) error {
 		if werr != nil {
 			if os.IsNotExist(werr) {
 				return nil
@@ -38,7 +46,7 @@ func migrateCmdSidecars(indexDir string, dek []byte) error {
 		}
 		name := d.Name()
 		if d.IsDir() {
-			if p != root && strings.HasPrefix(name, ".") {
+			if rel != "." && strings.HasPrefix(name, ".") {
 				return filepath.SkipDir
 			}
 			return nil
@@ -46,20 +54,20 @@ func migrateCmdSidecars(indexDir string, dek []byte) error {
 		if d.Type()&os.ModeSymlink != 0 || !d.Type().IsRegular() || strings.HasPrefix(name, ".") {
 			return nil
 		}
-		raw, err := os.ReadFile(p)
-		if err != nil {
-			if os.IsNotExist(err) {
+		raw, rErr := dirRoot.ReadFile(rel)
+		if rErr != nil {
+			if os.IsNotExist(rErr) {
 				return nil
 			}
-			return err
+			return rErr
 		}
 		if vault.IsSealedBytes(raw) {
 			return nil
 		}
-		sealed, err := vault.SealBytes(dek, vault.DomainSidecar, raw)
-		if err != nil {
-			return err
+		sealed, sErr := vault.SealBytes(dek, vault.DomainSidecar, raw)
+		if sErr != nil {
+			return sErr
 		}
-		return atomicfile.Write(p, sealed, 0o600)
+		return atomicfile.Write(filepath.Join(root, filepath.FromSlash(rel)), sealed, 0o600)
 	})
 }

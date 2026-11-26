@@ -13,8 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-
-	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 // A pass that replaces a few sessions wrote the whole store again: on 25,000
@@ -415,7 +413,7 @@ var logStampedFiles = []string{recordOffsetsFile, frictionTextsFile}
 // restamp replaces the fingerprint before with after in the file at p, if it
 // carries it.
 func restamp(p string, before, after [sha256.Size]byte) {
-	b, err := readIndexBytes(p, vault.DomainIndexFile)
+	b, err := readIndexBytes(p)
 	if err != nil {
 		return
 	}

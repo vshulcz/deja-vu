@@ -248,7 +248,7 @@ func mcpRequestMatchesAuthToken(params json.RawMessage, authToken string) bool {
 	return false
 }
 
-func applyMCPInitializeClient(params json.RawMessage) string {
+func applyMCPInitializeClient(params json.RawMessage) {
 	var p struct {
 		ClientInfo struct {
 			Name string `json:"name"`
@@ -276,7 +276,6 @@ func applyMCPInitializeClient(params json.RawMessage) string {
 	if tok != "" {
 		setMCPClientToken(tok)
 	}
-	return name
 }
 
 // readMCPLine reads one newline-delimited frame. A frame longer than most is

@@ -73,7 +73,7 @@ func rememberClaudeForkSource(dir, sid, transcript string) {
 	p := forkMarksPath(dir)
 	// Appended, so two forks starting together both keep theirs; pruned once
 	// the file holds more than a few days of them.
-	if fi, err := os.Stat(p); err == nil && fi.Size() > forkMarksPruneAt {
+	if fi, stErr := os.Stat(p); stErr == nil && fi.Size() > forkMarksPruneAt {
 		pruneForkMarks(p)
 	}
 	f, err := atomicfile.OpenSharedFile(p, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
@@ -116,11 +116,11 @@ func pruneForkMarks(p string) {
 		if len(f) != 3 {
 			continue
 		}
-		if at, err := strconv.ParseInt(f[2], 10, 64); err != nil || now.Sub(time.Unix(at, 0)) > forkMarkTTL {
+		if at, pErr := strconv.ParseInt(f[2], 10, 64); pErr != nil || now.Sub(time.Unix(at, 0)) > forkMarkTTL {
 			continue
 		}
-		sealed, err := vault.SealSidecarLine(dir, vault.DomainSidecar, []byte(plain))
-		if err != nil {
+		sealed, sErr := vault.SealSidecarLine(dir, vault.DomainSidecar, []byte(plain))
+		if sErr != nil {
 			return
 		}
 		keep = append(keep, sealed+"\n")

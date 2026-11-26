@@ -453,7 +453,7 @@ func (tx *SeenTx) appendRecords(sid, stamp, project string, ids []string) {
 		defer clear(dek)
 	}
 	if tx.ledger.rotateBytes > 0 {
-		if fi, err := os.Stat(p); err == nil && fi.Size() > tx.ledger.rotateBytes {
+		if fi, stErr := os.Stat(p); stErr == nil && fi.Size() > tx.ledger.rotateBytes {
 			RotateFile(p, sid)
 		}
 	}
@@ -570,9 +570,9 @@ func (tx *SeenTx) rewriteOmitting(sids, appendLines []string) {
 		}
 		sealed := make([]string, 0, len(lines))
 		for _, ln := range lines {
-			s, err := encodeLedgerLine(dek, ln)
-			if err != nil {
-				return nil, err
+			s, encErr := encodeLedgerLine(dek, ln)
+			if encErr != nil {
+				return nil, encErr
 			}
 			sealed = append(sealed, s)
 		}

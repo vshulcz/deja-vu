@@ -57,8 +57,8 @@ func prepareMCPUnixSocket(sockPath string) (net.Listener, os.FileInfo, error) {
 			return nil, nil, fmt.Errorf("mcp: unix socket parent %q is not a directory", parent)
 		}
 	} else if os.IsNotExist(err) {
-		if err := os.MkdirAll(parent, 0o700); err != nil {
-			return nil, nil, fmt.Errorf("mcp: create unix socket directory %q: %w", parent, err)
+		if mkErr := os.MkdirAll(parent, 0o700); mkErr != nil {
+			return nil, nil, fmt.Errorf("mcp: create unix socket directory %q: %w", parent, mkErr)
 		}
 		_ = os.Chmod(parent, 0o700)
 	} else {
@@ -82,8 +82,8 @@ func prepareMCPUnixSocket(sockPath string) (net.Listener, os.FileInfo, error) {
 		if !isStaleSocketDialError(dialErr) {
 			return nil, nil, fmt.Errorf("mcp: inspect unix socket %q: %w", sockPath, dialErr)
 		}
-		if err := os.Remove(sockPath); err != nil && !os.IsNotExist(err) {
-			return nil, nil, fmt.Errorf("mcp: remove stale unix socket %q: %w", sockPath, err)
+		if rmErr := os.Remove(sockPath); rmErr != nil && !os.IsNotExist(rmErr) {
+			return nil, nil, fmt.Errorf("mcp: remove stale unix socket %q: %w", sockPath, rmErr)
 		}
 	} else if !os.IsNotExist(err) {
 		return nil, nil, err
@@ -265,10 +265,7 @@ func serveMCPUnixConn(dir string, contextOnly bool, token string, conn net.Conn,
 			Conn:   conn,
 			reader: io.MultiReader(bytes.NewReader(append([]byte(nil), firstLine...)), br),
 		}
-		if httpLn.enqueue(pconn, stop) {
-			return true
-		}
-		return false
+		return httpLn.enqueue(pconn, stop)
 	}
 	if looksLikeContentLengthHeader(firstLine) {
 		serveMCPContentLength(dir, contextOnly, token, sess, append([]byte(nil), firstLine...), br, conn)

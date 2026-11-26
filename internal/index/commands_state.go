@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
-	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 // The command table and the session facts are mined from every command the
@@ -382,7 +381,7 @@ func commandTablesBehind(dir string, m Manifest) bool {
 		return false
 	}
 	t := tablesFromManifest(m)
-	if err := t.ensureCipherForFile(f.Name()); err != nil {
+	if cErr := t.ensureCipherForFile(f.Name()); cErr != nil {
 		return false
 	}
 	errFound := errors.New("found")
@@ -406,7 +405,7 @@ const commandsTailWalkMax = 4 << 20
 // commandsStateHead is the generation and log size the state in dir names,
 // read without the rest of it.
 func commandsStateHead(dir string) (gen string, size int64, ok bool) {
-	f, err := openIndexBlobFile(commandsStatePath(dir), vault.DomainIndexFile)
+	f, err := openIndexBlobFile(commandsStatePath(dir))
 	if err != nil {
 		return "", 0, false
 	}
@@ -537,7 +536,7 @@ func writeCommandsStateFile(dir string, st *commandsState) error {
 // readCommandsStateFile is the state in dir, false when there is none this
 // build can read.
 func readCommandsStateFile(dir string) (*commandsState, bool) {
-	b, err := readIndexBytes(commandsStatePath(dir), vault.DomainIndexFile)
+	b, err := readIndexBytes(commandsStatePath(dir))
 	if err != nil || len(b) < len(commandsStateMagic) || [8]byte(b[:8]) != commandsStateMagic {
 		return nil, false
 	}

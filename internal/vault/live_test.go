@@ -9,10 +9,10 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
-	"time"
 )
 
 type countingKeyring struct {
@@ -64,28 +64,28 @@ func TestLiveWholeFileAEADAndHelpers(t *testing.T) {
 	if err != nil || !bytes.Equal(got, plain) {
 		t.Fatalf("OpenBytes = (%q, %v), want %q", got, err, plain)
 	}
-	if _, err := OpenBytes(wrongDEK, DomainIndexFile, sealed1); err == nil {
+	if _, oErr := OpenBytes(wrongDEK, DomainIndexFile, sealed1); oErr == nil {
 		t.Fatal("OpenBytes accepted wrong DEK")
 	}
-	if _, err := OpenBytes(dek, DomainSidecar, sealed1); err == nil {
+	if _, oErr := OpenBytes(dek, DomainSidecar, sealed1); oErr == nil {
 		t.Fatal("OpenBytes accepted wrong domain AAD")
 	}
 	tampered := append([]byte(nil), sealed1...)
 	tampered[len(tampered)-1] ^= 0xff
-	if _, err := OpenBytes(dek, DomainIndexFile, tampered); err == nil {
+	if _, oErr := OpenBytes(dek, DomainIndexFile, tampered); oErr == nil {
 		t.Fatal("OpenBytes accepted tampered ciphertext")
 	}
-	if _, err := OpenBytes(dek, DomainIndexFile, []byte("DJVF1short")); err == nil {
+	if _, oErr := OpenBytes(dek, DomainIndexFile, []byte("DJVF1short")); oErr == nil {
 		t.Fatal("OpenBytes accepted truncated DJVF1 frame")
 	}
-	if _, err := SealBytes([]byte("short"), DomainIndexFile, plain); err == nil {
+	if _, sErr := SealBytes([]byte("short"), DomainIndexFile, plain); sErr == nil {
 		t.Fatal("SealBytes accepted short DEK")
 	}
 
 	// Unencrypted store writes and reads plaintext via helpers.
 	plainPath := indexDir + ".dejavu"
-	if err := WriteSealedFile(indexDir, plainPath, DomainSidecar, plain, 0o600); err != nil {
-		t.Fatalf("WriteSealedFile unencrypted: %v", err)
+	if wErr := WriteSealedFile(indexDir, plainPath, DomainSidecar, plain, 0o600); wErr != nil {
+		t.Fatalf("WriteSealedFile unencrypted: %v", wErr)
 	}
 	rawPlain, err := os.ReadFile(plainPath)
 	if err != nil || !bytes.Equal(rawPlain, plain) {
@@ -97,12 +97,12 @@ func TestLiveWholeFileAEADAndHelpers(t *testing.T) {
 	}
 
 	// Encrypted store seals on disk while unlocked and fails closed while locked.
-	if _, err := Init(indexDir, "live-passphrase-1", 0); err != nil {
-		t.Fatalf("Init: %v", err)
+	if _, iErr := Init(indexDir, "live-passphrase-1", 0); iErr != nil {
+		t.Fatalf("Init: %v", iErr)
 	}
 	livePath := indexDir + ".live"
-	if err := WriteSealedFile(indexDir, livePath, DomainSidecar, plain, 0o600); err != nil {
-		t.Fatalf("WriteSealedFile encrypted: %v", err)
+	if wErr := WriteSealedFile(indexDir, livePath, DomainSidecar, plain, 0o600); wErr != nil {
+		t.Fatalf("WriteSealedFile encrypted: %v", wErr)
 	}
 	diskBytes, err := os.ReadFile(livePath)
 	if err != nil || !IsSealedBytes(diskBytes) || bytes.Contains(diskBytes, plain) {
@@ -115,22 +115,22 @@ func TestLiveWholeFileAEADAndHelpers(t *testing.T) {
 
 	// Truncated DJVF1 file on disk fails loudly even when unlocked.
 	truncPath := indexDir + ".trunc"
-	if err := os.WriteFile(truncPath, []byte("DJVF1bad"), 0o600); err != nil {
-		t.Fatal(err)
+	if wErr := os.WriteFile(truncPath, []byte("DJVF1bad"), 0o600); wErr != nil {
+		t.Fatal(wErr)
 	}
-	if _, err := ReadSealedFile(indexDir, truncPath, DomainSidecar); err == nil {
+	if _, rErr := ReadSealedFile(indexDir, truncPath, DomainSidecar); rErr == nil {
 		t.Fatal("expected error reading truncated DJVF1 file")
 	}
 
 	// Locked store fails closed on both ReadSealedFile and WriteSealedFile.
-	if err := Lock(indexDir, ""); err != nil {
-		t.Fatalf("Lock: %v", err)
+	if lErr := Lock(indexDir, ""); lErr != nil {
+		t.Fatalf("Lock: %v", lErr)
 	}
-	if _, err := ReadSealedFile(indexDir, livePath, DomainSidecar); !errors.Is(err, ErrLocked) {
-		t.Fatalf("ReadSealedFile while locked = %v, want ErrLocked", err)
+	if _, rErr := ReadSealedFile(indexDir, livePath, DomainSidecar); !errors.Is(rErr, ErrLocked) {
+		t.Fatalf("ReadSealedFile while locked = %v, want ErrLocked", rErr)
 	}
-	if err := WriteSealedFile(indexDir, livePath, DomainSidecar, plain, 0o600); !errors.Is(err, ErrLocked) {
-		t.Fatalf("WriteSealedFile while locked = %v, want ErrLocked", err)
+	if wErr := WriteSealedFile(indexDir, livePath, DomainSidecar, plain, 0o600); !errors.Is(wErr, ErrLocked) {
+		t.Fatalf("WriteSealedFile while locked = %v, want ErrLocked", wErr)
 	}
 }
 
@@ -146,11 +146,11 @@ func TestLiveStreamAEAD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewStreamWriter: %v", err)
 	}
-	if _, err := sw.Write(payload); err != nil {
-		t.Fatalf("StreamWriter.Write: %v", err)
+	if _, wErr := sw.Write(payload); wErr != nil {
+		t.Fatalf("StreamWriter.Write: %v", wErr)
 	}
-	if err := sw.Close(); err != nil {
-		t.Fatalf("StreamWriter.Close: %v", err)
+	if cErr := sw.Close(); cErr != nil {
+		t.Fatalf("StreamWriter.Close: %v", cErr)
 	}
 	sealed := buf.Bytes()
 	if !IsStreamHeader(sealed) {
@@ -207,8 +207,8 @@ func TestLiveRecordCipherAndSidecarLines(t *testing.T) {
 	if RecordOverhead != 28 {
 		t.Fatalf("RecordOverhead = %d, want 28", RecordOverhead)
 	}
-	if rc, err := ActiveRecordCipher(indexDir); err != nil || rc != nil {
-		t.Fatalf("disabled ActiveRecordCipher = (%v, %v), want (nil, nil)", rc, err)
+	if rc, ok, err := ActiveRecordCipher(indexDir); err != nil || ok || rc != nil {
+		t.Fatalf("disabled ActiveRecordCipher = (%v, %v, %v), want (nil, false, nil)", rc, ok, err)
 	}
 	line, err := SealSidecarLine(indexDir, DomainSidecar, []byte("plain line"))
 	if err != nil || line != "plain line" {
@@ -219,12 +219,12 @@ func TestLiveRecordCipherAndSidecarLines(t *testing.T) {
 		t.Fatalf("disabled OpenSidecarLine = (%q, %v, %v)", gotLine, wasSealed, err)
 	}
 
-	if _, err := Init(indexDir, "record-cipher-pass", 0); err != nil {
-		t.Fatalf("Init: %v", err)
+	if _, iErr := Init(indexDir, "record-cipher-pass", 0); iErr != nil {
+		t.Fatalf("Init: %v", iErr)
 	}
-	rc, err := ActiveRecordCipher(indexDir)
-	if err != nil || rc == nil {
-		t.Fatalf("ActiveRecordCipher unlocked = (%v, %v)", rc, err)
+	rc, ok, err := ActiveRecordCipher(indexDir)
+	if err != nil || !ok || rc == nil {
+		t.Fatalf("ActiveRecordCipher unlocked = (%v, %v, %v)", rc, ok, err)
 	}
 	recBody := []byte("RECORD_CANARY_SECRET_77")
 	sealed, err := rc.Seal(1, recBody)
@@ -241,10 +241,10 @@ func TestLiveRecordCipherAndSidecarLines(t *testing.T) {
 	if err != nil || !bytes.Equal(opened, recBody) {
 		t.Fatalf("RecordCipher.Open = (%q, %v)", opened, err)
 	}
-	if _, err := rc.Open(0, sealed); err == nil {
+	if _, oErr := rc.Open(0, sealed); oErr == nil {
 		t.Fatal("RecordCipher.Open accepted wrong baseFlag AAD")
 	}
-	if _, err := rc.Open(1, []byte("too-short")); err == nil {
+	if _, oErr := rc.Open(1, []byte("too-short")); oErr == nil {
 		t.Fatal("RecordCipher.Open accepted short slice")
 	}
 
@@ -257,17 +257,17 @@ func TestLiveRecordCipherAndSidecarLines(t *testing.T) {
 		t.Fatalf("OpenSidecarLine = (%q, %v, %v)", decLine, wasSealed, err)
 	}
 
-	if err := Lock(indexDir, ""); err != nil {
-		t.Fatalf("Lock: %v", err)
+	if lErr := Lock(indexDir, ""); lErr != nil {
+		t.Fatalf("Lock: %v", lErr)
 	}
-	if _, err := ActiveRecordCipher(indexDir); !errors.Is(err, ErrLocked) {
-		t.Fatalf("locked ActiveRecordCipher = %v, want ErrLocked", err)
+	if _, _, rErr := ActiveRecordCipher(indexDir); !errors.Is(rErr, ErrLocked) {
+		t.Fatalf("locked ActiveRecordCipher = %v, want ErrLocked", rErr)
 	}
-	if _, err := SealSidecarLine(indexDir, DomainSidecar, []byte("x")); !errors.Is(err, ErrLocked) {
-		t.Fatalf("locked SealSidecarLine = %v, want ErrLocked", err)
+	if _, sErr := SealSidecarLine(indexDir, DomainSidecar, []byte("x")); !errors.Is(sErr, ErrLocked) {
+		t.Fatalf("locked SealSidecarLine = %v, want ErrLocked", sErr)
 	}
-	if _, _, err := OpenSidecarLine(indexDir, DomainSidecar, encLine); !errors.Is(err, ErrLocked) {
-		t.Fatalf("locked OpenSidecarLine = %v, want ErrLocked", err)
+	if _, _, oErr := OpenSidecarLine(indexDir, DomainSidecar, encLine); !errors.Is(oErr, ErrLocked) {
+		t.Fatalf("locked OpenSidecarLine = %v, want ErrLocked", oErr)
 	}
 }
 
@@ -389,14 +389,14 @@ func TestInitAndUnlockMigratorsAndPromptCacheAndTUIHistory(t *testing.T) {
 		t.Fatalf("ReadSealedFile(.tui-history) = (%q, %v)", gotTUI, err)
 	}
 
-	if err := Lock(indexDir, ""); err != nil {
-		t.Fatalf("Lock: %v", err)
+	if lErr := Lock(indexDir, ""); lErr != nil {
+		t.Fatalf("Lock: %v", lErr)
 	}
-	if _, err := os.Stat(tuiHistoryPath); !os.IsNotExist(err) {
-		t.Fatalf(".tui-history survived Lock (err=%v)", err)
+	if _, sErr := os.Stat(tuiHistoryPath); !os.IsNotExist(sErr) {
+		t.Fatalf(".tui-history survived Lock (err=%v)", sErr)
 	}
-	if err := Unlock(indexDir, "migrate-passphrase"); err != nil {
-		t.Fatalf("Unlock: %v", err)
+	if uErr := Unlock(indexDir, "migrate-passphrase"); uErr != nil {
+		t.Fatalf("Unlock: %v", uErr)
 	}
 	if migrated.Load() != 2 {
 		t.Fatalf("Unlock ran migrator %d times, want 2", migrated.Load())
@@ -407,15 +407,11 @@ func TestInitAndUnlockMigratorsAndPromptCacheAndTUIHistory(t *testing.T) {
 	}
 }
 
-func TestLinuxDBusFallbackKeyringAndStatus(t *testing.T) {
+func TestDBusFallbackAndStatus(t *testing.T) {
 	indexDir, _ := withTestVaultEnv(t)
-	sockDir, err := os.MkdirTemp("", "dbus")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.RemoveAll(sockDir) })
+	sockDir := t.TempDir()
 	busSock := filepath.Join(sockDir, "bus")
-	ln, err := net.Listen("unix", busSock)
+	ln, err := (&net.ListenConfig{}).Listen(t.Context(), "unix", busSock)
 	if err != nil {
 		t.Fatalf("listen unix: %v", err)
 	}
@@ -429,14 +425,7 @@ func TestLinuxDBusFallbackKeyringAndStatus(t *testing.T) {
 		t.Fatalf("keyringCommand linux: %v", err)
 	}
 	wantBus := "DBUS_SESSION_BUS_ADDRESS=unix:path=" + busSock
-	found := false
-	for _, kv := range extraEnv {
-		if kv == wantBus {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !slices.Contains(extraEnv, wantBus) {
 		t.Fatalf("linux keyringCommand extraEnv = %v, want %q", extraEnv, wantBus)
 	}
 
@@ -444,11 +433,21 @@ func TestLinuxDBusFallbackKeyringAndStatus(t *testing.T) {
 	if st0.Enabled || st0.Locked {
 		t.Fatalf("uninitialized Status = %+v", st0)
 	}
-	if err := os.MkdirAll(indexDir, 0o700); err != nil {
-		t.Fatal(err)
+	if mErr := os.MkdirAll(indexDir, 0o700); mErr != nil {
+		t.Fatal(mErr)
 	}
-	if _, err := Init(indexDir, "status-passphrase", 5*time.Minute); err != nil {
-		t.Fatalf("Init: %v", err)
+	if _, iErr := Init(indexDir, "status-passphrase", 300*1e9); iErr != nil {
+		t.Fatalf("Init: %v", iErr)
+	}
+	cfg, cErr := LoadConfig()
+	if cErr != nil {
+		t.Fatalf("LoadConfig: %v", cErr)
+	}
+	if _, uErr := unwrapDEKCached(cfg, "status-passphrase"); uErr != nil {
+		t.Fatalf("unwrapDEKCached valid: %v", uErr)
+	}
+	if _, badErr := unwrapDEKCached(cfg, "wrong-passphrase"); badErr == nil {
+		t.Fatal("unwrapDEKCached accepted wrong passphrase after cache fill")
 	}
 	st1 := Status(indexDir)
 	if !st1.Enabled || st1.Locked || st1.AutoLockSeconds != 300 || st1.KeyBackend == "" {

@@ -312,13 +312,9 @@ func (s *mcpServer) deadline() time.Duration {
 	return mcpDeadline
 }
 
-// cancel handles notifications/cancelled. A request the client gave up on is
-// owed no reply, and if nobody else is waiting on its work, the work is not
-// started.
-func (s *mcpServer) cancel(params json.RawMessage) {
-	s.cancelFor(nil, params)
-}
-
+// cancelFor handles notifications/cancelled for a client session. A request the
+// client gave up on is owed no reply, and if nobody else is waiting on its
+// work, the work is not started.
 func (s *mcpServer) cancelFor(sess *mcpClientSession, params json.RawMessage) {
 	var c struct {
 		RequestID any `json:"requestId"`

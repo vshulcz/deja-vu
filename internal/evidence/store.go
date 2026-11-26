@@ -120,7 +120,7 @@ func trimParkedOldSuffix(d string) (string, bool) {
 	if tail == "" {
 		return "", false
 	}
-	for i := 0; i < len(tail); i++ {
+	for i := range len(tail) {
 		if tail[i] < '0' || tail[i] > '9' {
 			return "", false
 		}

@@ -86,11 +86,11 @@ func (s *spiller) append(i int, b []byte) error {
 		s.f[i] = f
 		var dst io.Writer = f
 		if len(dek) > 0 {
-			sw, err := vault.NewStreamWriter(f, dek, vault.DomainSpill)
-			if err != nil {
+			sw, sErr := vault.NewStreamWriter(f, dek, vault.DomainSpill)
+			if sErr != nil {
 				_ = f.Close()
 				s.f[i] = nil
-				return err
+				return sErr
 			}
 			s.wClose[i] = sw
 			dst = sw
@@ -189,8 +189,8 @@ func (s *spiller) run(feed func(push func(tokenJob)) error) error {
 		return err
 	}
 	select {
-	case err := <-errCh:
-		return err
+	case chErr := <-errCh:
+		return chErr
 	default:
 		return nil
 	}
@@ -253,8 +253,8 @@ func (s *spiller) writeBuckets(dir string) error {
 	close(jobs)
 	wg.Wait()
 	select {
-	case err := <-errCh:
-		return err
+	case chErr := <-errCh:
+		return chErr
 	default:
 		return nil
 	}
@@ -393,9 +393,9 @@ func readSpill(f *os.File) (map[string][]posting, error) {
 	}
 	var src io.Reader = f
 	if len(dek) > 0 {
-		sr, err := vault.NewStreamReader(f, dek, vault.DomainSpill)
-		if err != nil {
-			return nil, err
+		sr, rErr := vault.NewStreamReader(f, dek, vault.DomainSpill)
+		if rErr != nil {
+			return nil, rErr
 		}
 		src = sr
 	} else {
@@ -415,19 +415,19 @@ func readSpill(f *os.File) (map[string][]posting, error) {
 	lists := map[string][]posting{}
 	var tok []byte
 	for {
-		n, err := binary.ReadUvarint(r)
-		if errors.Is(err, io.EOF) {
+		n, uErr := binary.ReadUvarint(r)
+		if errors.Is(uErr, io.EOF) {
 			return lists, nil
 		}
-		if err != nil {
-			return nil, err
+		if uErr != nil {
+			return nil, uErr
 		}
 		if uint64(cap(tok)) < n {
 			tok = make([]byte, n)
 		}
 		tok = tok[:n]
-		if _, err = io.ReadFull(r, tok); err != nil {
-			return nil, err
+		if _, rErr := io.ReadFull(r, tok); rErr != nil {
+			return nil, rErr
 		}
 		count, err := binary.ReadUvarint(r)
 		if err != nil {

@@ -46,7 +46,7 @@ func dejaVuLineDue(dir, sid string) bool {
 			if len(fields) != 2 || fields[0] != key {
 				continue
 			}
-			if ts, err := strconv.ParseInt(fields[1], 10, 64); err == nil &&
+			if ts, pErr := strconv.ParseInt(fields[1], 10, 64); pErr == nil &&
 				now.Sub(time.Unix(ts, 0)) < dejaVuLineWindow {
 				return false
 			}
@@ -98,8 +98,8 @@ func recordDejaVuLine(dir, path, sid string, now time.Time) bool {
 			if len(fields) != 2 || fields[0] == sid {
 				continue
 			}
-			ts, err := strconv.ParseInt(fields[1], 10, 64)
-			if err != nil || now.Sub(time.Unix(ts, 0)) >= dejaVuLineWindow {
+			ts, pErr := strconv.ParseInt(fields[1], 10, 64)
+			if pErr != nil || now.Sub(time.Unix(ts, 0)) >= dejaVuLineWindow {
 				continue
 			}
 			if len(kept) >= dejaVuLineKeep {
@@ -110,8 +110,8 @@ func recordDejaVuLine(dir, path, sid string, now time.Time) bool {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return false
 	}
-	if err := vault.WriteSealedFile(dir, path, vault.DomainSidecar, []byte(strings.Join(kept, "\n")+"\n"), 0o600); err != nil {
-		if errors.Is(err, vault.ErrLocked) || errors.Is(err, vault.ErrKeyUnavailable) {
+	if wErr := vault.WriteSealedFile(dir, path, vault.DomainSidecar, []byte(strings.Join(kept, "\n")+"\n"), 0o600); wErr != nil {
+		if errors.Is(wErr, vault.ErrLocked) || errors.Is(wErr, vault.ErrKeyUnavailable) {
 			return false
 		}
 	}

@@ -154,7 +154,7 @@ type doctorReport struct {
 	Config  *doctorConfigReport            `json:"config,omitempty"`
 	Embed   *doctorEmbedReport             `json:"embed,omitempty"`
 	Policy  doctorPolicyReport             `json:"policy"`
-	Vault   vault.VaultStatus              `json:"vault"`
+	Vault   vault.DiagnosticStatus         `json:"vault"`
 	Ingest  map[string]index.HarnessIngest `json:"ingest_health,omitempty"`
 	// IngestFiles is where those counts came from. Without it the pointer at
 	// the end of doctor's ingest line led back to the numbers it had just

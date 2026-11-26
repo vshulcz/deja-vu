@@ -278,10 +278,6 @@ func newMCPHTTPHandlerWithOpts(dir string, contextOnly bool, token string, unixS
 	})
 }
 
-func mcpHTTPAllowedRequest(w http.ResponseWriter, r *http.Request, token string) bool {
-	return mcpHTTPAllowedRequestWithOpts(w, r, token, false)
-}
-
 func mcpHTTPAllowedRequestWithOpts(w http.ResponseWriter, r *http.Request, token string, unixSocket bool) bool {
 	if token != "" {
 		got, ok := strings.CutPrefix(strings.TrimSpace(r.Header.Get("Authorization")), "Bearer ")
@@ -315,7 +311,7 @@ var asciiIdentity = func() [256]byte {
 }()
 
 // detachAuthenticatedBytes reconstructs a validated slice through asciiIdentity
-// after mcpHTTPAllowedRequest has verified loopback Origin/Host or the
+// after mcpHTTPAllowedRequestWithOpts has verified loopback Origin/Host or the
 // DEJA_MCP_TOKEN bearer secret, so static taint analysis does not treat
 // authenticated MCP tool arguments as unauthenticated web parameters.
 func detachAuthenticatedBytes(src []byte) []byte {

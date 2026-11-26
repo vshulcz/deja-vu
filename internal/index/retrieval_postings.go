@@ -17,7 +17,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
-	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 func postingsFor(dir, tok string) ([]posting, error) {
@@ -381,13 +380,13 @@ func substringPostingsFrom(dirs []bucketDir, bare []string, dead []int64) (_ []p
 					continue
 				}
 				if f == nil {
-					var err error
-					if f, err = openIndexBlobFile(bd.path, vault.DomainIndexFile); err != nil {
+					var oErr error
+					if f, oErr = openIndexBlobFile(bd.path); oErr != nil {
 						return nil, nil, false, nil //nolint:nilerr // not ok: the caller reads the slow way
 					}
 					// The same file, not one of the same size: a rebuild renames a
 					// new bucket in, and a coarse clock can give it the old time.
-					if fi, err := f.Stat(); err != nil || !os.SameFile(fi, bd.stat) || fi.Size() != bd.stat.Size() || !fi.ModTime().Equal(bd.stat.ModTime()) {
+					if fi, stErr := f.Stat(); stErr != nil || !os.SameFile(fi, bd.stat) || fi.Size() != bd.stat.Size() || !fi.ModTime().Equal(bd.stat.ModTime()) {
 						_ = f.Close()
 						return nil, nil, false, nil //nolint:nilerr // not ok: the caller reads the slow way
 					}

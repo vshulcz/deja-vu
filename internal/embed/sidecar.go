@@ -10,7 +10,6 @@ import (
 	"io"
 	"math"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -38,8 +37,8 @@ func migrateVectorSidecar(indexDir string, dek []byte) error {
 		return err
 	}
 	alreadyEnc := false
-	if sr, err := vault.NewStreamReader(f, dek, vault.DomainEmbed); err == nil {
-		if _, err := io.Copy(io.Discard, sr); err == nil {
+	if sr, sErr := vault.NewStreamReader(f, dek, vault.DomainEmbed); sErr == nil {
+		if _, cpErr := io.Copy(io.Discard, sr); cpErr == nil {
 			alreadyEnc = true
 		}
 	}
@@ -47,83 +46,46 @@ func migrateVectorSidecar(indexDir string, dek []byte) error {
 		_ = f.Close()
 		return nil
 	}
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
+	if _, skErr := f.Seek(0, io.SeekStart); skErr != nil {
 		_ = f.Close()
-		return err
+		return skErr
 	}
 	var got [4]byte
 	var version uint16
-	if _, err := io.ReadFull(f, got[:]); err != nil || got != magic {
+	if _, rErr := io.ReadFull(f, got[:]); rErr != nil || got != magic {
 		_ = f.Close()
 		return nil
 	}
-	if err := binary.Read(f, binary.LittleEndian, &version); err != nil || version < 1 || version > sidecarVersion {
+	if vErr := binary.Read(f, binary.LittleEndian, &version); vErr != nil || version < 1 || version > sidecarVersion {
 		_ = f.Close()
 		return nil
 	}
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
+	if _, skErr := f.Seek(0, io.SeekStart); skErr != nil {
 		_ = f.Close()
-		return err
+		return skErr
 	}
-	fi, err := f.Stat()
-	if err != nil {
-		_ = f.Close()
-		return err
+	raw, readErr := io.ReadAll(f)
+	_ = f.Close()
+	if readErr != nil {
+		return readErr
 	}
-	var src io.Reader
-	var cleanup func()
-	const memLimit = 8 << 20
-	if fi.Size() <= memLimit {
-		raw, rerr := io.ReadAll(f)
-		_ = f.Close()
-		if rerr != nil {
-			return rerr
+	src := bytes.NewReader(raw)
+	if wErr := atomicfile.WriteStream(path, 0o600, func(w io.Writer) error {
+		sw, swErr := vault.NewStreamWriter(w, dek, vault.DomainEmbed)
+		if swErr != nil {
+			return swErr
 		}
-		src = bytes.NewReader(raw)
-		cleanup = func() {}
-	} else {
-		spool, serr := os.CreateTemp(filepath.Dir(path), ".vectors-migrate-*")
-		if serr != nil {
-			_ = f.Close()
-			return serr
-		}
-		spoolName := spool.Name()
-		_, cerr := io.Copy(spool, f)
-		_ = f.Close()
-		if cerr != nil {
-			_ = spool.Close()
-			_ = os.Remove(spoolName)
-			return cerr
-		}
-		if _, cerr := spool.Seek(0, io.SeekStart); cerr != nil {
-			_ = spool.Close()
-			_ = os.Remove(spoolName)
-			return cerr
-		}
-		src = spool
-		cleanup = func() {
-			_ = spool.Close()
-			_ = os.Remove(spoolName)
-		}
-	}
-	defer cleanup()
-
-	err = atomicfile.WriteStream(path, 0o600, func(w io.Writer) error {
-		sw, err := vault.NewStreamWriter(w, dek, vault.DomainEmbed)
-		if err != nil {
-			return err
-		}
-		if _, err := io.Copy(sw, src); err != nil {
-			return err
+		if _, cpErr := io.Copy(sw, src); cpErr != nil {
+			return cpErr
 		}
 		return sw.Close()
-	})
-	if err == nil {
-		readMemo.Lock()
-		readMemo.path, readMemo.car, readMemo.enc = "", Sidecar{}, false
-		readMemo.Unlock()
+	}); wErr != nil {
+		return wErr
 	}
-	return err
+	readMemo.Lock()
+	readMemo.path, readMemo.car, readMemo.enc = "", Sidecar{}, false
+	readMemo.Unlock()
+	return nil
 }
 
 // sidecarVersion 2 adds each vector's Ident; 3 drops the record's time from
@@ -642,11 +604,11 @@ func readFile(path string) (Sidecar, error) {
 	}
 	if sr != nil {
 		var extra [1]byte
-		if _, err := r.Read(extra[:]); err != io.EOF {
-			if err == nil {
+		if _, tErr := r.Read(extra[:]); !errors.Is(tErr, io.EOF) {
+			if tErr == nil {
 				return Sidecar{}, errors.New("unexpected trailing data in encrypted vector sidecar")
 			}
-			return Sidecar{}, err
+			return Sidecar{}, tErr
 		}
 	}
 	return out, nil

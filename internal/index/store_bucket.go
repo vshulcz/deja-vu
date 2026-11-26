@@ -103,9 +103,9 @@ func writeBucket(p string, data map[string][]posting) error {
 		return err
 	}
 	if len(dek) > 0 {
-		sealed, err := vault.SealBytes(dek, vault.DomainIndexFile, encodeBucketBytes(data))
-		if err != nil {
-			return err
+		sealed, sErr := vault.SealBytes(dek, vault.DomainIndexFile, encodeBucketBytes(data))
+		if sErr != nil {
+			return sErr
 		}
 		return writeRawFileAtomic(p, sealed)
 	}
@@ -158,7 +158,7 @@ func readBucketFile(p string) (map[string][]posting, error) {
 
 // readBucketFileToken reads one token's postings from one postings file.
 func readBucketFileToken(p, tok string) ([]posting, error) {
-	f, err := openIndexBlobFile(p, vault.DomainIndexFile)
+	f, err := openIndexBlobFile(p)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func readBucketFileToken(p, tok string) ([]posting, error) {
 var bucketDirReads atomic.Int64
 
 func openBucketDir(p string) ([]bucketEntry, *indexBlobFile, error) {
-	f, err := openIndexBlobFile(p, vault.DomainIndexFile)
+	f, err := openIndexBlobFile(p)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -433,8 +433,8 @@ func writeGob(p string, v any) error {
 	}
 	if len(dek) > 0 {
 		var buf bytes.Buffer
-		if err := gob.NewEncoder(&buf).Encode(v); err != nil {
-			return err
+		if encErr := gob.NewEncoder(&buf).Encode(v); encErr != nil {
+			return encErr
 		}
 		return writeSealedIndexFile(p, buf.Bytes(), vault.DomainIndexFile)
 	}
@@ -462,15 +462,15 @@ func writeGobAtomicStat(p string, v any) (os.FileInfo, error) {
 	}
 	if len(dek) > 0 {
 		var buf bytes.Buffer
-		if err := gob.NewEncoder(&buf).Encode(v); err != nil {
-			return nil, err
+		if encErr := gob.NewEncoder(&buf).Encode(v); encErr != nil {
+			return nil, encErr
 		}
-		if err := writeSealedFileAtomic(p, buf.Bytes(), vault.DomainIndexFile); err != nil {
-			return nil, err
+		if wErr := writeSealedFileAtomic(p, buf.Bytes(), vault.DomainIndexFile); wErr != nil {
+			return nil, wErr
 		}
 		// The lock keeps other writers out, so what is at p is what it wrote.
-		fi, err := os.Stat(p)
-		if err != nil {
+		fi, stErr := os.Stat(p)
+		if stErr != nil {
 			// Written; only the stat failed, and nil caches nothing.
 			return nil, nil //nolint:nilerr,nilnil // written; nil caches nothing
 		}
@@ -522,12 +522,12 @@ func writeGobAtomicStat(p string, v any) (os.FileInfo, error) {
 }
 
 func readGob(p string, v any) error {
-	data, err := readIndexBytes(p, vault.DomainIndexFile)
+	data, err := readIndexBytes(p)
 	if err != nil {
 		return err
 	}
-	if err := gob.NewDecoder(bytes.NewReader(data)).Decode(v); err != nil { //nolint:gosec,nolintlint // decodes the index's own files; G709's taint pass fires on some runs only
-		return fmt.Errorf("read %s: %w", filepath.Base(p), err)
+	if decErr := gob.NewDecoder(bytes.NewReader(data)).Decode(v); decErr != nil { //nolint:gosec,nolintlint // decodes the index's own files; G709's taint pass fires on some runs only
+		return fmt.Errorf("read %s: %w", filepath.Base(p), decErr)
 	}
 	return nil
 }
@@ -657,7 +657,7 @@ func (b *bucketReader) fileDir(p string) (*cachedBucketDir, *indexBlobFile, bool
 	switch {
 	case !seen:
 		var err error
-		if f, err = openIndexBlobFile(p, vault.DomainIndexFile); err != nil {
+		if f, err = openIndexBlobFile(p); err != nil {
 			if os.IsNotExist(err) {
 				b.dirs[p] = nil
 			}
@@ -694,15 +694,15 @@ func (b *bucketReader) filePostings(p, tok string) ([]posting, error) {
 		return nil, nil
 	}
 	if f == nil {
-		var err error
-		if f, err = openIndexBlobFile(p, vault.DomainIndexFile); err != nil {
-			return nil, err
+		var oErr error
+		if f, oErr = openIndexBlobFile(p); oErr != nil {
+			return nil, oErr
 		}
 		defer func() { _ = f.Close() }()
 		// The directory for the file open now, which a swap since the first
 		// look may have replaced.
-		if d, err = bucketDirOf(p, f); err != nil {
-			return nil, err
+		if d, oErr = bucketDirOf(p, f); oErr != nil {
+			return nil, oErr
 		}
 		b.dirs[p] = d
 	}

@@ -478,8 +478,8 @@ func TestVaultLiveSidecarsMigrationAndLockedPreservation(t *testing.T) {
 	if strings.Contains(string(liveRaw), "canary-live-sess") || !vault.IsSealedBytes(liveRaw) {
 		t.Fatalf(".live not sealed: %q", liveRaw)
 	}
-	if live, err := readLiveSessionsErr(dir); err != nil || live["canary-live-sess"].IsZero() {
-		t.Fatalf("readLiveSessionsErr = (%v, %v), want canary-live-sess", live, err)
+	if live, lErr := readLiveSessionsErr(dir); lErr != nil || live["canary-live-sess"].IsZero() {
+		t.Fatalf("readLiveSessionsErr = (%v, %v), want canary-live-sess", live, lErr)
 	}
 
 	stampEnvironmentServed(dir)
@@ -513,8 +513,8 @@ func TestVaultLiveSidecarsMigrationAndLockedPreservation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(forkMarksPath(dir), []byte(forkSealed+"\n"), 0o600); err != nil {
-		t.Fatal(err)
+	if wErr := os.WriteFile(forkMarksPath(dir), []byte(forkSealed+"\n"), 0o600); wErr != nil {
+		t.Fatal(wErr)
 	}
 	forkRaw, err := os.ReadFile(forkMarksPath(dir))
 	if err != nil {
@@ -751,7 +751,7 @@ func TestVaultLauncherEnvKeyringHooksAndDoctor(t *testing.T) {
 	if err := run([]string{"index"}); err != nil {
 		t.Fatalf("index: %v", err)
 	}
-	const pass = "keyring-vault-pass-99"
+	const pass = "keyring-vault-pass-99" //nolint:gosec // G101: synthetic test passphrase
 	if _, err := vault.Init(dir, pass, 30*time.Minute); err != nil {
 		t.Fatalf("vault.Init: %v", err)
 	}

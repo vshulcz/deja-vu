@@ -26,7 +26,7 @@ import (
 )
 
 func allocShortSockDir() (string, error) {
-	root := ""
+	var root string
 	if st, err := os.Stat("/tmp"); err == nil && st.IsDir() {
 		root = "/tmp"
 	} else {
@@ -50,7 +50,7 @@ func shortUnixSockPath(t *testing.T, rel string) string {
 		t.Fatalf("alloc short socket dir: %v", err)
 	}
 	t.Cleanup(func() {
-		os.RemoveAll(base)
+		_ = os.RemoveAll(base)
 	})
 	return filepath.Join(base, rel)
 }
@@ -89,7 +89,7 @@ func startTestUnixSocketServer(t *testing.T, dir, sockPath string, contextOnly b
 		time.Sleep(15 * time.Millisecond)
 	}
 	close(stopCh)
-	<-doneCh
+	_ = <-doneCh
 	t.Fatalf("timed out waiting for unix socket server %s", sockPath)
 	return nil
 }
@@ -194,7 +194,7 @@ func unixHTTPClient(t *testing.T, sockPath string) *http.Client {
 	return &http.Client{Transport: tr, Timeout: 10 * time.Second}
 }
 
-func postUnixMCPHTTP(t *testing.T, client *http.Client, body string, headers map[string]string) (*http.Response, map[string]any) {
+func postUnixMCPHTTP(t *testing.T, client *http.Client, body string, headers map[string]string) (int, http.Header, map[string]any) {
 	t.Helper()
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "http://unix/mcp", strings.NewReader(body))
 	if err != nil {
@@ -208,7 +208,7 @@ func postUnixMCPHTTP(t *testing.T, client *http.Client, body string, headers map
 	if err != nil {
 		t.Fatalf("HTTP POST /mcp: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("read HTTP body: %v", err)
@@ -217,7 +217,7 @@ func postUnixMCPHTTP(t *testing.T, client *http.Client, body string, headers map
 	if len(bytes.TrimSpace(raw)) > 0 {
 		_ = json.Unmarshal(raw, &parsed)
 	}
-	return resp, parsed
+	return resp.StatusCode, resp.Header, parsed
 }
 
 func serveHTTPHandlerPOST(t *testing.T, handler http.Handler, body string, headers map[string]string) (*httptest.ResponseRecorder, map[string]any) {
@@ -364,16 +364,16 @@ func TestMCPUnixSocketFilesystemSafety(t *testing.T) {
 
 	// cleanupMCPUnixSocket must not remove a file whose inode no longer matches boundInfo.
 	preserved := shortUnixSockPath(t, "preserved.txt")
-	if err := os.WriteFile(preserved, []byte("keep"), 0o600); err != nil {
-		t.Fatal(err)
+	if wErr := os.WriteFile(preserved, []byte("keep"), 0o600); wErr != nil {
+		t.Fatal(wErr)
 	}
-	pInfo, err := os.Lstat(preserved)
-	if err != nil {
-		t.Fatal(err)
+	pInfo, lErr := os.Lstat(preserved)
+	if lErr != nil {
+		t.Fatal(lErr)
 	}
 	cleanupMCPUnixSocket(preserved, pInfo)
-	if _, err := os.Stat(preserved); err != nil {
-		t.Fatalf("cleanupMCPUnixSocket deleted non-socket path: %v", err)
+	if _, stErr := os.Stat(preserved); stErr != nil {
+		t.Fatalf("cleanupMCPUnixSocket deleted non-socket path: %v", stErr)
 	}
 }
 
@@ -430,21 +430,21 @@ func TestMCPUnixSocketProtocolsAndAuth(t *testing.T) {
 
 	// 3. Streamable HTTP over the same Unix socket + security header checks.
 	client := unixHTTPClient(t, sockPath)
-	initResp, initParsed := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":21,"method":"initialize","params":{"clientInfo":{"name":"codex"}}}`, nil)
-	if initResp.StatusCode != http.StatusOK || mcpToolIsError(initParsed) {
-		t.Fatalf("HTTP over UDS initialize = (%d, %v)", initResp.StatusCode, initParsed)
+	initStatus, initHdr, initParsed := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":21,"method":"initialize","params":{"clientInfo":{"name":"codex"}}}`, nil)
+	if initStatus != http.StatusOK || mcpToolIsError(initParsed) {
+		t.Fatalf("HTTP over UDS initialize = (%d, %v)", initStatus, initParsed)
 	}
-	sessID := initResp.Header.Get("Mcp-Session-Id")
+	sessID := initHdr.Get("Mcp-Session-Id")
 	if sessID == "" {
 		t.Fatal("missing Mcp-Session-Id header over UDS HTTP")
 	}
 
-	badOriginResp, _ := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":22,"method":"ping"}`, map[string]string{
+	badOriginStatus, _, _ := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":22,"method":"ping"}`, map[string]string{
 		"Origin":         "https://evil.example",
 		"Mcp-Session-Id": sessID,
 	})
-	if badOriginResp.StatusCode != http.StatusForbidden {
-		t.Fatalf("Origin evil.example over UDS HTTP = %d, want 403", badOriginResp.StatusCode)
+	if badOriginStatus != http.StatusForbidden {
+		t.Fatalf("Origin evil.example over UDS HTTP = %d, want 403", badOriginStatus)
 	}
 
 	getReq, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "http://unix/mcp", nil)
@@ -455,7 +455,7 @@ func TestMCPUnixSocketProtocolsAndAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	getResp.Body.Close()
+	_ = getResp.Body.Close()
 	if getResp.StatusCode != http.StatusMethodNotAllowed {
 		t.Fatalf("GET /mcp over UDS = %d, want 405", getResp.StatusCode)
 	}
@@ -469,7 +469,7 @@ func TestMCPUnixSocketProtocolsAndAuth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	delResp.Body.Close()
+	_ = delResp.Body.Close()
 	if delResp.StatusCode != http.StatusNoContent {
 		t.Fatalf("DELETE /mcp over UDS = %d, want 204", delResp.StatusCode)
 	}
@@ -508,11 +508,11 @@ func TestMCPUnixSocketProtocolsAndAuth(t *testing.T) {
 	// Content-Length auth failure vs success.
 	authCL := dialUnixConn(t, authSock)
 	_ = authCL.SetDeadline(time.Now().Add(10 * time.Second))
-	if err := writeContentLengthFrame(authCL, `{"jsonrpc":"2.0","id":34,"method":"ping"}`); err != nil {
-		t.Fatal(err)
+	if wErr := writeContentLengthFrame(authCL, `{"jsonrpc":"2.0","id":34,"method":"ping"}`); wErr != nil {
+		t.Fatal(wErr)
 	}
-	if err := writeContentLengthFrame(authCL, `{"jsonrpc":"2.0","id":35,"method":"ping","params":{"token":"uds-secret-token"}}`); err != nil {
-		t.Fatal(err)
+	if wErr := writeContentLengthFrame(authCL, `{"jsonrpc":"2.0","id":35,"method":"ping","params":{"token":"uds-secret-token"}}`); wErr != nil {
+		t.Fatal(wErr)
 	}
 	authCLReader := bufio.NewReader(authCL)
 	clDenied, err := readContentLengthFrame(authCLReader)
@@ -527,15 +527,15 @@ func TestMCPUnixSocketProtocolsAndAuth(t *testing.T) {
 
 	// HTTP auth failure vs success over UDS.
 	authClient := unixHTTPClient(t, authSock)
-	unauthHTTP, _ := postUnixMCPHTTP(t, authClient, `{"jsonrpc":"2.0","id":36,"method":"ping"}`, nil)
-	if unauthHTTP.StatusCode != http.StatusUnauthorized {
-		t.Fatalf("unauthenticated HTTP over UDS = %d, want 401", unauthHTTP.StatusCode)
+	unauthStatus, _, _ := postUnixMCPHTTP(t, authClient, `{"jsonrpc":"2.0","id":36,"method":"ping"}`, nil)
+	if unauthStatus != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated HTTP over UDS = %d, want 401", unauthStatus)
 	}
-	okHTTP, okParsed := postUnixMCPHTTP(t, authClient, `{"jsonrpc":"2.0","id":37,"method":"ping"}`, map[string]string{
+	okStatus, _, okParsed := postUnixMCPHTTP(t, authClient, `{"jsonrpc":"2.0","id":37,"method":"ping"}`, map[string]string{
 		"Authorization": "Bearer uds-secret-token",
 	})
-	if okHTTP.StatusCode != http.StatusOK || mcpToolIsError(okParsed) {
-		t.Fatalf("authenticated HTTP over UDS = (%d, %v)", okHTTP.StatusCode, okParsed)
+	if okStatus != http.StatusOK || mcpToolIsError(okParsed) {
+		t.Fatalf("authenticated HTTP over UDS = (%d, %v)", okStatus, okParsed)
 	}
 }
 
@@ -634,7 +634,10 @@ func TestMCPConcurrentMultiClientACLIsolation(t *testing.T) {
 					failf("alpha worker %d leaked beta data on call %d: %s", id, checkID, txt)
 				}
 			}
-			resBytes, _ := json.Marshal(reps[7])
+			resBytes, mErr := json.Marshal(reps[7])
+			if mErr != nil {
+				failf("alpha worker %d marshal resources/list: %v", id, mErr)
+			}
 			if strings.Contains(string(resBytes), "sess-beta-1") || strings.Contains(string(resBytes), "beta-fix-1") {
 				failf("alpha worker %d resources/list leaked beta session: %s", id, resBytes)
 			}
@@ -653,33 +656,33 @@ func TestMCPConcurrentMultiClientACLIsolation(t *testing.T) {
 				"X-Deja-Client":       "client-beta",
 				"X-Deja-Client-Token": "token-beta",
 			}
-			rInit, pInit := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`, hdrs)
-			if rInit.StatusCode != http.StatusOK || mcpToolIsError(pInit) {
-				failf("beta worker %d init failed: (%d, %v)", id, rInit.StatusCode, pInit)
+			initStatus, initHdr, pInit := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}`, hdrs)
+			if initStatus != http.StatusOK || mcpToolIsError(pInit) {
+				failf("beta worker %d init failed: (%d, %v)", id, initStatus, pInit)
 				return
 			}
-			sid := rInit.Header.Get("Mcp-Session-Id")
+			sid := initHdr.Get("Mcp-Session-Id")
 			callHdrs := map[string]string{
 				"Mcp-Session-Id":      sid,
 				"X-Deja-Client-Token": "token-beta",
 			}
-			_, pRecall := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"recall","arguments":{"query":"canary_beta_8822"}}}`, callHdrs)
+			_, _, pRecall := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"recall","arguments":{"query":"canary_beta_8822"}}}`, callHdrs)
 			if mcpToolIsError(pRecall) || !strings.Contains(vaultReplyText(pRecall), "canary_beta_8822") {
 				failf("beta worker %d missed canary_beta_8822: %v", id, pRecall)
 			}
-			_, pFix := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"fix","arguments":{"error":"zsh:1: command not found: betaerr4422"}}}`, callHdrs)
+			_, _, pFix := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"fix","arguments":{"error":"zsh:1: command not found: betaerr4422"}}}`, callHdrs)
 			if mcpToolIsError(pFix) || !strings.Contains(vaultReplyText(pFix), "betaremedy6633") {
 				failf("beta worker %d missed beta remedy: %v", id, pFix)
 			}
-			_, pLeak := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"recall","arguments":{"query":"canary_alpha_9911"}}}`, callHdrs)
+			_, _, pLeak := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"recall","arguments":{"query":"canary_alpha_9911"}}}`, callHdrs)
 			if strings.Contains(vaultReplyText(pLeak), "alpha deployment secret") {
 				failf("beta worker %d leaked canary_alpha_9911: %v", id, pLeak)
 			}
-			_, pDenyWrite := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"remember","arguments":{"text":"beta_bad_write","project":"tmp/alpha"}}}`, callHdrs)
+			_, _, pDenyWrite := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"remember","arguments":{"text":"beta_bad_write","project":"tmp/alpha"}}}`, callHdrs)
 			if !mcpToolIsError(pDenyWrite) {
 				failf("beta worker %d wrote to forbidden project tmp/alpha: %v", id, pDenyWrite)
 			}
-			_, pAllowWrite := postUnixMCPHTTP(t, client, fmt.Sprintf(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"remember","arguments":{"text":"beta_note_ok_%d","project":"tmp/beta"}}}`, id), callHdrs)
+			_, _, pAllowWrite := postUnixMCPHTTP(t, client, fmt.Sprintf(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"remember","arguments":{"text":"beta_note_ok_%d","project":"tmp/beta"}}}`, id), callHdrs)
 			if mcpToolIsError(pAllowWrite) {
 				failf("beta worker %d allowed remember failed: %v", id, pAllowWrite)
 			}
@@ -729,7 +732,7 @@ func TestMCPConcurrentMultiClientACLIsolation(t *testing.T) {
 	stopUDS()
 
 	// Verify locked vault fails closed across UDS (standard and --context-search) + hides active project trailer.
-	const pass = "acl-vault-lock-pass"
+	const pass = "acl-vault-lock-pass" //nolint:gosec // G101: synthetic test passphrase
 	if _, err := vault.Init(dir, pass, 30*time.Minute); err != nil {
 		t.Fatalf("vault.Init: %v", err)
 	}
@@ -768,26 +771,26 @@ func TestMCPLateRecallIsolatedAcrossClients(t *testing.T) {
 	startTestUnixSocketServer(t, dir, sockPath, false)
 
 	client := unixHTTPClient(t, sockPath)
-	initA, parsedA := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"client-alpha"}}}`, map[string]string{
+	statusA, hdrAInit, parsedA := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"client-alpha"}}}`, map[string]string{
 		"X-Deja-Client":       "client-alpha",
 		"X-Deja-Client-Token": "token-alpha",
 	})
-	if initA.StatusCode != http.StatusOK || mcpToolIsError(parsedA) {
-		t.Fatalf("client-alpha initialize = (%d, %v)", initA.StatusCode, parsedA)
+	if statusA != http.StatusOK || mcpToolIsError(parsedA) {
+		t.Fatalf("client-alpha initialize = (%d, %v)", statusA, parsedA)
 	}
-	sidA := initA.Header.Get("Mcp-Session-Id")
+	sidA := hdrAInit.Get("Mcp-Session-Id")
 	if sidA == "" {
 		t.Fatal("client-alpha missing Mcp-Session-Id")
 	}
 
-	initB, parsedB := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"client-beta"}}}`, map[string]string{
+	statusB, hdrBInit, parsedB := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"client-beta"}}}`, map[string]string{
 		"X-Deja-Client":       "client-beta",
 		"X-Deja-Client-Token": "token-beta",
 	})
-	if initB.StatusCode != http.StatusOK || mcpToolIsError(parsedB) {
-		t.Fatalf("client-beta initialize = (%d, %v)", initB.StatusCode, parsedB)
+	if statusB != http.StatusOK || mcpToolIsError(parsedB) {
+		t.Fatalf("client-beta initialize = (%d, %v)", statusB, parsedB)
 	}
-	sidB := initB.Header.Get("Mcp-Session-Id")
+	sidB := hdrBInit.Get("Mcp-Session-Id")
 	if sidB == "" {
 		t.Fatal("client-beta missing Mcp-Session-Id")
 	}
@@ -795,7 +798,7 @@ func TestMCPLateRecallIsolatedAcrossClients(t *testing.T) {
 	hdrA := map[string]string{"Mcp-Session-Id": sidA, "X-Deja-Client-Token": "token-alpha"}
 	hdrB := map[string]string{"Mcp-Session-Id": sidB, "X-Deja-Client-Token": "token-beta"}
 
-	_, slowRep := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"deja","arguments":{"mode":"recall","query":"alpha-secret-query"}}}`, hdrA)
+	_, _, slowRep := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"deja","arguments":{"mode":"recall","query":"alpha-secret-query"}}}`, hdrA)
 	if slowTxt := replyText(slowRep); !strings.Contains(slowTxt, "has not finished") {
 		t.Fatalf("want wait note for overdue recall, got %q (%#v)", slowTxt, slowRep)
 	}
@@ -810,14 +813,14 @@ func TestMCPLateRecallIsolatedAcrossClients(t *testing.T) {
 
 	setDeadline(t, 0)
 	close(h.gate("beta-query"))
-	_, betaRep := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"deja","arguments":{"mode":"recall","query":"beta-query"}}}`, hdrB)
+	_, _, betaRep := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"deja","arguments":{"mode":"recall","query":"beta-query"}}}`, hdrB)
 	betaTxt := replyText(betaRep)
 	if betaTxt != "answer for beta-query" || strings.Contains(betaTxt, "alpha-secret-query") || strings.Contains(betaTxt, "earlier answer") {
 		t.Fatalf("client-beta received client-alpha late recall: %q", betaTxt)
 	}
 
 	close(h.gate("alpha-next"))
-	_, alphaRep := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"deja","arguments":{"mode":"recall","query":"alpha-next"}}}`, hdrA)
+	_, _, alphaRep := postUnixMCPHTTP(t, client, `{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"deja","arguments":{"mode":"recall","query":"alpha-next"}}}`, hdrA)
 	alphaTxt := replyText(alphaRep)
 	if !strings.HasPrefix(alphaTxt, `deja: earlier answer for recall "alpha-secret-query"`) || !strings.HasSuffix(alphaTxt, "answer for alpha-next") {
 		t.Fatalf("client-alpha did not receive its own late recall: %q", alphaTxt)

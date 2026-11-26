@@ -34,7 +34,7 @@ func cooccurHash(s string) uint64 {
 
 func cooccurGobStamp(dir string) (uint64, [sha256.Size]byte, error) {
 	var zero [sha256.Size]byte
-	f, err := openIndexBlobFile(cooccurPath(dir), vault.DomainIndexFile)
+	f, err := openIndexBlobFile(cooccurPath(dir))
 	if err != nil {
 		return 0, zero, err
 	}
@@ -203,7 +203,7 @@ func lookupCooccurFallback(dir string, terms []string) (map[string][]string, boo
 }
 
 func lookupCooccurFromBin(dir string, gobSize uint64, stamp [sha256.Size]byte, terms []string) (map[string][]string, bool) {
-	f, err := openIndexBlobFile(cooccurBinPath(dir), vault.DomainIndexFile)
+	f, err := openIndexBlobFile(cooccurBinPath(dir))
 	if err != nil {
 		return nil, false
 	}
@@ -234,7 +234,7 @@ func lookupCooccurFromBin(dir string, gobSize uint64, stamp [sha256.Size]byte, t
 		return nil, false
 	}
 	dataStart := uint64(cooccurBinHeaderSize) + (uint64(bucketCount)+1)*8
-	fileSize := uint64(plainSize) //nolint:gosec // checked >= cooccurBinHeaderSize above
+	fileSize := uint64(plainSize)
 	if fileSize < dataStart || fileSize > math.MaxInt64 {
 		return nil, false
 	}

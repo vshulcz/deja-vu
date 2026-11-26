@@ -231,7 +231,7 @@ var errNoRecordOffsets = errors.New("no record offsets")
 // recordOffsetsCover reads only the table's header and reports how much of
 // the open log f it covers, when it still fits f.
 func recordOffsetsCover(dir string, f *os.File) (int64, bool) {
-	tf, err := openIndexBlobFile(filepath.Join(dir, recordOffsetsFile), vault.DomainIndexFile)
+	tf, err := openIndexBlobFile(filepath.Join(dir, recordOffsetsFile))
 	if err != nil {
 		return 0, false
 	}
@@ -255,7 +255,7 @@ func recordOffsetsCover(dir string, f *os.File) (int64, bool) {
 // log f. With keys it decodes only those keys' entries; with nil keys, all of
 // them.
 func readRecordOffsetsFor(dir string, f *os.File, keys map[string]bool) (recordOffsets, error) {
-	b, err := readIndexBytes(filepath.Join(dir, recordOffsetsFile), vault.DomainIndexFile)
+	b, err := readIndexBytes(filepath.Join(dir, recordOffsetsFile))
 	if err != nil {
 		return recordOffsets{}, errNoRecordOffsets
 	}

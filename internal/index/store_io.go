@@ -700,7 +700,7 @@ func (t *recordTables) ensureCipher(dir string) error {
 	if canon == "" {
 		return nil
 	}
-	rc, err := vault.ActiveRecordCipher(canon)
+	rc, _, err := vault.ActiveRecordCipher(canon)
 	if err != nil {
 		invalidateSnapshot(canon)
 		return err

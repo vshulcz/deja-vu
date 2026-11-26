@@ -145,7 +145,7 @@ func linuxDBusSocket() string {
 		cands = append(cands, filepath.Join(dir, "bus"))
 	}
 	if uid := os.Getuid(); uid >= 0 {
-		cands = append(cands, filepath.Join("/run/user", strconv.Itoa(uid), "bus"))
+		cands = append(cands, filepath.FromSlash("/run/user/"+strconv.Itoa(uid)+"/bus"))
 	}
 	for _, p := range cands {
 		if fi, err := os.Stat(p); err == nil && fi.Mode()&os.ModeSocket != 0 {

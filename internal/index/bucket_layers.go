@@ -483,20 +483,21 @@ func blankWords(p string, gone map[string]bool) error {
 	scan := func(src io.Reader) ([]span, error) {
 		r := bufio.NewReader(src)
 		magic := make([]byte, len(bucketMagic))
-		if _, err = io.ReadFull(r, magic); err != nil || !bytes.Equal(magic, bucketMagic) {
+		var rErr error
+		if _, rErr = io.ReadFull(r, magic); rErr != nil || !bytes.Equal(magic, bucketMagic) {
 			return nil, errCorruptIndex
 		}
-		count, err := binary.ReadUvarint(r)
-		if err != nil {
-			return nil, err
+		count, rErr := binary.ReadUvarint(r)
+		if rErr != nil {
+			return nil, rErr
 		}
 		pos := int64(len(bucketMagic) + uvarintLen(count))
 		var hits []span
 		tb := []byte{}
 		for range count {
-			ln, err := binary.ReadUvarint(r)
-			if err != nil {
-				return nil, err
+			ln, lnErr := binary.ReadUvarint(r)
+			if lnErr != nil {
+				return nil, lnErr
 			}
 			pos += int64(uvarintLen(ln))
 			if ln > uint64(maxRecordSize) {
@@ -506,8 +507,8 @@ func blankWords(p string, gone map[string]bool) error {
 				tb = make([]byte, ln)
 			}
 			tb = tb[:ln]
-			if _, err = io.ReadFull(r, tb); err != nil {
-				return nil, err
+			if _, rErr = io.ReadFull(r, tb); rErr != nil {
+				return nil, rErr
 			}
 			if gone[string(tb)] {
 				if b, ok := blankedWord(string(tb)); ok {
@@ -515,9 +516,9 @@ func blankWords(p string, gone map[string]bool) error {
 				}
 			}
 			pos += int64(ln)
-			n, err := binary.ReadUvarint(r)
-			if err != nil {
-				return nil, err
+			n, nErr := binary.ReadUvarint(r)
+			if nErr != nil {
+				return nil, nErr
 			}
 			pos += int64(uvarintLen(n))
 		}
@@ -525,21 +526,21 @@ func blankWords(p string, gone map[string]bool) error {
 	}
 
 	if len(dek) > 0 {
-		raw, err := readIndexBytes(p, vault.DomainIndexFile)
-		if err != nil {
-			return err
+		raw, rErr := readIndexBytes(p)
+		if rErr != nil {
+			return rErr
 		}
-		hits, err := scan(bytes.NewReader(raw))
-		if err != nil || len(hits) == 0 {
+		hits, sErr := scan(bytes.NewReader(raw))
+		if sErr != nil || len(hits) == 0 {
 			clear(raw)
-			return err
+			return sErr
 		}
 		for _, h := range hits {
 			copy(raw[h.at:], h.blank)
 		}
-		err = writeSealedFileAtomic(p, raw, vault.DomainIndexFile)
+		wErr := writeSealedFileAtomic(p, raw, vault.DomainIndexFile)
 		clear(raw)
-		return err
+		return wErr
 	}
 
 	f, err := os.OpenFile(p, os.O_RDWR, 0)

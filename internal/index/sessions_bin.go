@@ -133,7 +133,7 @@ func encodeSessionsBin(sessions map[string]SessionMeta) ([]byte, error) {
 }
 
 func readSessionsBinCount(dir string) (int, error) {
-	f, err := openIndexBlobFile(filepath.Join(dir, "sessions.bin"), vault.DomainIndexFile)
+	f, err := openIndexBlobFile(filepath.Join(dir, "sessions.bin"))
 	if err != nil {
 		return 0, err
 	}
@@ -162,7 +162,7 @@ func readSessionsBinCount(dir string) (int, error) {
 }
 
 func readSessionsBin(dir string) (map[string]SessionMeta, error) {
-	data, err := readIndexBytes(filepath.Join(dir, "sessions.bin"), vault.DomainIndexFile)
+	data, err := readIndexBytes(filepath.Join(dir, "sessions.bin"))
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +212,7 @@ func readSessionsBin(dir string) (map[string]SessionMeta, error) {
 }
 
 func readSessionsBinKey(dir, target string) (SessionMeta, bool, error) {
-	f, err := openIndexBlobFile(filepath.Join(dir, "sessions.bin"), vault.DomainIndexFile)
+	f, err := openIndexBlobFile(filepath.Join(dir, "sessions.bin"))
 	if err != nil {
 		return SessionMeta{}, false, err
 	}

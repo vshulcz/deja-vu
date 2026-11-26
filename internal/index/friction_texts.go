@@ -410,7 +410,7 @@ func encodeFrictionTexts(ft frictionTextFile) []byte {
 
 // decodeFrictionTextsFile reads the file without checking it against a log.
 func decodeFrictionTextsFile(path string) (frictionTextFile, bool) {
-	b, err := readIndexBytes(path, vault.DomainIndexFile)
+	b, err := readIndexBytes(path)
 	if err != nil {
 		return frictionTextFile{}, false
 	}
@@ -532,7 +532,7 @@ func loadFrictionTexts(dir string, m Manifest, want map[uint64]string) map[strin
 // session that carries a wall (#5402). A file that does not describe dir's
 // committed log is copied as it is, and checked entry by entry as before.
 func carryFrictionTexts(dir, tmp string, old Manifest, changed map[string]bool) {
-	b, err := readIndexBytes(filepath.Join(dir, frictionTextsFile), vault.DomainIndexFile)
+	b, err := readIndexBytes(filepath.Join(dir, frictionTextsFile))
 	if err != nil {
 		return
 	}
