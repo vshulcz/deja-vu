@@ -385,6 +385,7 @@ func TestExternalMCPAndProjectPathAndToolInputCWD(t *testing.T) {
 		}
 	}
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 
 	env := GrokEnvelope{
 		ConversationIDCamel: "conv-1",

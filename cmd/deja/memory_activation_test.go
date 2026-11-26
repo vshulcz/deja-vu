@@ -18,6 +18,23 @@ import (
 	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
+// claudeTestProjectDir encodes a working directory path using Claude Code's
+// folder naming rule so fixture directories work on both Unix and Windows.
+func claudeTestProjectDir(p string) string {
+	var b strings.Builder
+	for _, r := range p {
+		switch {
+		case r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r > 0xFFFF:
+			b.WriteString("--")
+		default:
+			b.WriteByte('-')
+		}
+	}
+	return b.String()
+}
+
 func TestMCPProjectPathNormalization(t *testing.T) {
 	tmp := hermeticEnv(t)
 	home := os.Getenv("HOME")
@@ -44,8 +61,8 @@ func TestMCPProjectPathNormalization(t *testing.T) {
 	}
 
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
-	encAlpha := strings.ReplaceAll(repoAlpha, string(filepath.Separator), "-")
-	encBeta := strings.ReplaceAll(repoBeta, string(filepath.Separator), "-")
+	encAlpha := claudeTestProjectDir(repoAlpha)
+	encBeta := claudeTestProjectDir(repoBeta)
 	writeClaudeFixture(t, filepath.Join(claudeRoot, encAlpha, "sess-alpha-1.jsonl"), "sess-alpha-1", []string{
 		`{"type":"user","sessionId":"sess-alpha-1","cwd":` + strconv.Quote(repoAlpha) + `,"timestamp":"2026-08-01T10:00:00Z","message":{"role":"user","content":"why does zorbmax jitter cap fail on pkg/retry/backoff.go"}}`,
 		`{"type":"assistant","sessionId":"sess-alpha-1","cwd":` + strconv.Quote(repoAlpha) + `,"timestamp":"2026-08-01T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":` + strconv.Quote(alphaFile) + `}},{"type":"text","text":"Pinned the zorbmax jitter cap floor inside pkg/retry/backoff.go."}]}}`,
@@ -155,7 +172,7 @@ func TestMCPRecallFilePathPrependsCausalBlame(t *testing.T) {
 	}
 
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
-	enc := strings.ReplaceAll(repoDir, string(filepath.Separator), "-")
+	enc := claudeTestProjectDir(repoDir)
 	// Session that edited pkg/worker/pool.go and recorded a decision later retracted.
 	writeClaudeFixture(t, filepath.Join(claudeRoot, enc, "sess-causal-1.jsonl"), "sess-causal-1", []string{
 		`{"type":"user","sessionId":"sess-causal-1","cwd":` + strconv.Quote(repoDir) + `,"timestamp":"2026-08-03T10:00:00Z","message":{"role":"user","content":"adjust worker pool sizing"}}`,
@@ -240,7 +257,7 @@ func TestHookToolExternalMCPWrappersAndToolInputCWD(t *testing.T) {
 	}
 
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
-	enc := strings.ReplaceAll(repoDir, string(filepath.Separator), "-")
+	enc := claudeTestProjectDir(repoDir)
 	for i, id := range []string{"sess-pool-prev-1", "sess-pool-prev-2"} {
 		h := string(rune('1' + i))
 		writeClaudeFixture(t, filepath.Join(claudeRoot, enc, id+".jsonl"), id, []string{
@@ -319,7 +336,7 @@ func TestHookToolAfterExternalMCPContentArrayAndWrappedHeaders(t *testing.T) {
 	}
 
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
-	enc := strings.ReplaceAll(repoDir, string(filepath.Separator), "-")
+	enc := claudeTestProjectDir(repoDir)
 	// Seed two prior sessions hitting the exact compiler error and resolving it so a confirmed FixPair exists.
 	for i, id := range []string{"sess-fix-1", "sess-fix-2"} {
 		ts1 := "2026-08-01T1" + string(rune('0'+i)) + ":00:00Z"
@@ -415,7 +432,7 @@ func TestSessionEndRefreshCapturesConfirmedFixAndRuleCandidates(t *testing.T) {
 	}
 
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
-	enc := strings.ReplaceAll(repoDir, string(filepath.Separator), "-")
+	enc := claudeTestProjectDir(repoDir)
 	for i, id := range []string{"sess-se-fix-1", "sess-se-fix-2"} {
 		h := string(rune('1' + i))
 		writeClaudeFixture(t, filepath.Join(claudeRoot, enc, id+".jsonl"), id, []string{
@@ -501,6 +518,7 @@ func TestRememberCandidatesAndMCPHelperBranches(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 	poolFile := filepath.Join(workerDir, "pool.go")
 	if err := os.WriteFile(poolFile, []byte("package worker\n"), 0o644); err != nil {
 		t.Fatal(err)
