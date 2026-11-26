@@ -91,6 +91,16 @@ func switchedParseFrom(f func(string, int64, int64) ([]model.Session, error)) fu
 	}
 }
 
+func switchedParseDBDelta(f func(string, int64, string) ([]model.Session, string, error)) func(string, int64, string) ([]model.Session, string, error) {
+	if f == nil {
+		return nil
+	}
+	return func(p string, nano int64, cursor string) ([]model.Session, string, error) {
+		ss, next, err := f(p, nano, cursor)
+		return applyReadSwitches(ss), next, err
+	}
+}
+
 func switchedLoad(f func() []model.Session) func() []model.Session {
 	if f == nil {
 		return nil
@@ -117,6 +127,7 @@ func withSubagentSwitch(hs []Harness) []Harness {
 		for j, k := range hs[i].Kinds {
 			k.Parse = switchedParse(k.Parse)
 			k.ParseFrom = switchedParseFrom(k.ParseFrom)
+			k.ParseDBDelta = switchedParseDBDelta(k.ParseDBDelta)
 			k.switched = true
 			kinds[j] = k
 		}

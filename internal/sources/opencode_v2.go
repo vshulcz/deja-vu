@@ -57,13 +57,15 @@ type opencodeSchema struct {
 	// session, turnsStamped that session_message carries time_updated: the
 	// since clause asks those where they are there (#4207).
 	rowsStamped, turnsStamped bool
+	// tables lists the present OpenCode tables and their row keys for cursor capture.
+	tables []sqliteTableSpec
 }
 
 // opencodeSchemaCache keeps one answer per store file, because the schema is
 // asked for again by every read beside the main projection — the newest id, the
 // parents, the titles, the counts — and each answer costs a sqlite3 process.
-// Keyed on the file's size and modification time, so a store that changes under
-// a long-running process is asked again.
+// Keyed on the file's and WAL's size and modification time, so a store that
+// changes under a long-running process is asked again.
 var opencodeSchemaCache sync.Map
 
 // opencodeSchemaOf answers that question once per store file.
@@ -71,6 +73,9 @@ func opencodeSchemaOf(db string) opencodeSchema {
 	key := db
 	if fi, err := os.Stat(db); err == nil {
 		key = fmt.Sprintf("%s|%d|%d", db, fi.Size(), fi.ModTime().UnixNano())
+	}
+	if wfi, err := os.Stat(db + "-wal"); err == nil {
+		key += fmt.Sprintf("|%d|%d", wfi.Size(), wfi.ModTime().UnixNano())
 	}
 	if v, ok := opencodeSchemaCache.Load(key); ok {
 		schema, _ := v.(opencodeSchema)
@@ -89,7 +94,7 @@ func readOpencodeSchema(db string) opencodeSchema {
 		`select name n from sqlite_master where type='table' `+
 		`and name in ('session','session_v2','session_message','message','part')`+
 		` union all select 'message.time_updated' from pragma_table_info('message') where name='time_updated'`+
-		` union all select 'part.'||name from pragma_table_info('part') where name in ('time_updated','session_id')`+
+		` union all select 'part.'||name from pragma_table_info('part') where name in ('time_updated','session_id','id')`+
 		` union all select 'session_message.time_updated' from pragma_table_info('session_message') where name='time_updated')`)
 	if err != nil {
 		return out
@@ -97,6 +102,16 @@ func readOpencodeSchema(db string) opencodeSchema {
 	have := map[string]bool{}
 	for name := range strings.SplitSeq(strings.TrimSpace(string(b)), ",") {
 		have[name] = true
+	}
+	for _, name := range []string{"session", "session_v2", "session_message", "message", "part"} {
+		if !have[name] {
+			continue
+		}
+		keyExpr := "cast(id as text)"
+		if name == "part" && !have["part.id"] {
+			keyExpr = "coalesce(cast(message_id as text),'')"
+		}
+		out.tables = append(out.tables, sqliteTableSpec{Name: name, KeyExpr: keyExpr})
 	}
 	out.rowsStamped = have["message.time_updated"] && have["part.time_updated"] && have["part.session_id"]
 	out.turnsStamped = have["session_message.time_updated"]
@@ -238,15 +253,6 @@ func opencodeV2Query(sessionTable, where string, limit int, only string) string 
 		`where (json_extract(p.data,'$.type')='text' ` +
 		`or json_extract(p.data,'$.type')='tool')` +
 		where + ` order by s.id,p.mc,p.ord` + lim
-}
-
-// opencodeV2SinceWhere picks the 2.x sessions touched after the watermark, read
-// whole, for the reason opencodeSinceWhere gives. A turn's row is rewritten as
-// its content streams in, so time_updated is what moves; a store without the
-// column is asked for the turn's own stamps, under `$.time.start` for a tool
-// and `$.time.created` for a turn.
-func opencodeV2SinceWhere(db string, t time.Time) string {
-	return " and s.id in (" + opencodeV2SinceSet(db, t) + ")"
 }
 
 // opencodeV2SinceSet is the query of those session ids on its own.

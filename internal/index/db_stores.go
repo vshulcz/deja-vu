@@ -92,3 +92,42 @@ func stampDatabaseStores(files map[string]FileState, sessions map[string]Session
 	setStoreLastUpdated(files, sessions, "omnigent", sources.OmnigentDB())
 	setStoreLastUpdated(files, sessions, "orca", sources.OrcaDB())
 }
+
+// captureDatabaseStoreCursors snapshots rowid cursors for readable database
+// stores after a full cold rebuild so the next incremental pass starts with a
+// delta anchor instead of rescanning from rowid 0.
+func captureDatabaseStoreCursors(files map[string]FileState) {
+	if len(files) == 0 {
+		return
+	}
+	failed := sources.DiagFailedPaths()
+	reg := sources.Registry()
+	for p, f := range files {
+		if failed[p] != "" || f.DBCursor != "" {
+			continue
+		}
+		k, ok := kindIn(reg, p)
+		if !ok || k.CaptureDBCursor == nil {
+			continue
+		}
+		if cur := k.CaptureDBCursor(p); cur != "" {
+			f.DBCursor = cur
+			files[p] = f
+		}
+	}
+}
+
+// carryDatabaseStoreCursors preserves prior rowid cursors for database stores
+// that were not re-read on this pass. Stores in reread keep the cursor produced
+// by ParseDBDelta (including empty string on fallback).
+func carryDatabaseStoreCursors(files, oldFiles, reread map[string]FileState) {
+	for p, f := range files {
+		if _, ok := reread[p]; ok || f.DBCursor != "" {
+			continue
+		}
+		if of, ok := oldFiles[p]; ok && !of.Kept && of.DBCursor != "" {
+			f.DBCursor = of.DBCursor
+			files[p] = f
+		}
+	}
+}

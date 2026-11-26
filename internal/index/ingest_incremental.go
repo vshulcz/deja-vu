@@ -718,3 +718,17 @@ func readSettled(p string, f FileState, parse func() ([]model.Session, error)) (
 		}
 	}
 }
+
+func readSettledDelta(harness, p string, f, old FileState) (ss []model.Session, at FileState, again bool, err error) {
+	var nextCursor string
+	ss, at, again, err = readSettled(p, f, func() ([]model.Session, error) {
+		var parsed []model.Session
+		var perr error
+		parsed, nextCursor, perr = parseChangedFileDelta(harness, p, old)
+		return parsed, perr
+	})
+	if err == nil {
+		at.DBCursor = nextCursor
+	}
+	return ss, at, again, err
+}

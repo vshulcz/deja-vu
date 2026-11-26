@@ -147,6 +147,56 @@ func ParseOpenClawDBSince(db string, t time.Time) ([]model.Session, error) {
 		t.Add(-time.Second).UnixMilli()))
 }
 
+const openclawSetCap = 2000
+
+var openclawDBTables = []sqliteTableSpec{
+	{Name: "transcript_events", KeyExpr: "cast(session_id as text)||':'||cast(seq as text)"},
+}
+
+// CaptureOpenClawDBCursor snapshots rowid anchors for an OpenClaw SQLite store.
+func CaptureOpenClawDBCursor(db string) string {
+	return captureSQLiteTableCursor(db, openclawDBTables)
+}
+
+// ParseOpenClawDBDelta reads OpenClaw sessions touched after (t, cursor) and returns the next cursor token.
+func ParseOpenClawDBDelta(db string, t time.Time, cursor string) ([]model.Session, string, error) {
+	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
+		return nil, "", nil //nolint:nilerr // a missing or empty store holds no sessions
+	}
+	prev, nextCursor, canDelta := prepareSQLiteDelta(db, cursor, openclawDBTables)
+	if !canDelta || t.IsZero() {
+		var ss []model.Session
+		var err error
+		if t.IsZero() {
+			ss, err = ParseOpenClawDB(db)
+		} else {
+			ss, err = ParseOpenClawDBSince(db, t)
+		}
+		if err != nil {
+			return nil, "", err
+		}
+		return ss, nextCursor, nil
+	}
+	prevMax := prev.Tables["transcript_events"].MaxRowID
+	set := fmt.Sprintf(
+		"select session_id from transcript_events where rowid > %d union select session_id from transcript_events where created_at > %d",
+		prevMax, t.Add(-time.Second).UnixMilli())
+	var where string
+	if ids, ok := sqliteBoundedIDs(db, set, openclawSetCap); ok {
+		if len(ids) == 0 {
+			return nil, nextCursor, nil
+		}
+		where = " where e.session_id in (" + sqlInValues(ids) + ")"
+	} else {
+		where = " where e.session_id in (" + set + ")"
+	}
+	ss, err := parseOpenClawDBWhere(db, where)
+	if err != nil {
+		return nil, "", err
+	}
+	return ss, nextCursor, nil
+}
+
 func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
 		return nil, nil
@@ -193,7 +243,7 @@ func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 	}
 	for dec.More() {
 		var row openclawEventRow
-		if err := dec.Decode(&row); err != nil {
+		if err := sqliteDecodeRow(dec, &row); err != nil {
 			_ = cmd.Wait()
 			return nil, fmt.Errorf("bad sqlite json: %w", err)
 		}
@@ -219,7 +269,15 @@ func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 		return nil, err
 	}
 	if len(out) > 0 {
-		applyOpenClawSpawns(out, openclawDBSpawns(db))
+		if where != "" && len(out) <= openclawSetCap {
+			ids := make([]string, len(out))
+			for i := range out {
+				ids[i] = out[i].ID
+			}
+			applyOpenClawSpawns(out, openclawDBSpawnsWhere(db, " and w.session_id in ("+sqlInValues(ids)+")"))
+		} else {
+			applyOpenClawSpawns(out, openclawDBSpawns(db))
+		}
 	}
 	return out, nil
 }

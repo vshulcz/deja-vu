@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -121,6 +122,62 @@ func ParseHermesDBSince(db string, t time.Time) ([]model.Session, error) {
 		t.Add(-time.Second).Unix()))
 }
 
+const hermesSetCap = 2000
+
+func hermesCursorSpecs(db string) []sqliteTableSpec {
+	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
+		return nil
+	}
+	specs := []sqliteTableSpec{{Name: "messages", KeyExpr: "cast(id as text)"}}
+	out, err := sqliteOutput(db, "select count(*) from pragma_table_info('sessions') where name='id'")
+	if err == nil && strings.TrimSpace(string(out)) == "1" {
+		specs = append(specs, sqliteTableSpec{Name: "sessions", KeyExpr: "cast(id as text)"})
+	}
+	return specs
+}
+
+// CaptureHermesDBCursor snapshots rowid anchors for a Hermes SQLite store.
+func CaptureHermesDBCursor(db string) string {
+	return captureSQLiteTableCursor(db, hermesCursorSpecs(db))
+}
+
+// ParseHermesDBDelta reads Hermes sessions touched after (t, cursor) and returns the next cursor token.
+func ParseHermesDBDelta(db string, t time.Time, cursor string) ([]model.Session, string, error) {
+	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
+		return nil, "", nil //nolint:nilerr // a missing or empty store holds no sessions
+	}
+	specs := hermesCursorSpecs(db)
+	prev, nextCursor, canDelta := prepareSQLiteDelta(db, cursor, specs)
+	if !canDelta || t.IsZero() {
+		ss, err := ParseHermesDBSince(db, t)
+		if err != nil {
+			return nil, "", err
+		}
+		return ss, nextCursor, nil
+	}
+	prevMsgMax := prev.Tables["messages"].MaxRowID
+	set := fmt.Sprintf(
+		"select session_id from messages where rowid > %d union select session_id from messages where timestamp > %d",
+		prevMsgMax, t.Add(-time.Second).Unix())
+	if st, ok := prev.Tables["sessions"]; ok {
+		set += fmt.Sprintf(" union select id from sessions where rowid > %d", st.MaxRowID)
+	}
+	var where string
+	if ids, ok := sqliteBoundedIDs(db, set, hermesSetCap); ok {
+		if len(ids) == 0 {
+			return nil, nextCursor, nil
+		}
+		where = " and session_id in (" + sqlInValues(ids) + ")"
+	} else {
+		where = " and session_id in (" + set + ")"
+	}
+	ss, err := parseHermesDBWhere(db, where)
+	if err != nil {
+		return nil, "", err
+	}
+	return ss, nextCursor, nil
+}
+
 func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
 		return nil, nil
@@ -179,7 +236,9 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 		}
 		return nil, err
 	}
-	applyHermesMeta(out, hermesSessionMeta(db))
+	if len(out) > 0 {
+		applyHermesMeta(out, hermesSessionMetaFor(db, where, out))
+	}
 	return out, nil
 }
 
@@ -315,7 +374,7 @@ func decodeHermesArray(dec *json.Decoder, project, path string) ([]model.Session
 	}
 	for dec.More() {
 		var r map[string]any
-		if err := dec.Decode(&r); err != nil {
+		if err := sqliteDecodeRow(dec, &r); err != nil {
 			return nil, err
 		}
 		id := str(r["session_id"])
@@ -459,6 +518,48 @@ type hermesMeta struct {
 // table or a column keeps what it has.
 func hermesSessionMeta(db string) map[string]hermesMeta {
 	return hermesSessionMetaWhere(db, "")
+}
+
+// hermesSessionMetaFor reads session metadata scoped to out's session IDs and
+// up to 8 ancestor hops when where != "" so cwd inheritance matches cold rebuilds.
+func hermesSessionMetaFor(db, where string, out []model.Session) map[string]hermesMeta {
+	if where == "" || len(out) > hermesSetCap {
+		return hermesSessionMeta(db)
+	}
+	ids := make([]string, len(out))
+	for i := range out {
+		ids[i] = out[i].ID
+	}
+	meta := hermesSessionMetaWhere(db, " where id in ("+sqlInValues(ids)+")")
+	for range 8 {
+		var need []string
+		seen := map[string]bool{}
+		for _, m := range meta {
+			if m.Cwd != "" {
+				continue
+			}
+			next := hermesDelegator(m)
+			if next == "" {
+				next = m.Branched
+			}
+			if next == "" || seen[next] {
+				continue
+			}
+			if _, ok := meta[next]; !ok {
+				seen[next] = true
+				need = append(need, next)
+			}
+		}
+		if len(need) == 0 {
+			break
+		}
+		more := hermesSessionMetaWhere(db, " where id in ("+sqlInValues(need)+")")
+		if len(more) == 0 {
+			break
+		}
+		maps.Copy(meta, more)
+	}
+	return meta
 }
 
 // hermesSessionMetaWhere is hermesSessionMeta for the rows a where clause

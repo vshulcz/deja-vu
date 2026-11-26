@@ -97,6 +97,17 @@ func ParseTeleagentDBSince(db string, t time.Time) ([]model.Session, error) {
 	return ss, err
 }
 
+// ParseTeleagentDBDelta reads one account's sessions touched after (t, cursor) and returns the next cursor token.
+func ParseTeleagentDBDelta(db string, t time.Time, cursor string) ([]model.Session, string, error) {
+	ss, next, err := parseOpencodeSchemaDBDelta("teleagent", db, t, cursor)
+	if err == nil {
+		for i := range ss {
+			ss[i].Path = db
+		}
+	}
+	return ss, next, err
+}
+
 // TeleAgentSessionFiles lists every account's store that exists and is
 // non-empty. The harness has no single-store shortcut (unlike mimo): one
 // account per machine is the common case but not the only one.

@@ -169,7 +169,7 @@ func (rp *replacePass) read(p string, f FileState) {
 	}
 	r, read := rp.readAhead[p]
 	if !read {
-		r.sessions, r.at, r.again, r.err = readSettled(p, f, func() ([]model.Session, error) { return parseChangedFile(rp.harness, p, rp.old.Files[p]) })
+		r.sessions, r.at, r.again, r.err = readSettledDelta(rp.harness, p, f, rp.old.Files[p])
 	}
 	ss, f, again, readErr := r.sessions, r.at, r.again, r.err
 	if readErr != nil {
@@ -910,6 +910,7 @@ func (rp *replacePass) commit() error {
 		}
 	}
 	settleCopies(&rp.m, rp.old.Sessions, rp.changed, rp.replacements)
+	carryDatabaseStoreCursors(rp.m.Files, rp.old.Files, rp.changed)
 	setDatabaseStoreWatermarks(rp.m.Files, rp.m.Sessions)
 	rp.m.RecordStrings = rp.tbl.strs
 	_ = rp.offsets.write(rp.tmp)

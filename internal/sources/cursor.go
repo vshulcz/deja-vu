@@ -140,6 +140,110 @@ func LoadCursor() []model.Session {
 	return ss
 }
 
+var cursorDBTables = []sqliteTableSpec{{Name: "cursorDiskKV", KeyExpr: "cast(key as text)"}}
+
+const (
+	cursorBubbleSelect = `select json_object('key',cast(key as text),` +
+		`'type',json_extract(value,'$.type'),` +
+		`'text',coalesce(json_extract(value,'$.text'), json_extract(value,'$.rawText')),` +
+		`'ts',json_extract(value,'$.timestamp'),` +
+		`'wsdir',json_extract(value,'$.workspaceProjectDir')) ` +
+		`from cursorDiskKV where key >= 'bubbleId:' and key < 'bubbleId;' and value is not null`
+	cursorComposerSelect = `select json_object('key',cast(key as text),` +
+		`'cid',json_extract(value,'$.composerId'),` +
+		`'name',json_extract(value,'$.name'),` +
+		`'created',json_extract(value,'$.createdAt'),` +
+		`'updated',json_extract(value,'$.lastUpdatedAt')) ` +
+		`from cursorDiskKV where key >= 'composerData:' and key < 'composerData;' and value is not null`
+)
+
+// CaptureCursorDBCursor snapshots Cursor's cursorDiskKV rowid watermark.
+func CaptureCursorDBCursor(db string) string {
+	return captureSQLiteTableCursor(db, cursorDBTables)
+}
+
+// ParseCursorDBDelta returns composers touched after (t, cursor) whole,
+// seeking cursorDiskKV by rowid for new bubbles and inspecting updated composers.
+func ParseCursorDBDelta(db string, t time.Time, cursor string) ([]model.Session, string, error) {
+	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
+		return nil, "", nil //nolint:nilerr // a missing or empty store holds no sessions
+	}
+	prev, nextCursor, canDelta := prepareSQLiteDelta(db, cursor, cursorDBTables)
+	if !canDelta || t.IsZero() {
+		ss, err := ParseCursorDBSince(db, t)
+		return ss, nextCursor, err
+	}
+	prevMax := prev.Tables["cursorDiskKV"].MaxRowID
+	// Unary + on key keeps SQLite on the INTEGER PRIMARY KEY (rowid > ?) seek
+	// rather than scanning the key index across all historical bubbles.
+	deltaBubblesQ := fmt.Sprintf(
+		`select json_object('key',cast(key as text)) from cursorDiskKV `+
+			`where rowid > %d and +key >= 'bubbleId:' and +key < 'bubbleId;' and value is not null`,
+		prevMax)
+	deltaBubbles, err := cursorQuery(db, deltaBubblesQ)
+	if err != nil {
+		return nil, "", err
+	}
+	deltaComposersQ := fmt.Sprintf(
+		`select json_object('key',cast(key as text),'cid',json_extract(value,'$.composerId')) `+
+			`from cursorDiskKV where key >= 'composerData:' and key < 'composerData;' and value is not null `+
+			`and (rowid > %d or %s)`,
+		prevMax, newerThanEpoch("json_extract(value,'$.lastUpdatedAt')", t))
+	deltaComposers, err := cursorQuery(db, deltaComposersQ)
+	if err != nil {
+		return nil, "", err
+	}
+	touched := map[string]bool{}
+	composerKeys := map[string]bool{}
+	for _, b := range deltaBubbles {
+		if parts := strings.SplitN(str(b["key"]), ":", 3); len(parts) == 3 && parts[1] != "" {
+			touched[parts[1]] = true
+		}
+	}
+	for _, c := range deltaComposers {
+		if cid := cursorComposerID(c); cid != "" {
+			touched[cid] = true
+		}
+		if k := str(c["key"]); k != "" {
+			composerKeys[k] = true
+		}
+	}
+	if len(touched) == 0 {
+		return nil, nextCursor, nil
+	}
+	if len(touched) > cursorComposerListMax {
+		ss, derr := ParseCursorDBSince(db, t)
+		return ss, nextCursor, derr
+	}
+	var cKeys []string
+	for k := range composerKeys {
+		cKeys = append(cKeys, k)
+	}
+	var ranges []string
+	for cid := range touched {
+		ck := "composerData:" + cid
+		if !composerKeys[ck] {
+			cKeys = append(cKeys, ck)
+		}
+		esc := sqlEscape(cid)
+		ranges = append(ranges, "(key >= 'bubbleId:"+esc+":' and key < 'bubbleId:"+esc+";')")
+	}
+	sort.Strings(cKeys)
+	sort.Strings(ranges)
+	composers, err := cursorQuery(db, cursorComposerSelect+" and key in ("+sqlInValues(cKeys)+")")
+	if err != nil {
+		return nil, "", err
+	}
+	if len(composers) == 0 {
+		return nil, nextCursor, nil
+	}
+	bubbles, err := cursorQuery(db, cursorBubbleSelect+" and ("+strings.Join(ranges, " or ")+")")
+	if err != nil {
+		return nil, "", err
+	}
+	return cursorSessions(db, composers, bubbles), nextCursor, nil
+}
+
 // ParseCursorDBSince returns the composers touched after t, whole: those
 // whose lastUpdatedAt passed the watermark or that gained a bubble stamped
 // after it, each with every bubble it has. The index replaces those sessions
@@ -222,18 +326,8 @@ func parseCursorDB(db string, since time.Time) ([]model.Session, error) {
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
 		return nil, nil //nolint:nilerr // a missing or empty store holds no sessions
 	}
-	const bubbleSelect = `select json_object('key',cast(key as text),` +
-		`'type',json_extract(value,'$.type'),` +
-		`'text',coalesce(json_extract(value,'$.text'), json_extract(value,'$.rawText')),` +
-		`'ts',json_extract(value,'$.timestamp'),` +
-		`'wsdir',json_extract(value,'$.workspaceProjectDir')) ` +
-		`from cursorDiskKV where key >= 'bubbleId:' and key < 'bubbleId;' and value is not null`
-	const composerSelect = `select json_object('key',cast(key as text),` +
-		`'cid',json_extract(value,'$.composerId'),` +
-		`'name',json_extract(value,'$.name'),` +
-		`'created',json_extract(value,'$.createdAt'),` +
-		`'updated',json_extract(value,'$.lastUpdatedAt')) ` +
-		`from cursorDiskKV where key >= 'composerData:' and key < 'composerData;' and value is not null`
+	const bubbleSelect = cursorBubbleSelect
+	const composerSelect = cursorComposerSelect
 	if since.IsZero() {
 		bubbles, err := cursorQuery(db, bubbleSelect)
 		if err != nil {
@@ -393,7 +487,7 @@ func cursorQuery(db, q string) ([]map[string]any, error) {
 	dec.UseNumber()
 	for dec.More() {
 		var r map[string]any
-		if err := dec.Decode(&r); err != nil {
+		if err := sqliteDecodeRow(dec, &r); err != nil {
 			return nil, err
 		}
 		rows = append(rows, r)

@@ -45,12 +45,35 @@ func kindIn(reg []sources.Harness, p string) (sources.FileKind, bool) {
 	return sources.FileKind{}, false
 }
 
-func parseChangedFile(_, p string, old FileState) ([]model.Session, error) {
+func parseChangedFile(harness, p string, old FileState) ([]model.Session, error) {
+	ss, _, err := parseChangedFileDelta(harness, p, old)
+	return ss, err
+}
+
+func parseChangedFileDelta(_, p string, old FileState) ([]model.Session, string, error) {
 	k, ok := kindForPath(p)
 	if !ok {
-		return nil, nil
+		return nil, "", nil
 	}
-	return sources.ReadWatched(p, func() ([]model.Session, error) { return k.Parse(p, old.LastUpdated) })
+	if k.ParseDBDelta != nil {
+		ch := make(chan string, 1)
+		ss, err := sources.ReadWatched(p, func() ([]model.Session, error) {
+			parsed, next, perr := k.ParseDBDelta(p, old.LastUpdated, old.DBCursor)
+			ch <- next
+			return parsed, perr
+		})
+		if err != nil {
+			return ss, "", err
+		}
+		select {
+		case next := <-ch:
+			return ss, next, nil
+		default:
+			return ss, "", nil
+		}
+	}
+	ss, err := sources.ReadWatched(p, func() ([]model.Session, error) { return k.Parse(p, old.LastUpdated) })
+	return ss, "", err
 }
 
 func parseAppendedFile(_, p string, old FileState, isNew bool) (ss []model.Session, err error) {
@@ -670,6 +693,9 @@ func walkFileStateIn(reg []sources.Harness, p string, fi os.FileInfo, old map[st
 			fs.CWDSize = cwd.Size()
 			fs.CWDMTime = cwd.ModTime().UnixNano()
 		}
+	}
+	if of, ok := old[p]; ok && !of.Kept && of.DBCursor != "" && sameFile(of, fs) {
+		fs.DBCursor = of.DBCursor
 	}
 	return fs
 }

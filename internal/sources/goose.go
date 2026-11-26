@@ -661,6 +661,48 @@ func ParseGooseNewest(db string) ([]model.Session, error) {
 	return parseGooseDBWhere(db, " and m.session_id = (select session_id from messages where role in ('user','assistant') order by id desc limit 1)")
 }
 
+const gooseSetCap = 2000
+
+var gooseDBTables = []sqliteTableSpec{
+	{Name: "sessions", KeyExpr: "cast(id as text)"},
+	{Name: "messages", KeyExpr: "cast(id as text)"},
+}
+
+// CaptureGooseDBCursor snapshots the goose database rowid watermark.
+func CaptureGooseDBCursor(db string) string {
+	return captureSQLiteTableCursor(db, gooseDBTables)
+}
+
+// ParseGooseDBDelta reads sessions in db touched after (t, cursor) whole,
+// seeking messages and sessions by rowid before falling back to timestamp checks.
+func ParseGooseDBDelta(db string, t time.Time, cursor string) ([]model.Session, string, error) {
+	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
+		return nil, "", nil //nolint:nilerr // a missing or empty store holds no sessions
+	}
+	prev, nextCursor, canDelta := prepareSQLiteDelta(db, cursor, gooseDBTables)
+	if !canDelta || t.IsZero() {
+		ss, err := ParseGooseDBSince(db, t)
+		return ss, nextCursor, err
+	}
+	tSlack := t.Add(-time.Second)
+	rfc := sqlEscape(tSlack.UTC().Format(time.RFC3339Nano))
+	q := fmt.Sprintf(
+		"select id from sessions where rowid > %d"+
+			" union select id from sessions where datetime(updated_at) > datetime('%s')"+
+			" union select session_id from messages where rowid > %d",
+		prev.Tables["sessions"].MaxRowID, rfc, prev.Tables["messages"].MaxRowID)
+	ids, ok := sqliteBoundedIDs(db, q, gooseSetCap)
+	if !ok {
+		ss, err := ParseGooseDBSince(db, t)
+		return ss, nextCursor, err
+	}
+	if len(ids) == 0 {
+		return nil, nextCursor, nil
+	}
+	ss, err := parseGooseDBWhere(db, " and s.id in ("+sqlInValues(ids)+")")
+	return ss, nextCursor, err
+}
+
 // ParseGooseDBSince reads the sessions in the goose database at db that changed after t.
 func ParseGooseDBSince(db string, t time.Time) ([]model.Session, error) {
 	if t.IsZero() {
@@ -680,12 +722,14 @@ func ParseGooseDBSince(db string, t time.Time) ([]model.Session, error) {
 	// which is reachable only through its session — and matched every session
 	// touched on a later date, handing back all of it (#2030).
 	//
-	// A matching session comes back whole, which is work repeated on every pass
-	// over an active store (#2030) — but it is also what keeps the session
-	// whole in the index: a partial return would replace what goose already
-	// had there (#2033).
-	where := fmt.Sprintf(" and (m.created_timestamp > %d or datetime(s.updated_at) > datetime('%s'))", sec, rfc)
-	return parseGooseDBWhere(db, where)
+	// Match sessions whole via s.id in (...): filtering individual messages
+	// inside the join dropped earlier turns when m.created_timestamp moved
+	// without bumping s.updated_at (#2033).
+	touched := fmt.Sprintf(
+		"select id from sessions where datetime(updated_at) > datetime('%s')"+
+			" union select session_id from messages where created_timestamp > %d",
+		rfc, sec)
+	return parseGooseDBWhere(db, " and s.id in ("+touched+")")
 }
 
 func parseGooseDBWhere(db, where string) ([]model.Session, error) {
@@ -749,7 +793,7 @@ func parseGooseDBWhere(db, where string) ([]model.Session, error) {
 	rows := 0
 	for dec.More() {
 		var r map[string]any
-		if err := dec.Decode(&r); err != nil {
+		if err := sqliteDecodeRow(dec, &r); err != nil {
 			_ = cmd.Wait()
 			return nil, fmt.Errorf("bad sqlite json: %w", err)
 		}

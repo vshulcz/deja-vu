@@ -82,7 +82,12 @@ func gooseForks(db string, g gooseSchema, where string) map[string]gooseFork {
 		return nil
 	}
 	only := ""
-	if where != "" {
+	switch {
+	case strings.HasPrefix(where, " and s.id "):
+		only = " and m.session_id " + strings.TrimPrefix(where, " and s.id ")
+	case strings.HasPrefix(where, " and m.session_id "):
+		only = where
+	case where != "":
 		only = ` and m.session_id in (select s.id from sessions s join messages m on m.session_id=s.id where 1=1` + where + `)`
 	}
 	q := `select json_object('fork',cast(m.session_id as text),'source',cast(m2.session_id as text),` +

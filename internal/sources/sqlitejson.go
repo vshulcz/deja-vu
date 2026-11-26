@@ -50,7 +50,7 @@ func sqliteObjects[T any](b []byte) ([]T, error) {
 	dec.UseNumber()
 	for dec.More() {
 		var r T
-		if err := dec.Decode(&r); err != nil {
+		if err := sqliteDecodeRow(dec, &r); err != nil {
 			return nil, err
 		}
 		out = append(out, r)

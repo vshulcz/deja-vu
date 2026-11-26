@@ -222,6 +222,7 @@ func appendPrepared(dir, harness, scope string, old Manifest, files, changed map
 		return filesTouched, messages, 0, err
 	}
 	m.bucketsLeaving = staleCount(stale)
+	carryDatabaseStoreCursors(m.Files, old.Files, changed)
 	setDatabaseStoreWatermarks(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
 	// Read before writeManifest: the fold in there drains the counters, and the
