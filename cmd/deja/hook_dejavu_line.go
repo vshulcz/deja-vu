@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -13,11 +14,11 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/termwidth"
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 // dejaVuLineDue rate-limits the visible line: a déjà vu that fires every
@@ -32,22 +33,28 @@ import (
 // sends none — falls back to the machine-wide window, which is the old
 // behaviour and still better than talking on every prompt.
 func dejaVuLineDue(dir, sid string) bool {
+	if _, err := vault.CheckUnlocked(dir); err != nil {
+		return false
+	}
 	p := dir + ".dejavu"
 	now := time.Now()
 	key := dejaVuKey(sid)
-	if b, err := os.ReadFile(p); err == nil {
+	b, err := vault.ReadSealedFile(dir, p, vault.DomainSidecar)
+	if err == nil {
 		for line := range strings.SplitSeq(string(b), "\n") {
 			fields := strings.Fields(line)
 			if len(fields) != 2 || fields[0] != key {
 				continue
 			}
-			if ts, err := strconv.ParseInt(fields[1], 10, 64); err == nil &&
+			if ts, pErr := strconv.ParseInt(fields[1], 10, 64); pErr == nil &&
 				now.Sub(time.Unix(ts, 0)) < dejaVuLineWindow {
 				return false
 			}
 		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return false
 	}
-	return recordDejaVuLine(p, key, now)
+	return recordDejaVuLine(dir, p, key, now)
 }
 
 // dejaVuKey is how a session is named in `.dejavu`, which is two fields to a
@@ -79,16 +86,20 @@ const (
 // recordDejaVuLine stamps this session and rewrites the file without the
 // entries that have aged out. It reports true so callers can return it
 // directly: failing to write is not a reason to withhold the line.
-func recordDejaVuLine(path, sid string, now time.Time) bool {
+func recordDejaVuLine(dir, path, sid string, now time.Time) bool {
+	if _, err := vault.CheckUnlocked(dir); err != nil {
+		return false
+	}
 	kept := []string{sid + " " + strconv.FormatInt(now.Unix(), 10)}
-	if b, err := os.ReadFile(path); err == nil {
+	b, err := vault.ReadSealedFile(dir, path, vault.DomainSidecar)
+	if err == nil {
 		for line := range strings.SplitSeq(string(b), "\n") {
 			fields := strings.Fields(line)
 			if len(fields) != 2 || fields[0] == sid {
 				continue
 			}
-			ts, err := strconv.ParseInt(fields[1], 10, 64)
-			if err != nil || now.Sub(time.Unix(ts, 0)) >= dejaVuLineWindow {
+			ts, pErr := strconv.ParseInt(fields[1], 10, 64)
+			if pErr != nil || now.Sub(time.Unix(ts, 0)) >= dejaVuLineWindow {
 				continue
 			}
 			if len(kept) >= dejaVuLineKeep {
@@ -96,8 +107,14 @@ func recordDejaVuLine(path, sid string, now time.Time) bool {
 			}
 			kept = append(kept, line)
 		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return false
 	}
-	_ = atomicfile.Write(path, []byte(strings.Join(kept, "\n")+"\n"), 0o600)
+	if wErr := vault.WriteSealedFile(dir, path, vault.DomainSidecar, []byte(strings.Join(kept, "\n")+"\n"), 0o600); wErr != nil {
+		if errors.Is(wErr, vault.ErrLocked) || errors.Is(wErr, vault.ErrKeyUnavailable) {
+			return false
+		}
+	}
 	return true
 }
 

@@ -1889,7 +1889,7 @@ func TestBucketDirsConcurrentReaders(t *testing.T) {
 				_, _ = postingsFor(dir, "twalnut")
 				_, _ = SearchDetailed(dir, query.Options{Query: "walnut leaves", All: true})
 				if runtime.GOOS == "windows" {
-					time.Sleep(time.Millisecond)
+					time.Sleep(10 * time.Millisecond)
 				}
 			}
 		})

@@ -2,6 +2,7 @@ package embed
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -14,10 +15,60 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vshulcz/deja-vu/internal/index"
-
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
+	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
+
+func init() {
+	vault.RegisterMigrator("embed", migrateVectorSidecar)
+}
+
+func hasPlainSidecarHeader(raw []byte) bool {
+	if len(raw) < 6 || [4]byte(raw[:4]) != magic {
+		return false
+	}
+	ver := binary.LittleEndian.Uint16(raw[4:6])
+	return ver >= 1 && ver <= sidecarVersion
+}
+
+func migrateVectorSidecar(indexDir string, dek []byte) error {
+	if len(dek) == 0 {
+		return nil
+	}
+	path := Path(indexDir)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if sr, sErr := vault.NewStreamReader(bytes.NewReader(raw), dek, vault.DomainEmbed); sErr == nil {
+		if _, cpErr := io.Copy(io.Discard, sr); cpErr == nil {
+			return nil
+		}
+	}
+	if !hasPlainSidecarHeader(raw) {
+		return nil
+	}
+	if wErr := atomicfile.WriteStream(path, 0o600, func(w io.Writer) error {
+		sw, swErr := vault.NewStreamWriter(w, dek, vault.DomainEmbed)
+		if swErr != nil {
+			return swErr
+		}
+		if _, wrErr := sw.Write(raw); wrErr != nil {
+			return wrErr
+		}
+		return sw.Close()
+	}); wErr != nil {
+		return wErr
+	}
+	readMemo.Lock()
+	readMemo.path, readMemo.car, readMemo.enc = "", Sidecar{}, false
+	readMemo.Unlock()
+	return nil
+}
 
 // sidecarVersion 2 adds each vector's Ident; 3 drops the record's time from
 // it. A version 1 file is still read, and its vectors are rekeyed on the next
@@ -267,8 +318,11 @@ func EmbedIndex(dir string, client *Client, keep func(index.Record) bool) (Sidec
 	if err != nil {
 		return Sidecar{}, err
 	}
-	old, _ := readFile(Path(dir))
-	if old.Model != client.storedModel() || old.Dim == 0 {
+	old, err := readFile(Path(dir))
+	if errors.Is(err, vault.ErrLocked) || errors.Is(err, vault.ErrKeyUnavailable) {
+		return Sidecar{}, err
+	}
+	if err != nil || old.Model != client.storedModel() || old.Dim == 0 {
 		old = Sidecar{}
 	}
 	// A vector is carried to the record it was made from, found by identity
@@ -399,6 +453,7 @@ var readMemo struct {
 	path  string
 	size  int64
 	mod   time.Time
+	enc   bool
 	car   Sidecar
 	timer *time.Timer
 }
@@ -412,7 +467,7 @@ func touchMemo() {
 	}
 	readMemo.timer = time.AfterFunc(memoIdle, func() {
 		readMemo.Lock()
-		readMemo.path, readMemo.car = "", Sidecar{}
+		readMemo.path, readMemo.car, readMemo.enc = "", Sidecar{}, false
 		readMemo.Unlock()
 	})
 }
@@ -420,13 +475,24 @@ func touchMemo() {
 // Read parses the sidecar of dir. The result is shared between callers of one
 // process and must not be modified; EmbedIndex, which does, uses readFile.
 func Read(dir string) (Sidecar, error) {
+	dek, err := vault.CheckUnlocked(dir)
+	if err != nil {
+		readMemo.Lock()
+		readMemo.path, readMemo.car, readMemo.enc = "", Sidecar{}, false
+		readMemo.Unlock()
+		return Sidecar{}, err
+	}
+	wantEnc := len(dek) > 0
+	if wantEnc {
+		clear(dek)
+	}
 	path := Path(dir)
 	st, err := os.Stat(path)
 	if err != nil {
 		return Sidecar{}, err
 	}
 	readMemo.Lock()
-	if readMemo.path == path && readMemo.size == st.Size() && readMemo.mod.Equal(st.ModTime()) && readMemo.car.Vectors != nil {
+	if readMemo.path == path && readMemo.enc == wantEnc && readMemo.size == st.Size() && readMemo.mod.Equal(st.ModTime()) && readMemo.car.Vectors != nil {
 		car := readMemo.car
 		touchMemo()
 		readMemo.Unlock()
@@ -438,7 +504,7 @@ func Read(dir string) (Sidecar, error) {
 		return car, err
 	}
 	readMemo.Lock()
-	readMemo.path, readMemo.size, readMemo.mod, readMemo.car = path, st.Size(), st.ModTime(), car
+	readMemo.path, readMemo.size, readMemo.mod, readMemo.enc, readMemo.car = path, st.Size(), st.ModTime(), wantEnc, car
 	touchMemo()
 	readMemo.Unlock()
 	return car, nil
@@ -446,15 +512,32 @@ func Read(dir string) (Sidecar, error) {
 
 //nolint:gocritic // one err carries through the fixed field sequence
 func readFile(path string) (Sidecar, error) {
+	indexDir := strings.TrimSuffix(path, ".vectors.bin")
+	dek, err := vault.CheckUnlocked(indexDir)
+	if err != nil {
+		return Sidecar{}, err
+	}
+	if len(dek) > 0 {
+		defer clear(dek)
+	}
 	f, err := os.Open(path)
 	if err != nil {
 		return Sidecar{}, err
 	}
 	defer func() { _ = f.Close() }()
+	var src io.Reader = f
+	var sr io.Reader
+	if len(dek) > 0 {
+		sr, err = vault.NewStreamReader(f, dek, vault.DomainEmbed)
+		if err != nil {
+			return Sidecar{}, err
+		}
+		src = sr
+	}
 	// Buffered: decoding straight off the file was a few syscalls per vector,
 	// and on windows the file stays open for all of it, which refuses the
 	// publish of the next sidecar over it (#5412).
-	r := bufio.NewReaderSize(f, 1<<16)
+	r := bufio.NewReaderSize(src, 1<<16)
 	var got [4]byte
 	if _, err = io.ReadFull(r, got[:]); err != nil || got != magic {
 		return Sidecar{}, errors.New("invalid vector sidecar")
@@ -501,6 +584,15 @@ func readFile(path string) (Sidecar, error) {
 			return Sidecar{}, err
 		}
 	}
+	if sr != nil {
+		var extra [1]byte
+		if _, tErr := r.Read(extra[:]); !errors.Is(tErr, io.EOF) {
+			if tErr == nil {
+				return Sidecar{}, errors.New("unexpected trailing data in encrypted vector sidecar")
+			}
+			return Sidecar{}, tErr
+		}
+	}
 	return out, nil
 }
 
@@ -509,14 +601,31 @@ func readFile(path string) (Sidecar, error) {
 // shared that name, so one could rename a file the other was still writing and
 // leave a sidecar that decodes as nothing (#1319).
 func write(dir string, s Sidecar) error {
+	dek, err := vault.CheckUnlocked(dir)
+	if err != nil {
+		return err
+	}
+	if len(dek) > 0 {
+		defer clear(dek)
+	}
 	readMemo.Lock()
-	readMemo.path = ""
+	readMemo.path, readMemo.car, readMemo.enc = "", Sidecar{}, false
 	readMemo.Unlock()
 	return atomicfile.WriteStream(Path(dir), 0o600, func(w io.Writer) error {
+		dst := w
+		var sw io.WriteCloser
+		if len(dek) > 0 {
+			var err error
+			sw, err = vault.NewStreamWriter(w, dek, vault.DomainEmbed)
+			if err != nil {
+				return err
+			}
+			dst = sw
+		}
 		// An error-remembering writer rather than a check after every field:
 		// the fields are a fixed sequence, the first failure is the one worth
 		// reporting, and the checks were branches nothing could reach.
-		ew := &errWriter{w: w}
+		ew := &errWriter{w: dst}
 		ew.write(magic[:])
 		ew.num(sidecarVersion)
 		ew.num(uint16(s.Dim)) //nolint:gosec // model dimensions are far below 65536, and readFile refuses above 16384
@@ -530,7 +639,13 @@ func write(dir string, s Sidecar) error {
 			ew.str(v.Key)
 			ew.num(v.Values)
 		}
-		return ew.err
+		if ew.err != nil {
+			return ew.err
+		}
+		if sw != nil {
+			return sw.Close()
+		}
+		return nil
 	})
 }
 

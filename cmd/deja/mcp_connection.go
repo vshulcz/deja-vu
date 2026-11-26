@@ -35,6 +35,11 @@ func newMCPConn() string {
 // mcpConnID is the current connection's id, or "" before one is open — a tool
 // called outside serveMCP, which the tests do.
 func mcpConnID() string {
+	if sess := currentMCPClientSession(); sess != nil {
+		if id := sess.connIDValue(); id != "" {
+			return id
+		}
+	}
 	s, _ := mcpConn.Load().(string)
 	return s
 }

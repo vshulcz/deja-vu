@@ -357,7 +357,7 @@ func substringPostingsFrom(dirs []bucketDir, bare []string, dead []int64) (_ []p
 	}
 	for _, bd := range dirs {
 		entries := bd.entries
-		var f *os.File
+		var f *indexBlobFile
 		if entries == nil {
 			var err error
 			entries, f, err = openBucketDir(bd.path)
@@ -380,13 +380,13 @@ func substringPostingsFrom(dirs []bucketDir, bare []string, dead []int64) (_ []p
 					continue
 				}
 				if f == nil {
-					var err error
-					if f, err = openIndexFile(bd.path); err != nil {
+					var oErr error
+					if f, oErr = openIndexBlobFile(bd.path); oErr != nil {
 						return nil, nil, false, nil //nolint:nilerr // not ok: the caller reads the slow way
 					}
 					// The same file, not one of the same size: a rebuild renames a
 					// new bucket in, and a coarse clock can give it the old time.
-					if fi, err := f.Stat(); err != nil || !os.SameFile(fi, bd.stat) || fi.Size() != bd.stat.Size() || !fi.ModTime().Equal(bd.stat.ModTime()) {
+					if fi, stErr := f.Stat(); stErr != nil || !os.SameFile(fi, bd.stat) || fi.Size() != bd.stat.Size() || !fi.ModTime().Equal(bd.stat.ModTime()) {
 						_ = f.Close()
 						return nil, nil, false, nil //nolint:nilerr // not ok: the caller reads the slow way
 					}

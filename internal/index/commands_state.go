@@ -241,6 +241,9 @@ func buildCommandTables(dir, tmp string, m Manifest, priorDead int, redo map[str
 	}
 	size := fi.Size()
 	t := tablesFromManifest(m)
+	if err := t.ensureCipher(dir); err != nil {
+		return
+	}
 	st, facts := carriedCommandsState(dir, m, priorDead, size)
 	if st != nil {
 		redo = commandsTail(log, t, st.Size, size, redo)
@@ -369,7 +372,8 @@ func commandTablesBehind(dir string, m Manifest) bool {
 	if from > fi.Size() || fi.Size()-from > commandsTailWalkMax {
 		return true
 	}
-	f, err := openIndexFile(path)
+	t := tablesFromManifest(m)
+	f, err := openRecordFile(path, t)
 	if err != nil {
 		return false
 	}
@@ -377,7 +381,6 @@ func commandTablesBehind(dir string, m Manifest) bool {
 	if _, err = f.Seek(from, io.SeekStart); err != nil {
 		return false
 	}
-	t := tablesFromManifest(m)
 	errFound := errors.New("found")
 	err = walkStored(io.LimitReader(f, fi.Size()-from), t, from, func(_ int64, payload []byte) error {
 		_, _, rid, _, ok := recordPrefix(payload)
@@ -399,7 +402,7 @@ const commandsTailWalkMax = 4 << 20
 // commandsStateHead is the generation and log size the state in dir names,
 // read without the rest of it.
 func commandsStateHead(dir string) (gen string, size int64, ok bool) {
-	f, err := os.Open(commandsStatePath(dir))
+	f, err := openIndexBlobFile(commandsStatePath(dir))
 	if err != nil {
 		return "", 0, false
 	}
@@ -434,7 +437,7 @@ func commandsTail(path string, t *recordTables, from, to int64, redo map[string]
 	if from >= to {
 		return out
 	}
-	f, err := openIndexFile(path)
+	f, err := openRecordFile(path, t)
 	if err != nil {
 		return nil
 	}
@@ -527,7 +530,7 @@ func writeCommandsStateFile(dir string, st *commandsState) error {
 // readCommandsStateFile is the state in dir, false when there is none this
 // build can read.
 func readCommandsStateFile(dir string) (*commandsState, bool) {
-	b, err := os.ReadFile(commandsStatePath(dir))
+	b, err := readIndexBytes(commandsStatePath(dir))
 	if err != nil || len(b) < len(commandsStateMagic) || [8]byte(b[:8]) != commandsStateMagic {
 		return nil, false
 	}

@@ -1,6 +1,7 @@
 package hookengine
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/evidence"
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 func TestSeenKeySanitizationAndPrefixGuards(t *testing.T) {
@@ -335,5 +337,218 @@ func TestCoalesceRecallMessages(t *testing.T) {
 	}
 	if !strings.Contains(got, "plain supplement") {
 		t.Fatalf("missing plain supplement:\n%s", got)
+	}
+}
+
+func TestLedgerEncryptsLinesWhenVaultEnabledAndFailClosedWhenLocked(t *testing.T) {
+	vault.ClearCache()
+	t.Cleanup(vault.ClearCache)
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, ".config"))
+	t.Setenv("DEJA_VAULT_FILE", filepath.Join(tmp, "vault.json"))
+	t.Setenv("DEJA_VAULT_BACKEND", "passphrase")
+	t.Setenv("DEJA_VAULT_PASSPHRASE", "ledger-vault-pass")
+	oldIter := vault.KDFIterations
+	vault.KDFIterations = 1000
+	t.Cleanup(func() { vault.KDFIterations = oldIter })
+
+	dir := filepath.Join(tmp, "index.db")
+	if _, err := vault.Init(dir, "ledger-vault-pass", 0); err != nil {
+		t.Fatalf("vault.Init: %v", err)
+	}
+
+	l := NewLedger(dir)
+	l.rotateBytes = 256
+	l.RecordIDs("conv-canary", "CANARY_LEDGER_TOK_7731")
+	l.RecordIDs("conv-canary", "compaction:CANARY_KEEP_881")
+	l.RecordIDs("conv-other", "noise-1", "noise-2", "noise-3", "noise-4")
+
+	raw, err := os.ReadFile(dir + ".hookseen")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), vault.NoteLinePrefix) {
+		t.Fatalf(".hookseen missing %q prefix: %q", vault.NoteLinePrefix, raw)
+	}
+	for _, secret := range []string{"conv-canary", "CANARY_LEDGER_TOK_7731", "CANARY_KEEP_881", "conv-other"} {
+		if strings.Contains(string(raw), secret) {
+			t.Fatalf("plaintext secret %q leaked into .hookseen: %q", secret, raw)
+		}
+	}
+
+	seen := l.Read().Injected("conv-canary")
+	if !seen["CANARY_LEDGER_TOK_7731"] || !seen["compaction:CANARY_KEEP_881"] {
+		t.Fatalf("decryption of encrypted .hookseen lost entries: %v", seen)
+	}
+	if !l.ForgetCheckpoint("conv-canary", "cp-vault-1") {
+		t.Fatal("ForgetCheckpoint failed on encrypted .hookseen")
+	}
+	rawAfterCP, _ := os.ReadFile(dir + ".hookseen")
+	if strings.Contains(string(rawAfterCP), "cp-vault-1") || strings.Contains(string(rawAfterCP), "conv-canary") {
+		t.Fatalf("plaintext leaked after ForgetCheckpoint rewrite: %q", rawAfterCP)
+	}
+	if l.Read().Injected("conv-canary")["CANARY_LEDGER_TOK_7731"] {
+		t.Fatal("checkpoint failed to forget encrypted entry")
+	}
+	if !l.Read().Injected("conv-canary")["compaction:CANARY_KEEP_881"] {
+		t.Fatal("compaction mark dropped on encrypted .hookseen")
+	}
+
+	// Lock vault: Read returns nil/empty, writes fail closed without plaintext leak.
+	t.Setenv("DEJA_VAULT_PASSPHRASE", "")
+	if err := vault.Lock(dir, "ledger-vault-pass"); err != nil {
+		t.Fatalf("vault.Lock: %v", err)
+	}
+	if gotLocked := l.Read().Injected("conv-canary"); len(gotLocked) != 0 {
+		t.Fatalf("Read when locked returned entries: %v", gotLocked)
+	}
+	l.RecordIDs("conv-locked", "SECRET_WHEN_LOCKED")
+	if rawLocked, err := os.ReadFile(dir + ".hookseen"); err == nil && strings.Contains(string(rawLocked), "SECRET_WHEN_LOCKED") {
+		t.Fatalf("wrote plaintext entry while vault locked")
+	}
+}
+
+func TestMigrateLedgerSidecarAndDecodeEdges(t *testing.T) {
+	dek := make([]byte, 32)
+	for i := range dek {
+		dek[i] = byte(i + 1)
+	}
+	sealedValid, err := vault.SealLine(dek, vault.DomainSidecar, []byte("conv1 tok1"))
+	if err != nil {
+		t.Fatalf("SealLine: %v", err)
+	}
+
+	if mErr := migrateLedgerSidecar("", dek); mErr != nil {
+		t.Fatalf("migrateLedgerSidecar empty dir = %v", mErr)
+	}
+	if mErr := migrateLedgerSidecar(t.TempDir(), nil); mErr != nil {
+		t.Fatalf("migrateLedgerSidecar nil dek = %v", mErr)
+	}
+
+	dir := filepath.Join(t.TempDir(), "index.db")
+	if mErr := migrateLedgerSidecar(dir, dek); mErr != nil {
+		t.Fatalf("migrateLedgerSidecar missing file = %v", mErr)
+	}
+
+	mixed := "\nplain-session tok0\n" + sealedValid + "\n" + vault.NoteLinePrefix + "corrupt!!!\n"
+	if wErr := os.WriteFile(dir+".hookseen", []byte(mixed), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if mErr := migrateLedgerSidecar(dir, dek); mErr != nil {
+		t.Fatalf("migrateLedgerSidecar mixed = %v", mErr)
+	}
+	raw, rErr := os.ReadFile(dir + ".hookseen")
+	if rErr != nil {
+		t.Fatal(rErr)
+	}
+	if strings.Contains(string(raw), "plain-session") || !strings.Contains(string(raw), sealedValid) {
+		t.Fatalf("unexpected migrated .hookseen content: %q", raw)
+	}
+	if mErr := migrateLedgerSidecar(dir, dek); mErr != nil {
+		t.Fatalf("migrateLedgerSidecar idempotent = %v", mErr)
+	}
+	rawAgain, rErr := os.ReadFile(dir + ".hookseen")
+	if rErr != nil || !bytes.Equal(rawAgain, raw) {
+		t.Fatalf("second migrateLedgerSidecar mutated file: err=%v", rErr)
+	}
+
+	if entries, ok := decodeLedgerEntries(nil, []byte(sealedValid+"\n")); ok || entries != nil {
+		t.Fatalf("decodeLedgerEntries(nil) accepted sealed prefix: (%v, %v)", entries, ok)
+	}
+	plainEntries, ok := decodeLedgerEntries(nil, []byte("\nplain1\nplain2\n"))
+	if !ok || len(plainEntries) != 2 {
+		t.Fatalf("decodeLedgerEntries(nil) plain = (%v, %v)", plainEntries, ok)
+	}
+	dec, ok := decodeLedgerEntries(dek, []byte("\n"+sealedValid+"\n"+vault.NoteLinePrefix+"corrupt\nplain-legacy\n"))
+	if !ok || len(dec) != 2 || dec[0].plain != "conv1 tok1" || dec[1].plain != "plain-legacy" {
+		t.Fatalf("decodeLedgerEntries(dek) = (%+v, %v)", dec, ok)
+	}
+	plainEnc, eErr := encodeLedgerLine(nil, "abc")
+	if eErr != nil || plainEnc != "abc" {
+		t.Fatalf("encodeLedgerLine(nil) = (%q, %v)", plainEnc, eErr)
+	}
+
+	// RotateFile encrypts plain lines on active vault and fails closed when locked.
+	rotDir := filepath.Join(t.TempDir(), "index.db")
+	if mkErr := os.MkdirAll(rotDir, 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	cfgDir := t.TempDir()
+	t.Setenv("DEJA_VAULT_FILE", filepath.Join(cfgDir, "vault.json"))
+	t.Setenv("DEJA_VAULT_BACKEND", "passphrase")
+	t.Setenv("DEJA_VAULT_PASSPHRASE", "rot-vault-pass")
+	oldIter := vault.KDFIterations
+	vault.KDFIterations = 1000
+	t.Cleanup(func() { vault.KDFIterations = oldIter })
+	vault.ClearCache()
+	if _, iErr := vault.Init(rotDir, "rot-vault-pass", 0); iErr != nil {
+		t.Fatalf("vault.Init: %v", iErr)
+	}
+	rotPath := rotDir + ".hookseen"
+	var rotLines strings.Builder
+	rotLines.WriteString("sid1 compaction:mark1\n")
+	rotLines.WriteString("sid1 tok_plain\n")
+	for i := range ledgerTailLines + 5 {
+		fmt.Fprintf(&rotLines, "other tok_%d\n", i)
+	}
+	if wErr := os.WriteFile(rotPath, []byte(rotLines.String()), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	RotateFile(rotPath, "sid1")
+	rotOut, rErr2 := os.ReadFile(rotPath)
+	if rErr2 != nil || strings.Contains(string(rotOut), "tok_plain") || !strings.Contains(string(rotOut), vault.NoteLinePrefix) {
+		t.Fatalf("RotateFile unlocked failed to seal plain lines: %q (%v)", rotOut, rErr2)
+	}
+
+	t.Setenv("DEJA_VAULT_PASSPHRASE", "")
+	if lErr := vault.Lock(rotDir, "rot-vault-pass"); lErr != nil {
+		t.Fatalf("vault.Lock: %v", lErr)
+	}
+	RotateFile(rotPath, "sid1")
+	tx := &SeenTx{ledger: NewLedger(rotPath)}
+	tx.rewriteOmitting([]string{"sid1"}, []string{"sid1 append_locked"})
+}
+
+func TestLedgerCorruptAndMigrationErrorBranches(t *testing.T) {
+	vault.ClearCache()
+	t.Cleanup(vault.ClearCache)
+	oldIter := vault.KDFIterations
+	vault.KDFIterations = 1000
+	t.Cleanup(func() { vault.KDFIterations = oldIter })
+
+	tmp := t.TempDir()
+	uDir := filepath.Join(tmp, "index.db")
+	if mkErr := os.MkdirAll(uDir, 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	t.Setenv("DEJA_VAULT_FILE", filepath.Join(tmp, "vault.json"))
+	t.Setenv("DEJA_VAULT_BACKEND", "passphrase")
+	t.Setenv("DEJA_VAULT_PASSPHRASE", "ledger-corrupt-pass")
+	if _, iErr := vault.Init(uDir, "ledger-corrupt-pass", 0); iErr != nil {
+		t.Fatal(iErr)
+	}
+
+	uPath := uDir + ".hookseen"
+	corruptBody := vault.NoteLinePrefix + "corrupt\n"
+	if wErr := os.WriteFile(uPath, []byte(corruptBody), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if seen := NewLedger(uPath).Read(); seen != nil {
+		t.Fatalf("Read corrupt = %v, want nil", seen)
+	}
+	NewLedger(uPath).ForgetSessions("s1")
+	got, rErr := os.ReadFile(uPath)
+	if rErr != nil || string(got) != corruptBody {
+		t.Fatalf("ForgetSessions mutated corrupt ledger: %q (%v)", got, rErr)
+	}
+	RotateFile(uPath, "s1")
+
+	dDir := filepath.Join(tmp, "dir-err.db")
+	if mkErr := os.MkdirAll(dDir+".hookseen", 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	if mErr := migrateLedgerSidecar(dDir, make([]byte, 32)); mErr == nil {
+		t.Fatal("migrateLedgerSidecar on directory succeeded")
 	}
 }

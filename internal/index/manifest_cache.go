@@ -31,6 +31,9 @@ import (
 // Contract: the cached Manifest is shared — read-only paths must not mutate
 // it. Writers keep using readManifest directly.
 func readManifestCached(dir string) (Manifest, error) {
+	if err := ensureVaultUnlocked(dir); err != nil {
+		return Manifest{}, err
+	}
 	// Plain stat: a failure here falls through to readManifest, which waits the
 	// swap out itself, so a wait added here cannot be made to fail (#1319).
 	fi, err := os.Stat(filepath.Join(dir, "manifest.gob"))

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,7 +33,8 @@ type rpcRequest struct {
 	Params  json.RawMessage `json:"params,omitempty"`
 	// served, when set, is told how many sessions a recall answered from, so
 	// the server knows whether an answer it kept is worth handing on.
-	served *int
+	served  *int
+	session *mcpClientSession
 }
 
 // isNotification reports whether a request omitted id (a JSON-RPC notification,
@@ -109,8 +111,16 @@ func serveMCP(dir string, r io.Reader, w io.Writer) error {
 // serveMCPAs serves either deja's own tool or, with contextOnly, the single
 // context_search tool of Qwen Code's External Context MCP Profile v1.
 func serveMCPAs(dir string, r io.Reader, w io.Writer, contextOnly bool) error {
-	mcpConn.Store(newMCPConn())
+	sess := newMCPClientSession(newMCPConn())
+	mcpConn.Store(sess.connIDValue())
 	br := bufio.NewReaderSize(r, 64*1024)
+	return serveMCPBuffered(dir, br, w, contextOnly, sess, "")
+}
+
+func serveMCPBuffered(dir string, br *bufio.Reader, w io.Writer, contextOnly bool, sess *mcpClientSession, authToken string) error {
+	if sess == nil {
+		sess = newMCPClientSession(newMCPConn())
+	}
 	enc := json.NewEncoder(w)
 	srv := newMCPServer(dir, enc)
 	srv.contextOnly = contextOnly
@@ -125,38 +135,7 @@ func serveMCPAs(dir string, r io.Reader, w io.Writer, contextOnly bool) error {
 			// server keeps serving instead of tearing down the whole session.
 			srv.refuse(nil, -32700, "parse error")
 		} else if trimmed := strings.TrimSpace(string(line)); trimmed != "" {
-			var req rpcRequest
-			if batch, isBatch := parseBatch(trimmed); isBatch {
-				// A batch is valid JSON, and answering -32700 told a client its
-				// bytes were corrupt when they were not — with a null id, so it
-				// could not tell which of its requests died either. deja serves
-				// one request per frame; the refusal says so (#1795). A batch
-				// carrying nothing but notifications gets no reply at all, as a
-				// notification does on its own line: the spec forbids answering
-				// one, inside a batch or out of it.
-				if id, answer := batchReply(batch); answer {
-					srv.refuse(id, -32600, "batch requests are not supported — send one request per line")
-				}
-			} else if uerr := json.Unmarshal([]byte(trimmed), &req); uerr != nil {
-				srv.refuse(nil, -32700, "parse error")
-			} else if req.JSONRPC != "" && req.JSONRPC != "2.0" {
-				// The member that says which protocol the frame speaks. An
-				// absent one is still served — clients in the wild omit it and
-				// the request is unambiguous — but "1.0" asks for a protocol
-				// this server does not speak and used to be answered anyway.
-				srv.refuse(req.ID, -32600, "unsupported jsonrpc version "+req.JSONRPC+" — this server speaks 2.0")
-			} else if msg := rpcIDProblem(req); msg != "" {
-				srv.refuse(nil, -32600, msg)
-			} else {
-				switch {
-				case !isNotification(req.ID) && req.Method == "":
-					srv.refuse(req.ID, -32600, "request has no method")
-				case !isNotification(req.ID):
-					srv.serve(req)
-				case req.Method == "notifications/cancelled":
-					srv.cancel(req.Params)
-				}
-			}
+			serveMCPFrame(srv, sess, authToken, trimmed)
 		}
 		if err != nil {
 			if !errors.Is(err, io.EOF) && os.Getenv("DEJA_DEBUG") == "1" {
@@ -167,6 +146,135 @@ func serveMCPAs(dir string, r io.Reader, w io.Writer, contextOnly bool) error {
 			srv.wait()
 			return srv.writeErr()
 		}
+	}
+}
+
+func serveMCPFrame(srv *mcpServer, sess *mcpClientSession, authToken, trimmed string) {
+	if trimmed == "" {
+		return
+	}
+	if batch, isBatch := parseBatch(trimmed); isBatch {
+		// A batch is valid JSON, and answering -32700 told a client its
+		// bytes were corrupt when they were not — with a null id, so it
+		// could not tell which of its requests died either. deja serves
+		// one request per frame; the refusal says so (#1795). A batch
+		// carrying nothing but notifications gets no reply at all, as a
+		// notification does on its own line: the spec forbids answering
+		// one, inside a batch or out of it.
+		if id, answer := batchReply(batch); answer {
+			if authToken != "" && !sess.isAuthed() {
+				srv.refuse(id, -32001, "unauthorized")
+				return
+			}
+			srv.refuse(id, -32600, "batch requests are not supported — send one request per line")
+		}
+		return
+	}
+	var req rpcRequest
+	if uerr := json.Unmarshal([]byte(trimmed), &req); uerr != nil {
+		srv.refuse(nil, -32700, "parse error")
+		return
+	}
+	if req.JSONRPC != "" && req.JSONRPC != "2.0" {
+		// The member that says which protocol the frame speaks. An
+		// absent one is still served — clients in the wild omit it and
+		// the request is unambiguous — but "1.0" asks for a protocol
+		// this server does not speak and used to be answered anyway.
+		srv.refuse(req.ID, -32600, "unsupported jsonrpc version "+req.JSONRPC+" — this server speaks 2.0")
+		return
+	}
+	if msg := rpcIDProblem(req); msg != "" {
+		srv.refuse(nil, -32600, msg)
+		return
+	}
+	if authToken != "" && !sess.isAuthed() {
+		if !mcpRequestMatchesAuthToken(req.Params, authToken) {
+			if !isNotification(req.ID) {
+				srv.refuse(req.ID, -32001, "unauthorized")
+			}
+			return
+		}
+		sess.setAuthed(true)
+	}
+	req.session = sess
+	switch {
+	case !isNotification(req.ID) && req.Method == "":
+		srv.refuse(req.ID, -32600, "request has no method")
+	case !isNotification(req.ID):
+		srv.serve(req)
+	case req.Method == "notifications/cancelled":
+		srv.cancelFor(sess, req.Params)
+	}
+}
+
+func stripMCPBearer(raw string) string {
+	s := strings.TrimSpace(raw)
+	if len(s) >= 7 && strings.EqualFold(s[:7], "Bearer ") {
+		return strings.TrimSpace(s[7:])
+	}
+	return s
+}
+
+func mcpRequestMatchesAuthToken(params json.RawMessage, authToken string) bool {
+	if authToken == "" {
+		return true
+	}
+	var p struct {
+		Token         string `json:"token"`
+		Auth          string `json:"auth"`
+		Authorization string `json:"authorization"`
+		Meta          struct {
+			Token         string `json:"token"`
+			Auth          string `json:"auth"`
+			Authorization string `json:"authorization"`
+		} `json:"_meta"`
+	}
+	if len(bytes.TrimSpace(params)) > 0 {
+		_ = json.Unmarshal(params, &p)
+	}
+	candidates := []string{
+		strings.TrimSpace(p.Token),
+		strings.TrimSpace(p.Meta.Token),
+		stripMCPBearer(p.Authorization),
+		stripMCPBearer(p.Meta.Authorization),
+		stripMCPBearer(p.Auth),
+		stripMCPBearer(p.Meta.Auth),
+	}
+	for _, cand := range candidates {
+		if cand != "" && subtle.ConstantTimeCompare([]byte(cand), []byte(authToken)) == 1 {
+			return true
+		}
+	}
+	return false
+}
+
+func applyMCPInitializeClient(params json.RawMessage) {
+	var p struct {
+		ClientInfo struct {
+			Name string `json:"name"`
+		} `json:"clientInfo"`
+		ClientToken string `json:"clientToken"`
+		Meta        struct {
+			ClientToken     string `json:"clientToken"`
+			DejaClientToken string `json:"dejaClientToken"`
+		} `json:"_meta"`
+	}
+	// A malformed or missing clientInfo only loses the client-specific
+	// sentence; initialize itself must still succeed.
+	_ = json.Unmarshal(params, &p)
+	name := strings.TrimSpace(p.ClientInfo.Name)
+	if name != "" || currentMCPClientSession() == nil {
+		setMCPClient(name)
+	}
+	tok := strings.TrimSpace(p.ClientToken)
+	if tok == "" {
+		tok = strings.TrimSpace(p.Meta.ClientToken)
+	}
+	if tok == "" {
+		tok = strings.TrimSpace(p.Meta.DejaClientToken)
+	}
+	if tok != "" {
+		setMCPClientToken(tok)
 	}
 }
 
@@ -193,22 +301,24 @@ func readMCPLine(br *bufio.Reader, most int) (line []byte, overlong bool, err er
 }
 
 func handleMCP(dir string, req rpcRequest) (any, int, string) {
+	var res any
+	var code int
+	var msg string
+	withMCPClientSession(req.session, func() {
+		res, code, msg = handleMCPSession(dir, req)
+	})
+	return res, code, msg
+}
+
+func handleMCPSession(dir string, req rpcRequest) (any, int, string) {
 	switch req.Method {
 	case "initialize":
-		var p struct {
-			ClientInfo struct {
-				Name string `json:"name"`
-			} `json:"clientInfo"`
-		}
-		// A malformed or missing clientInfo only loses the client-specific
-		// sentence; initialize itself must still succeed.
-		_ = json.Unmarshal(req.Params, &p)
-		setMCPClient(p.ClientInfo.Name)
+		applyMCPInitializeClient(req.Params)
 		return map[string]any{
 			"protocolVersion": mcpProtocolVersion,
 			"capabilities":    map[string]any{"tools": map[string]any{}, "resources": map[string]any{}, "prompts": map[string]any{}},
 			"serverInfo":      map[string]any{"name": "deja", "version": version},
-			"instructions":    mcpInstructions(dir, p.ClientInfo.Name),
+			"instructions":    mcpInstructions(dir, mcpActiveClientName()),
 		}, 0, ""
 	case "tools/list":
 		return map[string]any{"tools": []map[string]any{dejaTool()}}, 0, ""
@@ -225,6 +335,9 @@ func handleMCP(dir string, req rpcRequest) (any, int, string) {
 		// an error here reads as a broken capability.
 		return map[string]any{"resourceTemplates": []map[string]any{}}, 0, ""
 	case "prompts/list":
+		if err := checkMCPAccess(dir, "read", ""); err != nil {
+			return nil, -32603, err.Error()
+		}
 		return map[string]any{"prompts": []map[string]any{dejaPrompt()}}, 0, ""
 	case "prompts/get":
 		return mcpPromptGet(dir, req.Params)
@@ -1054,14 +1167,14 @@ func mcpFix(dir, name string, raw json.RawMessage) (string, int, error) {
 	}
 	pol := policy.Load()
 	pairs := index.FixesFor(dir, a.Error, int(a.Limit), func(project string) bool {
-		return pol.Allows(policy.ActivationMCP, project)
+		return policyAllowsProject(pol, policy.ActivationMCP, project)
 	})
 	if len(pairs) == 0 {
 		if near := nearestRecordedError(dir, a.Error, func(project string) bool {
-			return pol.Allows(policy.ActivationMCP, project)
+			return policyAllowsProject(pol, policy.ActivationMCP, project)
 		}); near != "" {
 			pairs = index.FixesFor(dir, near, int(a.Limit), func(project string) bool {
-				return pol.Allows(policy.ActivationMCP, project)
+				return policyAllowsProject(pol, policy.ActivationMCP, project)
 			})
 		}
 	}
@@ -1092,14 +1205,14 @@ func mcpFix(dir, name string, raw json.RawMessage) (string, int, error) {
 		// Held-but-unconfirmed is not never-seen, and the agent asking is
 		// the one that would otherwise re-derive the remedy (#2282).
 		if index.FixCandidateSeen(dir, a.Error, func(project string) bool {
-			return pol.Allows(policy.ActivationMCP, project)
+			return policyAllowsProject(pol, policy.ActivationMCP, project)
 		}) {
 			return "Something was run after that error before, and nothing has confirmed it worked - deja names no remedy until something does.", 0, nil
 		}
 		// A remedy exists and was held back because it cannot be taken back;
 		// saying nothing ran would be false. What sessions said still helps.
 		if index.FixWithheldAsIrreversible(dir, a.Error, func(project string) bool {
-			return pol.Allows(policy.ActivationMCP, project)
+			return policyAllowsProject(pol, policy.ActivationMCP, project)
 		}) {
 			const withheld = "What ran after that error on this machine was a merge, a force push or a deletion - deja does not hand those over as a fix."
 			if text, n := fixFallsBackToRecall(dir, a.Error); n > 0 {

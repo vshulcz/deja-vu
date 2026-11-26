@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -12,8 +11,8 @@ import (
 	"sync"
 	"unicode/utf8"
 
-	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 // The commands built on the work records — `deja friction`, `deja files` —
@@ -459,7 +458,7 @@ const environmentTTL = 15 * time.Minute
 // Reading and stamping are separate because the block is spent on delivery: a
 // caller that asks and then fails must leave the next one its turn (#1806).
 func environmentServedRecently(dir string) bool {
-	if b, err := os.ReadFile(environmentMarker(dir)); err == nil {
+	if b, err := vault.ReadSealedFile(dir, environmentMarker(dir), vault.DomainSidecar); err == nil {
 		if ts, err := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64); err == nil {
 			if time.Since(time.Unix(ts, 0)) < environmentTTL {
 				return true
@@ -473,7 +472,7 @@ func environmentServedRecently(dir string) bool {
 // server do not both send one.
 func stampEnvironmentServed(dir string) {
 	p := environmentMarker(dir)
-	_ = atomicfile.Write(p, []byte(strconv.FormatInt(time.Now().Unix(), 10)), 0o600)
+	_ = vault.WriteSealedFile(dir, p, vault.DomainSidecar, []byte(strconv.FormatInt(time.Now().Unix(), 10)), 0o600)
 }
 
 func environmentMarker(dir string) string {

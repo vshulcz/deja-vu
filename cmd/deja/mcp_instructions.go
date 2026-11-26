@@ -9,6 +9,8 @@ import (
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/hookengine"
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 // mcpInstructions is returned from the MCP initialize handshake. Hosts that
@@ -61,6 +63,9 @@ func activeProjectInstructionTrailer(dir string) string {
 	if dir == "" || !index.HasManifest(dir) || readWarmupStatus(dir) != nil || warmupJustRequested(dir) {
 		return ""
 	}
+	if _, err := vault.CheckUnlocked(dir); err != nil {
+		return ""
+	}
 	cwd := howCwd()
 	if cwd == "" {
 		return ""
@@ -73,11 +78,12 @@ func activeProjectInstructionTrailer(dir string) string {
 	if err != nil || len(metas) == 0 {
 		return ""
 	}
+	pol := policy.Load()
 	var count int
 	var latest time.Time
 	bestIdx := len(cands)
 	for _, meta := range metas {
-		if meta.ID == "" {
+		if meta.ID == "" || !policyAllowsProject(pol, policy.ActivationMCP, meta.Project) {
 			continue
 		}
 		idx := slices.Index(cands, meta.Project)

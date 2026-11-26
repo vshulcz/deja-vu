@@ -66,7 +66,7 @@ func appendsInPlace(dir, tmp string, old Manifest) bool {
 	}
 	// Before the first byte is appended: a pass killed after it leaves the
 	// mark behind.
-	if writeFileAtomic(filepath.Join(dir, appendPendingFile), []byte(strconv.FormatInt(old.RecordsSize, 10))) != nil {
+	if writeRawFileAtomic(filepath.Join(dir, appendPendingFile), []byte(strconv.FormatInt(old.RecordsSize, 10))) != nil {
 		return undo()
 	}
 	return true
@@ -356,7 +356,7 @@ func deadWords(path string, t *recordTables, offs []int64, unindexed bool) (buck
 }
 
 func deadWordsOf(path string, t *recordTables, offs []int64, unindexed bool) (bucketPostings, map[string]bool, error) {
-	f, err := os.Open(path)
+	f, err := openRecordFile(path, t)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -410,7 +410,7 @@ var logStampedFiles = []string{recordOffsetsFile, frictionTextsFile}
 // restamp replaces the fingerprint before with after in the file at p, if it
 // carries it.
 func restamp(p string, before, after [sha256.Size]byte) {
-	b, err := os.ReadFile(p)
+	b, err := readIndexBytes(p)
 	if err != nil {
 		return
 	}

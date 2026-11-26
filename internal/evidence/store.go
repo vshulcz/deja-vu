@@ -1,7 +1,9 @@
 package evidence
 
 import (
+	"bytes"
 	"encoding/binary"
+	"io"
 	"maps"
 	"os"
 	"path/filepath"
@@ -14,6 +16,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/redact"
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 // receipts.bin is sorted FNV-64 keys with offsets, then the text. The hook
@@ -83,10 +86,71 @@ func collect(ss []model.Session, clean func(string) string, put func(map[uint64]
 	wg.Wait()
 }
 
+func canonicalVaultDir(dir string) string {
+	if dir == "" {
+		return ""
+	}
+	d := filepath.Clean(dir)
+	for {
+		switch {
+		case len(d) > len(".vaultmig") && strings.HasSuffix(d, ".vaultmig"):
+			d = strings.TrimSuffix(d, ".vaultmig")
+		case len(d) > len(".part") && strings.HasSuffix(d, ".part"):
+			d = strings.TrimSuffix(d, ".part")
+		case len(d) > len(".tmp") && strings.HasSuffix(d, ".tmp"):
+			d = strings.TrimSuffix(d, ".tmp")
+		case len(d) > len(".old") && strings.HasSuffix(d, ".old"):
+			d = strings.TrimSuffix(d, ".old")
+		default:
+			if base, ok := trimParkedOldSuffix(d); ok {
+				d = base
+				continue
+			}
+			return d
+		}
+	}
+}
+
+func trimParkedOldSuffix(d string) (string, bool) {
+	idx := strings.LastIndex(d, ".old.")
+	if idx <= 0 {
+		return "", false
+	}
+	tail := d[idx+len(".old."):]
+	if tail == "" {
+		return "", false
+	}
+	for i := range len(tail) {
+		if tail[i] < '0' || tail[i] > '9' {
+			return "", false
+		}
+	}
+	return d[:idx], true
+}
+
 // load reads every receipt in dir.
 func load(dir string) (map[uint64]string, bool) {
+	canon := canonicalVaultDir(dir)
+	dek, vErr := vault.CheckUnlocked(canon)
+	if vErr != nil {
+		readersMu.Lock()
+		delete(readers, dir)
+		readersMu.Unlock()
+		return nil, false
+	}
 	b, err := os.ReadFile(filepath.Join(dir, fileName))
-	if err != nil || len(b) < len(magic)+4 || string(b[:len(magic)]) != magic {
+	if err != nil {
+		return nil, false
+	}
+	if len(dek) > 0 {
+		b, err = vault.OpenBytes(dek, vault.DomainIndexFile, b)
+		if err != nil {
+			return nil, false
+		}
+	} else if vault.IsSealedBytes(b) {
+		return nil, false
+	}
+	if len(b) < len(magic)+4 || string(b[:len(magic)]) != magic {
 		return nil, false
 	}
 	n := int(binary.LittleEndian.Uint32(b[len(magic):]))
@@ -108,6 +172,10 @@ func load(dir string) (map[uint64]string, bool) {
 }
 
 func write(dir string, all map[uint64]string) error {
+	dek, err := vault.CheckUnlocked(canonicalVaultDir(dir))
+	if err != nil {
+		return err
+	}
 	keys := make([]uint64, 0, len(all))
 	for k := range all {
 		keys = append(keys, k)
@@ -124,13 +192,20 @@ func write(dir string, all map[uint64]string) error {
 		binary.LittleEndian.PutUint32(e[12:], uint32(len(all[k]))) //nolint:gosec // one receipt, a few hundred bytes
 		blob = append(blob, all[k]...)
 	}
+	payload := slices.Concat(head, blob)
+	if len(dek) > 0 {
+		payload, err = vault.SealBytes(dek, vault.DomainIndexFile, payload)
+		if err != nil {
+			return err
+		}
+	}
 	tmp := filepath.Join(dir, fileName+".tmp")
 	shared := atomicfile.SharedGroup(dir)
 	perm := os.FileMode(0o600)
 	if shared {
 		perm = 0o660
 	}
-	if err := os.WriteFile(tmp, slices.Concat(head, blob), perm); err != nil {
+	if err := os.WriteFile(tmp, payload, perm); err != nil {
 		_ = os.Remove(tmp)
 		return err
 	}
@@ -157,14 +232,17 @@ func Drop(dir string) { _ = os.Remove(filepath.Join(dir, fileName)) }
 // a handle kept for the life of the process stops a rebuild from renaming the
 // index directory ("Access is denied").
 type Reader struct {
-	path  string
-	n     int
-	built time.Time
+	path     string
+	canonDir string
+	plain    []byte
+	n        int
+	built    time.Time
 }
 
 type openReader struct {
-	r  *Reader
-	fi os.FileInfo
+	r   *Reader
+	fi  os.FileInfo
+	enc bool
 }
 
 var (
@@ -176,26 +254,43 @@ var (
 // A rebuild swaps the file in under the same name, so a long-lived process
 // reopens it when it changed.
 func Open(dir string) *Reader {
+	canon := canonicalVaultDir(dir)
+	dek, vErr := vault.CheckUnlocked(canon)
+	if vErr != nil {
+		readersMu.Lock()
+		delete(readers, dir)
+		readersMu.Unlock()
+		return nil
+	}
+	useEnc := len(dek) > 0
 	path := filepath.Join(dir, fileName)
 	fi, statErr := os.Stat(path)
 	readersMu.Lock()
 	defer readersMu.Unlock()
-	if o, ok := readers[dir]; ok && (statErr != nil && o.fi == nil || statErr == nil && o.fi != nil && os.SameFile(o.fi, fi) && o.fi.ModTime().Equal(fi.ModTime())) {
+	if o, ok := readers[dir]; ok && o.enc == useEnc && (statErr != nil && o.fi == nil || statErr == nil && o.fi != nil && os.SameFile(o.fi, fi) && o.fi.ModTime().Equal(fi.ModTime())) {
 		return o.r
 	}
 	var r *Reader
 	if statErr == nil {
-		if f, err := os.Open(path); err == nil {
-			h := make([]byte, len(magic)+4)
-			if _, err := f.ReadAt(h, 0); err == nil && string(h[:len(magic)]) == magic {
-				r = &Reader{path: path, n: int(binary.LittleEndian.Uint32(h[len(magic):])), built: fi.ModTime()}
+		if useEnc {
+			if raw, err := os.ReadFile(path); err == nil {
+				if plain, err := vault.OpenBytes(dek, vault.DomainIndexFile, raw); err == nil && len(plain) >= len(magic)+4 && string(plain[:len(magic)]) == magic {
+					r = &Reader{path: path, canonDir: canon, plain: plain, n: int(binary.LittleEndian.Uint32(plain[len(magic):])), built: fi.ModTime()}
+				}
 			}
-			_ = f.Close()
+		} else {
+			if f, err := os.Open(path); err == nil {
+				h := make([]byte, len(magic)+4)
+				if _, err := f.ReadAt(h, 0); err == nil && string(h[:len(magic)]) == magic {
+					r = &Reader{path: path, n: int(binary.LittleEndian.Uint32(h[len(magic):])), built: fi.ModTime()}
+				}
+				_ = f.Close()
+			}
 		}
 	} else {
 		fi = nil
 	}
-	readers[dir] = openReader{r: r, fi: fi}
+	readers[dir] = openReader{r: r, fi: fi, enc: useEnc}
 	return r
 }
 
@@ -211,25 +306,34 @@ func (r *Reader) Lookup(harness, id, text string) []string {
 	if r == nil || r.n == 0 {
 		return nil
 	}
-	f, err := os.Open(r.path)
-	if err != nil {
-		return nil
+	var ra io.ReaderAt
+	if r.plain != nil {
+		if _, err := vault.CheckUnlocked(r.canonDir); err != nil {
+			return nil
+		}
+		ra = bytes.NewReader(r.plain)
+	} else {
+		f, err := os.Open(r.path)
+		if err != nil {
+			return nil
+		}
+		defer func() { _ = f.Close() }()
+		ra = f
 	}
-	defer func() { _ = f.Close() }()
 	k := Key(harness, id, text)
 	e := make([]byte, entrySize)
 	base := int64(len(magic) + 4)
 	lo, hi := 0, r.n
 	for lo < hi {
 		mid := (lo + hi) / 2
-		if _, err := f.ReadAt(e, base+int64(mid)*entrySize); err != nil {
+		if _, err := ra.ReadAt(e, base+int64(mid)*entrySize); err != nil {
 			return nil
 		}
 		v := binary.LittleEndian.Uint64(e)
 		if v == k {
 			off, n := binary.LittleEndian.Uint32(e[8:]), binary.LittleEndian.Uint32(e[12:])
 			b := make([]byte, n)
-			if _, err := f.ReadAt(b, base+int64(r.n)*entrySize+int64(off)); err != nil {
+			if _, err := ra.ReadAt(b, base+int64(r.n)*entrySize+int64(off)); err != nil {
 				return nil
 			}
 			return strings.Split(string(b), "\n")

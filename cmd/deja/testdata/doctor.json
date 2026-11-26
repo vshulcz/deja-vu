@@ -1197,6 +1197,12 @@
       }
     }
   },
+  "vault": {
+    "enabled": false,
+    "locked": false,
+    "keyring_available": false,
+    "encrypted_store": false
+  },
   "sync": {
     "state": "ok",
     "peers": []

@@ -15,6 +15,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"unicode/utf8"
+
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 // A pass that adds a few sessions used to write every postings file again: a
@@ -470,57 +472,89 @@ func markLiveWords(p string, toks map[string][]posting, dead []int64, live map[s
 // blankWords zeroes the words of gone where the directory of the postings
 // file at p names them, and syncs the file.
 func blankWords(p string, gone map[string]bool) error {
+	dek, err := indexDEKForFile(p)
+	if err != nil {
+		return err
+	}
+	type span struct {
+		at    int64
+		blank []byte
+	}
+	scan := func(src io.Reader) ([]span, error) {
+		r := bufio.NewReader(src)
+		magic := make([]byte, len(bucketMagic))
+		var rErr error
+		if _, rErr = io.ReadFull(r, magic); rErr != nil || !bytes.Equal(magic, bucketMagic) {
+			return nil, errCorruptIndex
+		}
+		count, rErr := binary.ReadUvarint(r)
+		if rErr != nil {
+			return nil, rErr
+		}
+		pos := int64(len(bucketMagic) + uvarintLen(count))
+		var hits []span
+		tb := []byte{}
+		for range count {
+			ln, lnErr := binary.ReadUvarint(r)
+			if lnErr != nil {
+				return nil, lnErr
+			}
+			pos += int64(uvarintLen(ln))
+			if ln > uint64(maxRecordSize) {
+				return nil, errCorruptIndex
+			}
+			if cap(tb) < int(ln) {
+				tb = make([]byte, ln)
+			}
+			tb = tb[:ln]
+			if _, rErr = io.ReadFull(r, tb); rErr != nil {
+				return nil, rErr
+			}
+			if gone[string(tb)] {
+				if b, ok := blankedWord(string(tb)); ok {
+					hits = append(hits, span{pos, b})
+				}
+			}
+			pos += int64(ln)
+			n, nErr := binary.ReadUvarint(r)
+			if nErr != nil {
+				return nil, nErr
+			}
+			pos += int64(uvarintLen(n))
+		}
+		return hits, nil
+	}
+
+	if len(dek) > 0 {
+		raw, rErr := readIndexBytes(p)
+		if rErr != nil {
+			return rErr
+		}
+		hits, sErr := scan(bytes.NewReader(raw))
+		if sErr != nil || len(hits) == 0 {
+			clear(raw)
+			return sErr
+		}
+		for _, h := range hits {
+			copy(raw[h.at:], h.blank)
+		}
+		wErr := writeSealedFileAtomic(p, raw)
+		clear(raw)
+		return wErr
+	}
+
 	f, err := os.OpenFile(p, os.O_RDWR, 0)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = f.Close() }()
-	r := bufio.NewReader(f)
-	magic := make([]byte, len(bucketMagic))
-	if _, err = io.ReadFull(r, magic); err != nil || !bytes.Equal(magic, bucketMagic) {
-		return errCorruptIndex
+	var head [5]byte
+	if n, _ := f.ReadAt(head[:], 0); n == len(head) && vault.IsSealedBytes(head[:]) {
+		return vault.ErrKeyUnavailable
 	}
-	count, err := binary.ReadUvarint(r)
-	if err != nil {
+	hits, err := scan(f)
+	if err != nil || len(hits) == 0 {
 		return err
-	}
-	pos := int64(len(bucketMagic) + uvarintLen(count))
-	type span struct {
-		at    int64
-		blank []byte
-	}
-	var hits []span
-	tb := []byte{}
-	for range count {
-		ln, err := binary.ReadUvarint(r)
-		if err != nil {
-			return err
-		}
-		pos += int64(uvarintLen(ln))
-		if ln > uint64(maxRecordSize) {
-			return errCorruptIndex
-		}
-		if cap(tb) < int(ln) {
-			tb = make([]byte, ln)
-		}
-		tb = tb[:ln]
-		if _, err = io.ReadFull(r, tb); err != nil {
-			return err
-		}
-		if gone[string(tb)] {
-			if b, ok := blankedWord(string(tb)); ok {
-				hits = append(hits, span{pos, b})
-			}
-		}
-		pos += int64(ln)
-		n, err := binary.ReadUvarint(r)
-		if err != nil {
-			return err
-		}
-		pos += int64(uvarintLen(n))
-	}
-	if len(hits) == 0 {
-		return nil
 	}
 	for _, h := range hits {
 		if _, err := f.WriteAt(h.blank, h.at); err != nil {

@@ -22,6 +22,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/userconfig"
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 // doctorVersionLookup fetches the latest released version. It is injected so
@@ -144,6 +145,8 @@ func printDoctorText(w io.Writer, report doctorReport, deepReport *index.DeepRep
 	doctorConfig(w)
 	fmt.Fprintln(w)
 	doctorPolicy(w, dir)
+	fmt.Fprintln(w)
+	doctorVault(w, dir)
 	fmt.Fprintln(w)
 	doctorMCP(w)
 	fmt.Fprintln(w)
@@ -857,9 +860,13 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 	} else if n := sources.ProjectAliasCount(); n > 0 {
 		fmt.Fprintf(w, "  projects %d tree%s named in %s\n", n, pluralS(n), reportPath(sources.ProjectAliasPath()))
 	}
-	// A precise non-claim: users deciding what to trust deserve to read the
-	// boundary in the tool itself, not only in the security docs.
-	fmt.Fprintln(w, "  security plaintext on disk — protected by file permissions only, no encryption or access control")
+	if vault.Enabled() {
+		fmt.Fprintln(w, "  security vault encryption enabled — see Vault section above")
+	} else {
+		// A precise non-claim: users deciding what to trust deserve to read the
+		// boundary in the tool itself, not only in the security docs.
+		fmt.Fprintln(w, "  security plaintext on disk — protected by file permissions only, no encryption or access control")
+	}
 	if n := index.UnsharedFiles(loc); n > 0 {
 		fmt.Fprintf(w, "  permissions %d file%s in shared index not group-writable — `chmod -R g+rwX %s`\n", n, pluralS(n), reportPath(loc))
 	}
@@ -1274,6 +1281,36 @@ func noPolicyFileLine() string {
 		return "no file at " + reportPath(p)
 	}
 	return "no policy file — deja cannot find a home directory to look in"
+}
+
+func doctorVault(w io.Writer, dir string) {
+	st := vault.Status(dir)
+	fmt.Fprintln(w, "Vault")
+	if !st.Enabled {
+		fmt.Fprintln(w, "  enabled          false (plaintext store)")
+		fmt.Fprintf(w, "  keyring          available=%t\n", st.KeyringAvailable)
+		if st.Error != "" {
+			fmt.Fprintf(w, "  error            %s\n", st.Error)
+		}
+		return
+	}
+	state := "unlocked"
+	if st.Locked {
+		state = "locked"
+	}
+	fmt.Fprintf(w, "  enabled          true (%s)\n", state)
+	if st.KeyBackend != "" {
+		fmt.Fprintf(w, "  key_backend      %s (keyring_available=%t)\n", st.KeyBackend, st.KeyringAvailable)
+	} else {
+		fmt.Fprintf(w, "  keyring          available=%t\n", st.KeyringAvailable)
+	}
+	fmt.Fprintf(w, "  encrypted_store  %t\n", st.EncryptedStore)
+	if st.AutoLockSeconds > 0 {
+		fmt.Fprintf(w, "  auto_lock        %ds\n", st.AutoLockSeconds)
+	}
+	if st.Error != "" {
+		fmt.Fprintf(w, "  error            %s\n", st.Error)
+	}
 }
 
 // notBuiltLine is doctor's line for an index not built yet. With automatic

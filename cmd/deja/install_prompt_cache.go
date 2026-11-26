@@ -51,7 +51,22 @@ function nullMap(src) {
   return out;
 }
 
+function vaultEnabled() {
+  const explicit = String(process.env.DEJA_VAULT_FILE || "").trim();
+  if (explicit) return existsSync(explicit);
+  const xdg = process.env.XDG_CONFIG_HOME || "";
+  if (xdg && isAbsolute(xdg)) return existsSync(join(xdg, "deja", "vault.json"));
+  if (process.platform === "win32") {
+    const appdata = process.env.APPDATA || "";
+    if (appdata && isAbsolute(appdata)) return existsSync(join(appdata, "deja", "vault.json"));
+  }
+  const home = homedir();
+  if (home && isAbsolute(home)) return existsSync(join(home, ".config", "deja", "vault.json"));
+  return false;
+}
+
 function readPromptCacheFile(file) {
+  if (vaultEnabled()) return { version: 1, sessions: Object.create(null) };
   try {
     if (!existsSync(file)) return { version: 1, sessions: Object.create(null) };
     const parsed = JSON.parse(readFileSync(file, "utf8"));
@@ -63,6 +78,7 @@ function readPromptCacheFile(file) {
 }
 
 function writePromptCacheFile(file, data, keepScope, maxSessions) {
+  if (vaultEnabled()) return;
   try {
     const entries = Object.entries(data.sessions);
     if (entries.length > maxSessions) {

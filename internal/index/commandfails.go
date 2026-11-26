@@ -530,7 +530,8 @@ func heldKeys(redo map[string]bool, m Manifest) map[string]bool {
 // failing log laid the log at the build (#4309). It stops at end, or at the
 // end of the log for 0, and returns where the last whole record ended.
 func eachCommandAndOutputFrom(path string, m Manifest, from, end int64, redo map[string]bool, fn func(Record), stop func(key string)) (int64, error) {
-	f, err := openIndexFile(path)
+	t := tablesFromManifest(m)
+	f, err := openRecordFile(path, t)
 	if err != nil {
 		return 0, err
 	}
@@ -539,10 +540,9 @@ func eachCommandAndOutputFrom(path string, m Manifest, from, end int64, redo map
 	if len(redo) > 0 {
 		off = 0
 	}
-	if _, err := f.Seek(off, io.SeekStart); err != nil {
+	if _, err = f.Seek(off, io.SeekStart); err != nil {
 		return 0, err
 	}
-	t := tablesFromManifest(m)
 	dead := t.deadFrom(off)
 	var src io.Reader = f
 	if end > 0 {

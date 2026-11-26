@@ -485,6 +485,8 @@ type Manifest struct {
 	// resume stub's row carries its span and file to the transcript that
 	// takes the id later, as a rebuild reading both gives (#4213).
 	Empty map[string]SessionMeta `json:"empty,omitempty"`
+
+	vaultDir string
 }
 
 // HarnessIngest is one harness's ingestion health from its last indexing pass.

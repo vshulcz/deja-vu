@@ -1,11 +1,10 @@
 package main
 
 import (
-	"os"
 	"strings"
 
-	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
 // The searches the reader acted on, oldest first, kept beside the index the
@@ -16,7 +15,7 @@ const tuiHistoryMax = 100
 func tuiHistoryPath(dir string) string { return dir + ".tui-history" }
 
 func loadTUIHistory(dir string) []string {
-	b, err := os.ReadFile(tuiHistoryPath(dir))
+	b, err := vault.ReadSealedFile(dir, tuiHistoryPath(dir), vault.DomainSidecar)
 	if err != nil {
 		return nil
 	}
@@ -47,7 +46,7 @@ func (a *tuiApp) remember() {
 		hist = hist[len(hist)-tuiHistoryMax:]
 	}
 	a.history = hist
-	_ = atomicfile.Write(tuiHistoryPath(a.dir), []byte(strings.Join(hist, "\n")+"\n"), 0o600)
+	_ = vault.WriteSealedFile(a.dir, tuiHistoryPath(a.dir), vault.DomainSidecar, []byte(strings.Join(hist, "\n")+"\n"), 0o600)
 }
 
 // recall steps through history: -1 is older, +1 newer, and stepping past the

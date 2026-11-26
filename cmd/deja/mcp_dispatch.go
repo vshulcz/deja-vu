@@ -2,9 +2,12 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -81,12 +84,13 @@ type mcpServer struct {
 }
 
 type mcpPending struct {
-	id        any
-	key       string
-	answered  bool
-	cancelled bool
-	timer     *time.Timer
-	reply     func(id any, result any, code int, msg string)
+	id         any
+	pendingKey string
+	key        string
+	answered   bool
+	cancelled  bool
+	timer      *time.Timer
+	reply      func(id any, result any, code int, msg string)
 }
 
 type mcpWork struct {
@@ -159,8 +163,9 @@ func (s *mcpServer) serveRequest(req rpcRequest, reply func(id any, result any, 
 		s.mu.Unlock()
 		return nil
 	}
+	pendingKey := mcpPendingKey(req.session, req.ID)
 	key := mcpCallKey(req)
-	p := &mcpPending{id: req.ID, key: key, reply: reply}
+	p := &mcpPending{id: req.ID, pendingKey: pendingKey, key: key, reply: reply}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if l, ok := s.late[key]; ok {
@@ -171,7 +176,7 @@ func (s *mcpServer) serveRequest(req rpcRequest, reply func(id any, result any, 
 		}
 	}
 	s.open.Add(1)
-	s.pending[mcpIDKey(req.ID)] = p
+	s.pending[pendingKey] = p
 	if d := s.deadline(); req.Method == "tools/call" && d > 0 {
 		p.timer = time.AfterFunc(d, func() { s.overdue(p) })
 	}
@@ -256,7 +261,7 @@ func (s *mcpServer) answerLocked(p *mcpPending) {
 	if p.timer != nil {
 		p.timer.Stop()
 	}
-	delete(s.pending, mcpIDKey(p.id))
+	delete(s.pending, p.pendingKey)
 	s.open.Done()
 }
 
@@ -280,13 +285,21 @@ func (s *mcpServer) overdue(p *mcpPending) {
 
 // handle answers one request on whichever surface this server serves.
 func (s *mcpServer) handle(req rpcRequest) (any, int, string) {
-	if s.contextOnly {
-		return handleContextMCP(s.dir, req)
-	}
-	if s.handler != nil {
-		return s.handler(s.dir, req)
-	}
-	return mcpHandler(s.dir, req)
+	var res any
+	var code int
+	var msg string
+	withMCPClientSession(req.session, func() {
+		if s.contextOnly {
+			res, code, msg = handleContextMCP(s.dir, req)
+			return
+		}
+		if s.handler != nil {
+			res, code, msg = s.handler(s.dir, req)
+			return
+		}
+		res, code, msg = mcpHandler(s.dir, req)
+	})
+	return res, code, msg
 }
 
 // deadline is how long a tools/call may run before it is answered. The
@@ -299,10 +312,10 @@ func (s *mcpServer) deadline() time.Duration {
 	return mcpDeadline
 }
 
-// cancel handles notifications/cancelled. A request the client gave up on is
-// owed no reply, and if nobody else is waiting on its work, the work is not
-// started.
-func (s *mcpServer) cancel(params json.RawMessage) {
+// cancelFor handles notifications/cancelled for a client session. A request the
+// client gave up on is owed no reply, and if nobody else is waiting on its
+// work, the work is not started.
+func (s *mcpServer) cancelFor(sess *mcpClientSession, params json.RawMessage) {
 	var c struct {
 		RequestID any `json:"requestId"`
 	}
@@ -311,7 +324,10 @@ func (s *mcpServer) cancel(params json.RawMessage) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	p, ok := s.pending[mcpIDKey(c.RequestID)]
+	p, ok := s.pending[mcpPendingKey(sess, c.RequestID)]
+	if !ok && sess == nil {
+		p, ok = s.pending[mcpIDKey(c.RequestID)]
+	}
 	if !ok {
 		return
 	}
@@ -364,16 +380,62 @@ func mcpIDKey(id any) string {
 	return string(b)
 }
 
-// mcpCallKey names a call by what it asks, so the same question asked twice
-// is one piece of work.
+func mcpSessionConnKey(sess *mcpClientSession) string {
+	if sess != nil {
+		if id := sess.connIDValue(); id != "" {
+			return id
+		}
+	}
+	return mcpConnID()
+}
+
+func mcpPendingKey(sess *mcpClientSession, id any) string {
+	key := mcpIDKey(id)
+	if cid := mcpSessionConnKey(sess); cid != "" {
+		return cid + "\x00" + key
+	}
+	return key
+}
+
+func sanitizeMCPKeyPart(s string) string {
+	return strings.ReplaceAll(s, "\x00", "")
+}
+
+// mcpCallKey names a call by session/client scope and what it asks, so the
+// same question asked twice within one session is one piece of work while
+// distinct clients on a shared HTTP or Unix-socket server stay isolated.
 func mcpCallKey(req rpcRequest) string {
 	var b bytes.Buffer
+	b.WriteString(sanitizeMCPKeyPart(mcpSessionConnKey(req.session)))
+	b.WriteByte(0)
+	b.WriteString(sanitizeMCPKeyPart(mcpActiveClientNameFor(req.session)))
+	b.WriteByte(0)
+	if tok := mcpActiveClientTokenFor(req.session); tok != "" {
+		sum := sha256.Sum256([]byte(tok))
+		b.WriteString(hex.EncodeToString(sum[:]))
+	}
+	b.WriteByte(0)
 	b.WriteString(req.Method)
 	b.WriteByte(0)
 	if json.Compact(&b, req.Params) != nil {
 		b.Write(req.Params)
 	}
 	return b.String()
+}
+
+// mcpSplitCallKey splits a key built by mcpCallKey into its session/client
+// scope prefix (including the trailing NUL) and the method+params tail.
+func mcpSplitCallKey(key string) (scope, rest string, ok bool) {
+	n := 0
+	for i := range len(key) {
+		if key[i] == 0 {
+			n++
+			if n == 3 {
+				return key[:i+1], key[i+1:], true
+			}
+		}
+	}
+	return "", "", false
 }
 
 // refuse writes an error reply from the read loop.

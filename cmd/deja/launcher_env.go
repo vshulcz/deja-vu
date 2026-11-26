@@ -54,6 +54,7 @@ var launcherEnvSettings = map[string]bool{
 	"DEJA_NO_AUTO_INDEX":         true,
 	"DEJA_NO_SOURCE_HINTS":       true,
 	"DEJA_SEARCH_ONLY":           true,
+	"DEJA_VAULT_BACKEND":         true,
 }
 
 // launcherEnvLocation matches the DEJA_* variables that name a path: the index

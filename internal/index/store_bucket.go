@@ -14,9 +14,11 @@ import (
 	"sort"
 	"strings"
 	"sync/atomic"
+
+	"github.com/vshulcz/deja-vu/internal/vault"
 )
 
-func writeBucket(p string, data map[string][]posting) error {
+func writeBucketPlain(w io.Writer, data map[string][]posting) error {
 	toks := make([]string, 0, len(data))
 	for tok := range data {
 		toks = append(toks, tok)
@@ -40,13 +42,6 @@ func writeBucket(p string, data map[string][]posting) error {
 		entries = append(entries, bucketEntry{tok: tok, off: pos, n: uint32(len(b))}) //nolint:gosec // a token's postings are far below 4 GiB
 		pos += uint64(len(b))
 	}
-	tmp := p + ".tmp"
-	f, err := openIndexFileWrite(tmp, os.O_RDWR|os.O_CREATE|os.O_TRUNC)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = f.Close() }()
-	w := bufio.NewWriterSize(f, 1<<20)
 	if _, err := w.Write(bucketMagic); err != nil {
 		return err
 	}
@@ -60,7 +55,7 @@ func writeBucket(p string, data map[string][]posting) error {
 		if _, err := w.Write(scratch[:n]); err != nil {
 			return err
 		}
-		if _, err := w.WriteString(e.tok); err != nil {
+		if _, err := io.WriteString(w, e.tok); err != nil {
 			return err
 		}
 		n = binary.PutUvarint(scratch[:], uint64(e.n))
@@ -72,6 +67,57 @@ func writeBucket(p string, data map[string][]posting) error {
 		if _, err := w.Write(encoded[tok]); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func encodeBucketBytes(data map[string][]posting) []byte {
+	var buf bytes.Buffer
+	_ = writeBucketPlain(&buf, data)
+	return buf.Bytes()
+}
+
+func decodeBucketBytes(raw []byte) (map[string][]posting, error) {
+	entries, err := parseBucketDir(bufio.NewReader(bytes.NewReader(raw)), uint64(len(raw)))
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string][]posting, len(entries))
+	for _, e := range entries {
+		end := e.off + uint64(e.n)
+		if e.off > uint64(len(raw)) || end > uint64(len(raw)) {
+			return nil, fmt.Errorf("%w: truncated bucket posting block", errCorruptIndex)
+		}
+		posts, err := decodePostingBlock(raw[e.off:end])
+		if err != nil {
+			return nil, err
+		}
+		out[e.tok] = posts
+	}
+	return out, nil
+}
+
+func writeBucket(p string, data map[string][]posting) error {
+	dek, err := indexDEKForFile(p)
+	if err != nil {
+		return err
+	}
+	if len(dek) > 0 {
+		sealed, sErr := vault.SealBytes(dek, vault.DomainIndexFile, encodeBucketBytes(data))
+		if sErr != nil {
+			return sErr
+		}
+		return writeRawFileAtomic(p, sealed)
+	}
+	tmp := p + ".tmp"
+	f, err := openIndexFileWrite(tmp, os.O_RDWR|os.O_CREATE|os.O_TRUNC)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	w := bufio.NewWriterSize(f, 1<<20)
+	if err := writeBucketPlain(w, data); err != nil {
+		return err
 	}
 	if err := w.Flush(); err != nil {
 		return err
@@ -112,7 +158,7 @@ func readBucketFile(p string) (map[string][]posting, error) {
 
 // readBucketFileToken reads one token's postings from one postings file.
 func readBucketFileToken(p, tok string) ([]posting, error) {
-	f, err := openIndexFile(p)
+	f, err := openIndexBlobFile(p)
 	if err != nil {
 		return nil, err
 	}
@@ -136,8 +182,8 @@ func readBucketFileToken(p, tok string) ([]posting, error) {
 // pins the part-of-word step to the catalog's copy of them.
 var bucketDirReads atomic.Int64
 
-func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
-	f, err := openIndexFile(p)
+func openBucketDir(p string) ([]bucketEntry, *indexBlobFile, error) {
+	f, err := openIndexBlobFile(p)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -156,9 +202,26 @@ func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
 
 // readBucketDir parses the directory of the bucket file f, just opened, which
 // fi describes. f is left open.
-func readBucketDir(f *os.File, fi os.FileInfo) ([]bucketEntry, error) {
+func readBucketDir(f *indexBlobFile, fi os.FileInfo) ([]bucketEntry, error) {
 	bucketDirReads.Add(1)
-	r := bufio.NewReader(f)
+	var plainSize int64
+	switch {
+	case f.sealed:
+		plainSize = int64(len(f.plain))
+	case fi != nil:
+		plainSize = fi.Size()
+	default:
+		var err error
+		plainSize, err = f.PlainSize()
+		if err != nil {
+			return nil, err
+		}
+	}
+	r := bufio.NewReader(io.NewSectionReader(f, 0, plainSize))
+	return parseBucketDir(r, uint64(plainSize))
+}
+
+func parseBucketDir(r *bufio.Reader, fileSize uint64) ([]bucketEntry, error) {
 	magic := make([]byte, len(bucketMagic))
 	if _, err := io.ReadFull(r, magic); err != nil {
 		return nil, fmt.Errorf("%w: %w", errCorruptIndex, err)
@@ -179,7 +242,6 @@ func readBucketDir(f *os.File, fi os.FileInfo) ([]bucketEntry, error) {
 	// allocation could satisfy — and make() panics on that rather than
 	// failing. Every other corruption here is recoverable, so bound both
 	// against the file: no entry occupies fewer than two bytes.
-	fileSize := uint64(fi.Size()) //nolint:gosec // file sizes are non-negative
 	if count > fileSize/2 {
 		return nil, fmt.Errorf("%w: bucket directory claims %d entries in %d bytes", errCorruptIndex, count, fileSize)
 	}
@@ -374,6 +436,17 @@ func uvarintLen(v uint64) int {
 }
 
 func writeGob(p string, v any) error {
+	dek, err := indexDEKForFile(p)
+	if err != nil {
+		return err
+	}
+	if len(dek) > 0 {
+		var buf bytes.Buffer
+		if encErr := gob.NewEncoder(&buf).Encode(v); encErr != nil {
+			return encErr
+		}
+		return writeSealedIndexFile(p, buf.Bytes())
+	}
 	f, err := openIndexFileWrite(p, os.O_RDWR|os.O_CREATE|os.O_TRUNC)
 	if err != nil {
 		return err
@@ -392,6 +465,17 @@ func writeGobAtomic(p string, v any) error {
 // writeGobAtomicStat is writeGobAtomic that also returns the file it wrote as
 // stat saw it before the rename, which moves the name and not the file.
 func writeGobAtomicStat(p string, v any) (os.FileInfo, error) {
+	dek, err := indexDEKForFile(p)
+	if err != nil {
+		return nil, err
+	}
+	if len(dek) > 0 {
+		var buf bytes.Buffer
+		if encErr := gob.NewEncoder(&buf).Encode(v); encErr != nil {
+			return nil, encErr
+		}
+		return writeSealedAtomicStat(p, buf.Bytes())
+	}
 	tmp := p + ".tmp"
 	f, err := openIndexFileWrite(tmp, os.O_RDWR|os.O_CREATE|os.O_TRUNC)
 	if err != nil {
@@ -435,13 +519,12 @@ func writeGobAtomicStat(p string, v any) (os.FileInfo, error) {
 }
 
 func readGob(p string, v any) error {
-	f, err := openIndexFile(p)
+	data, err := readIndexBytes(p)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = f.Close() }()
-	if err := gob.NewDecoder(f).Decode(v); err != nil { //nolint:gosec,nolintlint // decodes the index's own files; G709's taint pass fires on some runs only
-		return fmt.Errorf("read %s: %w", filepath.Base(p), err)
+	if decErr := gob.NewDecoder(bytes.NewReader(data)).Decode(v); decErr != nil { //nolint:gosec,nolintlint // decodes the index's own files; G709's taint pass fires on some runs only
+		return fmt.Errorf("read %s: %w", filepath.Base(p), decErr)
 	}
 	return nil
 }
@@ -458,7 +541,7 @@ type bucketReader struct {
 	// dirs is each file's directory as first looked up, nil for a file that
 	// was not there.
 	dirs  map[string]*cachedBucketDir
-	files map[string]*os.File
+	files map[string]*indexBlobFile
 	// layers is each bucket's overlays as first looked up.
 	layers map[string][]string
 	posts  map[string][]posting
@@ -469,7 +552,7 @@ func newBucketReader(dir string) *bucketReader {
 	return &bucketReader{
 		dir:    dir,
 		dirs:   map[string]*cachedBucketDir{},
-		files:  map[string]*os.File{},
+		files:  map[string]*indexBlobFile{},
 		layers: map[string][]string{},
 		posts:  map[string][]posting{},
 		dead:   deadRecordsOf(dir),
@@ -564,14 +647,14 @@ func (b *bucketReader) hasToken(tok string) (bool, error) {
 	return false, nil
 }
 
-func (b *bucketReader) fileDir(p string) (*cachedBucketDir, *os.File, bool, error) {
+func (b *bucketReader) fileDir(p string) (*cachedBucketDir, *indexBlobFile, bool, error) {
 	d, seen := b.dirs[p]
-	var f *os.File
+	var f *indexBlobFile
 	closeFile := false
 	switch {
 	case !seen:
 		var err error
-		if f, err = openIndexFile(p); err != nil {
+		if f, err = openIndexBlobFile(p); err != nil {
 			if os.IsNotExist(err) {
 				b.dirs[p] = nil
 			}
@@ -608,15 +691,15 @@ func (b *bucketReader) filePostings(p, tok string) ([]posting, error) {
 		return nil, nil
 	}
 	if f == nil {
-		var err error
-		if f, err = openIndexFile(p); err != nil {
-			return nil, err
+		var oErr error
+		if f, oErr = openIndexBlobFile(p); oErr != nil {
+			return nil, oErr
 		}
 		defer func() { _ = f.Close() }()
 		// The directory for the file open now, which a swap since the first
 		// look may have replaced.
-		if d, err = bucketDirOf(p, f); err != nil {
-			return nil, err
+		if d, oErr = bucketDirOf(p, f); oErr != nil {
+			return nil, oErr
 		}
 		b.dirs[p] = d
 	}

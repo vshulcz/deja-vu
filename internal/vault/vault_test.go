@@ -191,9 +191,13 @@ func TestVaultInitLockUnlockNoPlaintextOnDisk(t *testing.T) {
 	if restErr != nil || string(restored) != "header "+canary {
 		t.Fatalf("restored records.bin = %q, err = %v", restored, restErr)
 	}
-	sidecar, sideErr := os.ReadFile(indexDir + ".dejavu")
-	if sideErr != nil || string(sidecar) != canary {
-		t.Fatalf("restored sidecar = %q, err = %v", sidecar, sideErr)
+	sidecarRaw, sideErr := os.ReadFile(indexDir + ".dejavu")
+	if sideErr != nil || !IsSealedBytes(sidecarRaw) || strings.Contains(string(sidecarRaw), canary) {
+		t.Fatalf("restored sidecar leaked plaintext: %q, err = %v", sidecarRaw, sideErr)
+	}
+	sidecar, sideReadErr := ReadSealedFile(indexDir, indexDir+".dejavu", DomainSidecar)
+	if sideReadErr != nil || string(sidecar) != canary {
+		t.Fatalf("ReadSealedFile sidecar = %q, err = %v", sidecar, sideReadErr)
 	}
 }
 

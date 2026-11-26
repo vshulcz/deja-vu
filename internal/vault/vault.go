@@ -189,6 +189,10 @@ func LoadConfig() (Config, error) {
 	if p == "" {
 		return Config{}, errors.New("cannot determine vault config path")
 	}
+	if cfg, ok := loadConfigCached(p); ok {
+		return cfg, nil
+	}
+	fi, statErr := os.Stat(p)
 	b, err := os.ReadFile(p)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -203,10 +207,14 @@ func LoadConfig() (Config, error) {
 	if cfg.Version != 1 || cfg.WrappedDEK == "" || cfg.Salt == "" || cfg.KeyID == "" {
 		return Config{}, errors.New("vault config incomplete (failing closed)")
 	}
+	if statErr == nil {
+		storeConfigCache(p, fi, cfg)
+	}
 	return cfg, nil
 }
 
 func saveConfig(cfg Config) error {
+	invalidateConfigCache()
 	p := ConfigPath()
 	if p == "" {
 		return errors.New("cannot determine vault config path")
@@ -218,7 +226,11 @@ func saveConfig(cfg Config) error {
 	if err != nil {
 		return err
 	}
-	return atomicfile.Write(p, append(b, '\n'), 0o600)
+	if err := atomicfile.Write(p, append(b, '\n'), 0o600); err != nil {
+		return err
+	}
+	invalidateConfigCache()
+	return nil
 }
 
 // CheckUnlocked verifies that the store is usable and returns the active 32-byte
@@ -232,6 +244,7 @@ func CheckUnlocked(indexDir string) ([]byte, error) {
 		return nil, err
 	}
 	if cfg.Locked {
+		ClearCache()
 		return nil, ErrLocked
 	}
 	dir := effectiveIndexDir(indexDir)
@@ -256,16 +269,13 @@ func resolveDEK(cfg Config) ([]byte, error) {
 		return dek, nil
 	}
 	if pass := os.Getenv(EnvVaultPassphrase); pass != "" {
-		dek, unwrapErr := unwrapDEK(cfg, pass)
+		dek, unwrapErr := unwrapDEKCached(cfg, pass)
 		if unwrapErr != nil {
 			return nil, unwrapErr
 		}
 		return dek, nil
 	}
-	if dek, err := activeKeyring.Get(cfg.KeyID); err == nil && len(dek) == 32 && keyIDMatches(dek, cfg.KeyID) {
-		return dek, nil
-	}
-	return nil, ErrKeyUnavailable
+	return keyringDEKCached(cfg)
 }
 
 func idleExpired(indexDir string, cfg Config) bool {
@@ -297,6 +307,7 @@ func idleExpired(indexDir string, cfg Config) bool {
 // keyringless host with no DEJA_VAULT_KEY/DEJA_VAULT_PASSPHRASE fails loudly
 // instead of reporting "locked" while leaving the plaintext index on disk.
 func autoLock(indexDir string, cfg Config) error {
+	ClearCache()
 	dir := effectiveIndexDir(indexDir)
 	if dir != "" && hasPlaintextStore(dir) {
 		dek, err := resolveDEK(cfg)
@@ -414,15 +425,15 @@ func unwrapDEK(cfg Config, passphrase string) ([]byte, error) {
 
 // SealLine encrypts plain under a domain-separated subkey and encodes it with NoteLinePrefix.
 func SealLine(dek []byte, domain string, plain []byte) (string, error) {
-	sub, err := deriveSubkey(dek, domain)
+	gcm, err := aeadFor(dek, domain)
 	if err != nil {
 		return "", err
 	}
-	defer clear(sub)
-	sealed, err := sealAEAD(sub, []byte(domain), plain)
-	if err != nil {
+	nonce := make([]byte, fileNonceSize)
+	if _, err := rand.Read(nonce); err != nil {
 		return "", err
 	}
+	sealed := gcm.Seal(nonce, nonce, plain, []byte(domain))
 	return NoteLinePrefix + base64.StdEncoding.EncodeToString(sealed), nil
 }
 
@@ -436,12 +447,15 @@ func OpenLine(dek []byte, domain, encoded string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	sub, err := deriveSubkey(dek, domain)
+	gcm, err := aeadFor(dek, domain)
 	if err != nil {
 		return nil, err
 	}
-	defer clear(sub)
-	return openAEAD(sub, []byte(domain), raw)
+	ns := gcm.NonceSize()
+	if len(raw) < ns {
+		return nil, errors.New("ciphertext truncated")
+	}
+	return gcm.Open(nil, raw[:ns], raw[ns:], []byte(domain))
 }
 
 // SealNoteLine encrypts a personal notes.jsonl record line.

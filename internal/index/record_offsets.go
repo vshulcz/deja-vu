@@ -229,7 +229,7 @@ var errNoRecordOffsets = errors.New("no record offsets")
 // recordOffsetsCover reads only the table's header and reports how much of
 // the open log f it covers, when it still fits f.
 func recordOffsetsCover(dir string, f *os.File) (int64, bool) {
-	tf, err := os.Open(filepath.Join(dir, recordOffsetsFile))
+	tf, err := openIndexBlobFile(filepath.Join(dir, recordOffsetsFile))
 	if err != nil {
 		return 0, false
 	}
@@ -253,7 +253,7 @@ func recordOffsetsCover(dir string, f *os.File) (int64, bool) {
 // log f. With keys it decodes only those keys' entries; with nil keys, all of
 // them.
 func readRecordOffsetsFor(dir string, f *os.File, keys map[string]bool) (recordOffsets, error) {
-	b, err := os.ReadFile(filepath.Join(dir, recordOffsetsFile))
+	b, err := readIndexBytes(filepath.Join(dir, recordOffsetsFile))
 	if err != nil {
 		return recordOffsets{}, errNoRecordOffsets
 	}
@@ -551,6 +551,9 @@ func recordInSpan(b []byte, rel int, t *recordTables, want, roles map[string]boo
 // readRecordAtInRoles reads the record at off, checking it belongs to a wanted
 // key, and decodes it when its role is wanted.
 func readRecordAtInRoles(f *os.File, off int64, t *recordTables, want, roles map[string]bool) (Record, bool, error) {
+	if err := t.ensureCipherForFile(f.Name()); err != nil {
+		return Record{}, false, err
+	}
 	buf := readAheadPool.Get().(*[]byte) //nolint:forcetypeassert // the pool holds only *[]byte
 	defer readAheadPool.Put(buf)
 	b := *buf
@@ -609,16 +612,7 @@ func readRecordAtInRoles(f *os.File, off int64, t *recordTables, want, roles map
 // writeFileAtomic writes b beside p and renames it over p. No fsync: the
 // table is a cache checked against the log, and a torn one is refused.
 func writeFileAtomic(p string, b []byte) error {
-	tmp := p + ".tmp"
-	if err := writeIndexFile(tmp, b); err != nil {
-		_ = os.Remove(tmp)
-		return err
-	}
-	if err := renameWaiting(tmp, p); err != nil {
-		_ = os.Remove(tmp)
-		return err
-	}
-	return nil
+	return writeSealedFileAtomic(p, b)
 }
 
 // passOffsets is the offset table of a log a pass writes from scratch,

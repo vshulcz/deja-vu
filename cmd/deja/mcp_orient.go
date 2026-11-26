@@ -728,7 +728,7 @@ func orientRecurringCommands(dir string, projects []string, activation string) [
 		failures := 0
 		var last time.Time
 		for proj, use := range cu.ByProject {
-			if !howProjectMatches(proj, projects) || !pol.Allows(activation, proj) {
+			if !howProjectMatches(proj, projects) || !policyAllowsProject(pol, activation, proj) {
 				continue
 			}
 			n += use.Sessions
@@ -972,7 +972,7 @@ func orientProjectFixes(dir string, projects []string, cwd, activation string) [
 			continue
 		}
 		proj := strings.TrimSpace(p.Project)
-		if proj == "" || !howProjectMatches(proj, projects) || !pol.Allows(activation, proj) {
+		if proj == "" || !howProjectMatches(proj, projects) || !policyAllowsProject(pol, activation, proj) {
 			continue
 		}
 		pairs = append(pairs, p)
