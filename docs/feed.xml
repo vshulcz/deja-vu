@@ -25,6 +25,13 @@
     <summary>Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
   </entry>
   <entry>
+    <title>Claude Code, Codex, Cursor and 50 more agents — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/harnesses.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/harnesses.html"></link>
+    <updated>2026-11-26T00:00:00Z</updated>
+    <summary>The fifty-three coding agents deja indexes today, where each stores its history, and how to add a new one.</summary>
+  </entry>
+  <entry>
     <title>deja-vu: local memory, session search &amp; handoff across 53 coding agents</title>
     <id>https://vshulcz.github.io/deja-vu/</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
@@ -51,13 +58,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/configuration.html"></link>
     <updated>2026-11-25T00:00:00Z</updated>
     <summary>Configure deja with ~/.config/deja/config.toml: precedence over wrappers, embed endpoints, periodic background embedding, chmod 600 checks, and doctor.</summary>
-  </entry>
-  <entry>
-    <title>Claude Code, Codex, Cursor and 50 more agents — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/harnesses.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/harnesses.html"></link>
-    <updated>2026-11-25T00:00:00Z</updated>
-    <summary>The fifty-three coding agents deja indexes today, where each stores its history, and how to add a new one.</summary>
   </entry>
   <entry>
     <title>Recover files overwritten by an AI agent — deja-vu</title>

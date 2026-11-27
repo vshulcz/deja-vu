@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -65,6 +66,49 @@ func TestCodeBuddyIDE4IndexPath(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := CodeBuddyIDE4IndexPath(tc.path, roots); got != tc.want {
 				t.Errorf("CodeBuddyIDE4IndexPath(%s) = %v, want %v", tc.path, got, tc.want)
+			}
+		})
+	}
+}
+
+// A conversion is told by the converter's marker beside where the transcript
+// was, so a transcript already deleted is still told, and nothing else that
+// shares the id is taken for one.
+func TestCodeBuddyIDE4ConversionTranscript(t *testing.T) {
+	tmp := t.TempDir()
+	cli := filepath.Join(tmp, "cli")
+	t.Setenv("DEJA_CODEBUDDY_ROOTS", cli)
+	const id = "a1b2c3d4e5f60718293a4b5c6d7e8f90"
+	mark := func(project, names string) {
+		t.Helper()
+		dir := filepath.Join(cli, project, id)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, codeBuddyIDE4Marker), []byte(`{"conversationId":"`+names+`"}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mark("converted", id)
+	mark("other", "f0e1d2c3b4a5968778695a4b3c2d1e0f")
+	if err := os.MkdirAll(filepath.Join(cli, "unmarked"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name string
+		path string
+		want bool
+	}{
+		{"the transcript the marker names, gone", filepath.Join(cli, "converted", id+".jsonl"), true},
+		{"a transcript with no marker", filepath.Join(cli, "unmarked", id+".jsonl"), false},
+		{"a marker that names another conversation", filepath.Join(cli, "other", id+".jsonl"), false},
+		{"outside the CLI roots", filepath.Join(tmp, "claude", "converted", id+".jsonl"), false},
+		{"a sub-agent transcript", filepath.Join(cli, "converted", id, "subagents", "agent-"+id+".jsonl"), false},
+		{"an id the store would not name a file by", filepath.Join(cli, "converted", "a b.jsonl"), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := CodeBuddyIDE4ConversionTranscript(tc.path); got != tc.want {
+				t.Errorf("CodeBuddyIDE4ConversionTranscript(%s) = %v, want %v", tc.path, got, tc.want)
 			}
 		})
 	}

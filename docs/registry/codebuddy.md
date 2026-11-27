@@ -185,7 +185,10 @@ it holds every turn the old one did and every turn after the upgrade — and the
 copy is read again, and the index drops what it held from the transcript. The
 5.x catalog database is not consulted, so a machine with only 4.x installed
 reads its whole history. A CodeBuddy Code session that shares an id with a 4.x
-conversation without the marker is a different conversation, and both are kept.
+conversation without the marker is a different conversation, and both are kept;
+deleted, it is kept like any other deleted transcript, as is a transcript of
+another agent that shares the id. Only a deleted transcript whose marker is
+still there hands the conversation back to the 4.x copy.
 A team member of a converted conversation goes into the lead's `subagents/`
 and is read from there. On a real store, every converted conversation reads the
 same user turns from the 4.x copy as from its transcript.

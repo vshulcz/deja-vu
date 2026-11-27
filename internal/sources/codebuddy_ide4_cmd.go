@@ -82,3 +82,20 @@ func CodeBuddyIDE4ConvertedTranscript(p string) string {
 	}
 	return codeBuddyIDE4ConvertedIDs()[id]
 }
+
+// CodeBuddyIDE4ConversionTranscript reports a CodeBuddy Code transcript the
+// 5.x IDE converted from a 4.x conversation: a main transcript
+// <project>/<id>.jsonl under one of the CLI roots whose sidecar directory
+// <id>/ holds the converter's marker naming the same conversation. It asks
+// the marker and not the transcript, so a transcript already deleted is
+// still told; a session that only shares the id has no marker.
+func CodeBuddyIDE4ConversionTranscript(p string) bool {
+	if !isCodeBuddySession(p) {
+		return false
+	}
+	id := strings.TrimSuffix(filepath.Base(p), ".jsonl")
+	if !codeBuddyIDE4SafeID(id) {
+		return false
+	}
+	return codeBuddyIDE4MarkerID(filepath.Join(filepath.Dir(p), id, codeBuddyIDE4Marker)) == id
+}

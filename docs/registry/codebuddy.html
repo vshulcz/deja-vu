@@ -231,7 +231,10 @@
 <p>copy is read again, and the index drops what it held from the transcript. The</p>
 <p>5.x catalog database is not consulted, so a machine with only 4.x installed</p>
 <p>reads its whole history. A CodeBuddy Code session that shares an id with a 4.x</p>
-<p>conversation without the marker is a different conversation, and both are kept.</p>
+<p>conversation without the marker is a different conversation, and both are kept;</p>
+<p>deleted, it is kept like any other deleted transcript, as is a transcript of</p>
+<p>another agent that shares the id. Only a deleted transcript whose marker is</p>
+<p>still there hands the conversation back to the 4.x copy.</p>
 <p>A team member of a converted conversation goes into the lead&#39;s <code>subagents/</code></p>
 <p>and is read from there. On a real store, every converted conversation reads the</p>
 <p>same user turns from the 4.x copy as from its transcript.</p>

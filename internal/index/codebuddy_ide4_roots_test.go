@@ -185,14 +185,26 @@ func TestCodeBuddyIDE4ConversionPairRoles(t *testing.T) {
 }
 
 // A deleted CodeBuddy transcript hands its conversation back to the 4.x index
-// with the same id only while that index is listed and not itself kept, and a
-// 4.x index that is not listed hands over to a listed copy of it.
+// with the same id only when the converter's marker names it as that
+// conversation's conversion and the index is listed and not itself kept, and
+// a 4.x index that is not listed hands over to a listed copy of it.
 func TestCodeBuddyIDE4ConversionWentAwayCases(t *testing.T) {
+	tmp := t.TempDir()
+	cli := filepath.Join(tmp, "cli")
+	t.Setenv("DEJA_CODEBUDDY_ROOTS", cli)
 	t.Setenv("DEJA_CODEBUDDY_LEGACY_ROOTS", filepath.Join("copy", "one-workspace"))
 	legacy := filepath.Join("data", "u1", "CodeBuddyIDE", "u1", "history", cb4WorkspaceID, cb4SessionID, "index.json")
 	twin := filepath.Join("data", "u1", "CodeBuddyIDE", "u1", "history", "fedcba9876543210fedcba9876543210", cb4SessionID, "index.json")
 	narrow := filepath.Join("copy", "one-workspace", cb4SessionID, "index.json")
-	jsonl := filepath.Join("cli", "work-p", cb4SessionID+".jsonl")
+	// The transcripts are gone; the converter's marker is what is left of a
+	// conversion, and the unmarked project never had one.
+	jsonl := filepath.Join(cli, "work-p", cb4SessionID+".jsonl")
+	cb4Write(t, filepath.Join(cli, "work-p", cb4SessionID, ".codebuddy-ide-4-conversion.json"),
+		`{"conversationId":"`+cb4SessionID+`"}`)
+	unmarked := filepath.Join(cli, "work-q", cb4SessionID+".jsonl")
+	cb4Write(t, filepath.Join(cli, "work-r", cb4SessionID, ".codebuddy-ide-4-conversion.json"), `{"conversationId":"another"}`)
+	misnamed := filepath.Join(cli, "work-r", cb4SessionID+".jsonl")
+	outside := filepath.Join(tmp, "claude", "-work-p", cb4SessionID+".jsonl")
 	listed := map[string]FileState{legacy: {Path: legacy}}
 	for _, tc := range []struct {
 		name  string
@@ -205,10 +217,13 @@ func TestCodeBuddyIDE4ConversionWentAwayCases(t *testing.T) {
 		{"transcript gone, 4.x listed under a workspace root", jsonl, map[string]FileState{narrow: {Path: narrow}}, true, false},
 		{"transcript gone, 4.x kept", jsonl, map[string]FileState{legacy: {Path: legacy, Kept: true}}, false, false},
 		{"transcript gone, no 4.x", jsonl, map[string]FileState{}, false, false},
-		{"another id's transcript gone", filepath.Join("cli", "work-p", "other.jsonl"), listed, false, false},
+		{"another id's transcript gone", filepath.Join(cli, "work-p", "other.jsonl"), listed, false, false},
+		{"a transcript with no marker gone", unmarked, listed, false, false},
+		{"a transcript whose marker names another conversation gone", misnamed, listed, false, false},
+		{"another agent's transcript with the id gone", outside, listed, false, false},
 		{"a 4.x copy gone, the other listed", twin, listed, false, true},
 		{"a 4.x copy gone, the other kept", twin, map[string]FileState{legacy: {Path: legacy, Kept: true}}, false, false},
-		{"not a transcript", filepath.Join("cli", "work-p", cb4SessionID+".json"), listed, false, false},
+		{"not a transcript", filepath.Join(cli, "work-p", cb4SessionID+".json"), listed, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			l := listedCodeBuddyIDE4(tc.files)

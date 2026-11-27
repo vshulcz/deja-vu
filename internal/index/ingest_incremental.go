@@ -378,17 +378,20 @@ func listedCodeBuddyIDE4(files map[string]FileState) *codeBuddyIDE4Listed {
 	return l
 }
 
-// conversionWentAway reports a CodeBuddy transcript that was deleted while a
-// 4.x conversation it shared an id with is still listed. The 4.x reader
-// yields to a converted transcript while it is readable, so a deleted
-// conversion hands the conversation back to the 4.x index.json. The old
-// manifest keeps the deleted JSONL's row and Copies; the walk's files name
-// the 4.x index that is still there. Keeping the deleted JSONL's records
-// would duplicate the turns the 4.x reader hands back (#2970 keeps a
-// transcript the client deleted; this is one storage generation yielding to
-// another, as a ZCode snapshot restored into the database).
+// conversionWentAway reports a deleted CodeBuddy Code transcript that the
+// 5.x IDE converted from a 4.x conversation still listed under the same id.
+// The 4.x reader yields to a converted transcript while it is readable, so a
+// deleted conversion hands the conversation back to the 4.x index.json, and
+// keeping the deleted transcript's records would hold its turns twice. Only
+// a transcript the converter's marker still names is that conversion
+// (sources.CodeBuddyIDE4ConversionTranscript), as attributeSession asks: any
+// other deleted transcript that shares the id — a CLI session of its own,
+// another agent's — is kept as #2970 keeps one, and so is a conversion
+// deleted together with its marker, which is how the IDE deletes a
+// conversation.
 func (l *codeBuddyIDE4Listed) conversionWentAway(p string) bool {
-	return filepath.Ext(p) == ".jsonl" && l.ids[strings.TrimSuffix(filepath.Base(p), ".jsonl")]
+	return filepath.Ext(p) == ".jsonl" && l.ids[strings.TrimSuffix(filepath.Base(p), ".jsonl")] &&
+		sources.CodeBuddyIDE4ConversionTranscript(p)
 }
 
 // copyListed reports a 4.x conversation index no longer listed while another

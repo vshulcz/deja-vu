@@ -609,7 +609,13 @@ func TestParseCodeBuddyIDE4EmptyUserQuery(t *testing.T) {
 // A folder no transcript names still gives the directory its name decodes to
 // on disk, the way the CLI encoded it.
 func TestCodeBuddyFolderCWDDecodesTheFolderName(t *testing.T) {
-	home := cb4Env(t)
+	// The resolved temp dir: Windows hands it out under its 8.3 name
+	// (RUNNER~1), which no directory listing carries, so the folder name
+	// never decodes back to it (#4455).
+	home, err := filepath.EvalSymlinks(cb4Env(t))
+	if err != nil {
+		t.Fatal(err)
+	}
 	work := filepath.Join(home, "workdir", "projx")
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		t.Fatal(err)
