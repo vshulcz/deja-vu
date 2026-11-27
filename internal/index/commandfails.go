@@ -464,9 +464,10 @@ func commandFailsFromIndex(dir string, prior *commandFailState, redo map[string]
 			st.Acc.output(r.Key, r.Text)
 		}
 		var end int64
-		if from == fi.Size() && len(redo) == 0 {
+		switch {
+		case from == fi.Size() && len(redo) == 0:
 			end = from
-		} else if from == fi.Size() && len(redo) > 0 {
+		case from == fi.Size():
 			// The state covers the whole log but the sessions in redo, which a
 			// rewriting pass names: read those alone, through the offset table
 			// where there is one, rather than walking the log (#5402).
@@ -484,7 +485,7 @@ func commandFailsFromIndex(dir string, prior *commandFailState, redo map[string]
 					st.Acc.stop(r.Key)
 				})
 			}
-		} else {
+		default:
 			end, err = eachCommandAndOutputFrom(path, m, from, 0, redo, take, st.Acc.stop)
 		}
 		if err != nil {

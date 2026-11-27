@@ -39,6 +39,13 @@ func sayRenamed(progress io.Writer, pairs map[string]string) {
 	}
 }
 
+func finishAppendRename(dir string, old Manifest, rename renamePlan, progress io.Writer) {
+	if len(rename.reprojected) > 0 && !old.SearchOnly {
+		reprojectFixes(dir, old.Sessions, rename.reprojected)
+	}
+	sayRenamed(progress, rename.pairs)
+}
+
 func harnessIn(reg []sources.Harness, p string) string {
 	if k, ok := kindIn(reg, p); ok {
 		return k.Name
@@ -177,8 +184,12 @@ func detectRenamedFiles(oldFiles, files map[string]FileState) map[string]string 
 
 func matchGrownRename(np string, nf FileState, ops []string, oldFiles map[string]FileState, taken map[string]bool) string {
 	var f *os.File
+	defer func() {
+		if f != nil {
+			_ = f.Close()
+		}
+	}()
 	var samples map[int64]uint64
-	opened := false
 	for _, op := range ops {
 		if taken[op] {
 			continue
@@ -187,14 +198,12 @@ func matchGrownRename(np string, nf FileState, ops []string, oldFiles map[string
 		if nf.Size <= of.Size || nf.SafeSize < of.SafeSize {
 			continue
 		}
-		if !opened {
-			opened = true
+		if f == nil {
 			var err error
 			f, err = os.Open(np)
 			if err != nil {
 				return ""
 			}
-			defer func() { _ = f.Close() }()
 			samples = map[int64]uint64{}
 		}
 		got, cached := samples[of.SafeSize]
@@ -215,10 +224,7 @@ func parseRenamedFiles(paths []string) map[string]map[string]model.Session {
 		return nil
 	}
 	parsed := make([]map[string]model.Session, len(paths))
-	workers := min(len(paths), runtime.GOMAXPROCS(0))
-	if workers < 1 {
-		workers = 1
-	}
+	workers := max(1, min(len(paths), runtime.GOMAXPROCS(0)))
 	if workers == 1 {
 		for i, np := range paths {
 			if ss, _ := parseAppendedFile("", np, FileState{}, true); len(ss) > 0 {

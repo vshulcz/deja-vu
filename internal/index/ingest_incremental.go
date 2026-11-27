@@ -133,7 +133,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	if len(changed) == 0 && len(removed) == 0 && !handover {
 		sayKept(progress, kept, unseen)
 		lastIngestFiles.Store(0)
-		err := writeQuietPass(dir, old, files, newlyKept, touched, dated, rename)
+		err = writeQuietPass(dir, old, files, newlyKept, touched, dated, rename)
 		if err == nil {
 			sayRenamed(progress, rename.pairs)
 		}
@@ -142,12 +142,9 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	takenFrom := sharedTakeovers(dir, harness, old, changed, files)
 	if len(removed) == 0 && !rewritten && !handover && !promptLogTakeover(changed, old.Files, old.Sessions) && takenFrom == nil {
 		if canAppendIncremental(changed, old.Files) {
-			err := appendPass(dir, harness, scope, old, files, changed, true, progress, kept, unseen, nil)
+			err = appendPass(dir, harness, scope, old, files, changed, true, progress, kept, unseen, nil)
 			if err == nil {
-				if len(rename.reprojected) > 0 && !old.SearchOnly {
-					reprojectFixes(dir, old.Sessions, rename.reprojected)
-				}
-				sayRenamed(progress, rename.pairs)
+				finishAppendRename(dir, old, rename, progress)
 			}
 			return err
 		}
@@ -159,10 +156,7 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 				if passErr := appendPass(dir, harness, scope, old, withoutRest(files, rest, old.Files), appendable, false, progress, kept, unseen, ready.appendFiles); passErr != nil {
 					return passErr
 				}
-				if len(rename.reprojected) > 0 && !old.SearchOnly {
-					reprojectFixes(dir, old.Sessions, rename.reprojected)
-				}
-				sayRenamed(progress, rename.pairs)
+				finishAppendRename(dir, old, rename, progress)
 				return updateIndexPass(dir, harness, scope, withoutDeferred(walked, ready.appendFiles, old.Files), false, false, progress, ready)
 			}
 			readAhead = ready.restFiles

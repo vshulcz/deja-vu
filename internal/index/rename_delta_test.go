@@ -222,7 +222,7 @@ func TestRenamedFilenameKeyedTranscriptMatchesColdRebuild(t *testing.T) {
 	}
 	oldID := beforeMetas[0].ID
 
-	if err := os.Rename(oldPath, newPath); err != nil {
+	if err = os.Rename(oldPath, newPath); err != nil {
 		t.Fatal(err)
 	}
 	indexPass(t, dir)

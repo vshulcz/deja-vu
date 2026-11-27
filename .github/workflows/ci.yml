@@ -325,12 +325,12 @@ jobs:
           # And every class is present. A wall-clock comparison stood here and
           # failed on the runner while the local margin was five-fold — which
           # is the lesson above, applied to this step rather than quoted by it.
-          # What the gate can hold on a shared machine is the shape: the five
+          # What the gate can hold on a shared machine is the shape: the six
           # classes exist, and none of them rewrites.
           printf '%s\n' "$report" | jq -e '
             [.classes[].name] | sort == [
-              "appended turn", "new transcript", "renamed transcript",
-              "rewritten transcript", "unchanged"]'
+              "appended turn", "new transcript", "renamed directory",
+              "renamed transcript", "rewritten transcript", "unchanged"]'
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: runner.os == 'Linux'
         with:
