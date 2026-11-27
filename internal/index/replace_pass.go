@@ -55,6 +55,7 @@ type replacePass struct {
 	compactedKeys       map[string]bool
 	unreadMsgs          map[string][]model.Message
 	keptOwner, keptCopy map[string]string
+	reprojected         map[string]bool
 }
 
 // run reads the changed files and the copies beside them, then writes the index.
@@ -942,6 +943,9 @@ func (rp *replacePass) commit() error {
 	// as a full build would not write it (#4441).
 	fixSessions, fixKeys := fixSessionsForPass(rp.tmp, rp.old, rp.m, rp.replacements, rp.replaceKeys)
 	mergeFixes(rp.dir, rp.tmp, sessionKeys(rp.m), fixSessions, fixKeys)
+	if len(rp.reprojected) > 0 && !rp.m.SearchOnly {
+		reprojectFixes(rp.tmp, rp.m.Sessions, rp.reprojected)
+	}
 	// The sessions this pass changed, and those whose row moved to another
 	// copy; the rest are carried as they were.
 	changedKeys := maps.Clone(rp.dropped)

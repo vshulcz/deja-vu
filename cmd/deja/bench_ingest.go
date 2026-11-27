@@ -25,9 +25,10 @@ import (
 // conversation survived two months and twenty releases before a contributor
 // measured it (#3500).
 //
-// Five classes, because they are the five things that happen to a store:
+// Six classes, because they are the six things that happen to a store:
 // nothing changed, a turn was appended to a transcript, a transcript appeared,
-// a transcript changed its name, a transcript was rewritten. None of them
+// a transcript changed its name, a project directory changed its name, a
+// transcript was rewritten. None of them
 // may rewrite `records.bin`: a rewritten transcript's records are appended and
 // the old ones listed as dead (#5387), and cleared where they stand (#5429). That is the property the cost rests on,
 // and it is reported per class rather than assumed, since wall time on a
@@ -126,6 +127,13 @@ func measureIngest(seed int64) (ingestReport, error) {
 	if len(sessions) > 1 {
 		renameTarget = filepath.Join(claudeRoot, sessions[1].Project, sessions[1].ID+".jsonl")
 	}
+	dirProject := target.Project
+	for _, s := range sessions {
+		if s.Project != target.Project {
+			dirProject = s.Project
+			break
+		}
+	}
 
 	report := ingestReport{CorpusHash: corpus.Hash, Seed: seed, Sessions: len(store)}
 	for _, class := range []struct {
@@ -149,7 +157,15 @@ func measureIngest(seed int64) (ingestReport, error) {
 		// under a new name used to cost a second copy of the whole log (#3546),
 		// and the only place that shows is the size of the store.
 		{"renamed transcript", func() error {
-			return os.Rename(renameTarget, renameTarget+".renamed")
+			return os.Rename(renameTarget, strings.TrimSuffix(renameTarget, ".jsonl")+"-renamed.jsonl")
+		}},
+		{"renamed directory", func() error {
+			src := filepath.Join(claudeRoot, dirProject)
+			dst := filepath.Join(claudeRoot, dirProject+"-renamed")
+			if dirProject == target.Project {
+				existing = filepath.Join(dst, target.ID+".jsonl")
+			}
+			return os.Rename(src, dst)
 		}},
 		{"rewritten transcript", func() error {
 			return os.WriteFile(existing, []byte(""), 0o600)

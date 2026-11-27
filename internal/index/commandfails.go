@@ -464,7 +464,10 @@ func commandFailsFromIndex(dir string, prior *commandFailState, redo map[string]
 			st.Acc.output(r.Key, r.Text)
 		}
 		var end int64
-		if from == fi.Size() && len(redo) > 0 {
+		switch {
+		case from == fi.Size() && len(redo) == 0:
+			end = from
+		case from == fi.Size():
 			// The state covers the whole log but the sessions in redo, which a
 			// rewriting pass names: read those alone, through the offset table
 			// where there is one, rather than walking the log (#5402).
@@ -482,7 +485,7 @@ func commandFailsFromIndex(dir string, prior *commandFailState, redo map[string]
 					st.Acc.stop(r.Key)
 				})
 			}
-		} else {
+		default:
 			end, err = eachCommandAndOutputFrom(path, m, from, 0, redo, take, st.Acc.stop)
 		}
 		if err != nil {
@@ -504,6 +507,37 @@ func commandFailsFromIndex(dir string, prior *commandFailState, redo map[string]
 		return nil
 	})
 	return out, st, err
+}
+
+// reprojectCommandFails updates commandfails.bin from the carried state and
+// updated session projects without opening records.bin when the state already
+// covers the full log.
+func reprojectCommandFails(dir string, m Manifest) {
+	fi, err := os.Stat(filepath.Join(dir, "records.bin"))
+	if err != nil {
+		buildCommandFailsFromIndex(dir, nil, nil)
+		return
+	}
+	st := readCommandFailState(dir)
+	if st == nil || st.Generation != m.Generation || st.Size != fi.Size() {
+		buildCommandFailsFromIndex(dir, st, nil)
+		return
+	}
+	project := func(key string) (string, bool) {
+		meta, ok := m.Sessions[key]
+		return meta.Project, ok
+	}
+	dirtyState := false
+	for key, s := range st.Acc.Sessions {
+		if _, ok := project(key); !ok || (len(s.Fails) == 0 && s.Pending == "") {
+			delete(st.Acc.Sessions, key)
+			dirtyState = true
+		}
+	}
+	writeCommandFails(dir, st.Acc.table(project))
+	if dirtyState {
+		_ = writeGobAtomic(commandFailStatePath(dir), st)
+	}
 }
 
 // commandFailRecordsSeen counts the records the walk looked at, read or

@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -761,6 +762,9 @@ func preRedactSessions(m *Manifest, ss []model.Session) {
 // cost does not depend on how long the session has been running.
 const prefixSampleWindow = 512 << 10
 
+// renamePrefixReads counts disk prefix-sample reads performed by detectRenamedFiles.
+var renamePrefixReads atomic.Int64
+
 // filePrefixSample fingerprints the first n bytes by reading at most two
 // windows of them: the head and the bytes ending at n. n is mixed in, so a
 // file that grew and one that was rewritten to the same content at a
@@ -774,20 +778,24 @@ func filePrefixSample(path string, n int64) uint64 {
 		return 0
 	}
 	defer func() { _ = f.Close() }()
+	return filePrefixSampleFrom(f, n)
+}
+
+func filePrefixSampleFrom(r io.ReaderAt, n int64) uint64 {
+	if r == nil || n <= 0 {
+		return 0
+	}
 	h := fnv.New64a()
 	var b [8]byte
 	binary.LittleEndian.PutUint64(b[:], uint64(n))
 	_, _ = h.Write(b[:])
 	head := min(n, prefixSampleWindow)
-	if _, err := io.Copy(h, io.LimitReader(f, head)); err != nil {
+	if _, err := io.Copy(h, io.NewSectionReader(r, 0, head)); err != nil {
 		return 0
 	}
 	if n > head {
 		start := max(head, n-prefixSampleWindow)
-		if _, err := f.Seek(start, io.SeekStart); err != nil {
-			return 0
-		}
-		if _, err := io.Copy(h, io.LimitReader(f, n-start)); err != nil {
+		if _, err := io.Copy(h, io.NewSectionReader(r, start, n-start)); err != nil {
 			return 0
 		}
 	}

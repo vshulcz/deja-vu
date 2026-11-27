@@ -272,20 +272,24 @@ func buildCommandTables(dir, tmp string, m Manifest, priorDead int, redo map[str
 		}
 		return nil
 	}
+	stateChanged := len(redo) > 0
 	if st != nil {
 		for key := range redo {
 			delete(st.Sessions, key)
 			delete(facts, key)
 		}
-		want := func(key string) bool { return redo[key] }
-		ok, err := eachStoredRecordOfKeys(tmp, size, t, redo, want, map[string]bool{roleCommand: true}, func(off int64, payload []byte) error {
-			return take(off, payload, want)
-		}, func(string, []int64) {})
-		if err != nil || !ok {
-			st = nil
+		if len(redo) > 0 {
+			want := func(key string) bool { return redo[key] }
+			ok, err := eachStoredRecordOfKeys(tmp, size, t, redo, want, map[string]bool{roleCommand: true}, func(off int64, payload []byte) error {
+				return take(off, payload, want)
+			}, func(string, []int64) {})
+			if err != nil || !ok {
+				st = nil
+			}
 		}
 	}
 	if st == nil {
+		stateChanged = true
 		st, facts, msgs = newCommandsState(), map[string]SessionFact{}, map[string][]model.Message{}
 		f, err := openIndexFile(log)
 		if err != nil {
@@ -300,9 +304,11 @@ func buildCommandTables(dir, tmp string, m Manifest, priorDead int, redo map[str
 			return
 		}
 	}
+	factsChanged := len(redo) > 0 || stateChanged
 	for key := range facts {
 		if _, ok := m.Sessions[key]; !ok {
 			delete(facts, key)
+			factsChanged = true
 		}
 	}
 	for key, ms := range msgs {
@@ -314,6 +320,13 @@ func buildCommandTables(dir, tmp string, m Manifest, priorDead int, redo map[str
 		sort.SliceStable(ms, func(i, j int) bool { return ms[i].Time.Before(ms[j].Time) })
 		if f, ok := sessionFactOf(ms); ok {
 			facts[key] = f
+			factsChanged = true
+		}
+	}
+	for key := range st.Sessions {
+		if _, ok := m.Sessions[key]; !ok {
+			delete(st.Sessions, key)
+			stateChanged = true
 		}
 	}
 	if out := st.table(m); len(out) == 0 {
@@ -323,12 +336,16 @@ func buildCommandTables(dir, tmp string, m Manifest, priorDead int, redo map[str
 	}
 	if len(facts) == 0 {
 		_ = os.Remove(sessionFactsPath(tmp))
-	} else {
+	} else if factsChanged || dir != tmp {
+		_ = writeGobAtomic(sessionFactsPath(tmp), facts)
+	} else if _, err := os.Stat(sessionFactsPath(tmp)); err != nil {
 		_ = writeGobAtomic(sessionFactsPath(tmp), facts)
 	}
-	st.Generation, st.Size, st.Dead = m.Generation, size, len(m.DeadRecords)
-	st.Facts = factsStamp(tmp)
-	_ = writeCommandsStateFile(tmp, st)
+	if stateChanged || factsChanged || len(facts) == 0 || dir != tmp || st.Generation != m.Generation || st.Size != size || st.Dead != len(m.DeadRecords) {
+		st.Generation, st.Size, st.Dead = m.Generation, size, len(m.DeadRecords)
+		st.Facts = factsStamp(tmp)
+		_ = writeCommandsStateFile(tmp, st)
+	}
 }
 
 // carriedCommandsState is the state and the session facts dir's index left,
