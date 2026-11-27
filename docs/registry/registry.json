@@ -1473,7 +1473,7 @@
         "fixtures/registry/crush/crush.sql"
       ],
       "parser_source": "internal/sources/crush.go",
-      "last_verified": "2026-09-07",
+      "last_verified": "2026-11-27",
       "display_name": "Crush",
       "capabilities": {
         "mcp": true,
