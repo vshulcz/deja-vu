@@ -94,8 +94,11 @@
 <ul>
 <li><strong>Command</strong>: <code>~/.config/crush/commands/deja.md</code>, which Crush lists as</li>
 </ul>
-<p><code>/user:deja</code>. The palette is a TUI surface, so the entry is written but its</p>
-<p>expansion is unverified here.</p>
+<p><code>/user:deja</code>. Verified on v0.103.0: Crush scans named arguments with</p>
+<p><code>\$([A-Z][A-Z0-9_]*)</code> and opens a &#34;Custom Command Arguments&#34; TUI dialog</p>
+<p>prompting for <code>Arguments*</code>. On confirm, Crush substitutes <code>$ARGUMENTS</code> into</p>
+<p>the command body and sends the expanded markdown to the model as a user</p>
+<p>message, recorded in <code>crush.db</code> as a single <code>text</code> part in <code>messages.parts</code>.</p>
 <ul>
 <li><strong>Auto-recall</strong>: <code>deja install crush-auto</code> adds a <code>PreToolUse</code> hook —</li>
 </ul>
@@ -127,7 +130,7 @@
 <p>that answers adds 269 bytes to the turn that asked. With the binary moved aside</p>
 <p>and the wiring left in place, the turn still completed: 28 tools instead of 29,</p>
 <p>the hook&#39;s failure logged and ignored, the tool call through.</p>
-<p><strong>Last verified:</strong> 2026-09-07</p>
+<p><strong>Last verified:</strong> 2026-11-27</p>
 
 <hr>
 <p>deja reads this format and 52 others, and turns what it finds into memory your

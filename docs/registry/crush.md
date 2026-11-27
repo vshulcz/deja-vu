@@ -54,8 +54,11 @@ endpoint: the store landed beside the project, the registry gained its path and
   prompt's `<available_skills>` block and in `crush_info` as `deja-history =
   user`.
 - **Command**: `~/.config/crush/commands/deja.md`, which Crush lists as
-  `/user:deja`. The palette is a TUI surface, so the entry is written but its
-  expansion is unverified here.
+  `/user:deja`. Verified on v0.103.0: Crush scans named arguments with
+  `\$([A-Z][A-Z0-9_]*)` and opens a "Custom Command Arguments" TUI dialog
+  prompting for `Arguments*`. On confirm, Crush substitutes `$ARGUMENTS` into
+  the command body and sends the expanded markdown to the model as a user
+  message, recorded in `crush.db` as a single `text` part in `messages.parts`.
 - **Auto-recall**: `deja install crush-auto` adds a `PreToolUse` hook —
   `deja hook-tool --crush`, matcher `^(bash|edit|write|multiedit)$`. `PreToolUse`
   is the only event Crush fires, so that one hook carries the rest: the
@@ -83,4 +86,4 @@ that answers adds 269 bytes to the turn that asked. With the binary moved aside
 and the wiring left in place, the turn still completed: 28 tools instead of 29,
 the hook's failure logged and ignored, the tool call through.
 
-**Last verified:** 2026-09-07
+**Last verified:** 2026-11-27
