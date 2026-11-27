@@ -87,9 +87,9 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// owner where a rebuild hands it to a copy. A rename that keeps the order
 	// changes nothing a rebuild would, and reading the session again sent it
 	// down the replacing path: 20 s for 20 renames at 40,000 sessions (#5466).
-	var regather []string
+	var rename renamePlan
 	if err == nil && !force {
-		regather = followRenames(dir, &old, files, progress)
+		rename = planRenames(&old, files)
 	}
 	// The format is checked beside the version because the two answer different
 	// questions: a store whose content rules are stale still reads, a store
@@ -129,16 +129,27 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 	// moved; a live transcript growing beside an unrelated deletion still
 	// appends.
 	sharedBy := keysByFile(old.Sessions)
-	handover := handsOver(changed, files, old.Files, newlyKept, sharedBy, regather)
+	handover := handsOver(changed, files, old.Files, newlyKept, sharedBy, rename.regather)
 	if len(changed) == 0 && len(removed) == 0 && !handover {
 		sayKept(progress, kept, unseen)
 		lastIngestFiles.Store(0)
-		return writeQuietPass(dir, old, files, newlyKept, touched, dated)
+		err := writeQuietPass(dir, old, files, newlyKept, touched, dated, rename)
+		if err == nil {
+			sayRenamed(progress, rename.pairs)
+		}
+		return err
 	}
 	takenFrom := sharedTakeovers(dir, harness, old, changed, files)
 	if len(removed) == 0 && !rewritten && !handover && !promptLogTakeover(changed, old.Files, old.Sessions) && takenFrom == nil {
 		if canAppendIncremental(changed, old.Files) {
-			return appendPass(dir, harness, scope, old, files, changed, true, progress, kept, unseen, nil)
+			err := appendPass(dir, harness, scope, old, files, changed, true, progress, kept, unseen, nil)
+			if err == nil {
+				if len(rename.reprojected) > 0 && !old.SearchOnly {
+					reprojectFixes(dir, old.Sessions, rename.reprojected)
+				}
+				sayRenamed(progress, rename.pairs)
+			}
+			return err
 		}
 		// Decided per file: the appendable ones are appended, and the pass
 		// after it, over the same walk, replaces only the rest (#5324).
@@ -148,48 +159,23 @@ func updateIndexPass(dir, harness, scope string, files map[string]FileState, for
 				if passErr := appendPass(dir, harness, scope, old, withoutRest(files, rest, old.Files), appendable, false, progress, kept, unseen, ready.appendFiles); passErr != nil {
 					return passErr
 				}
+				if len(rename.reprojected) > 0 && !old.SearchOnly {
+					reprojectFixes(dir, old.Sessions, rename.reprojected)
+				}
+				sayRenamed(progress, rename.pairs)
 				return updateIndexPass(dir, harness, scope, withoutDeferred(walked, ready.appendFiles, old.Files), false, false, progress, ready)
 			}
 			readAhead = ready.restFiles
 		}
 	}
 	rp := &replacePass{dir: dir, harness: harness, scope: scope, progress: progress, old: old, files: files, changed: changed,
-		removed: removed, kept: kept, unseen: unseen, newlyKept: newlyKept, sharedBy: sharedBy, readAhead: readAhead}
-	return rp.run(takenFrom)
-}
-
-// followRenames points the index at transcripts that moved under a new name,
-// and returns the renamed files that have to be read again with their copies.
-func followRenames(dir string, old *Manifest, files map[string]FileState, progress io.Writer) []string {
-	var regather []string
-	if pairs := detectRenamedFiles(old.Files, files); len(pairs) > 0 {
-		reprojected := applyRenamedFiles(old, pairs)
-		heldBy := keysByFile(old.Sessions)
-		for np := range pairs {
-			for _, key := range heldBy[np] {
-				if renameReorders(sessionFiles(old.Sessions[key]), pairs) {
-					regather = append(regather, np)
-					break
-				}
-			}
-		}
-		// Failing to record it costs the duplicate this exists to avoid,
-		// not correctness: the pass below then treats the file as new.
-		// A rename read again is recorded by the pass that reads it, which
-		// writes the manifest anyway; one that fails leaves the rename to
-		// be found again.
-		var werr error
-		if len(regather) == 0 || len(reprojected) > 0 {
-			werr = writeManifestMeta(dir, *old)
-		}
-		if werr == nil && len(reprojected) > 0 {
-			reprojectSidecars(dir, old.Sessions, reprojected)
-		}
-		if werr == nil && progress != nil {
-			fmt.Fprintf(progress, "deja: %d transcript%s renamed — the index followed the new name\n", len(pairs), pluralS(len(pairs)))
-		}
+		removed: removed, kept: kept, unseen: unseen, newlyKept: newlyKept, sharedBy: sharedBy, readAhead: readAhead,
+		reprojected: rename.reprojected}
+	err = rp.run(takenFrom)
+	if err == nil {
+		sayRenamed(progress, rename.pairs)
 	}
-	return regather
+	return err
 }
 
 // sayFullPass says why a pass reads every source again.
@@ -440,15 +426,10 @@ func handsOver(changed, files, oldFiles map[string]FileState, newlyKept map[stri
 }
 
 // writeQuietPass records what a pass with nothing to read still has to.
-func writeQuietPass(dir string, old Manifest, files map[string]FileState, newlyKept, touched map[string]bool, dated bool) error {
-	if !old.SearchOnly {
-		if _, ok := readFixRaw(dir); !ok {
-			remineFixes(dir)
-		}
-	}
-	// Nothing to read, but the kept mark has to land, or the next run
+func writeQuietPass(dir string, old Manifest, files map[string]FileState, newlyKept, touched map[string]bool, dated bool, rename renamePlan) error {
+	// Nothing to read, but the kept mark or rename has to land, or the next run
 	// takes the same file for a fresh deletion.
-	if len(newlyKept) > 0 || !dated || len(touched) > 0 || !unreadableCurrent(old, files) {
+	if len(rename.pairs) > 0 || len(newlyKept) > 0 || !dated || len(touched) > 0 || !unreadableCurrent(old, files) {
 		for p := range newlyKept {
 			old.Files[p] = files[p]
 		}
@@ -458,7 +439,21 @@ func writeQuietPass(dir string, old Manifest, files map[string]FileState, newlyK
 		if !unreadableCurrent(old, files) {
 			mergeIngestDiag(&old)
 		}
-		return writeManifestOnly(dir, old)
+		if len(rename.pairs) > 0 {
+			if err := writeManifestMeta(dir, old); err != nil {
+				return err
+			}
+		} else if err := writeManifestOnly(dir, old); err != nil {
+			return err
+		}
+	}
+	if !old.SearchOnly {
+		if _, ok := readFixRaw(dir); !ok {
+			remineFixes(dir)
+		}
+	}
+	if len(rename.reprojected) > 0 {
+		reprojectSidecars(dir, old, rename.reprojected)
 	}
 	return nil
 }

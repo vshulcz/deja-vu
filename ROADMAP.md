@@ -5,7 +5,7 @@ Engineering direction rather than release commitments; shipped work moves to `CH
 ## Now
 
 - **Answer-bearing blocks at every seam.** Judge session-start, per-prompt, and tool hooks by whether injected context carries settled conclusions rather than keyword overlap, gated by the prompt/block suites and LongMemEval-S.
-- **Sub-second incremental indexing on 50k+ session stores.** Rewritten JSONL transcripts and multi-session SQLite stores already update in proportion to the delta; extend delta-proportional updates to file renames.
+- **Sub-second incremental indexing on 50k+ session stores.** Rewritten JSONL transcripts, multi-session SQLite stores, and file or directory renames update in proportion to the delta; keep incremental passes independent of total corpus size as harness formats grow.
 - **Cross-platform parity.** Keep path handling, store relocation, rebuild exclusions, and hook launchers hermetic across macOS, Linux, and Windows.
 - **Supply-chain and privacy guarantees.** Maintain index-time redaction, trust policy (`policy.json`), signed checksums, build provenance, and release SBOMs as harness formats evolve.
 

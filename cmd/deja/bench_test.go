@@ -412,8 +412,8 @@ func TestBenchIngestNoUpdateRewritesTheStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(report.Classes) != 5 {
-		t.Fatalf("measured %d update classes, want the five a store sees: %#v", len(report.Classes), report.Classes)
+	if len(report.Classes) != 6 {
+		t.Fatalf("measured %d update classes, want the six a store sees: %#v", len(report.Classes), report.Classes)
 	}
 	for _, c := range report.Classes {
 		if c.Rewritten {
@@ -441,6 +441,13 @@ func TestBenchIngestNoUpdateRewritesTheStore(t *testing.T) {
 	}
 	if renamed.AddedKB != 0 {
 		t.Errorf("a rename added %.2f KB of records, so the file was read again", renamed.AddedKB)
+	}
+	renamedDir := report.Classes[4]
+	if renamedDir.Name != "renamed directory" {
+		t.Fatalf("class 4 is %q, want the directory rename", renamedDir.Name)
+	}
+	if renamedDir.AddedKB != 0 {
+		t.Errorf("a directory rename added %.2f KB of records, so files were read again", renamedDir.AddedKB)
 	}
 }
 

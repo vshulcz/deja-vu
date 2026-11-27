@@ -643,12 +643,18 @@ func walkFileState(p string, fi os.FileInfo) FileState {
 // transcript on the machine (#5386).
 func walkFileStateIn(reg []sources.Harness, p string, fi os.FileInfo, old map[string]FileState) FileState {
 	fs := FileState{Path: p, Size: fi.Size(), MTime: fi.ModTime().UnixNano()}
-	if strings.HasSuffix(p, ".jsonl") {
+	k, ok := kindIn(reg, p)
+	isJSONL := strings.HasSuffix(p, ".jsonl")
+	// Regular non-DB transcripts also get a prefix sample so directory/file
+	// renames update in place, while growth resume stays limited to appendable
+	// kinds.
+	regularTranscript := !isJSONL && ok && !k.IsDBBacked() && !hasSQLiteExt(p) && storeHarness(p) == "" && k.Name != "opencode-diff" && fs.Size > 0
+	if isJSONL || regularTranscript {
 		// Deriving these means reading the file: the tail for the last
 		// complete line, the head for the prefix hash. When size and
 		// mtime are unchanged the bytes are too, and on a large store
 		// this is the difference between a stat and 650 ms of reading.
-		if of, ok := old[p]; ok && of.Size == fs.Size && of.MTime == fs.MTime {
+		if of, cached := old[p]; cached && of.Size == fs.Size && of.MTime == fs.MTime {
 			fs.SafeSize, fs.PrefixHash = of.SafeSize, of.PrefixHash
 			fs.PrefixSample = of.PrefixSample
 			fs.WrittenBack = of.WrittenBack
@@ -661,7 +667,10 @@ func walkFileStateIn(reg []sources.Harness, p string, fi os.FileInfo, old map[st
 				sample uint64
 			}
 			e, err := sources.Watch(p, func() (ends, error) {
-				safe := lastCompleteLineOffset(p, fi.Size())
+				safe := fs.Size
+				if isJSONL {
+					safe = lastCompleteLineOffset(p, fs.Size)
+				}
 				return ends{safe, filePrefixSample(p, safe)}, nil
 			})
 			if err != nil {
@@ -673,7 +682,6 @@ func walkFileStateIn(reg []sources.Harness, p string, fi os.FileInfo, old map[st
 			fs.SafeSize, fs.PrefixSample = e.safe, e.sample
 		}
 	}
-	k, ok := kindIn(reg, p)
 	if ok && k.Sidecar != nil {
 		fs.MetadataSize, fs.MetadataMTime = k.Sidecar(p)
 	}
