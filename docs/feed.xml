@@ -6,7 +6,7 @@
   <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
   <link rel="self" type="application/atom+xml" href="https://vshulcz.github.io/deja-vu/feed.xml"></link>
   <link rel="hub" href="https://pubsubhubbub.appspot.com/"></link>
-  <updated>2026-11-26T00:00:00Z</updated>
+  <updated>2026-11-27T00:00:00Z</updated>
   <author>
     <name>vshulcz</name>
   </author>
@@ -14,8 +14,15 @@
     <title>Compare Claude Code, Codex and Cursor memory — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/compare.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/compare.html"></link>
-    <updated>2026-11-26T00:00:00Z</updated>
+    <updated>2026-11-27T00:00:00Z</updated>
     <summary>Compare deja-vu (97.2% R@5 LongMemEval-S, 53 agents) against claude-mem, MemPalace, agentmemory, Mem0, Letta, MCP Memory, CASS, ctx, and agentsview.</summary>
+  </entry>
+  <entry>
+    <title>deja CLI reference: search, recall, blame, stats — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/commands.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/commands.html"></link>
+    <updated>2026-11-26T00:00:00Z</updated>
+    <summary>Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
   </entry>
   <entry>
     <title>deja-vu: local memory, session search &amp; handoff across 53 coding agents</title>
@@ -37,13 +44,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html"></link>
     <updated>2026-11-25T00:00:00Z</updated>
     <summary>No API key or daemon: deja-vu (97.2% R@5 LongMemEval-S) indexes Claude Code, Codex, Cursor, opencode and 49 other agents via hooks and MCP.</summary>
-  </entry>
-  <entry>
-    <title>deja CLI reference: search, recall, blame, stats — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/commands.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/commands.html"></link>
-    <updated>2026-11-25T00:00:00Z</updated>
-    <summary>Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
   </entry>
   <entry>
     <title>Configuration: config.toml &amp; embed — deja-vu</title>
