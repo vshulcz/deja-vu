@@ -374,14 +374,15 @@ var kimiHooks = []struct {
 	event, matcher string
 	args           []string
 }{
+	{"SessionStart", "", []string{"hook-context", "--kimi"}},
 	{"UserPromptSubmit", "", []string{"hook-context", "--plain", "--once"}},
 	{"UserPromptSubmit", "", []string{"hook-prompt", "--plain"}},
 	{"PreCompact", "", []string{"hook-precompact", "--harness", "kimi"}},
 	{"SessionEnd", "", []string{"hook-session-end"}},
 	{"Stop", "", []string{"hook-session-end"}},
 	{"PreToolUse", "^mcp__deja__", []string{"hook-mcp-call"}},
-	{"PostToolUse", "Bash", []string{"hook-tool-after", "--defer"}},
-	{"PostToolUseFailure", "Bash", []string{"hook-tool-after", "--defer"}},
+	{"PostToolUse", "^(Edit|Write|Bash)$", []string{"hook-tool-after", "--kimi"}},
+	{"PostToolUseFailure", "Bash", []string{"hook-tool-after", "--kimi"}},
 	{"PreToolUse", "^(Edit|Write)$", []string{"hook-tool", "--defer"}},
 }
 
@@ -429,12 +430,15 @@ func removeUnmarkedKimiDejaHooks(s, exe string) string {
 }
 
 // kimiLegacyHooks are lines an older kimi-auto wrote: PreCompact ran
-// without --harness before #4793.
+// without --harness before #4793, and PostToolUse/PostToolUseFailure passed
+// --defer before #6198.
 var kimiLegacyHooks = []struct {
 	event, matcher string
 	args           []string
 }{
 	{"PreCompact", "", []string{"hook-precompact"}},
+	{"PostToolUse", "Bash", []string{"hook-tool-after", "--defer"}},
+	{"PostToolUseFailure", "Bash", []string{"hook-tool-after", "--defer"}},
 }
 
 func kimiTableIsDejas(body []string, exe string) bool {

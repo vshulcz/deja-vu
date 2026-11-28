@@ -39,6 +39,8 @@ test("a stale installer block does not count as wiring", () => {
   // hook-prompt call in *their* rule is not ours to stand down for.
   const followed = `${installerHookMarker}\n[[hooks]]\ncommand = "deja hook-prompt --plain"\n\n[[hooks]]\nevent = "Stop"\n`
   assert.equal(installerHookPresent(followed), true)
+  const multiBlock = `${installerHookMarker}\n[[hooks]]\nevent = "SessionStart"\ncommand = "deja hook-context --kimi"\n\n${installerHookMarker}\n[[hooks]]\nevent = "UserPromptSubmit"\ncommand = "deja hook-prompt --plain"\n`
+  assert.equal(installerHookPresent(multiBlock), true)
   const theirs = `${installerHookMarker}\n[[hooks]]\nevent = "SessionStart"\ncommand = "deja hook-context"\n\n[[hooks]]\ncommand = "deja hook-prompt --plain"\n`
   assert.equal(installerHookPresent(theirs), false)
 })
@@ -143,10 +145,16 @@ test("each manifest hook reaches deja as the subcommand it names", async () => {
       seen.push(hook.event + " " + out.trim())
     }
     assert.deepEqual(seen, [
+      "SessionStart ARGS hook-context --kimi",
       "UserPromptSubmit ARGS hook-context --plain --once",
       "UserPromptSubmit ARGS hook-prompt --plain",
       "PreCompact ARGS hook-precompact --harness kimi",
       "SessionEnd ARGS hook-session-end",
+      "Stop ARGS hook-session-end",
+      "PreToolUse ARGS hook-mcp-call",
+      "PostToolUse ARGS hook-tool-after --kimi",
+      "PostToolUseFailure ARGS hook-tool-after --kimi",
+      "PreToolUse ARGS hook-tool --defer",
     ])
   } finally {
     rmSync(dir, { recursive: true, force: true })

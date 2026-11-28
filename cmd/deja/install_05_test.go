@@ -1283,13 +1283,13 @@ func TestKimiHooksUserPromptSubmitWithPlainOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := string(b)
-	if strings.Contains(cfg, `event = "SessionStart"`) {
-		t.Fatal("SessionStart runs but its output goes nowhere: wrong event")
+	if !strings.Contains(cfg, `event = "SessionStart"`) || !strings.Contains(cfg, "hook-context --kimi") {
+		t.Fatalf("no version-gated SessionStart hook:\n%s", cfg)
 	}
-	if !strings.Contains(cfg, `event = "UserPromptSubmit"`) {
-		t.Fatalf("no UserPromptSubmit hook:\n%s", cfg)
+	if !strings.Contains(cfg, `event = "UserPromptSubmit"`) || !strings.Contains(cfg, "hook-context --plain --once") {
+		t.Fatalf("no UserPromptSubmit --once fallback hook:\n%s", cfg)
 	}
-	// Kimi reads stdout verbatim; the JSON envelope would land in the prompt.
+	// Kimi <= 2.8.x reads stdout verbatim on UserPromptSubmit; the JSON envelope would land in the prompt.
 	if !strings.Contains(cfg, "hook-prompt --plain") {
 		t.Fatalf("hook does not ask for the bare digest:\n%s", cfg)
 	}

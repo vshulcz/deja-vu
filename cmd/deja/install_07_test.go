@@ -1345,8 +1345,8 @@ func TestKimiPutsTheDigestOnThePromptHook(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := string(b)
-	if strings.Contains(cfg, `event = "SessionStart"`) {
-		t.Fatalf("a hook whose output is discarded: %s", cfg)
+	if !strings.Contains(cfg, "hook-context --kimi") || strings.Contains(cfg, `command = "/bin/deja hook-context"`) {
+		t.Fatalf("SessionStart must use version-gated hook-context --kimi: %s", cfg)
 	}
 	if !strings.Contains(cfg, "hook-context --plain --once") {
 		t.Fatalf("no session digest on the prompt hook: %s", cfg)
