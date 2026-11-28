@@ -46,10 +46,17 @@ var appendReplacing = true
 // in; a test fails the pass there.
 var beforeAppendSwap func() error
 
+// truncateRecordsFile cuts records.bin back to a committed length; tests stub
+// it to simulate a transient lock refusal during recovery.
+var truncateRecordsFile = os.Truncate
+
 // appendsInPlace stages tmp from dir's files and reports whether the pass may
 // append to the log. False leaves tmp empty, and the pass writes the log anew.
 func appendsInPlace(dir, tmp string, old Manifest) bool {
 	if !appendReplacing || old.RecordsSize <= 0 || old.DeadBytes*deadShareCompact > old.RecordsSize {
+		return false
+	}
+	if _, pErr := os.Stat(filepath.Join(dir, appendPendingFile)); pErr == nil || !os.IsNotExist(pErr) {
 		return false
 	}
 	fi, err := os.Stat(filepath.Join(dir, "records.bin"))
@@ -86,8 +93,17 @@ func createLog(p string) (*os.File, error) {
 // pass that appended to it did not swap its index in.
 func undoAppend(dir string, size int64) {
 	p := filepath.Join(dir, "records.bin")
-	if fi, err := os.Stat(p); err == nil && fi.Size() > size {
-		_ = os.Truncate(p, size)
+	fi, statErr := os.Stat(p)
+	if statErr != nil {
+		if os.IsNotExist(statErr) {
+			_ = os.Remove(filepath.Join(dir, appendPendingFile))
+		}
+		return
+	}
+	if fi.Size() > size {
+		if truncErr := truncateRecordsFile(p, size); truncErr != nil {
+			return
+		}
 	}
 	_ = os.Remove(filepath.Join(dir, appendPendingFile))
 }
