@@ -45,6 +45,7 @@ func TestKimiPluginManifest(t *testing.T) {
 		} `json:"mcpServers"`
 		Hooks []struct {
 			Event   string `json:"event"`
+			Matcher string `json:"matcher"`
 			Command string `json:"command"`
 			Timeout int    `json:"timeout"`
 		} `json:"hooks"`
@@ -61,20 +62,24 @@ func TestKimiPluginManifest(t *testing.T) {
 		t.Fatal("no version: the marketplace and the update check both read it")
 	}
 
-	// UserPromptSubmit is the only event whose output Kimi appends to the
-	// turn, so the digest and the recall both hang off it. A SessionStart hook
-	// runs and its answer goes nowhere. PreCompact and SessionEnd print
-	// nothing; they are there for what they do to deja's own state.
+	// Kimi <= 2.8.x appends UserPromptSubmit output directly; >= 2.9 also
+	// reads SessionStart additionalContext and PostToolUse updatedToolOutput.
 	speaks := map[string]bool{}
+	hasSessionStartKimi := false
 	for _, h := range manifest.Hooks {
 		switch h.Event {
+		case "SessionStart":
+			if !strings.Contains(h.Command, "hook-context --kimi") {
+				t.Fatalf("SessionStart must run version-gated hook-context --kimi: %+v", h)
+			}
+			hasSessionStartKimi = true
 		case "UserPromptSubmit":
 			for _, sub := range []string{"hook-context", "hook-prompt"} {
 				if strings.Contains(h.Command, " "+sub+" ") {
 					speaks[sub] = true
 				}
 			}
-		case "PreCompact", "SessionEnd":
+		case "PreCompact", "SessionEnd", "Stop", "PreToolUse", "PostToolUse", "PostToolUseFailure":
 		default:
 			t.Fatalf("%s: Kimi drops what a hook on this event prints, or never runs it: %+v", h.Event, h)
 		}
@@ -82,8 +87,8 @@ func TestKimiPluginManifest(t *testing.T) {
 			t.Fatalf("timeout %d is outside the 1-600s Kimi allows", h.Timeout)
 		}
 	}
-	if !speaks["hook-context"] || !speaks["hook-prompt"] {
-		t.Fatalf("the digest and the recall have to hang off UserPromptSubmit, got %+v", manifest.Hooks)
+	if !hasSessionStartKimi || !speaks["hook-context"] || !speaks["hook-prompt"] {
+		t.Fatalf("manifest must wire SessionStart --kimi plus UserPromptSubmit fallback hooks, got %+v", manifest.Hooks)
 	}
 
 	// `command: "node"` is the one form Kimi rewrites to its own runtime when

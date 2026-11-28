@@ -34,6 +34,11 @@
   },
   "hooks": [
     {
+      "event": "SessionStart",
+      "command": "node ./extensions/kimi/hooks/recall.mjs hook-context --kimi",
+      "timeout": 30
+    },
+    {
       "event": "UserPromptSubmit",
       "command": "node ./extensions/kimi/hooks/recall.mjs hook-context --plain --once",
       "timeout": 30
@@ -51,6 +56,35 @@
     {
       "event": "SessionEnd",
       "command": "node ./extensions/kimi/hooks/recall.mjs hook-session-end",
+      "timeout": 30
+    },
+    {
+      "event": "Stop",
+      "command": "node ./extensions/kimi/hooks/recall.mjs hook-session-end",
+      "timeout": 30
+    },
+    {
+      "event": "PreToolUse",
+      "matcher": "^mcp__deja__",
+      "command": "node ./extensions/kimi/hooks/recall.mjs hook-mcp-call",
+      "timeout": 30
+    },
+    {
+      "event": "PostToolUse",
+      "matcher": "^(Edit|Write|Bash)$",
+      "command": "node ./extensions/kimi/hooks/recall.mjs hook-tool-after --kimi",
+      "timeout": 30
+    },
+    {
+      "event": "PostToolUseFailure",
+      "matcher": "Bash",
+      "command": "node ./extensions/kimi/hooks/recall.mjs hook-tool-after --kimi",
+      "timeout": 30
+    },
+    {
+      "event": "PreToolUse",
+      "matcher": "^(Edit|Write)$",
+      "command": "node ./extensions/kimi/hooks/recall.mjs hook-tool --defer",
       "timeout": 30
     }
   ]

@@ -69,9 +69,14 @@ export const installerHookMarker = "# deja: auto-recall (managed by `deja instal
 // the same state stale, and reads this file the same way.
 export function installerHookPresent(configToml) {
   const text = String(configToml || "")
-  const at = text.indexOf(installerHookMarker)
-  if (at < 0) return false
-  return blockAfter(text.slice(at + installerHookMarker.length)).includes("hook-prompt")
+  let pos = 0
+  while (true) {
+    const at = text.indexOf(installerHookMarker, pos)
+    if (at < 0) return false
+    const start = at + installerHookMarker.length
+    if (blockAfter(text.slice(start)).includes("hook-prompt")) return true
+    pos = start
+  }
 }
 
 // blockAfter returns the marked entry and stops at the next table header, so a
@@ -106,7 +111,15 @@ export function installerMcpPresent(mcpJson) {
 // hookArgs is the deja call a manifest hook entry asks for. Only deja's own
 // hook subcommands pass: the arguments come from a manifest, and a hook entry
 // that could name any subcommand could run `deja index` on every prompt.
-export const HOOKS = ["hook-context", "hook-prompt", "hook-precompact", "hook-session-end", "hook-tool", "hook-tool-after"]
+export const HOOKS = [
+  "hook-context",
+  "hook-prompt",
+  "hook-precompact",
+  "hook-session-end",
+  "hook-mcp-call",
+  "hook-tool",
+  "hook-tool-after",
+]
 
 export function hookArgs(argv) {
   const args = Array.isArray(argv) ? argv.map(String) : []

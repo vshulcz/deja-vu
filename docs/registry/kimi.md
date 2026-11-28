@@ -38,18 +38,21 @@ Media is out of scope.
   `$KIMI_CODE_HOME/mcp.json` (common JSON shape, existing entries preserved).
 - **Guidance**: the shared skill at `~/.agents/skills/deja-history/SKILL.md`. Kimi Code 0.28.1 scans both that directory and `$KIMI_CODE_HOME/skills`, and deja writes the shared one so a machine with several harnesses keeps one copy. The `~/.kimi/skills/` in some write-ups belongs to `MoonshotAI/kimi-cli`, a different tool with the same name. An older deja wrote a block into the global `AGENTS.md`, which install now removes.
 - **Auto-recall**: `deja install kimi-auto` adds marked `[[hooks]]` entries to
-  `$KIMI_CODE_HOME/config.toml`: two `UserPromptSubmit` hooks
-  (`deja hook-context --plain --once`, `deja hook-prompt --plain`) and a
-  `PreCompact` one, and a `SessionEnd` hook that runs `deja hook-session-end`. Measured on 0.28.1, `UserPromptSubmit` is the only event
-  whose output reaches the model, and it takes plain stdout, so the session
-  digest rides the first prompt rather than a session-start hook. Two more
-  entries, `PostToolUse` and `PostToolUseFailure` on `Bash`, run
-  `deja hook-tool-after --defer`: Kimi does not wait for them and drops what
-  they print, so the fix pair for a failed command is held and handed over
-  once, on the session's next prompt. A `PreToolUse` entry on `^(Edit|Write)$`
-  runs `deja hook-tool --defer` the same way: Kimi waits for it but keeps only
-  a block's reason (`runPreToolUse`), so the line about the edited file comes
-  with the next prompt, after the edit.
+  `$KIMI_CODE_HOME/config.toml`: `SessionStart` (`deja hook-context --kimi`), two
+  `UserPromptSubmit` hooks (`deja hook-context --plain --once`,
+  `deja hook-prompt --plain`), `PreCompact`, `SessionEnd` and `Stop`
+  (`deja hook-session-end`), `PreToolUse` on `^mcp__deja__`
+  (`deja hook-mcp-call`), `PostToolUse` on `^(Edit|Write|Bash)$` and
+  `PostToolUseFailure` on `Bash` (`deja hook-tool-after --kimi`), plus
+  `PreToolUse` on `^(Edit|Write)$` (`deja hook-tool --defer`). On `<= 2.8.x`,
+  `SessionStart` and `PostToolUse` output is dropped, so `hook-context --kimi`
+  stays silent (leaving the digest on `UserPromptSubmit --once`), `hook-tool`
+  defers edit recall to `UserPromptSubmit`, and `hook-tool-after --kimi`
+  defers command fix pairs. On `>= 2.9.0`, `SessionStart` emits
+  `hookSpecificOutput.additionalContext` and `PostToolUse` returns
+  `hookSpecificOutput.updatedToolOutput` for `Edit`/`Write` when `tool_output`
+  is under Kimi's 2000-character slice boundary (avoiding truncation of larger
+  outputs and deferring `Bash`/error results to the next prompt).
 - **Resume**: `kimi --session <sessionId>`, run in the `workDir` from the
   session's `state.json`: Kimi refuses a session from any other directory
   (verified live on 0.28.1). A `workDir` that is gone is refused with a
