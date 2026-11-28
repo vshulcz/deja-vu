@@ -227,11 +227,22 @@ func hasPlaintextStore(indexDir string) bool {
 func SealTree(indexDir string, dek []byte) error {
 	base := strings.TrimSuffix(indexDir, string(filepath.Separator))
 	archPath := ArchivePath(base)
-	if err := os.MkdirAll(filepath.Dir(archPath), 0o700); err != nil {
-		return err
+	pendingPath := sealPendingPath(base)
+	if mkErr := os.MkdirAll(filepath.Dir(archPath), 0o700); mkErr != nil {
+		return mkErr
 	}
 	if !hasPlaintextStore(base) {
+		_ = os.Remove(pendingPath)
 		return nil
+	}
+	if fi, statErr := os.Lstat(archPath); statErr == nil && fi.Mode().IsRegular() {
+		verifyErr := verifyArchive(archPath, dek)
+		if verifyErr == nil {
+			return finishWipePlaintextStore(base, pendingPath)
+		}
+		if _, pErr := os.Stat(pendingPath); pErr == nil {
+			return fmt.Errorf("vault: existing archive corrupt after interrupted cleanup: %w", verifyErr)
+		}
 	}
 	tmpPath := archPath + ".tmp"
 	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
@@ -270,26 +281,24 @@ func SealTree(indexDir string, dek []byte) error {
 		_ = os.Remove(tmpPath)
 		return err
 	}
-	if err := os.Rename(tmpPath, archPath); err != nil {
+	if writeErr := atomicfile.Write(pendingPath, []byte("1\n"), 0o600); writeErr != nil {
 		_ = os.Remove(tmpPath)
-		return err
+		return writeErr
 	}
-	wipePlaintextStore(base)
-	return nil
+	if renErr := os.Rename(tmpPath, archPath); renErr != nil {
+		_ = os.Remove(tmpPath)
+		_ = os.Remove(pendingPath)
+		return renErr
+	}
+	return finishWipePlaintextStore(base, pendingPath)
 }
 
 // OpenTree decrypts ArchivePath(indexDir) into indexDir + sibling sidecars.
 func OpenTree(indexDir string, dek []byte) error {
 	base := strings.TrimSuffix(indexDir, string(filepath.Separator))
 	archPath := ArchivePath(base)
-	f, err := os.Open(archPath)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = f.Close() }()
-	cr, err := newChunkReader(f, dek)
-	if err != nil {
-		return err
+	if _, statErr := os.Stat(archPath); statErr != nil {
+		return statErr
 	}
 	stage, err := os.MkdirTemp(filepath.Dir(base), ".vault-unpack-*")
 	if err != nil {
@@ -303,61 +312,29 @@ func OpenTree(indexDir string, dek []byte) error {
 	}
 	defer func() { _ = stageRoot.Close() }()
 
-	tr := tar.NewReader(cr)
-	entries := 0
-	for {
-		hdr, nextErr := tr.Next()
-		if errors.Is(nextErr, io.EOF) {
-			break
-		}
-		if nextErr != nil {
-			return nextErr
-		}
-		entries++
-		if entries > maxArchiveFiles {
-			return errors.New("vault archive exceeds file limit")
-		}
-		if strings.Contains(hdr.Name, "..") {
-			return fmt.Errorf("unsafe path in vault archive: %q", hdr.Name)
-		}
-		rel := filepath.Clean(filepath.FromSlash(hdr.Name))
-		if rel == "." {
-			continue
-		}
-		if !filepath.IsLocal(rel) {
-			return fmt.Errorf("unsafe path in vault archive: %q", hdr.Name)
-		}
-		switch hdr.Typeflag {
-		case tar.TypeDir:
-			if mkErr := stageRoot.MkdirAll(rel, 0o700); mkErr != nil {
-				return mkErr
-			}
-		case tar.TypeReg:
+	walkErr := walkArchive(archPath, dek,
+		func(rel string) error {
+			return stageRoot.MkdirAll(rel, 0o700)
+		},
+		func(rel string, size int64, r io.Reader) error {
 			if parent := filepath.Dir(rel); parent != "." {
 				if mkErr := stageRoot.MkdirAll(parent, 0o700); mkErr != nil {
 					return mkErr
 				}
 			}
-			if hdr.Size < 0 || hdr.Size > maxArchiveFileBytes {
-				return fmt.Errorf("vault archive entry %q exceeds size limit (%d)", hdr.Name, hdr.Size)
-			}
 			out, openErr := stageRoot.OpenFile(rel, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
 			if openErr != nil {
 				return openErr
 			}
-			if _, copyErr := io.CopyN(out, tr, hdr.Size); copyErr != nil {
+			if _, copyErr := io.CopyN(out, r, size); copyErr != nil {
 				_ = out.Close()
 				return copyErr
 			}
-			if closeErr := out.Close(); closeErr != nil {
-				return closeErr
-			}
-		default:
-			return fmt.Errorf("unsupported tar entry type %d in vault archive", hdr.Typeflag)
-		}
-	}
-	if verifyErr := cr.VerifyEOF(); verifyErr != nil {
-		return verifyErr
+			return out.Close()
+		},
+	)
+	if walkErr != nil {
+		return walkErr
 	}
 	_ = stageRoot.Close()
 
@@ -381,8 +358,11 @@ func OpenTree(indexDir string, dek []byte) error {
 	if err := restorePromptCache(stage, base); err != nil {
 		return err
 	}
-	_ = f.Close()
-	return os.Remove(archPath)
+	if rmErr := os.Remove(archPath); rmErr != nil {
+		return rmErr
+	}
+	_ = os.Remove(sealPendingPath(base))
+	return nil
 }
 
 func writeTreeToTar(tw *tar.Writer, base string) error {
@@ -452,6 +432,83 @@ func addFileToTar(tw *tar.Writer, srcPath, tarName string, info fs.FileInfo) err
 	_, err = io.CopyN(tw, f, info.Size())
 	return err
 }
+
+func sealPendingPath(base string) string {
+	return ArchivePath(base) + ".wiping"
+}
+
+func finishWipePlaintextStore(base, pendingPath string) error {
+	wipePlaintextStoreFn(base)
+	if hasPlaintextStore(base) {
+		return errors.New("vault: failed to wipe plaintext store after sealing")
+	}
+	_ = os.Remove(pendingPath)
+	return nil
+}
+
+func verifyArchive(archPath string, dek []byte) error {
+	return walkArchive(archPath, dek, nil, func(_ string, size int64, r io.Reader) error {
+		_, err := io.CopyN(io.Discard, r, size)
+		return err
+	})
+}
+
+func walkArchive(archPath string, dek []byte, onDir func(rel string) error, onFile func(rel string, size int64, r io.Reader) error) error {
+	f, err := os.Open(archPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	cr, err := newChunkReader(f, dek)
+	if err != nil {
+		return err
+	}
+	tr := tar.NewReader(cr)
+	entries := 0
+	for {
+		hdr, nextErr := tr.Next()
+		if errors.Is(nextErr, io.EOF) {
+			break
+		}
+		if nextErr != nil {
+			return nextErr
+		}
+		entries++
+		if entries > maxArchiveFiles {
+			return errors.New("vault archive exceeds file limit")
+		}
+		if strings.Contains(hdr.Name, "..") {
+			return fmt.Errorf("unsafe path in vault archive: %q", hdr.Name)
+		}
+		rel := filepath.Clean(filepath.FromSlash(hdr.Name))
+		if rel == "." {
+			continue
+		}
+		if !filepath.IsLocal(rel) {
+			return fmt.Errorf("unsafe path in vault archive: %q", hdr.Name)
+		}
+		switch hdr.Typeflag {
+		case tar.TypeDir:
+			if onDir != nil {
+				if dirErr := onDir(rel); dirErr != nil {
+					return dirErr
+				}
+			}
+		case tar.TypeReg:
+			if hdr.Size < 0 || hdr.Size > maxArchiveFileBytes {
+				return fmt.Errorf("vault archive entry %q exceeds size limit (%d)", hdr.Name, hdr.Size)
+			}
+			if fileErr := onFile(rel, hdr.Size, tr); fileErr != nil {
+				return fileErr
+			}
+		default:
+			return fmt.Errorf("unsupported tar entry type %d in vault archive", hdr.Typeflag)
+		}
+	}
+	return cr.VerifyEOF()
+}
+
+var wipePlaintextStoreFn = wipePlaintextStore
 
 func wipePlaintextStore(base string) {
 	wipeTree(base)
