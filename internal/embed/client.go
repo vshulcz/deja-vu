@@ -30,6 +30,7 @@ type Client struct {
 	QueryPrefix   string
 	PassagePrefix string
 	sendInputType bool
+	asyncBatch    *bool
 }
 
 // Made reports whether the vectors of s came from this client's model and
@@ -77,6 +78,22 @@ func Disabled() bool {
 // stays green on CI, which is the worst way round for a contributor to meet it.
 func Off() bool {
 	return os.Getenv("DEJA_EMBED_OFF") == "1" || Disabled()
+}
+
+// AsyncBatchEnabled reports whether DEJA_EMBED_ASYNC_BATCH enables OpenAI-compatible
+// async Batch API indexing for this process.
+func AsyncBatchEnabled() bool {
+	v := strings.TrimSpace(os.Getenv("DEJA_EMBED_ASYNC_BATCH"))
+	return v == "1" || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes")
+}
+
+// AsyncBatch reports whether index embedding uses async Batch API endpoints.
+// Query embedding always remains synchronous.
+func (c *Client) AsyncBatch() bool {
+	if c != nil && c.asyncBatch != nil {
+		return *c.asyncBatch
+	}
+	return AsyncBatchEnabled()
 }
 
 // New builds a client from the DEJA_EMBED_* environment.

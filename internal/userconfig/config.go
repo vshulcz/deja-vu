@@ -42,6 +42,7 @@ type EmbedConfig struct {
 	QueryPrefix   string
 	PassagePrefix string
 	Off           *bool
+	AsyncBatch    *bool
 }
 
 // HooksConfig controls runtime hook behavior.
@@ -238,6 +239,7 @@ func (c Config) EnvBindings() []EnvBinding {
 	addStr("DEJA_EMBED_QUERY_PREFIX", c.Embed.QueryPrefix)
 	addStr("DEJA_EMBED_PASSAGE_PREFIX", c.Embed.PassagePrefix)
 	addBool("DEJA_EMBED_OFF", c.Embed.Off)
+	addBool("DEJA_EMBED_ASYNC_BATCH", c.Embed.AsyncBatch)
 
 	addStr("DEJA_RECALL", c.Hooks.Recall)
 	addBool("DEJA_RECALL_GLOBAL", c.Hooks.RecallGlobal)
@@ -418,6 +420,8 @@ func applyEmbedEntry(path, full string, val tomlValue, cfg *EmbedConfig, sawTop,
 			return true, err
 		}
 		cfg.Off = &b
+	case "embed.async_batch":
+		return applyBoolField(path, full, val, &cfg.AsyncBatch)
 	default:
 		return false, nil
 	}

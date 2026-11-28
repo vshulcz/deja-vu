@@ -262,7 +262,7 @@ var helpEntries = []helpEntry{
 	{name: "embed", group: groupSetup,
 		usage:    []string{"deja embed"},
 		desc:     "build the semantic search sidecar from an endpoint",
-		more:     "DEJA_EMBED_URL names the embedding endpoint and DEJA_EMBED_MODEL the model. This sends session text to that endpoint.",
+		more:     "DEJA_EMBED_URL names the embedding endpoint and DEJA_EMBED_MODEL the model. Set DEJA_EMBED_ASYNC_BATCH=1 (or [embed].async_batch = true) to queue indexing via /v1/batches while keeping search queries synchronous. This sends session text to that endpoint.",
 		examples: []string{"DEJA_EMBED_URL=http://localhost:11434/v1/embeddings deja embed"}},
 	{name: "sync", group: groupSetup,
 		usage: []string{

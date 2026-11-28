@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -19,9 +21,32 @@ const hookEmbedFallbackStale = 2 * time.Minute
 const hookEmbedMaxRetryBackoff = 15 * time.Minute
 
 var (
-	startEmbedWorker = startRefresher
-	embedRunner      = func(dir string) error { return runEmbed(dir, nil) }
+	startEmbedWorker     = startRefresher
+	embedRunner          = runHookEmbedPass
+	errEmbedBatchPending = errors.New("async embed batch pending")
 )
+
+func runHookEmbedPass(dir string) error {
+	if err := index.Ensure(dir, "", false, io.Discard); err != nil {
+		return err
+	}
+	client, err := embed.New()
+	if err != nil {
+		return err
+	}
+	keep, _, err := embedPolicyKeep(dir)
+	if err != nil {
+		return err
+	}
+	_, pending, err := embed.EmbedIndexStep(context.Background(), dir, client, keep)
+	if err != nil {
+		return err
+	}
+	if pending {
+		return errEmbedBatchPending
+	}
+	return nil
+}
 
 func embedSidecarBase(dir string) string {
 	return strings.TrimSuffix(filepath.Clean(dir), string(filepath.Separator))
@@ -89,6 +114,10 @@ func runHookEmbed(dir string) {
 	}
 	defer func() { _ = os.Remove(embedRunningPath(dir)) }()
 	if err := embedRunner(dir); err != nil {
+		if errors.Is(err, errEmbedBatchPending) {
+			_ = os.Remove(embedRetryPath(dir))
+			return
+		}
 		backoff := userconfig.EffectiveEmbedEvery()
 		if backoff <= 0 || backoff > hookEmbedMaxRetryBackoff {
 			backoff = hookEmbedMaxRetryBackoff

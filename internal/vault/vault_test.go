@@ -331,10 +331,17 @@ func TestVaultFailClosedAndArchiveTamper(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(indexDir, "records.bin"), make([]byte, archiveChunkSize+128), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	embedBatchSidecar := indexDir + ".embed-batch"
+	if err := os.WriteFile(embedBatchSidecar, []byte(`{"batch_id":"b1"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	dek := make([]byte, 32)
 	_, _ = rand.Read(dek)
 	if err := SealTree(indexDir, dek); err != nil {
 		t.Fatalf("SealTree multi-chunk: %v", err)
+	}
+	if _, statErr := os.Stat(embedBatchSidecar); !os.IsNotExist(statErr) {
+		t.Fatalf("SealTree left embed-batch sidecar on disk: %v", statErr)
 	}
 	arch := ArchivePath(indexDir)
 	orig, readErr := os.ReadFile(arch)
@@ -363,6 +370,9 @@ func TestVaultFailClosedAndArchiveTamper(t *testing.T) {
 	}
 	if err := OpenTree(indexDir, dek); err != nil {
 		t.Fatalf("OpenTree valid multi-chunk: %v", err)
+	}
+	if gotEB, ebErr := os.ReadFile(embedBatchSidecar); ebErr != nil || string(gotEB) != `{"batch_id":"b1"}` {
+		t.Fatalf("OpenTree embed-batch = (%q, %v)", gotEB, ebErr)
 	}
 	snapEnc, snapErr := SealSnapshot(dek, "hello world")
 	if snapErr != nil {

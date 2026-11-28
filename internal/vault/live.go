@@ -50,6 +50,7 @@ var (
 		".envblock",
 		".live",
 		".tui-history",
+		".embed-batch",
 	}
 	lineEncryptedSidecars = []string{
 		".hookseen",

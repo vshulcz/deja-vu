@@ -299,6 +299,7 @@ var configEnvToKey = map[string]string{ //nolint:gosec // env var name to config
 	"DEJA_EMBED_QUERY_PREFIX":    "embed.query_prefix",
 	"DEJA_EMBED_PASSAGE_PREFIX":  "embed.passage_prefix",
 	"DEJA_EMBED_OFF":             "embed.off",
+	"DEJA_EMBED_ASYNC_BATCH":     "embed.async_batch",
 	"DEJA_RECALL":                "hooks.recall",
 	"DEJA_RECALL_GLOBAL":         "hooks.recall_global",
 	"DEJA_AUTORECALL_LOCAL_ONLY": "hooks.autorecall_local_only",

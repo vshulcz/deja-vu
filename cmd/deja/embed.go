@@ -2,8 +2,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/embed"
@@ -16,10 +20,19 @@ import (
 var embedFlags = []string{}
 
 func runEmbed(dir string, args []string) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return runEmbedContext(ctx, dir, args, os.Stderr)
+}
+
+func runEmbedContext(ctx context.Context, dir string, args []string, errOut io.Writer) error {
+	if errOut == nil {
+		errOut = io.Discard
+	}
 	if len(args) != 0 {
 		return unknownFlag("embed", args[0], embedFlags)
 	}
-	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
+	if err := index.Ensure(dir, "", false, errOut); err != nil {
 		return err
 	}
 	client, err := embed.New()
@@ -30,11 +43,14 @@ func runEmbed(dir string, args []string) error {
 	if err != nil {
 		return err
 	}
-	_, err = embed.EmbedIndex(dir, client, keep)
+	_, err = embed.EmbedIndexContext(ctx, dir, client, keep)
 	// Said out loud, because the alternative is a sidecar that quietly covers
 	// less than the index and semantic search that quietly answers from less.
 	if n := held(); n > 0 {
-		fmt.Fprintf(os.Stderr, "deja: %d record%s stayed here — the trust policy withholds them on at least one path, and embedding sends text off the machine (`deja doctor`)\n", n, pluralS(n))
+		fmt.Fprintf(errOut, "deja: %d record%s stayed here — the trust policy withholds them on at least one path, and embedding sends text off the machine (`deja doctor`)\n", n, pluralS(n))
+	}
+	if errors.Is(err, context.Canceled) && client.AsyncBatch() {
+		fmt.Fprintln(errOut, "deja: interrupted — async embed batch stays queued; run `deja embed` again to resume")
 	}
 	return err
 }
