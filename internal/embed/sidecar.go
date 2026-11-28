@@ -301,55 +301,14 @@ func Path(dir string) string {
 // trust policy withholds off the wire to an external endpoint. A nil keep
 // embeds every record.
 func EmbedIndex(dir string, client *Client, keep func(index.Record) bool) (Sidecar, error) { //nolint:revive // the name is used from cmd/deja
-	recs, err := index.ReadRecords(dir)
-	if err != nil {
-		return Sidecar{}, fmt.Errorf("read index records: %w", err)
-	}
-	if keep != nil {
-		kept := recs[:0:0]
-		for _, r := range recs {
-			if keep(r.Record) {
-				kept = append(kept, r)
-			}
-		}
-		recs = kept
-	}
-	gen, err := index.Generation(dir)
+	return EmbedIndexContext(context.Background(), dir, client, keep)
+}
+
+func embedIndexSync(ctx context.Context, dir string, client *Client, keep func(index.Record) bool) (Sidecar, error) {
+	recs, gen, old, covered, err := prepareSidecar(dir, client, keep)
 	if err != nil {
 		return Sidecar{}, err
 	}
-	old, err := readFile(Path(dir))
-	if errors.Is(err, vault.ErrLocked) || errors.Is(err, vault.ErrKeyUnavailable) {
-		return Sidecar{}, err
-	}
-	if err != nil || old.Model != client.storedModel() || old.Dim == 0 {
-		old = Sidecar{}
-	}
-	// A vector is carried to the record it was made from, found by identity
-	// and given that record's offset now. Only the records the caller allows
-	// are looked in, so vectors the caller no longer allows go rather than
-	// being carried forward: a policy that tightens has to reach the sidecar
-	// too, since SemanticSearch reads this file directly and kept vectors bring
-	// the withheld sessions back as answers (#1311). A version 1 vector has no
-	// identity and is carried only while the layout it was made for holds; a
-	// version 2 one is found by the identity it was written with.
-	lookup := newRecordLookup(recs, sameLayout(old.Generation, gen), identOf(old.Version))
-	covered := make(map[uint64]bool, len(old.Vectors))
-	kept := old.Vectors[:0:0]
-	for _, v := range old.Vectors {
-		r, ok := lookup.find(v)
-		if !ok {
-			continue
-		}
-		id := RecordIdent(r.Record)
-		if covered[id] {
-			continue
-		}
-		covered[id] = true
-		kept = append(kept, Vector{Offset: r.Offset, Ident: id, Key: v.Key, Values: v.Values})
-	}
-	old.Version = sidecarVersion
-	old.Vectors = kept
 	pending := toEmbed(recs, covered)
 	batches := 0
 	for len(pending) > 0 {
@@ -358,7 +317,7 @@ func EmbedIndex(dir string, client *Client, keep func(index.Record) bool) (Sidec
 		for i := range pending[:n] {
 			texts[i] = client.PassagePrefix + truncate(pending[i].Record.Text)
 		}
-		vectors, err := client.Embed(context.Background(), texts)
+		vectors, err := client.Embed(ctx, texts)
 		if err != nil {
 			// Keep what this run embedded since the last checkpoint: a run
 			// that failed half an hour in lost all of it (#4975).
@@ -393,6 +352,59 @@ func EmbedIndex(dir string, client *Client, keep func(index.Record) bool) (Sidec
 		return Sidecar{}, err
 	}
 	return old, nil
+}
+
+func prepareSidecar(dir string, client *Client, keep func(index.Record) bool) ([]index.OffsetRecord, string, Sidecar, map[uint64]bool, error) {
+	recs, err := index.ReadRecords(dir)
+	if err != nil {
+		return nil, "", Sidecar{}, nil, fmt.Errorf("read index records: %w", err)
+	}
+	if keep != nil {
+		kept := recs[:0:0]
+		for _, r := range recs {
+			if keep(r.Record) {
+				kept = append(kept, r)
+			}
+		}
+		recs = kept
+	}
+	gen, err := index.Generation(dir)
+	if err != nil {
+		return nil, "", Sidecar{}, nil, err
+	}
+	old, err := readFile(Path(dir))
+	if errors.Is(err, vault.ErrLocked) || errors.Is(err, vault.ErrKeyUnavailable) {
+		return nil, "", Sidecar{}, nil, err
+	}
+	if err != nil || old.Model != client.storedModel() || old.Dim == 0 {
+		old = Sidecar{}
+	}
+	// A vector is carried to the record it was made from, found by identity
+	// and given that record's offset now. Only the records the caller allows
+	// are looked in, so vectors the caller no longer allows go rather than
+	// being carried forward: a policy that tightens has to reach the sidecar
+	// too, since SemanticSearch reads this file directly and kept vectors bring
+	// the withheld sessions back as answers (#1311). A version 1 vector has no
+	// identity and is carried only while the layout it was made for holds; a
+	// version 2 one is found by the identity it was written with.
+	lookup := newRecordLookup(recs, sameLayout(old.Generation, gen), identOf(old.Version))
+	covered := make(map[uint64]bool, len(old.Vectors))
+	kept := old.Vectors[:0:0]
+	for _, v := range old.Vectors {
+		r, ok := lookup.find(v)
+		if !ok {
+			continue
+		}
+		id := RecordIdent(r.Record)
+		if covered[id] {
+			continue
+		}
+		covered[id] = true
+		kept = append(kept, Vector{Offset: r.Offset, Ident: id, Key: v.Key, Values: v.Values})
+	}
+	old.Version = sidecarVersion
+	old.Vectors = kept
+	return recs, gen, old, covered, nil
 }
 
 // toEmbed is the records still to embed: not embedded yet, and with text to

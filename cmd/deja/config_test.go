@@ -249,6 +249,7 @@ func TestUserConfigDoctorTextAndJSON(t *testing.T) {
 [embed]
 api_key = "`+secret+`"
 model = "text-embedding-3-small"
+async_batch = true
 unknown_opt = true
 
 [hooks]
@@ -278,7 +279,7 @@ recall = "safe"
 	if !reflect.DeepEqual(rep.Config.Unknown, []string{"embed.unknown_opt"}) {
 		t.Fatalf("rep.Config.Unknown = %v", rep.Config.Unknown)
 	}
-	for _, wantKey := range []string{"embed.api_key", "embed.model", "hooks.recall"} {
+	for _, wantKey := range []string{"embed.api_key", "embed.async_batch", "embed.model", "hooks.recall"} {
 		if !slices.Contains(rep.Config.Keys, wantKey) {
 			t.Fatalf("rep.Config.Keys = %v, missing %q", rep.Config.Keys, wantKey)
 		}

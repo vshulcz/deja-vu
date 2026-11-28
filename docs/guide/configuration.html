@@ -217,6 +217,7 @@ model = "nomic-embed-text"
 # batch = 32
 # query_prefix = "search_query: "
 # passage_prefix = "search_document: "
+# async_batch = false # true (or DEJA_EMBED_ASYNC_BATCH=1) indexes via /v1/files and /v1/batches
 # off = false
 
 [hooks]
@@ -243,12 +244,14 @@ recall = "safe" # "safe", "aggressive", or "off"
 
 <h2>Periodic background embedding</h2>
 <p>When <code>[embed].every</code> (or top-level <code>embed_every</code>, or <code>DEJA_EMBED_EVERY</code>) is a positive duration such as <code>"30m"</code>, <code>hook-session-end</code> checks whether the interval has elapsed and spawns a detached <code>deja hook-embed</code> worker so your vector sidecar stays current incrementally without blocking the agent exit path.</p>
-<p>Three sidecar state files beside the index directory coordinate background runs:</p>
+<p>Sidecar state files beside the index directory coordinate background runs:</p>
 <ul>
 <li><code>&lt;index&gt;.embed-running</code> — active worker claim so concurrent session ends do not launch duplicate embedders; stale claims from dead processes are reclaimed.</li>
-<li><code>&lt;index&gt;.embed-last</code> — nanosecond timestamp written after a successful embed pass.</li>
+<li><code>&lt;index&gt;.embed-last</code> — nanosecond timestamp written after a successful embed pass (or once an async batch completes).</li>
 <li><code>&lt;index&gt;.embed-retry</code> — backoff timestamp written after a failed pass (capped at 15 minutes) so offline endpoints do not hammer CPU on every turn.</li>
+<li><code>&lt;index&gt;.embed-batch</code> — resumable async Batch API state (sealed when vault is enabled), kept across interrupts and removed when vectors finish merging or fail permanently.</li>
 </ul>
+<p>Setting <code>[embed].async_batch = true</code> (or <code>DEJA_EMBED_ASYNC_BATCH=1</code>) queues indexing through OpenAI-compatible <code>/v1/files</code> and <code>/v1/batches</code> endpoints while leaving query embeddings synchronous. In this mode, <code>deja hook-embed</code> submits or polls batches without waiting for completion, and interrupting <code>deja embed</code> preserves queued jobs in <code>&lt;index&gt;.embed-batch</code> so the next run resumes without re-uploading.</p>
 
 <h2>Secrets and diagnostics</h2>
 <p>If <code>[embed].api_key</code> is set on a Unix system and the file is group- or world-readable, interactive runs warn on stderr to lock permissions down (<code>chmod 600 ~/.config/deja/config.toml</code>).</p>

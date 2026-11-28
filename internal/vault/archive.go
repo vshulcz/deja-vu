@@ -38,6 +38,7 @@ var contentSidecars = []string{
 	".embeddings",
 	".embeddings.bin",
 	".vectors.bin",
+	".embed-batch",
 	".compactions.gob",
 	".firstrecall",
 	".tui-history",

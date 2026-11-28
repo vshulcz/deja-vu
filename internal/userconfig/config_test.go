@@ -441,6 +441,7 @@ func TestConfigTypeErrorsStringListsSubagentsAndHome(t *testing.T) {
 	src := "" +
 		"[embed]\n" +
 		"off = true\n" +
+		"async_batch = true\n" +
 		"[hooks]\n" +
 		"recall_global = false\n" +
 		"[index]\n" +
@@ -470,17 +471,37 @@ func TestConfigTypeErrorsStringListsSubagentsAndHome(t *testing.T) {
 		t.Fatalf("Stores = %v", cfg.Index.Stores)
 	}
 	bindings := cfg.EnvBindings()
-	var gotOff, gotGlobal string
+	var gotOff, gotAsyncBatch, gotGlobal string
 	for _, b := range bindings {
 		switch b.Key {
 		case "DEJA_EMBED_OFF":
 			gotOff = b.Value
+		case "DEJA_EMBED_ASYNC_BATCH":
+			gotAsyncBatch = b.Value
 		case "DEJA_RECALL_GLOBAL":
 			gotGlobal = b.Value
 		}
 	}
-	if gotOff != "1" || gotGlobal != "0" {
-		t.Fatalf("EnvBindings booleans: off=%q global=%q", gotOff, gotGlobal)
+	if gotOff != "1" || gotAsyncBatch != "1" || gotGlobal != "0" {
+		t.Fatalf("EnvBindings booleans: off=%q async_batch=%q global=%q", gotOff, gotAsyncBatch, gotGlobal)
+	}
+
+	falseBatchPath := filepath.Join(t.TempDir(), "async-false.toml")
+	if err := os.WriteFile(falseBatchPath, []byte("[embed]\nasync_batch = false\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	falseBatchCfg, err := LoadPath(falseBatchPath)
+	if err != nil {
+		t.Fatalf("LoadPath(async-false) = %v", err)
+	}
+	var gotFalseBatch string
+	for _, b := range falseBatchCfg.EnvBindings() {
+		if b.Key == "DEJA_EMBED_ASYNC_BATCH" {
+			gotFalseBatch = b.Value
+		}
+	}
+	if gotFalseBatch != "0" {
+		t.Fatalf("EnvBindings(async_batch=false) = %q, want 0", gotFalseBatch)
 	}
 
 	if got := expandHome("/abs/path"); got != "/abs/path" {
@@ -521,6 +542,7 @@ func TestConfigTypeErrorsStringListsSubagentsAndHome(t *testing.T) {
 		{"embed.query_prefix int", "[embed]\nquery_prefix = 1\n"},
 		{"embed.passage_prefix int", "[embed]\npassage_prefix = 1\n"},
 		{"embed.off str", "[embed]\noff = \"yes\"\n"},
+		{"embed.async_batch str", "[embed]\nasync_batch = \"yes\"\n"},
 		{"hooks.recall int", "[hooks]\nrecall = 1\n"},
 		{"hooks.recall_global str", "[hooks]\nrecall_global = \"yes\"\n"},
 		{"index.dir bool", "[index]\ndir = true\n"},

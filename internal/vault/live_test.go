@@ -890,6 +890,10 @@ func TestVaultLiveMigrationAndCacheBranches(t *testing.T) {
 	if wErr := os.WriteFile(dejavuSidecar, []byte("plain-dejavu-entry"), 0o600); wErr != nil {
 		t.Fatal(wErr)
 	}
+	embedBatchSidecar := indexDir + ".embed-batch"
+	if wErr := os.WriteFile(embedBatchSidecar, []byte(`{"batch_id":"b1"}`), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
 	sealedLine, slErr := SealLine(dek, DomainSidecar, []byte("already-sealed"))
 	if slErr != nil {
 		t.Fatal(slErr)
@@ -904,6 +908,10 @@ func TestVaultLiveMigrationAndCacheBranches(t *testing.T) {
 	gotDV, rErr := os.ReadFile(dejavuSidecar)
 	if rErr != nil || !IsSealedBytes(gotDV) {
 		t.Fatalf("wholeFileSidecar not sealed: %q (%v)", gotDV, rErr)
+	}
+	gotEB, rErr := os.ReadFile(embedBatchSidecar)
+	if rErr != nil || !IsSealedBytes(gotEB) {
+		t.Fatalf("embed-batch sidecar not sealed: %q (%v)", gotEB, rErr)
 	}
 	gotHS, rErr := os.ReadFile(hookseenSidecar)
 	if rErr != nil || strings.Contains(string(gotHS), "plain-hookseen-token") || !strings.Contains(string(gotHS), NoteLinePrefix) {
