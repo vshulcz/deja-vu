@@ -6,10 +6,24 @@
   <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
   <link rel="self" type="application/atom+xml" href="https://vshulcz.github.io/deja-vu/feed.xml"></link>
   <link rel="hub" href="https://pubsubhubbub.appspot.com/"></link>
-  <updated>2026-11-27T00:00:00Z</updated>
+  <updated>2026-11-28T00:00:00Z</updated>
   <author>
     <name>vshulcz</name>
   </author>
+  <entry>
+    <title>Claude Code, Codex, Cursor and 50 more agents — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/harnesses.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/harnesses.html"></link>
+    <updated>2026-11-28T00:00:00Z</updated>
+    <summary>The fifty-three coding agents deja indexes today, where each stores its history, and how to add a new one.</summary>
+  </entry>
+  <entry>
+    <title>deja-vu: local memory, session search &amp; handoff across 53 coding agents</title>
+    <id>https://vshulcz.github.io/deja-vu/</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
+    <updated>2026-11-27T00:00:00Z</updated>
+    <summary>Shared local memory, session history search, cross-agent handoff, and uncommitted code recovery across 53 coding agents (Claude Code, Codex, Cursor, OpenCode, Gemini CLI, OpenClaw and 47 more agents). One Go binary, zero LLM calls.</summary>
+  </entry>
   <entry>
     <title>Compare Claude Code, Codex and Cursor memory — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/compare.html</id>
@@ -23,20 +37,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/commands.html"></link>
     <updated>2026-11-26T00:00:00Z</updated>
     <summary>Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
-  </entry>
-  <entry>
-    <title>Claude Code, Codex, Cursor and 50 more agents — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/harnesses.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/harnesses.html"></link>
-    <updated>2026-11-26T00:00:00Z</updated>
-    <summary>The fifty-three coding agents deja indexes today, where each stores its history, and how to add a new one.</summary>
-  </entry>
-  <entry>
-    <title>deja-vu: local memory, session search &amp; handoff across 53 coding agents</title>
-    <id>https://vshulcz.github.io/deja-vu/</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
-    <updated>2026-11-25T00:00:00Z</updated>
-    <summary>Shared local memory, session history search, cross-agent handoff, and uncommitted code recovery across 53 coding agents (Claude Code, Codex, Cursor, OpenCode, Gemini CLI, OpenClaw and 47 more agents). One Go binary, zero LLM calls.</summary>
   </entry>
   <entry>
     <title>Persistent memory for coding agents over MCP — deja-vu</title>
