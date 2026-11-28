@@ -1613,3 +1613,96 @@ func TestPromptCacheHelpersAndPlaintextDetection(t *testing.T) {
 		t.Fatalf("hasPlaintextStore(%q) = false with DEJA_PROMPT_CACHE_FILE present, want true", absentIdx)
 	}
 }
+
+func TestLockRetryAfterInterruptedCleanupPreservesArchive(t *testing.T) {
+	indexDir, _ := withTestVaultEnv(t)
+	ClearCache()
+	t.Cleanup(ClearCache)
+
+	if mkErr := os.MkdirAll(indexDir, 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	const wantRecords = "complete-records-payload"
+	const wantManifest = `{"sentinel":"complete-index"}`
+	const wantInjections = "{\"ts\":1}\n"
+	if wErr := os.WriteFile(filepath.Join(indexDir, "records.bin"), []byte(wantRecords), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if wErr := os.WriteFile(filepath.Join(indexDir, "manifest.json"), []byte(wantManifest), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if wErr := os.WriteFile(indexDir+".injections.jsonl", []byte(wantInjections), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+
+	const pass = "interrupt-cleanup-pass"
+	if _, initErr := Init(indexDir, pass, 0); initErr != nil {
+		t.Fatalf("Init: %v", initErr)
+	}
+	dek, dekErr := CheckUnlocked(indexDir)
+	if dekErr != nil {
+		t.Fatalf("CheckUnlocked: %v", dekErr)
+	}
+	defer clear(dek)
+
+	origWipe := wipePlaintextStoreFn
+	t.Cleanup(func() { wipePlaintextStoreFn = origWipe })
+	wipePlaintextStoreFn = func(base string) {
+		// Simulate interruption mid-cleanup: the index dir is gone, sidecar remains.
+		wipeTree(base)
+	}
+	_ = SealTree(indexDir, dek)
+	wipePlaintextStoreFn = origWipe
+
+	if lockErr := Lock(indexDir, pass); lockErr != nil {
+		t.Fatalf("retry Lock: %v", lockErr)
+	}
+	if hasPlaintextStore(indexDir) {
+		t.Fatal("plaintext store still present after retry Lock")
+	}
+	if unlockErr := Unlock(indexDir, pass); unlockErr != nil {
+		t.Fatalf("Unlock after retry Lock: %v", unlockErr)
+	}
+
+	if got, readErr := os.ReadFile(filepath.Join(indexDir, "records.bin")); readErr != nil || string(got) != wantRecords {
+		t.Fatalf("records.bin = %q (%v), want %q", got, readErr, wantRecords)
+	}
+	if got, readErr := os.ReadFile(filepath.Join(indexDir, "manifest.json")); readErr != nil || string(got) != wantManifest {
+		t.Fatalf("manifest.json = %q (%v), want %q", got, readErr, wantManifest)
+	}
+	if got, readErr := os.ReadFile(indexDir + ".injections.jsonl"); readErr != nil || string(got) != wantInjections {
+		t.Fatalf("sidecar = %q (%v), want %q", got, readErr, wantInjections)
+	}
+	if _, pStatErr := os.Stat(sealPendingPath(indexDir)); !os.IsNotExist(pStatErr) {
+		t.Fatalf("pending wipe marker left behind after Unlock: %v", pStatErr)
+	}
+
+	// Corrupt archive combined with a leftover .wiping marker must fail closed
+	// rather than silently overwriting the damaged archive with partial plaintext.
+	archPath := ArchivePath(indexDir)
+	corruptData := []byte("corrupt")
+	if wErr := os.WriteFile(archPath, corruptData, 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if wErr := os.WriteFile(sealPendingPath(indexDir), []byte("1\n"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	if lockErr := Lock(indexDir, pass); lockErr == nil {
+		t.Fatal("expected error when archive is corrupt during interrupted cleanup")
+	}
+	if got, readErr := os.ReadFile(archPath); readErr != nil || !bytes.Equal(got, corruptData) {
+		t.Fatalf("archive overwritten on corrupt interrupted cleanup: %q (%v)", got, readErr)
+	}
+
+	// Without .wiping, a stale corrupt archive is replaced by Lock and unlocks intact.
+	_ = os.Remove(sealPendingPath(indexDir))
+	if lockErr := Lock(indexDir, pass); lockErr != nil {
+		t.Fatalf("Lock replacing corrupt archive without .wiping: %v", lockErr)
+	}
+	if unlockErr := Unlock(indexDir, pass); unlockErr != nil {
+		t.Fatalf("Unlock after replacing corrupt archive: %v", unlockErr)
+	}
+	if got, readErr := os.ReadFile(filepath.Join(indexDir, "records.bin")); readErr != nil || string(got) != wantRecords {
+		t.Fatalf("records.bin = %q (%v), want %q", got, readErr, wantRecords)
+	}
+}
