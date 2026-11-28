@@ -1,0 +1,7 @@
+{
+  "id": "m2",
+  "role": "assistant",
+  "message": "{\"role\":\"assistant\",\"content\":[{\"type\":\"reasoning\",\"text\":\"Check the build tags first.\"},{\"type\":\"text\",\"text\":\"The build tag is missing from main.go; checking with go build.\"},{\"type\":\"tool-call\",\"toolCallId\":\"call_read\",\"toolName\":\"read_file\",\"args\":{\"filePath\":\"/workspace/registry-demo/main.go\"}},{\"type\":\"tool-call\",\"toolCallId\":\"call_build\",\"toolName\":\"execute_command\",\"args\":{\"command\":\"go build ./...\",\"requires_approval\":false}}]}",
+  "extra": "{\"requestId\":\"r1\",\"modelId\":\"glm-5.2\",\"modelName\":\"GLM-5.2\",\"isHelperMessage\":false}",
+  "createdAt": "2026-05-01T10:00:03.000Z"
+}

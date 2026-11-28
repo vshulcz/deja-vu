@@ -643,7 +643,10 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"qwen", []string{filepath.Join(sources.QwenRoot(), "projects")}, sources.QwenSessionFiles, sources.ParseQwenFile},
 		{"gigacode", []string{filepath.Join(sources.GigaCodeRoot(), "projects")}, sources.GigaCodeSessionFiles, sources.ParseGigaCodeFile},
 		{"qoder", []string{filepath.Join(sources.QoderRoot(), "projects")}, sources.QoderSessionFiles, sources.ParseQoderFile},
-		{"codebuddy", sources.CodeBuddyRoots(), sources.CodeBuddySessionFiles, sources.ParseCodeBuddyFile},
+		// The CLI transcripts and the IDE 4.x conversation indexes are one
+		// harness with two readers. The newest of either store is probed with
+		// the parser its path belongs to, as ZCode's two stores are.
+		{"codebuddy", append(sources.CodeBuddyRoots(), sources.CodeBuddyIDE4Roots()...), sources.CodeBuddyAllFiles, doctorProbeCodeBuddy},
 		{"kimi", []string{filepath.Join(sources.KimiRoot(), "sessions")}, sources.KimiSessionFiles, sources.ParseKimiFile},
 		{"goose", sources.GooseSessionsDirs(), sources.GooseSessionFiles, parseDoctorGoose},
 		{"continue", []string{filepath.Join(sources.ContinueRoot(), "sessions")}, sources.ContinueSessionFiles, sources.ParseContinueFile},
@@ -767,6 +770,20 @@ func doctorProbeZCode(path string) ([]model.Session, error) {
 		return sources.ParseZCodeLegacyFile(path)
 	}
 	return sources.ParseZCodeFile(path)
+}
+
+// doctorProbeCodeBuddy picks the reader by path: a 4.x conversation's
+// index.json and a CodeBuddy Code transcript are different files under one
+// harness. Probing the newest 4.x index with the JSONL reader reported the
+// store as empty when it held the only history on the machine.
+func doctorProbeCodeBuddy(path string) ([]model.Session, error) {
+	if sources.IsCodeBuddyIDE4Session(path) {
+		if converted := sources.CodeBuddyIDE4ConvertedTranscript(path); converted != "" {
+			return sources.ParseCodeBuddyFile(converted)
+		}
+		return sources.ParseCodeBuddyIDE4File(path)
+	}
+	return sources.ParseCodeBuddyFile(path)
 }
 
 // doctorProbeZed reads the newest thread in the store the way the indexer does,

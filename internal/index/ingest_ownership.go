@@ -243,6 +243,7 @@ func orphanedSessions(dir, harness string, files map[string]FileState) orphanSta
 	for _, op := range detectRenamedFiles(m.Files, files) {
 		moved[op] = true
 	}
+	var cb4 *codeBuddyIDE4Listed
 	for _, p := range sortedKeys(m.Files) {
 		if p == syncImportPath {
 			continue // importedSessions carries these
@@ -268,6 +269,12 @@ func orphanedSessions(dir, harness string, files map[string]FileState) orphanSta
 			continue
 		}
 		if !deletedFromLiveStore(p) {
+			continue
+		}
+		if cb4 == nil {
+			cb4 = listedCodeBuddyIDE4(files)
+		}
+		if cb4.conversionWentAway(p) || cb4.copyListed(p) {
 			continue
 		}
 		// Moved with its directory, not deleted: the session is read from

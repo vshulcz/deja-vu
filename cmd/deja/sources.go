@@ -211,7 +211,11 @@ func printSourcesTo(w io.Writer, dir string) {
 		{"qwen", filepath.Join(sources.QwenRoot(), "projects"), []string{filepath.Join(sources.QwenRoot(), "projects")}, sources.QwenSessionFiles, sources.LoadQwen},
 		{"gigacode", filepath.Join(sources.GigaCodeRoot(), "projects"), []string{filepath.Join(sources.GigaCodeRoot(), "projects")}, sources.GigaCodeSessionFiles, sources.LoadGigaCode},
 		{"qoder", filepath.Join(sources.QoderRoot(), "projects"), []string{filepath.Join(sources.QoderRoot(), "projects")}, sources.QoderSessionFiles, sources.LoadQoder},
-		{"codebuddy", strings.Join(sources.CodeBuddyRoots(), string(os.PathListSeparator)), sources.CodeBuddyRoots(), sources.CodeBuddySessionFiles, sources.LoadCodeBuddy},
+		// The CLI store and the IDE 4.x store are read as one harness: a 4.x
+		// conversation the IDE has not converted is the only copy of that
+		// history, so the row names both roots and counts both stores.
+		{"codebuddy", strings.Join(append(sources.CodeBuddyRoots(), sources.CodeBuddyIDE4Roots()...), string(os.PathListSeparator)),
+			append(sources.CodeBuddyRoots(), sources.CodeBuddyIDE4Roots()...), sources.CodeBuddyAllFiles, sources.LoadCodeBuddyAll},
 		{"codearts", sources.CodeArtsRoot(), []string{sources.CodeArtsRoot()}, sources.CodeArtsFiles, sources.LoadCodeArts},
 		{"doubao", sources.DoubaoRoot(), []string{sources.DoubaoRoot()}, sources.DoubaoFiles, sources.LoadDoubao},
 		{"kimi", filepath.Join(sources.KimiRoot(), "sessions"), []string{filepath.Join(sources.KimiRoot(), "sessions")}, sources.KimiSessionFiles, sources.LoadKimi},

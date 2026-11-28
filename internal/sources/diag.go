@@ -135,6 +135,7 @@ func NoteUnreadable(path string) {
 
 // BeginWalk forgets what an earlier walk in this process could not read.
 func BeginWalk() {
+	walkGeneration.Add(1)
 	diagMu.Lock()
 	for p := range diagWalkFailed {
 		delete(diagFailed, p)

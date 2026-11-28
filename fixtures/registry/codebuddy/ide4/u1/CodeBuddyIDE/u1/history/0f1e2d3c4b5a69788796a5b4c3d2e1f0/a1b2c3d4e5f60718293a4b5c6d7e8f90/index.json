@@ -1,0 +1,49 @@
+{
+  "messages": [
+    {
+      "id": "m1",
+      "type": "text",
+      "role": "user",
+      "isComplete": true
+    },
+    {
+      "id": "m2",
+      "type": "text",
+      "role": "assistant",
+      "isComplete": true
+    },
+    {
+      "id": "m3",
+      "type": "text",
+      "role": "tool",
+      "isComplete": true
+    },
+    {
+      "id": "m4",
+      "type": "text",
+      "role": "assistant",
+      "isComplete": true
+    }
+  ],
+  "requests": [
+    {
+      "id": "r1",
+      "type": "craft",
+      "messages": [
+        "m1",
+        "m2",
+        "m3",
+        "m4"
+      ],
+      "state": "complete",
+      "usage": {
+        "inputTokens": 1200,
+        "outputTokens": 80,
+        "totalTokens": 1280,
+        "lastTokens": 640,
+        "cacheTokens": 400
+      },
+      "startedAt": 1777629600000
+    }
+  ]
+}

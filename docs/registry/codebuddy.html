@@ -42,8 +42,9 @@
 <li><strong>Store</strong>: <code>${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/&lt;mangled-cwd&gt;/&lt;session-id&gt;.jsonl</code> — one file per session</li>
 <li><strong>Sub-agents</strong>: <code>&lt;mangled-cwd&gt;/&lt;session-id&gt;/subagents/agent-&lt;id&gt;.jsonl</code>, read as their task, edits and last turns; <code>DEJA_INCLUDE_SUBAGENTS=1</code> takes the whole run, <code>=0</code> skips them</li>
 <li><strong>WorkBuddy</strong>: <code>~/.workbuddy/projects/...</code> (workbuddy.cn) and <code>~/.workbuddy-ai/projects/...</code> (WorkBuddy AI, workbuddy.ai), or <code>$WORKBUDDY_CONFIG_DIR/projects</code>; the same layout and records, read when they exist</li>
-<li><strong>Read overrides</strong>: <code>DEJA_CODEBUDDY_ROOTS</code>, a path list, replaces both stores</li>
-<li><strong>Format</strong>: JSONL — OpenAI Responses-style items</li>
+<li><strong>IDE 4.x</strong>: <code>CodeBuddyExtension/Data/&lt;user&gt;/CodeBuddyIDE/&lt;user&gt;/history/&lt;workspace-md5&gt;/&lt;conversation-id&gt;/index.json</code> under <code>~/Library/Application Support</code> (macOS), <code>~/AppData/Local</code> (Windows) or <code>~/.local/share</code> (Linux) — one directory per conversation, read as the same <code>codebuddy</code> harness (<a href="#codebuddy-ide-4-x">below</a>)</li>
+<li><strong>Read overrides</strong>: <code>DEJA_CODEBUDDY_ROOTS</code>, a path list, replaces both CLI stores; <code>DEJA_CODEBUDDY_LEGACY_ROOTS</code>, a path list, replaces the IDE 4.x root</li>
+<li><strong>Format</strong>: JSONL — OpenAI Responses-style items; IDE 4.x keeps one JSON file per message</li>
 <li><strong>Needs</strong>: nothing</li>
 <li><strong>Wiring</strong>: <code>deja install codebuddy</code> adds the MCP server; <code>deja install codebuddy-auto</code> adds the hooks as well. <code>workbuddy</code> and <code>workbuddy-auto</code> do the same in the WorkBuddy home</li>
 </ul>
@@ -91,7 +92,7 @@
 <p><code>.mcp.json</code> and <code>mcp.json</code>. WorkBuddy AI keeps a server from that file off</p>
 <p>until you click Trust for it in Settings &gt; MCP and restart the app; install</p>
 <p>says so, and <code>deja doctor</code> reads the row as <code>untrusted</code> until then.</p>
-<p><strong>Last verified:</strong> 2026-10-05</p>
+<p><strong>Last verified:</strong> 2026-11-25</p>
 <h2 id="status-line">Status line</h2>
 <p><code>deja install codebuddy-auto</code> sets <code>statusLine.command</code> in</p>
 <p><code>~/.codebuddy/settings.json</code>. CodeBuddy pipes Claude&#39;s payload; before the</p>
@@ -107,10 +108,10 @@
 <p>the store path and the hook payloads read out of <code>dist/codebuddy.js</code>; the</p>
 <p>fixture is synthetic.</p>
 <ul>
-<li><strong>The IDE store is separate.</strong> The IDE and the VS Code extension keep their</li>
+<li><strong>IDE 5.x writes this store.</strong> CodeBuddy IDE 5.x runs CodeBuddy Code</li>
 </ul>
-<p>history under <code>CodeBuddyExtension/Data/...</code> in the platform data directory,</p>
-<p>never in this tree. Not read yet (#4681).</p>
+<p>underneath and keeps its conversations here, so they are read as CLI</p>
+<p>sessions. IDE 4.x kept its own store, read as described below.</p>
 <ul>
 <li><strong>Exit codes from the result text.</strong> A shell result ends with</li>
 </ul>
@@ -137,6 +138,124 @@
 <p>and runs the <code>settings.json</code> hooks and the <code>mcp.json</code> server. The</p>
 <p>workbuddy.cn build names its home <code>.workbuddy</code> in the same <code>product.json</code>.</p>
 <p><code>deja resume</code> has no command for WorkBuddy yet.</p>
+<h2 id="codebuddy-ide-4-x">CodeBuddy IDE 4.x</h2>
+<p>Before 5.x, the IDE kept its chats in the extension&#39;s data directory, which</p>
+<p>the 5.x IDE still resolves the same way (<code>resolveExtensionUserDataPath</code> in its</p>
+<p>genie extension): <code>CodeBuddyExtension/Data</code> under</p>
+<p><code>~/Library/Application Support</code> on macOS, <code>~/AppData/Local</code> on Windows and</p>
+<p><code>~/.local/share</code> elsewhere. On Windows a</p>
+<p><code>~/AppData/Roaming/CodeBuddyExtension/Data</code> is read too when it is there.</p>
+<pre><code>&lt;Data&gt;/&lt;user&gt;/CodeBuddyIDE/&lt;user&gt;/history/&lt;workspace-md5&gt;/index.json
+&lt;Data&gt;/&lt;user&gt;/CodeBuddyIDE/&lt;user&gt;/history/&lt;workspace-md5&gt;/&lt;conversation-id&gt;/index.json
+&lt;Data&gt;/&lt;user&gt;/CodeBuddyIDE/&lt;user&gt;/history/&lt;workspace-md5&gt;/&lt;conversation-id&gt;/messages/&lt;message-id&gt;.json</code></pre>
+<p>A signed-out IDE files under the user <code>default</code>, and an older one put</p>
+<p><code>history/</code> one level higher, so a conversation is any <code>&lt;id&gt;/index.json</code> two</p>
+<p>levels under a directory named <code>history</code>. <code>DEJA_CODEBUDDY_LEGACY_ROOTS</code> takes</p>
+<p>a <code>Data</code> directory, one user&#39;s directory, a <code>history</code> directory, one</p>
+<p>workspace&#39;s directory, or a copy of any of them from another machine.</p>
+<p>The workspace&#39;s <code>index.json</code> lists its conversations with a title, a type and</p>
+<p>times. A conversation&#39;s <code>index.json</code> lists its messages and its requests; each</p>
+<p>request names the messages it produced, its start time and token usage. Each</p>
+<p>message file holds <code>role</code>, a <code>message</code> and an <code>extra</code> that are JSON objects</p>
+<p>written as strings, and usually <code>createdAt</code>. A conversation with no</p>
+<p><code>createdAt</code> anywhere takes each message&#39;s time from its request, and one with</p>
+<p>no time at all, in its messages, its requests or the workspace index, takes</p>
+<p>the modification time of its <code>index.json</code>.</p>
+<p>The IDE can keep one conversation in two workspace directories, file for file</p>
+<p>under the same conversation id. It is read once: from the copy whose</p>
+<p><code>index.json</code> was written last, or from the one whose path sorts first when</p>
+<p>both were written at once. If that copy is deleted, the other takes over.</p>
+<p>The reading follows the 5.x IDE&#39;s own converter (<code>convertCraftConversation</code>),</p>
+<p>so a conversation reads the same before and after the upgrade:</p>
+<ul>
+<li><strong>User turns</strong> are what the person typed: the input box&#39;s blocks when they</li>
+</ul>
+<p>hold a file mention or an image (as <code>@path</code>), else the <code>&lt;user_query&gt;</code> inside</p>
+<p>the <code>&lt;user_info&gt;</code>, <code>&lt;additional_data&gt;</code> and <code>&lt;system_reminder&gt;</code> envelope, else</p>
+<p>the recorded input phrase. The workspace folder named in <code>&lt;user_info&gt;</code> is the</p>
+<p>session&#39;s project. A turn that is only envelope — the reminder the IDE sends</p>
+<p>after a crash — is dropped.</p>
+<ul>
+<li><strong>Answers to the agent&#39;s questions</strong> (<code>ask_followup_question</code>) come back as</li>
+</ul>
+<p>XML in the prompt and as <code>extra.questionAnswer</code>; each is indexed as</p>
+<p><code>question → answer</code>.</p>
+<ul>
+<li><strong>Prompts that mention a file or an image</strong> read the way the converter writes</li>
+</ul>
+<p>them: <code>@/path/to/file</code>, <code>@image#1:name.png</code>, <code>/command</code>. A code selection</p>
+<p>attached to a prompt is context, not what was typed, and is left out.</p>
+<ul>
+<li><strong>Messages between team members</strong> (<code>&lt;teammate-message&gt;</code>) are read into the</li>
+</ul>
+<p>team member&#39;s own conversation, as <code><strong>sender</strong></code> and the message, and left out</p>
+<p>of the lead&#39;s.</p>
+<ul>
+<li><strong>Assistant text</strong> is indexed. <code>reasoning</code> is not, as for CodeBuddy Code.</li>
+</ul>
+<p>Images are not indexed.</p>
+<ul>
+<li><strong>Tool calls</strong>: <code>read_file</code>, <code>write_to_file</code>, <code>replace_in_file</code> and</li>
+</ul>
+<p><code>execute_command</code> are read under the names the converter gives them (<code>Read</code>,</p>
+<p><code>Write</code>, <code>Edit</code>, <code>Bash</code>), so they become files, wrote, edit and command</p>
+<p>records; a command carries the <code>exitCode</code> its result reported. Results are</p>
+<p>indexed as tool output: a command&#39;s stdout and stderr, a file&#39;s content, an</p>
+<p>MCP tool&#39;s text. A result with none of these is indexed as the converter</p>
+<p>writes it: a file list or a search with no match in the converter&#39;s words,</p>
+<p>anything else as the result&#39;s JSON with sorted keys, so an edit or a write</p>
+<p>leaves an output before the upgrade as after it.</p>
+<ul>
+<li><strong>Compaction</strong>: a summary the IDE wrote in place of earlier turns</li>
+</ul>
+<p>(<code>isMaxTokenLimitSummary</code>) is skipped; the turns are in the files. The IDE</p>
+<p>deletes the message files of the turns a compaction replaced and keeps</p>
+<p>their ids in <code>index.json</code>; a file missing before a compaction message</p>
+<p>(<code>isMaxTokenLimitSummary</code>, <code>isSummary</code> or <code>isCompacted</code>) is not reported</p>
+<p>as unreadable, and one missing after the last is.</p>
+<ul>
+<li><strong>Team members</strong> — conversations listed with type <code>team-member</code> — are read as</li>
+</ul>
+<p>sub-agents, under <code>DEJA_INCLUDE_SUBAGENTS</code> like every other child run.</p>
+<ul>
+<li><strong>Model and tokens</strong> come from each assistant message&#39;s <code>modelId</code> and each</li>
+</ul>
+<p>request&#39;s <code>usage</code>, with <code>cacheTokens</code> counted as cache reads.</p>
+<p><strong>Upgraded conversations are read once.</strong> When the 5.x IDE opens a 4.x</p>
+<p>conversation it writes a CodeBuddy Code transcript under the same id, with a</p>
+<p>marker beside it naming the conversation it came from</p>
+<p>(<code>&lt;id&gt;/.codebuddy-ide-4-conversion.json</code>), and leaves the old directory where</p>
+<p>it was. While that transcript is on disk and not empty, it is the conversation —</p>
+<p>it holds every turn the old one did and every turn after the upgrade — and the</p>
+<p>4.x copy is not read. Without the marker, or with an empty transcript, the 4.x</p>
+<p>copy is read again, and the index drops what it held from the transcript. The</p>
+<p>5.x catalog database is not consulted, so a machine with only 4.x installed</p>
+<p>reads its whole history. A CodeBuddy Code session that shares an id with a 4.x</p>
+<p>conversation without the marker is a different conversation, and both are kept;</p>
+<p>deleted, it is kept like any other deleted transcript, as is a transcript of</p>
+<p>another agent that shares the id. Only a deleted transcript whose marker is</p>
+<p>still there hands the conversation back to the 4.x copy.</p>
+<p>A team member of a converted conversation goes into the lead&#39;s <code>subagents/</code></p>
+<p>and is read from there. On a real store, every converted conversation reads the</p>
+<p>same user turns from the 4.x copy as from its transcript.</p>
+<p><strong>Updates.</strong> The index reads a conversation again when its <code>index.json</code>, its</p>
+<p><code>messages/</code> directory, the size or time of any of its message files, its entry</p>
+<p>in the workspace index, or the transcript that stands in for it changes. A</p>
+<p>message rewritten in place to the same size within the filesystem&#39;s clock</p>
+<p>resolution is not seen until something else changes; the IDE rewrites a</p>
+<p>message while its reply streams, which grows it.</p>
+<p><strong>Resume.</strong> <code>codebuddy -r</code> cannot open a 4.x conversation. Opening it in IDE</p>
+<p>5.x converts it, after which <code>deja resume</code> prints the command for the</p>
+<p>transcript, from the directory the transcript ran in; <code>deja show</code> has the</p>
+<p>conversation either way. <code>--write-back</code> restores a deleted CodeBuddy Code</p>
+<p>transcript and does not write a 4.x conversation.</p>
+<p><strong>Remote history.</strong> A Remote-SSH workspace keeps its 4.x history on the remote</p>
+<p>machine under <code>~/.local/share/CodeBuddyExtension/Data</code>. Index it there, and</p>
+<p>bring it over with <code>deja sync ssh</code>, or point <code>DEJA_CODEBUDDY_LEGACY_ROOTS</code> at a</p>
+<p>copy.</p>
+<p>Checked against a real 4.x store holding conversations from several workspaces,</p>
+<p>some of them already converted by 5.x, and against the converter in the 5.x</p>
+<p>IDE&#39;s genie extension. The fixture is synthetic.</p>
 
 <hr>
 <p>deja reads this format and 52 others, and turns what it finds into memory your

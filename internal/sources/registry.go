@@ -874,14 +874,24 @@ func harnessTable() []Harness { //nolint:funlen // one entry per supported harne
 		{
 			// CodeBuddy Code and WorkBuddy: Claude Code's project tree, OpenAI
 			// Responses-style items inside. Read whole: a title record can
-			// arrive after the turns it names.
-			Name: "codebuddy", Load: LoadCodeBuddy, Files: CodeBuddySessionFiles,
+			// arrive after the turns it names. The IDE before 5.x kept its
+			// own store, one directory per conversation, read as the same
+			// harness: the 5.x IDE converts those conversations into this
+			// one's transcripts under the same ids.
+			Name: "codebuddy", Load: LoadCodeBuddyAll, Files: CodeBuddyAllFiles,
 			Kinds: []FileKind{{
 				Name: "codebuddy",
 				Match: func(p string) bool {
 					return isCodeBuddySession(p) || CodeBuddySubagentFile(p)
 				},
 				Parse: fullParse(ParseCodeBuddyFile),
+			}, {
+				// A conversation's index.json, with its messages beside it in
+				// files the IDE rewrites in place, read whole.
+				Name:    "codebuddy-ide4",
+				Match:   IsCodeBuddyIDE4Session,
+				Parse:   fullParse(ParseCodeBuddyIDE4File),
+				Sidecar: codeBuddyIDE4Sidecar,
 			}},
 		},
 		{

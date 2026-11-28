@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- CodeBuddy IDE 4.x conversations are searchable. deja reads the history the IDE kept in `CodeBuddyExtension/Data` on macOS, Windows and Linux, with or without 5.x installed, under the same `codebuddy` source as CodeBuddy Code and IDE 5.x. Prompts are read without the context the IDE wrapped around them, answers to the agent's questions are kept, and file, edit, command and tool output records carry over as the 5.x converter writes them. Once IDE 5.x has converted a conversation, the converted transcript is read in its place, so an upgraded conversation is listed once with the turns added after the upgrade. A conversation the IDE kept in two workspace directories is read once, a conversation with no recorded time is dated by its files, and message files the IDE deleted when it compacted a conversation are not reported as unreadable. `DEJA_CODEBUDDY_LEGACY_ROOTS` points deja at another copy, such as one from a Remote-SSH machine.
+
 ## [0.25.1] - 2026-11-24
 
 Optional encrypted-at-rest memory (`deja init --encrypted`, `deja lock`,

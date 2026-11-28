@@ -865,14 +865,20 @@
         "${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/<mangled-cwd>/<session-id>/subagents/agent-<id>.jsonl",
         "${WORKBUDDY_CONFIG_DIR:-~/.workbuddy}/projects/<mangled-cwd>/<session-id>.jsonl",
         "~/.workbuddy-ai/projects/<mangled-cwd>/<session-id>.jsonl",
-        "${DEJA_CODEBUDDY_ROOTS}/<mangled-cwd>/<session-id>.jsonl"
+        "${DEJA_CODEBUDDY_ROOTS}/<mangled-cwd>/<session-id>.jsonl",
+        "~/Library/Application Support/CodeBuddyExtension/Data/<user>/CodeBuddyIDE/<user>/history/<workspace-md5>/<conversation-id>/index.json",
+        "~/AppData/Local/CodeBuddyExtension/Data/<user>/CodeBuddyIDE/<user>/history/<workspace-md5>/<conversation-id>/index.json",
+        "~/.local/share/CodeBuddyExtension/Data/<user>/CodeBuddyIDE/<user>/history/<workspace-md5>/<conversation-id>/index.json",
+        "~/AppData/Roaming/CodeBuddyExtension/Data/<user>/CodeBuddyIDE/<user>/history/<workspace-md5>/<conversation-id>/index.json",
+        "${DEJA_CODEBUDDY_LEGACY_ROOTS}/**/history/<workspace-md5>/<conversation-id>/index.json"
       ],
-      "format_kind": "jsonl",
+      "format_kind": "jsonl+json",
       "fixture_paths": [
-        "fixtures/registry/codebuddy/projects/workspace-registry-demo/registry-codebuddy.jsonl"
+        "fixtures/registry/codebuddy/projects/workspace-registry-demo/registry-codebuddy.jsonl",
+        "fixtures/registry/codebuddy/ide4/u1/CodeBuddyIDE/u1/history/0f1e2d3c4b5a69788796a5b4c3d2e1f0/a1b2c3d4e5f60718293a4b5c6d7e8f90/index.json"
       ],
       "parser_source": "internal/sources/codebuddy.go",
-      "last_verified": "2026-10-05",
+      "last_verified": "2026-11-25",
       "display_name": "CodeBuddy Code",
       "capabilities": {
         "mcp": true,

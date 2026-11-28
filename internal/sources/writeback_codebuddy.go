@@ -23,6 +23,12 @@ func renderCodeBuddy(s model.Session, turns []model.Message) (string, []byte, er
 	if IsWorkBuddyTranscript(s.Path) {
 		return "", nil, &WriteBackRefusal{Harness: s.Harness, Reason: "session is WorkBuddy's, and deja knows no command that reopens one"}
 	}
+	if IsCodeBuddyIDE4Session(s.Path) {
+		if CodeBuddyIDE4ConvertedTranscript(s.Path) != "" {
+			return "", nil, &WriteBackRefusal{Harness: s.Harness, Reason: "the index holds a CodeBuddy IDE 4.x conversation that already has a CodeBuddy Code transcript — write-back only restores a deleted one; `codebuddy -r` reopens the transcript"}
+		}
+		return "", nil, &WriteBackRefusal{Harness: s.Harness, Reason: "the index holds a CodeBuddy IDE 4.x conversation, which `codebuddy -r` cannot open — opening it in CodeBuddy IDE 5.x converts it to a transcript deja can write back"}
+	}
 	if s.Kind == "subagent" || !strings.HasSuffix(s.Path, ".jsonl") || strings.TrimSuffix(filepath.Base(s.Path), ".jsonl") != s.ID {
 		return "", nil, &WriteBackRefusal{Harness: s.Harness, Reason: "the index has no <id>.jsonl path for this session, which is where `codebuddy -r` looks"}
 	}

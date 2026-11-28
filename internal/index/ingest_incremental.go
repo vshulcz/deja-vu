@@ -271,11 +271,22 @@ func keepRemoved(removed map[string]bool, changed, files map[string]FileState, o
 	newlyKept := map[string]bool{}
 	var view *listedView
 	var held map[string]bool
+	var cb4 *codeBuddyIDE4Listed
+	if len(removed) > 0 {
+		cb4 = listedCodeBuddyIDE4(files)
+	}
 	// Read before the loop and set after it: what a store written before
 	// deja dated deletions lost is undated, and from here on it is dated.
 	dated := old.KeptDated
 	for p := range removed {
 		if superseded[p] {
+			continue
+		}
+		// One copy of a 4.x conversation the store holds twice: the walk
+		// lists the other, so this one is read no more, as a rebuild does
+		// not read it. Kept back as a file still on disk, the conversation
+		// was held from both and its turns written twice.
+		if cb4.copyListed(p) {
 			continue
 		}
 		// A file still on disk that the listing left out was not deleted. When
@@ -311,7 +322,7 @@ func keepRemoved(removed map[string]bool, changed, files map[string]FileState, o
 			}
 			continue
 		}
-		if !deletedFromLiveStore(p) {
+		if !deletedFromLiveStore(p) || cb4.conversionWentAway(p) {
 			continue
 		}
 		if d := goneSessionDir(p); d != "" && arrivedDirs[filepath.Base(d)] {
@@ -346,6 +357,51 @@ func keepRemoved(removed map[string]bool, changed, files map[string]FileState, o
 		}
 	}
 	return kept, unseen, newlyKept, dated
+}
+
+// codeBuddyIDE4Listed is the 4.x conversations a walk listed and reads — a
+// kept one is not read — by id, with the 4.x roots read once for the pass.
+// A removed path is asked against it, so it is built before the pass puts
+// any removed file back.
+type codeBuddyIDE4Listed struct {
+	roots []string
+	ids   map[string]bool
+}
+
+func listedCodeBuddyIDE4(files map[string]FileState) *codeBuddyIDE4Listed {
+	l := &codeBuddyIDE4Listed{roots: sources.CodeBuddyIDE4Roots(), ids: map[string]bool{}}
+	for q, f := range files {
+		if !f.Kept && sources.CodeBuddyIDE4IndexPath(q, l.roots) {
+			l.ids[filepath.Base(filepath.Dir(q))] = true
+		}
+	}
+	return l
+}
+
+// conversionWentAway reports a deleted CodeBuddy Code transcript that the
+// 5.x IDE converted from a 4.x conversation still listed under the same id.
+// The 4.x reader yields to a converted transcript while it is readable, so a
+// deleted conversion hands the conversation back to the 4.x index.json, and
+// keeping the deleted transcript's records would hold its turns twice. Only
+// a transcript the converter's marker still names is that conversion
+// (sources.CodeBuddyIDE4ConversionTranscript), as attributeSession asks: any
+// other deleted transcript that shares the id — a CLI session of its own,
+// another agent's — is kept as #2970 keeps one, and so is a conversion
+// deleted together with its marker, which is how the IDE deletes a
+// conversation.
+func (l *codeBuddyIDE4Listed) conversionWentAway(p string) bool {
+	return filepath.Ext(p) == ".jsonl" && l.ids[strings.TrimSuffix(filepath.Base(p), ".jsonl")] &&
+		sources.CodeBuddyIDE4ConversionTranscript(p)
+}
+
+// copyListed reports a 4.x conversation index no longer listed while another
+// index of the same conversation is. The IDE can hold one conversation in two
+// workspace directories, and the walk lists one copy
+// (sources.CodeBuddyIDE4SessionFilesAndCopies); which one moves when the
+// other is written or deleted. The copy that is not listed hands the
+// conversation to the one that is, whether it is still on disk or gone.
+func (l *codeBuddyIDE4Listed) copyListed(p string) bool {
+	return sources.CodeBuddyIDE4IndexPath(p, l.roots) && l.ids[filepath.Base(filepath.Dir(p))]
 }
 
 // sayKept says how many removed transcripts the index keeps.
