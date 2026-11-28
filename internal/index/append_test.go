@@ -455,6 +455,109 @@ func TestKilledAppendIsCutBackUnderTheLock(t *testing.T) {
 	}
 }
 
+// When statting or truncating records.bin fails during recovery, append.pending
+// stays on disk and appendsInPlace refuses to stage another append until a
+// subsequent lock acquisition cuts the uncommitted tail back.
+func TestUndoAppendKeepsPendingWhenTruncateFails(t *testing.T) {
+	proj, inc := replaceStore(t, 8)
+	logPath := filepath.Join(inc, "records.bin")
+	pendingPath := filepath.Join(inc, appendPendingFile)
+	was := indexFiles(t, inc)["records.bin"].Size()
+	inode := indexFiles(t, inc)["records.bin"]
+
+	origTrunc := truncateRecordsFile
+	t.Cleanup(func() {
+		truncateRecordsFile = origTrunc
+		beforeAppendSwap = nil
+	})
+
+	if wErr := os.WriteFile(pendingPath, []byte(strconv.FormatInt(was, 10)), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	f, openErr := os.OpenFile(logPath, os.O_WRONLY|os.O_APPEND, 0o600)
+	if openErr != nil {
+		t.Fatal(openErr)
+	}
+	if _, writeErr := f.Write([]byte{9, 0, 0, 0, 1, 2, 3}); writeErr != nil {
+		t.Fatal(writeErr)
+	}
+	_ = f.Close()
+
+	truncateRecordsFile = func(_ string, _ int64) error {
+		return errors.New("sharing violation")
+	}
+	unlock, lockErr := lockDir(inc)
+	if lockErr != nil {
+		t.Fatal(lockErr)
+	}
+	unlock()
+
+	if _, statErr := os.Stat(pendingPath); statErr != nil {
+		t.Fatalf("append.pending removed when truncate failed: %v", statErr)
+	}
+	probeTmp := inc + ".probe"
+	t.Cleanup(func() { _ = os.RemoveAll(probeTmp) })
+	if mkErr := os.MkdirAll(filepath.Join(probeTmp, "buckets"), 0o700); mkErr != nil {
+		t.Fatal(mkErr)
+	}
+	if appendsInPlace(inc, probeTmp, Manifest{RecordsSize: was}) {
+		t.Fatal("appendsInPlace staged append while unrecovered append.pending exists")
+	}
+
+	truncateRecordsFile = origTrunc
+	unlock2, lockErr2 := lockDir(inc)
+	if lockErr2 != nil {
+		t.Fatal(lockErr2)
+	}
+	unlock2()
+	if got := indexFiles(t, inc)["records.bin"].Size(); got != was {
+		t.Fatalf("records.bin = %d bytes after recovery, want %d", got, was)
+	}
+	if _, statErr := os.Stat(pendingPath); !os.IsNotExist(statErr) {
+		t.Fatalf("append.pending still present after successful recovery: %v", statErr)
+	}
+	if Damaged(inc) {
+		t.Fatalf("damaged after recovery: %s", DamageReason(inc))
+	}
+
+	rewriteSession(t, proj, "s003")
+	beforeAppendSwap = func() error { return errors.New("killed") }
+	truncateRecordsFile = func(_ string, _ int64) error { return errors.New("sharing violation") }
+	if ensureErr := Ensure(inc, "", false, io.Discard); ensureErr == nil {
+		t.Fatal("expected Ensure failure under beforeAppendSwap hook")
+	}
+	if _, statErr := os.Stat(pendingPath); statErr != nil {
+		t.Fatalf("append.pending removed during failed pass when truncate failed: %v", statErr)
+	}
+
+	beforeAppendSwap = nil
+	truncateRecordsFile = origTrunc
+	parityPass(t, inc, false)
+	if !os.SameFile(inode, indexFiles(t, inc)["records.bin"]) {
+		t.Error("pass after delayed recovery rebuilt records.bin instead of appending in place")
+	}
+	sameAsRebuild(t, inc)
+
+	missingDir := t.TempDir()
+	missingPending := filepath.Join(missingDir, appendPendingFile)
+	if wErr := os.WriteFile(missingPending, []byte("12"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	undoAppend(missingDir, 12)
+	if _, statErr := os.Stat(missingPending); !os.IsNotExist(statErr) {
+		t.Fatalf("append.pending still present when records.bin is absent: %v", statErr)
+	}
+
+	notADir := filepath.Join(t.TempDir(), "notadir")
+	if wErr := os.WriteFile(notADir, []byte("x"), 0o600); wErr != nil {
+		t.Fatal(wErr)
+	}
+	undoAppend(notADir, 12)
+	if appendsInPlace(notADir, probeTmp, Manifest{RecordsSize: 12}) {
+		t.Fatal("appendsInPlace succeeded on non-directory path")
+	}
+}
+
 // A staging directory a pass could not clear may still hold a hard link to
 // the live log. The next pass that writes the log anew must make its own file
 // rather than truncate that one, which is the live log under another name.
